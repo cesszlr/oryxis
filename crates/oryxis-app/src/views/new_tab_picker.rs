@@ -31,8 +31,11 @@ impl Oryxis {
     pub(crate) fn view_new_tab_picker(&self) -> Element<'_, Message> {
         // Keyboard rows are recorded by the row builders below in
         // visual order; Up/Down move a selection, Enter is owned by
-        // the search's on_submit (selection-aware, see
-        // NewTabPickerSubmit) so the two paths can't double-fire.
+        // the modal key router (`handle_modal_nav_key`, selection-aware
+        // through `NewTabPickerSubmit`). The search input deliberately
+        // has NO on_submit: the fork's fires on any Enter, modifiers
+        // included, which would connect the row in a tab on the same
+        // Ctrl+Enter the binding table answers with a new window.
         self.modal_nav_reset();
         // Shortcut hint, resolved from the live binding table (never
         // hard-coded, the tab-jump default changed once already, issue
@@ -45,7 +48,6 @@ impl Oryxis {
         let search = text_input(t("search_hosts_or_tabs"), &self.new_tab_picker_search)
             .id(iced::widget::Id::new(crate::state::NEW_TAB_PICKER_SEARCH_ID))
             .on_input(|v| Message::Tabs(TabsMessage::NewTabPickerSearchChanged(v)))
-            .on_submit(Message::Tabs(TabsMessage::NewTabPickerSubmit))
             .padding(Padding {
                 top: 14.0,
                 right: if hotkey_hint.is_some() { 64.0 } else { 14.0 },

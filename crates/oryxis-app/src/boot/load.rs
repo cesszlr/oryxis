@@ -1081,10 +1081,19 @@ impl Oryxis {
             // for the clipboard pair, whose alternates (Ctrl+Insert /
             // Shift+Insert) are exactly the chords an early adopter is
             // most likely to have already bound by hand.
-            let mut user_chords: Vec<crate::hotkeys::HotkeyBinding> = user_bound
+            //
+            // Each user chord carries the action holding it: a factory
+            // action whose scope never meets that action's keeps the
+            // chord (`scopes_overlap`), the way the Shortcuts capture
+            // leaves such a pair alone. A snippet chord carries no
+            // action and collides with everything.
+            let mut user_chords: Vec<(
+                crate::hotkeys::HotkeyBinding,
+                Option<crate::hotkeys::HotkeyAction>,
+            )> = user_bound
                 .iter()
-                .filter_map(|a| self.hotkey_bindings.get(a))
-                .flat_map(|binds| binds.iter().copied())
+                .filter_map(|a| self.hotkey_bindings.get(a).map(|b| (*a, b)))
+                .flat_map(|(a, binds)| binds.iter().map(move |b| (*b, Some(a))))
                 .collect();
             // Per-snippet custom hotkeys are user choices too, recorded
             // against a table that did not yet contain the new factory
@@ -1100,7 +1109,8 @@ impl Oryxis {
                 self.snippets
                     .iter()
                     .filter_map(|sn| sn.hotkey.as_deref())
-                    .filter_map(crate::hotkeys::HotkeyBinding::parse),
+                    .filter_map(crate::hotkeys::HotkeyBinding::parse)
+                    .map(|b| (b, None)),
             );
             let mut emptied: Vec<crate::hotkeys::HotkeyAction> = Vec::new();
             for action in crate::hotkeys::HotkeyAction::all() {
@@ -1110,8 +1120,10 @@ impl Oryxis {
                 let Some(binds) = self.hotkey_bindings.get_mut(action) else {
                     continue;
                 };
-                for chord in &user_chords {
-                    binds.remove(chord);
+                for (chord, holder) in &user_chords {
+                    if holder.is_none_or(|h| crate::hotkeys::HotkeyAction::scopes_overlap(h, *action)) {
+                        binds.remove(chord);
+                    }
                 }
                 if binds.is_empty() {
                     emptied.push(*action);

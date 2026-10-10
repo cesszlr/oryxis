@@ -556,6 +556,11 @@ pub fn default_bindings() -> HotkeyMap {
     // precedent), rebindable like everything else.
     put(&mut m, VaultSectionPrev, true, false, false, false, Named(keyboard::key::Named::PageUp));
     put(&mut m, VaultSectionNext, true, false, false, false, Named(keyboard::key::Named::PageDown));
+    // Ctrl+Enter (Cmd+Enter on macOS): Enter on the ringed host card
+    // connects, Ctrl+Enter connects in a new window, the browser's
+    // modified-activate shape. Free everywhere else in the app, and
+    // `vault_only` keeps it with the program inside a terminal.
+    put(&mut m, ConnectInNewWindow, primary_ctrl, false, false, primary_logo, Named(keyboard::key::Named::Enter));
     // Not every action is in this table on purpose: the ones
     // `HotkeyAction::ships_unbound` names (the tab menu's window verbs,
     // rename / pin / copy address, close others / all, the pane's copy

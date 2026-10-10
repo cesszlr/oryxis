@@ -24,7 +24,7 @@
 use iced::keyboard;
 use iced::Task;
 
-use crate::app::{Message, Oryxis};
+use crate::app::{Message, Oryxis, TabsMessage};
 use crate::keynav::movement::index_move;
 use crate::keynav::{ModalSurface, RowAction};
 use crate::state::Modal;
@@ -287,13 +287,16 @@ impl Oryxis {
         match named {
             Named::Escape => None,
             Named::Enter => {
-                // The new-tab picker's search input carries an
-                // on_submit that fires on the same press through the
-                // widget tree; that handler is selection-aware, so
-                // this router must decline Enter there or the action
-                // would dispatch twice.
+                // The new-tab picker's Enter is OWNED here, not by its
+                // search input: the fork's `on_submit` fires on any
+                // Enter, modifiers included, and would connect the row
+                // in a tab on the very Ctrl+Enter the binding table
+                // answers with a new window. This router already
+                // declines a modified Enter above, so the plain one
+                // submits (selection-aware, see `NewTabPickerSubmit`)
+                // and a chord on Enter falls through to the table.
                 if surface == ModalSurface::Modal(Modal::NewTabPicker) {
-                    return None;
+                    return Some(Task::done(Message::Tabs(TabsMessage::NewTabPickerSubmit)));
                 }
                 self.modal_nav_activate(surface)
             }

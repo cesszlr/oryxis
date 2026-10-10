@@ -50,10 +50,13 @@ impl Oryxis {
                 self.new_tab_picker_search = v;
             }
             TabsMessage::NewTabPickerSubmit => {
-                // Enter in the picker. Owned by the search input's
-                // on_submit (the modal key router declines Enter here
-                // so the two paths can never double-fire). Priority:
-                // the explicit keyboard selection, then the ad-hoc
+                // Plain Enter in the picker. Owned by the modal key
+                // router (`handle_modal_nav_key`), which declines a
+                // MODIFIED Enter so a chord on it (Ctrl+Enter,
+                // `ConnectInNewWindow`) reaches the binding table; the
+                // search input has no on_submit, because the fork's
+                // fires on any Enter, modifiers included. Priority: the
+                // explicit keyboard selection, then the ad-hoc
                 // quick-connect target, then the top row of the
                 // filtered list.
                 if let Some((surface, _)) = self.modal_nav_surface()

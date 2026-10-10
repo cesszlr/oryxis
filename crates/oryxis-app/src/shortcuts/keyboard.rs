@@ -17,7 +17,7 @@ use crate::state::View;
 /// its storage vec. What the unbound tab verbs (`RenameTab`,
 /// `ToggleTabPin`, `CloseOtherTabs`, `MoveTabToNewWindow`) act on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FocusedTab {
+pub(crate) enum FocusedTab {
     Terminal(usize),
     Sftp(usize),
 }
@@ -28,7 +28,7 @@ impl Oryxis {
     /// `Some` means it is what the window shows); an SFTP tab counts
     /// only while the SFTP view shows it, the same shape as
     /// `sftp_surface_visible`. A panel tab or a vault screen is `None`.
-    fn focused_strip_tab(&self) -> Option<FocusedTab> {
+    pub(crate) fn focused_strip_tab(&self) -> Option<FocusedTab> {
         if let Some(idx) = self.cur_active_tab() {
             return Some(FocusedTab::Terminal(idx));
         }
@@ -44,6 +44,25 @@ impl Oryxis {
         match self.focused_strip_tab()? {
             FocusedTab::Terminal(idx) => self.tabs.get(idx).map(|t| t._id),
             FocusedTab::Sftp(idx) => self.sftp_tabs.get(idx).map(|t| t.id),
+        }
+    }
+
+    /// The saved host the new-tab picker would connect on Enter: its
+    /// keyboard selection, else its top row, the priority
+    /// `NewTabPickerSubmit` applies (minus the ad-hoc quick-connect
+    /// target, which is not a saved host and opens in a tab). `None`
+    /// when that row is not a host (Local Shell, SFTP, a folder).
+    pub(crate) fn new_tab_picker_highlighted_host(&self) -> Option<uuid::Uuid> {
+        let idx = self
+            .modal_nav_surface()
+            .and_then(|(surface, _)| self.modal_nav_effective(surface))
+            .unwrap_or(0);
+        let items = self.keynav.modal.items.borrow();
+        match items.get(idx).and_then(|a| a.activate.as_ref()) {
+            Some(Message::Ssh(crate::app::SshMessage::ConnectSsh(ci))) => {
+                self.connections.get(*ci).map(|c| c.id)
+            }
+            _ => None,
         }
     }
 
@@ -186,10 +205,17 @@ impl Oryxis {
         // open. Scoped to exactly what the picker offers: it hides the
         // SFTP row while a split pane is pending (SFTP is a tab, never a
         // pane), so the chord stays blocked there too.
+        //
+        // `ConnectInNewWindow` is exempt too: Enter on a picker row
+        // connects that host here, so Ctrl+Enter connecting it in a new
+        // window is the same pair the hosts screen offers, and the
+        // picker is where a keyboard user picks a host from inside a
+        // terminal (the reporter's own case). The arm reads the
+        // picker's highlighted row while it is open.
         let picker_exempt = |a: HotkeyAction| {
             self.panels.new_tab_picker
                 && match a {
-                    HotkeyAction::OpenLocalShell => true,
+                    HotkeyAction::OpenLocalShell | HotkeyAction::ConnectInNewWindow => true,
                     HotkeyAction::OpenSftp => self.pending_pane_split.is_none(),
                     _ => false,
                 }
@@ -216,7 +242,16 @@ impl Oryxis {
             // Vault section cycling only applies in the vault area.
             // Skipping (not consuming) leaves Ctrl+PageUp/Down to the
             // PTY inside a terminal tab, where TUIs use it.
-            if action.vault_only() && !self.in_vault_area() {
+            // A picker exemption lifts the vault gate too: the picker
+            // opens over a terminal tab as readily as over the hosts
+            // screen, and its rows are the same hosts.
+            if action.vault_only() && !self.in_vault_area() && !picker_exempt(action) {
+                continue;
+            }
+            // The tab verbs an SFTP tab shares only apply with a tab in
+            // front. Skipping, again: a vault screen leaves the key to
+            // a `vault_only` action that may share the chord.
+            if action.tab_only() && self.focused_strip_tab().is_none() {
                 continue;
             }
             let Some(binds) = self.hotkey_bindings.get(&action) else {
@@ -802,6 +837,34 @@ impl Oryxis {
             // declines a vault with no master password, like the burger
             // menu's row.
             LockVault => Task::done(Message::Vault(VaultMessage::LockVaultConfirm)),
+            // The card the ring has focused wins, the way its Enter
+            // connects exactly that card; with no ringed card, the
+            // dashboard selection in view order, the selection menu's
+            // own list. The handler queues the dials like the menu rows.
+            ConnectInNewWindow if self.panels.new_tab_picker => {
+                match self.new_tab_picker_highlighted_host() {
+                    Some(id) => {
+                        self.panels.new_tab_picker = false;
+                        Task::done(Message::Tabs(TabsMessage::ConnectHostsInNewWindow(vec![id])))
+                    }
+                    None => Task::none(),
+                }
+            }
+            ConnectInNewWindow => {
+                let ringed = match self.keynav.focus {
+                    Some((
+                        crate::keynav::FocusZone::Content,
+                        crate::keynav::NavItem::Dash(crate::keynav::DashNavItem::Host(i)),
+                    )) => self.connections.get(i).map(|c| vec![c.id]),
+                    _ => None,
+                };
+                let ids = ringed.unwrap_or_else(|| self.selected_hosts_in_view_order());
+                if ids.is_empty() {
+                    Task::none()
+                } else {
+                    Task::done(Message::Tabs(TabsMessage::ConnectHostsInNewWindow(ids)))
+                }
+            }
             // Vault section cycling: neighbor of the active view in the
             // sub-nav pill order, wrapping. The loop only reaches these
             // in the vault area (vault_only gate above).

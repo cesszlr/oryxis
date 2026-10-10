@@ -363,10 +363,19 @@ impl Oryxis {
         // factory default when that default happened to be free; with a
         // list there is nothing to paper over, and an action that still
         // has chords is simply still bound.
+        //
+        // Only an action that can see the same keypress is a conflict:
+        // a vault-only action and a tab-only one never do
+        // (`scopes_overlap`), so the chord stays on both and the screen
+        // decides which fires.
         let conflict: Option<HotkeyAction> = self
             .hotkey_bindings
             .iter()
-            .find(|(a, b)| **a != action && b.contains(&new_binding))
+            .find(|(a, b)| {
+                **a != action
+                    && b.contains(&new_binding)
+                    && HotkeyAction::scopes_overlap(**a, action)
+            })
             .map(|(a, _)| *a);
         let conflict_toast: Option<Task<Message>> = conflict.map(|other| {
             let mut left = self

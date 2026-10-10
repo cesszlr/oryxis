@@ -926,6 +926,7 @@ the app's own actions sit on `Ctrl+Shift`.
 | `Ctrl+Shift+P` | Command palette |
 | `Ctrl+Shift+L` | Open local terminal |
 | `Ctrl+N` | New host |
+| `Ctrl+Enter` | Connect the focused host card (or the selection) in a new window |
 | `Ctrl+F` | Search the current view / terminal scrollback |
 | `Ctrl+,` | Settings |
 | `Ctrl+= / Ctrl+- / Ctrl+0` | Zoom the terminal font for the session (also `Ctrl+Wheel` and the touchpad pinch, one chord of its own with a switch beside the font size) |

@@ -189,6 +189,14 @@ pub enum HotkeyAction {
     /// palette used to carry this as a hand-written extra; it is an
     /// ordinary action now so a chord can reach it.
     LockVault,
+    /// Connect the host the keyboard ring has focused (else every host
+    /// of the dashboard selection) in a NEW window: the card menu's
+    /// "Connect in New Window" on a chord. The one factory chord among
+    /// these verbs, Ctrl+Enter, because it derives from one that exists
+    /// (Enter on the ringed card connects here) rather than invented.
+    /// `vault_only`: a card is only ever ringed there, and inside a
+    /// terminal Ctrl+Enter belongs to the program running in it.
+    ConnectInNewWindow,
 }
 
 impl HotkeyAction {
@@ -204,6 +212,7 @@ impl HotkeyAction {
             NewWindow,
             NewHost,
             ShowQuickConnect,
+            ConnectInNewWindow,
             NewKey,
             NewIdentity,
             ReconnectTab,
@@ -322,6 +331,7 @@ impl HotkeyAction {
             TerminalCopyScreen => "terminal_copy_screen",
             TerminalClearScrollback => "terminal_clear_scrollback",
             LockVault => "lock_vault",
+            ConnectInNewWindow => "connect_in_new_window",
         }
     }
 
@@ -404,6 +414,8 @@ impl HotkeyAction {
             TerminalCopyScreen => "terminal_copy_screen",
             TerminalClearScrollback => "terminal_clear_scrollback",
             LockVault => "lock_vault",
+            // The card menu's own row label.
+            ConnectInNewWindow => "connect_new_window",
         }
     }
 
@@ -485,6 +497,35 @@ impl HotkeyAction {
         )
     }
 
+    /// Whether the action only applies with a TAB in front (a terminal
+    /// tab, or an SFTP tab under the SFTP view): the tab menu's verbs
+    /// that an SFTP tab shares, so `terminal_only` is too narrow for
+    /// them. The dispatch loop skips these on a vault screen or a panel
+    /// tab rather than consuming the key, which is what lets their
+    /// chords coexist with a `vault_only` action's (`scopes_overlap`).
+    pub fn tab_only(self) -> bool {
+        use HotkeyAction::*;
+        matches!(
+            self,
+            MoveTabToNewWindow | RenameTab | ToggleTabPin | CloseOtherTabs | CloseAllTabs
+        )
+    }
+
+    /// Whether two actions can ever both apply to one keypress. A
+    /// `vault_only` action and a `terminal_only` / `tab_only` one never
+    /// can: a vault screen has no tab in front and a tab is not a vault
+    /// screen, so the same chord on both fires exactly one of them,
+    /// decided by where the user is. Conflict resolution (the Shortcuts
+    /// capture, the boot pass over user overrides) leaves such a pair
+    /// alone instead of taking the chord away from one side: Ctrl+Enter
+    /// connects a ringed card in a new window AND, bound by the user,
+    /// moves the tab in front to one. Everything else overlaps: a
+    /// global action applies everywhere.
+    pub fn scopes_overlap(a: HotkeyAction, b: HotkeyAction) -> bool {
+        let tab_side = |x: HotkeyAction| x.terminal_only() || x.tab_only();
+        !((a.vault_only() && tab_side(b)) || (b.vault_only() && tab_side(a)))
+    }
+
     /// Whether the action only applies in the vault area (Home and
     /// its sub-sections). The dispatch loop skips these elsewhere,
     /// leaving the key free: Ctrl+PageUp/Down inside a terminal tab
@@ -492,7 +533,9 @@ impl HotkeyAction {
     pub fn vault_only(self) -> bool {
         matches!(
             self,
-            HotkeyAction::VaultSectionPrev | HotkeyAction::VaultSectionNext
+            HotkeyAction::VaultSectionPrev
+                | HotkeyAction::VaultSectionNext
+                | HotkeyAction::ConnectInNewWindow
         )
     }
 
@@ -620,6 +663,29 @@ mod tests {
         // SSH session), so it stays clickable in the palette. Guards the
         // pair against being lumped together by a later edit.
         assert!(!HotkeyAction::TerminalPaste.widget_dispatched());
+    }
+
+    /// The scope split that lets one chord serve two actions: a vault
+    /// action and a tab action never see the same keypress, anything
+    /// global overlaps with everything.
+    #[test]
+    fn disjoint_scopes_do_not_overlap() {
+        use HotkeyAction::*;
+        assert!(!HotkeyAction::scopes_overlap(ConnectInNewWindow, MoveTabToNewWindow));
+        assert!(!HotkeyAction::scopes_overlap(MoveTabToNewWindow, ConnectInNewWindow));
+        assert!(!HotkeyAction::scopes_overlap(VaultSectionNext, SplitPaneVertical));
+        // Global vs anything: overlap.
+        assert!(HotkeyAction::scopes_overlap(NewWindow, ConnectInNewWindow));
+        assert!(HotkeyAction::scopes_overlap(NewWindow, MoveTabToNewWindow));
+        // Tab vs terminal: a terminal tab is a tab.
+        assert!(HotkeyAction::scopes_overlap(MoveTabToNewWindow, DuplicateInNewWindow));
+        // No action sits on both sides of the split.
+        for &a in HotkeyAction::all() {
+            assert!(
+                !(a.vault_only() && (a.terminal_only() || a.tab_only())),
+                "{a:?} is both vault-only and tab-side"
+            );
+        }
     }
 
     /// Exactly one layer claims each (action, button) pair. Both the

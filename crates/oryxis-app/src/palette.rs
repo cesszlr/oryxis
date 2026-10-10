@@ -93,7 +93,9 @@ fn hotkey_category(action: HotkeyAction) -> PaletteCategory {
         | DuplicateInNewWindow | MoveTabToNewWindow | RenameTab | ToggleTabPin
         | CopyTabAddress | CloseOtherTabs | CloseAllTabs => PaletteCategory::Tabs,
         OpenPortForwards | FocusViewSearch | NewHost | ShowQuickConnect | NewKey | NewIdentity
-        | VaultSectionPrev | VaultSectionNext | VaultSectionSlot => PaletteCategory::Vault,
+        | VaultSectionPrev | VaultSectionNext | VaultSectionSlot | ConnectInNewWindow => {
+            PaletteCategory::Vault
+        }
         FontZoomIn | FontZoomOut | FontZoomReset | SplitPaneVertical | SplitPaneHorizontal
         | FocusPaneLeft | FocusPaneRight | FocusPaneUp | FocusPaneDown | ToggleMaximizePane
         | MovePaneToNewTab
@@ -248,6 +250,7 @@ impl Oryxis {
             // applies: nothing to lock without a master password.
             let enabled = (!action.terminal_only() || in_terminal)
                 && (!action.vault_only() || self.in_vault_area())
+                && (!action.tab_only() || self.focused_strip_tab().is_some())
                 && (action != HotkeyAction::LockVault || self.vault_ui.has_user_password);
             candidates.push(Candidate {
                 label: t(action.label_key()).to_string(),
