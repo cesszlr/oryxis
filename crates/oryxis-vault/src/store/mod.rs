@@ -66,6 +66,23 @@ pub enum VaultError {
     /// match path in the UI.
     #[error("Unsupported key kind: {0}")]
     UnsupportedKeyKind(String),
+
+    /// `VaultStore::open` did not finish: `step` names the phase that
+    /// failed (the SQLite open, the pragmas, the schema and its
+    /// migrations) and `source` is what it met there. Open runs before
+    /// any UI and, on a cold boot, before the log sink, so the error
+    /// text is the whole diagnostic a report comes with: it has to say
+    /// WHERE on its own (issue #250 arrived as "Failed to open vault
+    /// database", nothing else).
+    #[error("Could not open the vault at step \"{step}\": {source}")]
+    Open { step: &'static str, source: Box<VaultError> },
+}
+
+impl VaultError {
+    /// Tag an error with the `open` step it came from.
+    fn at_open_step(step: &'static str) -> impl FnOnce(VaultError) -> VaultError {
+        move |source| VaultError::Open { step, source: Box::new(source) }
+    }
 }
 
 impl From<rusqlite::Error> for VaultError {
@@ -481,7 +498,9 @@ impl VaultStore {
     /// Open or create the vault database at a specific path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, VaultError> {
         let path = path.as_ref().to_path_buf();
-        let db = SqliteConn::open(&path)?;
+        let db = SqliteConn::open(&path)
+            .map_err(VaultError::from)
+            .map_err(VaultError::at_open_step("open"))?;
         // WAL lets readers and a writer coexist; `busy_timeout` covers
         // the rare two-writer overlap (e.g. the sync engine opens its
         // own handle on the same file, see `oryxis-app::sync_runtime`)
@@ -494,9 +513,15 @@ impl VaultStore {
         // hammer the disk. The durability trade-off is bounded: a power
         // loss can drop the last committed transaction, never corrupt the
         // file. Acceptable here, the vault is re-derivable user state.
+        //
+        // The first statement is the first read of the file: a file that
+        // is not a database, or a schema the engine cannot parse, fails
+        // here, so the step is named.
         db.execute_batch(
             "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;",
-        )?;
+        )
+        .map_err(VaultError::from)
+        .map_err(VaultError::at_open_step("pragmas"))?;
 
         // Tighten file permissions to 0600 on Unix, the vault holds
         // encrypted credentials but if another local user can read the
@@ -512,7 +537,7 @@ impl VaultStore {
             command_history_migrated: std::sync::atomic::AtomicBool::new(false),
             db_path: path,
         };
-        store.create_tables()?;
+        store.create_tables().map_err(VaultError::at_open_step("schema"))?;
         Ok(store)
     }
 

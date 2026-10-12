@@ -302,7 +302,8 @@ impl VaultStore {
             CREATE INDEX IF NOT EXISTS idx_chat_messages_conv
                 ON chat_messages(conversation_id);
             ",
-        )?;
+        )
+        .map_err(|e| VaultError::Database(format!("base tables: {e}")))?;
 
         // Migrations: add columns to existing tables (ignore errors if already present)
         let _ = self.db.execute_batch("ALTER TABLE connections ADD COLUMN identity_id TEXT;");
@@ -559,19 +560,38 @@ impl VaultStore {
     /// a crash before COMMIT leaves no column behind to skip the backfill
     /// on the next open. Counts chunks only; a legacy inline
     /// `session_logs.data` is sized from its own row by the readers.
-    fn ensure_session_log_bytes(&self) -> Result<(), VaultError> {
-        self.db.execute_batch("BEGIN IMMEDIATE")?;
+    ///
+    /// Every error names its phase: this is the one migration that
+    /// takes the WRITE lock on every open (the `BEGIN IMMEDIATE`), so a
+    /// second writer that holds it past `busy_timeout` fails the open
+    /// here, and the text must tell that apart from a schema the engine
+    /// refused (issue #250).
+    pub(super) fn ensure_session_log_bytes(&self) -> Result<(), VaultError> {
+        let phase = |what: &'static str| {
+            move |e: rusqlite::Error| VaultError::Database(format!("session log sizes, {what}: {e}"))
+        };
+        if !self.db.is_autocommit() {
+            // `BEGIN IMMEDIATE` inside a caller's transaction would fail
+            // with SQLite's "cannot start a transaction within a
+            // transaction"; say what this migration needs instead.
+            return Err(VaultError::Database(
+                "session log sizes: the migration needs its own transaction, one is already open".into(),
+            ));
+        }
+        self.db.execute_batch("BEGIN IMMEDIATE").map_err(phase("begin"))?;
         let result = (|| -> Result<(), VaultError> {
             let added = self
                 .db
                 .execute_batch("ALTER TABLE session_logs ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0;")
                 .is_ok();
             if added {
-                self.db.execute_batch(
-                    "UPDATE session_logs SET bytes = COALESCE(
-                        (SELECT SUM(LENGTH(c.data)) FROM session_log_chunks c
-                         WHERE c.log_id = session_logs.id), 0);",
-                )?;
+                self.db
+                    .execute_batch(
+                        "UPDATE session_logs SET bytes = COALESCE(
+                            (SELECT SUM(LENGTH(c.data)) FROM session_log_chunks c
+                             WHERE c.log_id = session_logs.id), 0);",
+                    )
+                    .map_err(phase("backfill"))?;
             }
             self.db.execute_batch(
                 "CREATE TRIGGER IF NOT EXISTS session_log_bytes_insert
@@ -594,12 +614,13 @@ impl VaultStore {
                      UPDATE session_logs SET bytes = bytes + LENGTH(NEW.data)
                      WHERE id = NEW.log_id;
                  END;",
-            )?;
+            )
+            .map_err(phase("triggers"))?;
             Ok(())
         })();
         match result {
             Ok(()) => {
-                self.db.execute_batch("COMMIT")?;
+                self.db.execute_batch("COMMIT").map_err(phase("commit"))?;
                 Ok(())
             }
             Err(e) => {

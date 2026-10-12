@@ -26,6 +26,7 @@ fn unlocked_vault() -> VaultStore {
 }
 
 mod chat;
+mod open;
 mod cloud;
 mod command_history;
 mod connections;

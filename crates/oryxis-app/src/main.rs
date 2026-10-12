@@ -266,7 +266,26 @@ fn main() -> iced::Result {
     // below: the debug sink has to be armed before the vault read, so
     // the whole boot is captured.
     let force_debug_log = std::env::args().skip(1).any(|a| a == "--debug-log");
-    if let Ok(vault) = oryxis_vault::VaultStore::open_default() {
+    // `--debug-log` is armed BEFORE the vault is touched: a vault that
+    // cannot be opened is the boot that needs the log most, and the flag
+    // used to be read inside the open's success branch, so that boot
+    // wrote no log at all (issue #250). The flag wins over the stored
+    // setting and pins the sink on for the whole process (see
+    // `logging::force_enable`), which is what makes a diagnostic session
+    // survive the user toggling Settings mid-run.
+    if force_debug_log && let Err(e) = logging::force_enable() {
+        eprintln!("oryxis: failed to enable debug logging: {e}");
+    }
+    // The open's failure, kept for the subscriber below (it does not
+    // exist yet); stderr gets it now for a terminal launch. `boot`
+    // opens again and shows its own result on the error screen.
+    let mut early_vault_error: Option<String> = None;
+    match oryxis_vault::VaultStore::open_default() {
+        Err(e) => {
+            eprintln!("oryxis: vault open failed: {e}");
+            early_vault_error = Some(e.to_string());
+        }
+        Ok(vault) => {
         renderer_mode = vault.get_setting("renderer_backend").ok().flatten();
         if let (Some(w), Some(h)) = (
             vault.get_setting("window_width").ok().flatten(),
@@ -325,22 +344,16 @@ fn main() -> iced::Result {
         {
             theme::set_terminal_opacity(percent);
         }
-        // Debug logging (Settings > Advanced, or `--debug-log`). Armed
-        // before the tracing subscriber below is built so the earliest
-        // boot lines land in the file too; same unlocked settings read
-        // as the renderer knob. The flag wins over the stored setting
-        // and pins the sink on for the whole process (see
-        // `logging::force_enable`), which is what makes a diagnostic
-        // session survive the user toggling Settings mid-run.
-        let armed = if force_debug_log {
-            logging::force_enable().map(|_| ())
-        } else if vault.get_setting("debug_logging").ok().flatten().as_deref() == Some("true") {
-            logging::enable().map(|_| ())
-        } else {
-            Ok(())
-        };
-        if let Err(e) = armed {
+        // Debug logging (Settings > Advanced). Armed before the tracing
+        // subscriber below is built so the earliest boot lines land in
+        // the file too; same unlocked settings read as the renderer
+        // knob. `--debug-log` was armed above, before the open.
+        if !force_debug_log
+            && vault.get_setting("debug_logging").ok().flatten().as_deref() == Some("true")
+            && let Err(e) = logging::enable()
+        {
             eprintln!("oryxis: failed to enable debug logging: {e}");
+        }
         }
     }
     // SAFETY (both set_var sites): still single-threaded here (tracing
@@ -619,6 +632,11 @@ fn main() -> iced::Result {
         .init();
 
     tracing::info!("Starting Oryxis");
+    if let Some(e) = &early_vault_error {
+        // Deferred from the pre-boot open above, which runs before the
+        // subscriber exists; the debug log is what a report comes with.
+        tracing::error!("vault open failed before boot: {e}");
+    }
     if let Some(note) = renderer_probe_note {
         // Deferred from the probe above, which runs before the
         // subscriber exists.

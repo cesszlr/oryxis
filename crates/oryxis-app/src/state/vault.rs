@@ -29,6 +29,12 @@ pub(crate) enum VaultPwOp {
 pub(crate) struct VaultUi {
     /// Loading / NeedSetup / Locked / Unlocked.
     pub(crate) state: VaultState,
+    /// Why the boot left `state` at `Loading`: the text of the error
+    /// `VaultStore::open_default` returned, shown on the error screen
+    /// beside the vault path and the debug-log path. `None` once the
+    /// vault opened (the state moved on) and on a boot that never
+    /// tried.
+    pub(crate) open_error: Option<String>,
     /// Password typed on the lock / setup screen.
     pub(crate) password_input: String,
     /// Whether the lock-screen password is shown as plain text.

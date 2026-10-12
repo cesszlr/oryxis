@@ -6,6 +6,7 @@ use iced::widget::{button, column, container, svg, text, Space};
 use iced::{Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{VaultMessage, Message, Oryxis};
+use crate::i18n::t;
 use crate::theme::{mix, OryxisColors};
 use crate::views::chrome::window_chrome_bar;
 use crate::widgets::{accent_gradient, styled_button, styled_icon_button};
@@ -223,19 +224,53 @@ impl Oryxis {
         with_chrome(body, self.cur_maximized())
     }
 
-    pub(crate) fn view_vault_error(&self, msg: &str) -> Element<'_, Message> {
-        let msg = msg.to_string();
-        let body: Element<'_, Message> = container(
-            text(msg).size(16).color(OryxisColors::t().error),
-        )
-        .center(Length::Fill)
-        .style(|_| container::Style {
-            background: Some(Background::Color(OryxisColors::t().bg_primary)),
-            ..Default::default()
-        })
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .boxed();
+    /// The screen a boot lands on when `VaultStore::open_default` failed
+    /// (`VaultState::Loading` after boot): the reason the engine gave,
+    /// the file it was opening and where the debug log goes, every line
+    /// selectable so a report can carry them verbatim. No control on
+    /// it: the chrome bar above is the way out.
+    pub(crate) fn view_vault_open_failed(&self) -> Element<'_, Message> {
+        let c = OryxisColors::t();
+        let vault_path = oryxis_core::paths::oryxis_dir()
+            .map(|d| d.join("vault.db").display().to_string())
+            .unwrap_or_else(|| "~/.oryxis/vault.db".to_string());
+        let log_path = crate::logging::log_path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "~/.oryxis/oryxis-debug.log".to_string());
+        let mut col = column![
+            text(t("vault_open_failed")).size(18).color(c.error),
+        ]
+        .spacing(10);
+        if let Some(reason) = &self.vault_ui.open_error {
+            col = col.push(
+                text(reason.clone()).size(13).selectable(true).color(c.text_primary).boxed(),
+            );
+        }
+        col = col
+            .push(
+                text(t("vault_open_failed_file").replace("{path}", &vault_path))
+                    .size(13)
+                    .selectable(true)
+                    .color(c.text_secondary)
+                    .boxed(),
+            )
+            .push(text(t("vault_open_failed_hint")).size(13).color(c.text_secondary).boxed())
+            .push(
+                text(t("vault_open_failed_log").replace("{path}", &log_path))
+                    .size(13)
+                    .selectable(true)
+                    .color(c.text_secondary)
+                    .boxed(),
+            );
+        let body: Element<'_, Message> = container(container(col).width(Length::Fixed(640.0)).padding(24))
+            .center(Length::Fill)
+            .style(|_| container::Style {
+                background: Some(Background::Color(OryxisColors::t().bg_primary)),
+                ..Default::default()
+            })
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .boxed();
         with_chrome(body, self.cur_maximized())
     }
 

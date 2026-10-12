@@ -16,7 +16,7 @@ impl Oryxis {
         // presentation, not in our handlers.
         crate::stall_watchdog::beat_view();
         let base = match self.vault_ui.state {
-            VaultState::Loading => self.view_vault_error("Failed to open vault database"),
+            VaultState::Loading => self.view_vault_open_failed(),
             // First-run welcome / onboarding carousel, full page.
             VaultState::NeedSetup => crate::views::vault::with_chrome(
                 self.view_onboarding_page(),
