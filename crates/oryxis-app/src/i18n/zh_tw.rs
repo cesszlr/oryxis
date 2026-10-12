@@ -880,6 +880,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "保險庫檔案：{path}",
         "vault_open_failed_hint" => "請關閉 Oryxis 的所有其他視窗或執行個體後重新啟動。若仍然失敗，請在終端機執行 oryxis --debug-log，並將記錄附加到錯誤回報中。",
         "vault_open_failed_log" => "偵錯記錄：{path}",
+        "vault_open_read_only_hint" => "目前使用者無法寫入保險庫檔案。請檢查該檔案及其資料夾的權限，並確認磁碟未以唯讀方式掛載。Oryxis 不會開啟無法寫入的保險庫：您所做的任何變更都不會被儲存。",
         "export_select_what" => "匯出內容",
         "import_select_what" => "匯入內容",
         "import_inspect" => "檢視",

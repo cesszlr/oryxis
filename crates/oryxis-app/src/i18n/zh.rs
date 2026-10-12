@@ -880,6 +880,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "保险库文件：{path}",
         "vault_open_failed_hint" => "请关闭 Oryxis 的所有其他窗口或实例后重新启动。如果仍然失败，请在终端中运行 oryxis --debug-log，并将日志附加到错误报告中。",
         "vault_open_failed_log" => "调试日志：{path}",
+        "vault_open_read_only_hint" => "当前用户无法写入保险库文件。请检查该文件及其所在文件夹的权限，并确认磁盘未以只读方式挂载。Oryxis 不会打开无法写入的保险库：您所做的任何更改都不会被保存。",
         "export_select_what" => "导出内容",
         "import_select_what" => "导入内容",
         "import_inspect" => "检查",

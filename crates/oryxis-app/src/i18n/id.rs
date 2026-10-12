@@ -1083,6 +1083,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Berkas vault: {path}",
         "vault_open_failed_hint" => "Tutup semua jendela atau instance Oryxis lainnya lalu mulai lagi. Jika masih gagal, jalankan oryxis --debug-log dari terminal dan lampirkan log pada laporan bug.",
         "vault_open_failed_log" => "Log debug: {path}",
+        "vault_open_read_only_hint" => "Pengguna Anda tidak dapat menulis ke berkas vault. Periksa izin berkas dan foldernya, dan pastikan drive tidak dipasang hanya-baca. Oryxis tidak membuka vault yang tidak bisa ditulisnya: tidak ada perubahan Anda yang akan tersimpan.",
         "export_select_what" => "Apa yang diekspor",
         "import_select_what" => "Apa yang diimpor",
         "import_inspect" => "Periksa",

@@ -1057,6 +1057,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Arquivo do cofre: {path}",
         "vault_open_failed_hint" => "Feche todas as outras janelas ou instâncias do Oryxis e inicie de novo. Se continuar falhando, execute oryxis --debug-log em um terminal e anexe o log ao relato do bug.",
         "vault_open_failed_log" => "Log de depuração: {path}",
+        "vault_open_read_only_hint" => "Seu usuário não consegue escrever no arquivo do cofre. Verifique as permissões do arquivo e da pasta dele, e se a unidade não está montada somente leitura. O Oryxis não abre um cofre em que não consegue escrever: nada do que você alterasse seria salvo.",
         "export_select_what" => "O que exportar",
         "import_select_what" => "O que importar",
         "import_inspect" => "Inspecionar",

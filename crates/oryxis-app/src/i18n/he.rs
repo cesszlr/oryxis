@@ -1089,6 +1089,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "קובץ הכספת: {path}",
         "vault_open_failed_hint" => "סגרו את כל שאר החלונות או המופעים של Oryxis והפעילו מחדש. אם הכישלון נמשך, הריצו oryxis --debug-log מהטרמינל וצרפו את היומן לדיווח על הבאג.",
         "vault_open_failed_log" => "יומן ניפוי שגיאות: {path}",
+        "vault_open_read_only_hint" => "המשתמש שלכם אינו יכול לכתוב לקובץ הכספת. בדקו את ההרשאות של הקובץ ושל התיקייה שלו, ושהכונן אינו מעוגן לקריאה בלבד. Oryxis אינו פותח כספת שאינו יכול לכתוב אליה: שום שינוי שלכם לא היה נשמר.",
         "export_select_what" => "מה לייצא",
         "import_select_what" => "מה לייבא",
         "import_inspect" => "בדיקה",

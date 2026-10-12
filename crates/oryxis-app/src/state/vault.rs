@@ -35,6 +35,13 @@ pub(crate) struct VaultUi {
     /// vault opened (the state moved on) and on a boot that never
     /// tried.
     pub(crate) open_error: Option<String>,
+    /// The open failed because SQLite could only open the file
+    /// read-only (`VaultError::ReadOnly`): the error screen swaps its
+    /// generic hint for the one that says what to check. The owner's
+    /// call (2026-10-12): a vault this user cannot write to is REFUSED,
+    /// with the reason, never opened read-only (nothing changed would
+    /// be saved, and the pre-0.20 opens did exactly that in silence).
+    pub(crate) open_read_only: bool,
     /// Password typed on the lock / setup screen.
     pub(crate) password_input: String,
     /// Whether the lock-screen password is shown as plain text.

@@ -867,6 +867,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "File della cassaforte: {path}",
         "vault_open_failed_hint" => "Chiudi tutte le altre finestre o istanze di Oryxis e riavvia. Se continua a fallire, esegui oryxis --debug-log da un terminale e allega il log alla segnalazione del bug.",
         "vault_open_failed_log" => "Log di debug: {path}",
+        "vault_open_read_only_hint" => "Il tuo utente non può scrivere nel file della cassaforte. Controlla i permessi del file e della sua cartella, e che l'unità non sia montata in sola lettura. Oryxis non apre una cassaforte in cui non può scrivere: nulla di ciò che modificassi verrebbe salvato.",
         "export_select_what" => "Cosa esportare",
         "import_select_what" => "Cosa importare",
         "import_inspect" => "Ispeziona",

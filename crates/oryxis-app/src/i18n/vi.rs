@@ -1083,6 +1083,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Tệp kho: {path}",
         "vault_open_failed_hint" => "Đóng mọi cửa sổ hoặc phiên Oryxis khác rồi khởi động lại. Nếu vẫn lỗi, hãy chạy oryxis --debug-log từ terminal và đính kèm nhật ký vào báo cáo lỗi.",
         "vault_open_failed_log" => "Nhật ký gỡ lỗi: {path}",
+        "vault_open_read_only_hint" => "Người dùng của bạn không thể ghi vào tệp kho. Hãy kiểm tra quyền của tệp và thư mục chứa nó, và ổ đĩa không được gắn ở chế độ chỉ đọc. Oryxis không mở kho mà nó không thể ghi: mọi thay đổi của bạn sẽ không được lưu.",
         "export_select_what" => "Xuất những gì",
         "import_select_what" => "Nhập những gì",
         "import_inspect" => "Kiểm tra",

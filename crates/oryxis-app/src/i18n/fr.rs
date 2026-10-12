@@ -880,6 +880,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Fichier du coffre : {path}",
         "vault_open_failed_hint" => "Fermez toutes les autres fenêtres ou instances d'Oryxis et relancez. Si l'échec persiste, lancez oryxis --debug-log depuis un terminal et joignez le journal au rapport de bug.",
         "vault_open_failed_log" => "Journal de débogage : {path}",
+        "vault_open_read_only_hint" => "Votre utilisateur ne peut pas écrire dans le fichier du coffre. Vérifiez les permissions du fichier et de son dossier, et que le volume n'est pas monté en lecture seule. Oryxis n'ouvre pas un coffre dans lequel il ne peut pas écrire : rien de ce que vous modifieriez ne serait enregistré.",
         "export_select_what" => "Quoi exporter",
         "import_select_what" => "Quoi importer",
         "import_inspect" => "Inspecter",

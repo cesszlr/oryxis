@@ -1083,6 +1083,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Kasa dosyası: {path}",
         "vault_open_failed_hint" => "Diğer tüm Oryxis pencerelerini veya örneklerini kapatıp yeniden başlatın. Hata sürerse terminalden oryxis --debug-log çalıştırın ve günlüğü hata raporuna ekleyin.",
         "vault_open_failed_log" => "Hata ayıklama günlüğü: {path}",
+        "vault_open_read_only_hint" => "Kullanıcınız kasa dosyasına yazamıyor. Dosyanın ve klasörünün izinlerini ve sürücünün salt okunur bağlanmadığını denetleyin. Oryxis yazamadığı bir kasayı açmaz: yaptığınız hiçbir değişiklik kaydedilmezdi.",
         "export_select_what" => "Ne dışa aktarılacak",
         "import_select_what" => "Ne içe aktarılacak",
         "import_inspect" => "İncele",

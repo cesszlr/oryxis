@@ -873,6 +873,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Archivo de la bóveda: {path}",
         "vault_open_failed_hint" => "Cierra todas las demás ventanas o instancias de Oryxis y vuelve a iniciar. Si sigue fallando, ejecuta oryxis --debug-log desde una terminal y adjunta el registro al informe de error.",
         "vault_open_failed_log" => "Registro de depuración: {path}",
+        "vault_open_read_only_hint" => "Tu usuario no puede escribir en el archivo de la bóveda. Revisa los permisos del archivo y de su carpeta, y que la unidad no esté montada como solo lectura. Oryxis no abre una bóveda en la que no puede escribir: nada de lo que cambiaras se guardaría.",
         "export_select_what" => "Qué exportar",
         "import_select_what" => "Qué importar",
         "import_inspect" => "Inspeccionar",

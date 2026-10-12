@@ -254,7 +254,18 @@ impl Oryxis {
                     .color(c.text_secondary)
                     .boxed(),
             )
-            .push(text(t("vault_open_failed_hint")).size(13).color(c.text_secondary).boxed())
+            .push(
+                text(t(if self.vault_ui.open_read_only {
+                    // Refused on purpose, with the reason: see
+                    // `VaultUi::open_read_only`.
+                    "vault_open_read_only_hint"
+                } else {
+                    "vault_open_failed_hint"
+                }))
+                .size(13)
+                .color(c.text_secondary)
+                .boxed(),
+            )
             .push(
                 text(t("vault_open_failed_log").replace("{path}", &log_path))
                     .size(13)

@@ -41,12 +41,17 @@ impl Oryxis {
         // with it (and to the log and stderr), since that screen is the
         // only surface left and a report used to come with the fixed
         // label alone (issue #250).
-        let (mut vault, vault_open_error) = match VaultStore::open_default() {
-            Ok(v) => (Some(v), None),
+        let (mut vault, vault_open_error, vault_open_read_only) = match VaultStore::open_default() {
+            Ok(v) => (Some(v), None, false),
             Err(e) => {
                 tracing::error!("vault open failed: {e}");
                 eprintln!("oryxis: vault open failed: {e}");
-                (None, Some(e.to_string()))
+                let read_only = matches!(
+                    &e,
+                    oryxis_vault::VaultError::Open { source, .. }
+                        if matches!(**source, oryxis_vault::VaultError::ReadOnly)
+                );
+                (None, Some(e.to_string()), read_only)
             }
         };
         let mut vault_state = VaultState::Loading;
@@ -338,6 +343,7 @@ impl Oryxis {
                 vault_ui: crate::state::VaultUi {
                     state: vault_state,
                     open_error: vault_open_error,
+                    open_read_only: vault_open_read_only,
                     has_user_password: vault_has_user_password,
                     // Pre-check the onboarding form's biometric opt-in
                     // whenever the platform can service it.

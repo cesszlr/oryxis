@@ -1089,6 +1089,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "ไฟล์ Vault: {path}",
         "vault_open_failed_hint" => "ปิดหน้าต่างหรืออินสแตนซ์อื่น ๆ ของ Oryxis ทั้งหมดแล้วเริ่มใหม่ หากยังล้มเหลว ให้รัน oryxis --debug-log จากเทอร์มินัลแล้วแนบบันทึกไปกับรายงานข้อบกพร่อง",
         "vault_open_failed_log" => "บันทึกดีบัก: {path}",
+        "vault_open_read_only_hint" => "ผู้ใช้ของคุณไม่สามารถเขียนไฟล์ Vault ได้ ตรวจสอบสิทธิ์ของไฟล์และโฟลเดอร์ที่เก็บไฟล์ และตรวจสอบว่าไดรฟ์ไม่ได้ถูกเมานต์แบบอ่านอย่างเดียว Oryxis จะไม่เปิด Vault ที่เขียนไม่ได้ เพราะการเปลี่ยนแปลงใด ๆ ของคุณจะไม่ถูกบันทึก",
         "export_select_what" => "สิ่งที่จะส่งออก",
         "import_select_what" => "สิ่งที่จะนำเข้า",
         "import_inspect" => "ตรวจดู",

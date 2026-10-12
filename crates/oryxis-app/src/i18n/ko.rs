@@ -1083,6 +1083,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "볼트 파일: {path}",
         "vault_open_failed_hint" => "다른 Oryxis 창이나 인스턴스를 모두 닫고 다시 시작하세요. 계속 실패하면 터미널에서 oryxis --debug-log를 실행하고 로그를 버그 보고서에 첨부하세요.",
         "vault_open_failed_log" => "디버그 로그: {path}",
+        "vault_open_read_only_hint" => "현재 사용자는 볼트 파일에 쓸 수 없습니다. 파일과 해당 폴더의 권한을 확인하고, 드라이브가 읽기 전용으로 마운트되어 있지 않은지 확인하세요. Oryxis는 쓸 수 없는 볼트를 열지 않습니다. 변경한 내용이 전혀 저장되지 않기 때문입니다.",
         "export_select_what" => "내보낼 항목",
         "import_select_what" => "가져올 항목",
         "import_inspect" => "검사",

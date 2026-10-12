@@ -1089,6 +1089,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Soubor trezoru: {path}",
         "vault_open_failed_hint" => "Zavřete všechna ostatní okna nebo instance Oryxis a spusťte jej znovu. Pokud selhání trvá, spusťte oryxis --debug-log z terminálu a přiložte protokol k hlášení chyby.",
         "vault_open_failed_log" => "Ladicí protokol: {path}",
+        "vault_open_read_only_hint" => "Váš uživatel nemůže zapisovat do souboru trezoru. Zkontrolujte oprávnění souboru i jeho složky a že disk není připojen jen pro čtení. Oryxis neotevře trezor, do kterého nemůže zapisovat: nic z toho, co byste změnili, by se neuložilo.",
         "export_select_what" => "Co exportovat",
         "import_select_what" => "Co importovat",
         "import_inspect" => "Prozkoumat",

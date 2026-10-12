@@ -880,6 +880,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "保管庫ファイル: {path}",
         "vault_open_failed_hint" => "他の Oryxis のウィンドウやインスタンスをすべて閉じてから、もう一度起動してください。それでも失敗する場合は、ターミナルで oryxis --debug-log を実行し、ログをバグ報告に添付してください。",
         "vault_open_failed_log" => "デバッグログ: {path}",
+        "vault_open_read_only_hint" => "現在のユーザーは保管庫ファイルに書き込めません。ファイルとそのフォルダーの権限、およびドライブが読み取り専用でマウントされていないかを確認してください。Oryxis は書き込めない保管庫を開きません。変更しても何も保存されないためです。",
         "export_select_what" => "エクスポートする項目",
         "import_select_what" => "インポートする項目",
         "import_inspect" => "確認",

@@ -1093,6 +1093,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Plik sejfu: {path}",
         "vault_open_failed_hint" => "Zamknij wszystkie pozostałe okna lub instancje Oryxis i uruchom ponownie. Jeśli błąd się powtarza, uruchom oryxis --debug-log z terminala i dołącz dziennik do zgłoszenia błędu.",
         "vault_open_failed_log" => "Dziennik debugowania: {path}",
+        "vault_open_read_only_hint" => "Twój użytkownik nie może zapisywać do pliku sejfu. Sprawdź uprawnienia pliku i jego folderu oraz czy dysk nie jest zamontowany tylko do odczytu. Oryxis nie otwiera sejfu, do którego nie może zapisywać: żadna zmiana nie zostałaby zapisana.",
         "export_select_what" => "Co wyeksportować",
         "import_select_what" => "Co zaimportować",
         "import_inspect" => "Sprawdź",

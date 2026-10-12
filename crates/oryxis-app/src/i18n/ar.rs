@@ -1115,6 +1115,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "ملف الخزنة: {path}",
         "vault_open_failed_hint" => "أغلق جميع نوافذ Oryxis أو نسخه الأخرى ثم ابدأ من جديد. إذا استمر الفشل، شغّل oryxis --debug-log من الطرفية وأرفق السجل بتقرير الخطأ.",
         "vault_open_failed_log" => "سجل التصحيح: {path}",
+        "vault_open_read_only_hint" => "لا يمكن لمستخدمك الكتابة في ملف الخزنة. تحقّق من أذونات الملف ومجلده، ومن أن القرص غير مُركّب للقراءة فقط. لا يفتح Oryxis خزنة لا يستطيع الكتابة فيها: لن يُحفظ أي شيء تغيّره.",
         "export_select_what" => "ما الذي تريد تصديره",
         "import_select_what" => "ما الذي تريد استيراده",
         "import_inspect" => "فحص",

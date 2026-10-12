@@ -867,6 +867,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_open_failed_file" => "Tresordatei: {path}",
         "vault_open_failed_hint" => "Schließen Sie alle anderen Oryxis-Fenster oder -Instanzen und starten Sie erneut. Schlägt es weiterhin fehl, führen Sie oryxis --debug-log in einem Terminal aus und hängen Sie das Protokoll an den Fehlerbericht an.",
         "vault_open_failed_log" => "Debug-Protokoll: {path}",
+        "vault_open_read_only_hint" => "Ihr Benutzer kann nicht in die Tresordatei schreiben. Prüfen Sie die Berechtigungen der Datei und ihres Ordners und ob das Laufwerk nicht schreibgeschützt eingebunden ist. Oryxis öffnet keinen Tresor, in den es nicht schreiben kann: nichts, was Sie ändern, würde gespeichert.",
         "export_select_what" => "Was exportieren",
         "import_select_what" => "Was importieren",
         "import_inspect" => "Prüfen",
