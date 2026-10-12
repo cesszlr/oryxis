@@ -76,6 +76,16 @@ pub enum VaultError {
     /// database", nothing else).
     #[error("Could not open the vault at step \"{step}\": {source}")]
     Open { step: &'static str, source: Box<VaultError> },
+
+    /// SQLite could only open the file read-only (its permissions, its
+    /// folder's, or a read-only mount). Up to 0.19 such a vault opened,
+    /// unlocked and listed, and only its writes failed, one by one and
+    /// in silence; since 0.20 the open runs a migration and would fail
+    /// deep inside it with "attempt to write a readonly database"
+    /// (issue #250's shape). Named here so the error screen can say
+    /// what to check.
+    #[error("The vault file is read-only for this user: check the permissions of the file and its folder, and that the mount is writable")]
+    ReadOnly,
 }
 
 impl VaultError {
@@ -522,6 +532,17 @@ impl VaultStore {
         )
         .map_err(VaultError::from)
         .map_err(VaultError::at_open_step("pragmas"))?;
+        // SQLite falls back to a read-only open when the file cannot be
+        // opened for writing (EACCES, EROFS) and says nothing; the
+        // schema step below would then fail on its first write with a
+        // text that names the statement, not the cause.
+        if db
+            .is_readonly(rusqlite::MAIN_DB)
+            .map_err(VaultError::from)
+            .map_err(VaultError::at_open_step("pragmas"))?
+        {
+            return Err(VaultError::Open { step: "open", source: Box::new(VaultError::ReadOnly) });
+        }
 
         // Tighten file permissions to 0600 on Unix, the vault holds
         // encrypted credentials but if another local user can read the

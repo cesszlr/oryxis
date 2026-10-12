@@ -580,10 +580,19 @@ impl VaultStore {
         }
         self.db.execute_batch("BEGIN IMMEDIATE").map_err(phase("begin"))?;
         let result = (|| -> Result<(), VaultError> {
-            let added = self
+            // Only "duplicate column name" means the column is there;
+            // any other refusal (a schema the engine will not re-parse,
+            // a read-only file) must not leave the triggers below over
+            // a column that does not exist, where the first chunk
+            // append would fail instead of this open.
+            let added = match self
                 .db
                 .execute_batch("ALTER TABLE session_logs ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0;")
-                .is_ok();
+            {
+                Ok(()) => true,
+                Err(e) if e.to_string().contains("duplicate column name") => false,
+                Err(e) => return Err(phase("add column")(e)),
+            };
             if added {
                 self.db
                     .execute_batch(
