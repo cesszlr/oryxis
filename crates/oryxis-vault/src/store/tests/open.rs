@@ -49,3 +49,27 @@ fn open_error_display_carries_the_step_and_the_cause() {
         "Could not open the vault at step \"schema\": Database error: session log sizes, begin: database is locked"
     );
 }
+
+/// An owner's file at 0444 (a restore from read-only media) is made
+/// writable by the open itself, before SQLite would fall back to a
+/// read-only handle: the pre-0.20 opens healed it the same way, so the
+/// read-only refusal must not reach it.
+#[cfg(unix)]
+#[test]
+fn an_owner_file_without_write_bits_is_healed_before_the_read_only_check() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let tmp = NamedTempFile::new().unwrap();
+    let path = tmp.path().to_path_buf();
+    std::mem::forget(tmp);
+    drop(VaultStore::open(&path).unwrap());
+    for ext in ["", "-wal", "-shm"] {
+        let p = std::path::PathBuf::from(format!("{}{ext}", path.display()));
+        if p.exists() {
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o444)).unwrap();
+        }
+    }
+    let vault = VaultStore::open(&path).expect("the open heals the mode");
+    vault.set_setting("probe", "1").unwrap();
+    let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "{mode:o}");
+}

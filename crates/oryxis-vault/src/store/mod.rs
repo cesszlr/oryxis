@@ -508,9 +508,32 @@ impl VaultStore {
     /// Open or create the vault database at a specific path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, VaultError> {
         let path = path.as_ref().to_path_buf();
+        // Tighten file permissions to 0600 on Unix, the vault holds
+        // encrypted credentials but if another local user can read the
+        // ciphertext they can attempt offline brute force at leisure.
+        // Best-effort: a missing chmod (e.g., readonly fs, exotic mount)
+        // shouldn't break vault open, just log and move on. BEFORE the
+        // open: an owner's file at 0444 (a restore from read-only
+        // media) opens read-only and would be refused below, where the
+        // chmod makes it writable first; SQLite mirrors the file's mode
+        // onto the `-wal` / `-shm` it creates.
+        Self::tighten_perms(&path);
         let db = SqliteConn::open(&path)
             .map_err(VaultError::from)
             .map_err(VaultError::at_open_step("open"))?;
+        // SQLite falls back to a read-only open when the file cannot be
+        // opened for writing (EACCES, EROFS) and says nothing; the first
+        // write (the WAL pragma on a rollback-journal file, else the
+        // schema step) would fail with a text that names the statement,
+        // not the cause. The flag is set at open time, so it is read
+        // before any statement runs.
+        if db
+            .is_readonly(rusqlite::MAIN_DB)
+            .map_err(VaultError::from)
+            .map_err(VaultError::at_open_step("open"))?
+        {
+            return Err(VaultError::Open { step: "open", source: Box::new(VaultError::ReadOnly) });
+        }
         // WAL lets readers and a writer coexist; `busy_timeout` covers
         // the rare two-writer overlap (e.g. the sync engine opens its
         // own handle on the same file, see `oryxis-app::sync_runtime`)
@@ -532,24 +555,6 @@ impl VaultStore {
         )
         .map_err(VaultError::from)
         .map_err(VaultError::at_open_step("pragmas"))?;
-        // SQLite falls back to a read-only open when the file cannot be
-        // opened for writing (EACCES, EROFS) and says nothing; the
-        // schema step below would then fail on its first write with a
-        // text that names the statement, not the cause.
-        if db
-            .is_readonly(rusqlite::MAIN_DB)
-            .map_err(VaultError::from)
-            .map_err(VaultError::at_open_step("pragmas"))?
-        {
-            return Err(VaultError::Open { step: "open", source: Box::new(VaultError::ReadOnly) });
-        }
-
-        // Tighten file permissions to 0600 on Unix, the vault holds
-        // encrypted credentials but if another local user can read the
-        // ciphertext they can attempt offline brute force at leisure.
-        // Best-effort: a missing chmod (e.g., readonly fs, exotic mount)
-        // shouldn't break vault open, just log and move on.
-        Self::tighten_perms(&path);
 
         let mut store = Self {
             db,
