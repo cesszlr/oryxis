@@ -286,74 +286,74 @@ fn main() -> iced::Result {
             early_vault_error = Some(e.to_string());
         }
         Ok(vault) => {
-        renderer_mode = vault.get_setting("renderer_backend").ok().flatten();
-        if let (Some(w), Some(h)) = (
-            vault.get_setting("window_width").ok().flatten(),
-            vault.get_setting("window_height").ok().flatten(),
-        ) && let (Ok(w), Ok(h)) = (w.parse::<f32>(), h.parse::<f32>())
-            && w.is_finite()
-            && h.is_finite()
-        {
-            // Clamp so a hand-edited vault (or a corrupt row) can't
-            // restore an unusably small window; oversized values are
-            // capped by the window manager against the actual desktop.
-            window_size = Size::new(
-                w.clamp(MIN_WIDTH, 16384.0),
-                h.clamp(MIN_HEIGHT, 16384.0),
-            );
-        }
-        // Outer position in logical desktop coordinates. Legitimately
-        // negative on monitors left of / above the primary, which is
-        // exactly how the "same monitor" part round-trips; a stale
-        // position (that monitor unplugged since) is rescued after boot
-        // by `WindowEnsureOnScreen`. Absent rows (fresh install, or a
-        // Wayland session where positions don't exist) fall through to
-        // the platform default placement.
-        if let (Some(x), Some(y)) = (
-            vault.get_setting("window_pos_x").ok().flatten(),
-            vault.get_setting("window_pos_y").ok().flatten(),
-        ) && let (Ok(x), Ok(y)) = (x.parse::<f32>(), y.parse::<f32>())
-            && x.is_finite()
-            && y.is_finite()
-        {
-            window_position =
-                window::Position::Specific(iced::Point::new(x, y));
-        }
-        window_maximized = vault
-            .get_setting("window_maximized")
-            .ok()
-            .flatten()
-            .as_deref()
-            == Some("true");
-        window_fullscreen = vault
-            .get_setting("window_fullscreen")
-            .ok()
-            .flatten()
-            .as_deref()
-            == Some("true");
-        // Terminal background opacity. Read here, with the geometry and
-        // the renderer knob, because a transparent surface is decided
-        // when the window is created and can't be turned on afterwards
-        // (winit exposes `set_transparent`, but it is a no-op on most
-        // platforms and the fork is not ours to change). A window born
-        // opaque therefore stays opaque for the whole run, which is what
-        // the restart prompt in Settings covers. `boot` hydrates the
-        // same row into `prefs` for the UI.
-        if let Some(v) = vault.get_setting("terminal_opacity").ok().flatten()
-            && let Ok(percent) = v.parse::<u8>()
-        {
-            theme::set_terminal_opacity(percent);
-        }
-        // Debug logging (Settings > Advanced). Armed before the tracing
-        // subscriber below is built so the earliest boot lines land in
-        // the file too; same unlocked settings read as the renderer
-        // knob. `--debug-log` was armed above, before the open.
-        if !force_debug_log
-            && vault.get_setting("debug_logging").ok().flatten().as_deref() == Some("true")
-            && let Err(e) = logging::enable()
-        {
-            eprintln!("oryxis: failed to enable debug logging: {e}");
-        }
+            renderer_mode = vault.get_setting("renderer_backend").ok().flatten();
+            if let (Some(w), Some(h)) = (
+                vault.get_setting("window_width").ok().flatten(),
+                vault.get_setting("window_height").ok().flatten(),
+            ) && let (Ok(w), Ok(h)) = (w.parse::<f32>(), h.parse::<f32>())
+                && w.is_finite()
+                && h.is_finite()
+            {
+                // Clamp so a hand-edited vault (or a corrupt row) can't
+                // restore an unusably small window; oversized values are
+                // capped by the window manager against the actual desktop.
+                window_size = Size::new(
+                    w.clamp(MIN_WIDTH, 16384.0),
+                    h.clamp(MIN_HEIGHT, 16384.0),
+                );
+            }
+            // Outer position in logical desktop coordinates. Legitimately
+            // negative on monitors left of / above the primary, which is
+            // exactly how the "same monitor" part round-trips; a stale
+            // position (that monitor unplugged since) is rescued after boot
+            // by `WindowEnsureOnScreen`. Absent rows (fresh install, or a
+            // Wayland session where positions don't exist) fall through to
+            // the platform default placement.
+            if let (Some(x), Some(y)) = (
+                vault.get_setting("window_pos_x").ok().flatten(),
+                vault.get_setting("window_pos_y").ok().flatten(),
+            ) && let (Ok(x), Ok(y)) = (x.parse::<f32>(), y.parse::<f32>())
+                && x.is_finite()
+                && y.is_finite()
+            {
+                window_position =
+                    window::Position::Specific(iced::Point::new(x, y));
+            }
+            window_maximized = vault
+                .get_setting("window_maximized")
+                .ok()
+                .flatten()
+                .as_deref()
+                == Some("true");
+            window_fullscreen = vault
+                .get_setting("window_fullscreen")
+                .ok()
+                .flatten()
+                .as_deref()
+                == Some("true");
+            // Terminal background opacity. Read here, with the geometry and
+            // the renderer knob, because a transparent surface is decided
+            // when the window is created and can't be turned on afterwards
+            // (winit exposes `set_transparent`, but it is a no-op on most
+            // platforms and the fork is not ours to change). A window born
+            // opaque therefore stays opaque for the whole run, which is what
+            // the restart prompt in Settings covers. `boot` hydrates the
+            // same row into `prefs` for the UI.
+            if let Some(v) = vault.get_setting("terminal_opacity").ok().flatten()
+                && let Ok(percent) = v.parse::<u8>()
+            {
+                theme::set_terminal_opacity(percent);
+            }
+            // Debug logging (Settings > Advanced). Armed before the tracing
+            // subscriber below is built so the earliest boot lines land in
+            // the file too; same unlocked settings read as the renderer
+            // knob. `--debug-log` was armed above, before the open.
+            if !force_debug_log
+                && vault.get_setting("debug_logging").ok().flatten().as_deref() == Some("true")
+                && let Err(e) = logging::enable()
+            {
+                eprintln!("oryxis: failed to enable debug logging: {e}");
+            }
         }
     }
     // SAFETY (both set_var sites): still single-threaded here (tracing
