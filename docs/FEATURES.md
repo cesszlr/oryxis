@@ -265,6 +265,11 @@ coming next, see the [Roadmap](../README.md#roadmap).
   feeds the tray submenu and the Windows JumpList.
 - **Copy Screen.** The terminal's context menu (or the tab menu, under
   the other right-click schemes) copies the screen exactly as drawn.
+- **Save Output As.** The same menus take the pane's whole buffer,
+  scrollback included, to the clipboard or to a text file, the way
+  Terminal.app's Export Text and Konsole's Save Output do; the text is
+  read at the click, so a session that keeps printing doesn't change
+  what you saved.
 - **Syntax highlighting.** IPs, URLs, and file paths auto-detected and
   colored.
 - **Clickable links, including the ones that log in.** Ctrl+click follows
@@ -934,7 +939,7 @@ the app's own actions sit on `Ctrl+Shift`.
 Some verbs ship with no chord at all and wait in Settings > Shortcuts
 for one: move the tab to a new window, duplicate it in a new window,
 rename or pin it, copy its host address, close the other tabs or all of
-them, copy the pane's whole buffer or its screen, clear its scrollback,
+them, save the pane's output or copy its screen, clear its scrollback,
 and lock the vault. No terminal or browser agrees on a key for any of
 these, so the choice is yours; the command palette lists them either
 way.

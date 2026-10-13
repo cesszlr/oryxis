@@ -144,6 +144,11 @@ impl Oryxis {
                     // action, so a stray Enter never hands a remote
                     // host's URL to the browser.
                     | Modal::TerminalLinkConfirm
+                    // "Save Output As...": Clipboard is the default-ringed
+                    // row. The user asked for it, nothing in it destroys
+                    // anything, and it is the one answer that finishes
+                    // without a second dialog.
+                    | Modal::TerminalSaveOutput
                     // The update offer: Later is the default-ringed row
                     // in every state, so a stray Enter on a dialog that
                     // opened itself neither downloads nor restarts.

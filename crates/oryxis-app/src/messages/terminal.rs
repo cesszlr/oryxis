@@ -223,9 +223,18 @@ pub enum TerminalMessage {
     TerminalDropProgress(Uuid, crate::state::DropProgress),
     /// User asked to cancel the pane's in-flight OS-drop upload.
     TerminalDropCancel(Uuid),
-    /// Copy the whole buffer (scrollback + screen) of a pane to the
-    /// clipboard (context-menu "Copy All"). `pane_id`.
-    TerminalCopyAll(Uuid),
+    /// Take the whole buffer (scrollback + screen) of a pane and ask where
+    /// it goes (context-menu "Save Output As..."). `pane_id`. The text is
+    /// read here and parked in `Oryxis::save_output`, never carried by a
+    /// message.
+    TerminalSaveOutput(Uuid),
+    /// The answer to the save-output dialog: where the parked text goes.
+    TerminalSaveOutputTo(crate::dispatch_terminal::SaveOutputDestination),
+    /// The save-output dialog was dismissed: the parked text is dropped.
+    TerminalSaveOutputCancel,
+    /// The file write finished: the path written, or the error. A save
+    /// dialog the user dismissed reports nothing.
+    TerminalSaveOutputWritten(Result<String, String>),
     /// Copy only the pane's displayed viewport, scroll position included and
     /// off-screen history excluded (context-menu "Copy Screen"). `pane_id`.
     TerminalCopyScreen(Uuid),

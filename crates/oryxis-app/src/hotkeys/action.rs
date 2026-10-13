@@ -177,10 +177,11 @@ pub enum HotkeyAction {
     CloseOtherTabs,
     /// Close every tab of this window, through its confirm.
     CloseAllTabs,
-    /// Copy the focused pane's whole buffer (scrollback + screen).
+    /// Save the focused pane's whole buffer (scrollback + screen) to the
+    /// clipboard or a file, through the "Save Output As..." dialog.
     /// App-dispatched, unlike `TerminalCopy`: the handler reads the
     /// pane's buffer under its lock, so the palette can run it.
-    TerminalCopyAll,
+    TerminalSaveOutput,
     /// Copy the focused pane's displayed screen only.
     TerminalCopyScreen,
     /// Drop the focused pane's scrollback.
@@ -256,7 +257,7 @@ impl HotkeyAction {
             TerminalSelectAll,
             ScrollbackPageUp,
             ScrollbackPageDown,
-            TerminalCopyAll,
+            TerminalSaveOutput,
             TerminalCopyScreen,
             TerminalClearScrollback,
             VaultSectionSlot,
@@ -327,7 +328,7 @@ impl HotkeyAction {
             CopyTabAddress => "copy_tab_address",
             CloseOtherTabs => "close_other_tabs",
             CloseAllTabs => "close_all_tabs",
-            TerminalCopyAll => "terminal_copy_all",
+            TerminalSaveOutput => "terminal_save_output",
             TerminalCopyScreen => "terminal_copy_screen",
             TerminalClearScrollback => "terminal_clear_scrollback",
             LockVault => "lock_vault",
@@ -410,7 +411,7 @@ impl HotkeyAction {
             CopyTabAddress => "copy_host_address",
             CloseOtherTabs => "close_other_tabs",
             CloseAllTabs => "close_all_tabs",
-            TerminalCopyAll => "terminal_copy_all",
+            TerminalSaveOutput => "terminal_save_output",
             TerminalCopyScreen => "terminal_copy_screen",
             TerminalClearScrollback => "terminal_clear_scrollback",
             LockVault => "lock_vault",
@@ -436,7 +437,7 @@ impl HotkeyAction {
                 | CopyTabAddress
                 | CloseOtherTabs
                 | CloseAllTabs
-                | TerminalCopyAll
+                | TerminalSaveOutput
                 | TerminalCopyScreen
                 | TerminalClearScrollback
                 | LockVault
@@ -473,7 +474,7 @@ impl HotkeyAction {
                 | ScrollbackPageDown
                 | DuplicateInNewWindow
                 | CopyTabAddress
-                | TerminalCopyAll
+                | TerminalSaveOutput
                 | TerminalCopyScreen
                 | TerminalClearScrollback
         )

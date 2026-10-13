@@ -25,11 +25,13 @@ mod keyboard;
 mod links;
 mod output;
 mod pane_end;
+mod save_output;
 mod session_file;
 mod triggers;
 
 pub(crate) use links::LinkConfirmCard;
 pub(crate) use output::PendingSessionRow;
+pub(crate) use save_output::{SaveOutputCard, SaveOutputDestination};
 pub(crate) use session_file::{MirrorJob, MirrorWriter};
 pub(crate) use triggers::TriggerConfirmCard;
 
@@ -836,7 +838,7 @@ impl Oryxis {
             }
             TerminalMessage::ShowTerminalContextMenu(pane_id, x, y, selection) => {
                 // Focus the right-clicked pane first (standard context-menu
-                // behavior), so all rows act on the same pane: Copy All /
+                // behavior), so all rows act on the same pane: Save Output /
                 // Clear Scrollback are pane-targeted by id, and Paste
                 // routes through the focused pane.
                 if let Some(tab_idx) = self.pane_tab_index(pane_id) {
@@ -947,17 +949,17 @@ impl Oryxis {
                     up.abort.store(true, std::sync::atomic::Ordering::Relaxed);
                 }
             }
-            TerminalMessage::TerminalCopyAll(pane_id) => {
-                self.overlay = None;
-                if let Some(pane) = self.pane_by_id(pane_id)
-                    && let Ok(state) = pane.terminal.lock()
-                {
-                    let text = state.all_text();
-                    drop(state);
-                    if !text.is_empty() {
-                        return crate::dispatch_global::write_clipboard_text(text);
-                    }
-                }
+            TerminalMessage::TerminalSaveOutput(pane_id) => {
+                return self.open_save_output(pane_id);
+            }
+            TerminalMessage::TerminalSaveOutputTo(to) => {
+                return self.resolve_save_output(to);
+            }
+            TerminalMessage::TerminalSaveOutputCancel => {
+                self.save_output = None;
+            }
+            TerminalMessage::TerminalSaveOutputWritten(outcome) => {
+                return self.save_output_written(outcome);
             }
             TerminalMessage::TerminalCopyScreen(pane_id) => {
                 self.overlay = None;
