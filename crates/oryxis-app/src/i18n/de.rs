@@ -430,6 +430,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Remotedesktop wird auf Port {port} geöffnet",
         "remote_desktop_no_client" => "Kein Remotedesktop-Client gefunden; installiere einen von",
         "remote_desktop_tunnel_failed" => "Remotedesktop-Tunnel fehlgeschlagen",
+        "remote_desktop_password_handoff_failed" => "Das gespeicherte Passwort konnte nicht an den Remotedesktop-Client übergeben werden; er wird danach fragen: {error}",
         "section_compatibility" => "Kompatibilität",
         "editor_preset_heading" => "Ausgehend von",
         "preset_basic_ssh" => "Einfaches SSH",

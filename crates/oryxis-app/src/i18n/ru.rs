@@ -430,6 +430,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Открытие удалённого рабочего стола на порту {port}",
         "remote_desktop_no_client" => "Клиент удалённого рабочего стола не найден; установите один из",
         "remote_desktop_tunnel_failed" => "Сбой туннеля удалённого рабочего стола",
+        "remote_desktop_password_handoff_failed" => "Сохранённый пароль не удалось передать клиенту удалённого рабочего стола, он запросит его сам: {error}",
         "section_compatibility" => "Совместимость",
         "editor_preset_heading" => "Начать с",
         "preset_basic_ssh" => "Базовый SSH",

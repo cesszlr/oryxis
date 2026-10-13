@@ -18,10 +18,16 @@
 //! longer fails outright (the old behaviour, which forced you to open a
 //! terminal to the host first to trust its key).
 //!
-//! The client spawn is a fire-and-forget leaf with no automated coverage
-//! (no headless RDP/VNC client exists); it needs manual QA. The command
-//! RESOLUTION (`crate::remote_desktop::resolve_command`) is a pure,
-//! unit-tested function.
+//! The client spawn is a leaf with no automated coverage (no headless
+//! RDP/VNC client exists); it needs manual QA. The command RESOLUTION
+//! (`crate::remote_desktop::resolve_command`) is a pure, unit-tested
+//! function, and so is the `.rdp` file it hands mstsc.
+//!
+//! The desktop login is RESOLVED here, in `update` (the folder's
+//! username, the identity's password: the same answer the card shows),
+//! and moved into the task that spawns; the password never rides a
+//! `Message` (`RemoteDesktopLaunched` carries text about the hand-over,
+//! not the secret).
 
 #![allow(clippy::result_large_err)]
 
@@ -32,7 +38,7 @@ use oryxis_core::models::Connection;
 use oryxis_ssh::SshEngine;
 
 use crate::app::{SshMessage, RemoteDesktopMessage, Message, Oryxis};
-use crate::remote_desktop::{program_on_path, resolve_command};
+use crate::remote_desktop::{Launched, program_on_path, resolve_command, spawn_client};
 
 impl Oryxis {
     pub(crate) fn handle_remote_desktop(
@@ -71,6 +77,13 @@ impl Oryxis {
                 }
                 Task::none()
             }
+            RemoteDesktopMessage::RemoteDesktopLaunched(port, res) => {
+                match res {
+                    Ok(launched) => self.toast_launched(port, &launched),
+                    Err(e) => self.set_toast(e),
+                }
+                Task::none()
+            }
             RemoteDesktopMessage::StopRemoteDesktop(conn_id) => {
                 if let Some((_, session)) = self.remote_desktop_forwards.remove(&conn_id) {
                     return Task::perform(
@@ -83,13 +96,28 @@ impl Oryxis {
         }
     }
 
+    /// The toast for a client that is up: the port it was pointed at, or,
+    /// when the stored password could not be handed over, why the client
+    /// is about to ask for it (the one thing the user needs to hear).
+    fn toast_launched(&mut self, port: u16, launched: &Launched) {
+        match launched.password_handoff_error.as_deref() {
+            Some(e) => self.set_toast(
+                crate::i18n::t("remote_desktop_password_handoff_failed").replace("{error}", e),
+            ),
+            None => self.set_toast(
+                crate::i18n::t("remote_desktop_opening").replace("{port}", &port.to_string()),
+            ),
+        }
+    }
+
     /// Launch the remote desktop for a `RemoteDesktop` host: tunnel to the
     /// desktop endpoint (`conn.hostname:conn.port`) through its gateway SSH
     /// host when `rd_gateway_id` is set (prompting for the gateway's host
     /// key if unknown), or connect directly when it isn't, then spawn the
-    /// OS-native client. The desktop login (`conn.username`) prefills the
-    /// client; it is NOT the gateway's SSH credential.
-    pub(crate) fn launch_remote_desktop(&mut self, conn: Connection) -> Task<Message> {
+    /// OS-native client. The desktop login (the host's effective username
+    /// and its password) goes to the client; it is NOT the gateway's SSH
+    /// credential.
+    pub(crate) fn launch_remote_desktop(&mut self, mut conn: Connection) -> Task<Message> {
         self.card_context_menu = None;
         self.overlay = None;
         // A remote-desktop launch never shows the connect-progress screen,
@@ -105,9 +133,13 @@ impl Oryxis {
         let kind = conn.rd_kind;
         let desktop_host = conn.hostname.clone();
         let desktop_port = conn.port;
-        // The desktop login prefills the client (FreeRDP `/u:`). Empty ->
-        // the client prompts for it.
+        // The desktop login the client gets: the same resolution every
+        // dial site and the card use (D4: the host's username, else the
+        // folder's, else the identity's; the password from the identity
+        // or the host's own column). Empty -> the client prompts for it.
+        self.apply_group_inheritance(&mut conn);
         let rd_username = conn.username.clone().filter(|u| !u.trim().is_empty());
+        let rd_password = self.resolve_credentials(&conn).0.filter(|p| !p.is_empty());
 
         // Resolve the gateway SSH host to tunnel through. A missing / non-SSH
         // id degrades to a direct connection with a warning (never an error),
@@ -121,41 +153,28 @@ impl Oryxis {
         }
 
         // Direct connection (no SSH gateway): point the client straight at
-        // the desktop endpoint, no tunnel, no managed forward.
+        // the desktop endpoint, no tunnel, no managed forward. Off the UI
+        // thread: the spawn writes the connection file and protects the
+        // password first.
         let Some(mut gw) = gateway else {
-            return match resolve_command(
-                kind,
-                std::env::consts::OS,
-                &desktop_host,
-                desktop_port,
-                rd_username.as_deref(),
-                &program_on_path,
-            ) {
-                Ok(cmd) => match std::process::Command::new(&cmd.program)
-                    .args(&cmd.args)
-                    .spawn()
-                {
-                    Ok(_child) => {
-                        self.set_toast(
-                            crate::i18n::t("remote_desktop_opening")
-                                .replace("{port}", &desktop_port.to_string()),
-                        );
-                        Task::none()
-                    }
-                    Err(e) => {
-                        self.set_toast(format!("{}: {e}", cmd.program));
-                        Task::none()
-                    }
+            return Task::perform(
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        resolve_and_spawn(
+                            kind,
+                            &desktop_host,
+                            desktop_port,
+                            rd_username.as_deref(),
+                            rd_password.as_deref(),
+                        )
+                    })
+                    .await
+                    .unwrap_or_else(|e| Err(format!("remote desktop launch: {e}")))
                 },
-                Err(no) => {
-                    self.set_toast(format!(
-                        "{} ({})",
-                        crate::i18n::t("remote_desktop_no_client"),
-                        no.looked_for.join(", ")
-                    ));
-                    Task::none()
-                }
-            };
+                move |res| {
+                    Message::RemoteDesktop(RemoteDesktopMessage::RemoteDesktopLaunched(desktop_port, res))
+                },
+            );
         };
 
         // Gateway path: resolve the GATEWAY's SSH credentials for the tunnel
@@ -177,6 +196,7 @@ impl Oryxis {
         let address_family = gw.address_family;
         let rekey_limit_mb = gw.rekey_limit_mb;
         let username = rd_username;
+        let password_for_desktop = rd_password;
         let conn_id = conn.id;
         let target_host = desktop_host;
         let target_port = desktop_port;
@@ -282,7 +302,7 @@ impl Oryxis {
                     }
                 });
 
-                let outcome: Result<(Arc<oryxis_ssh::ForwardSession>, u16), String> = async {
+                let outcome: Result<(Arc<oryxis_ssh::ForwardSession>, u16, Launched), String> = async {
                     let (session, port) = engine
                         .connect_local_forward_ephemeral(
                             &gw,
@@ -300,40 +320,31 @@ impl Oryxis {
                         })?;
 
                     // The tunnel is up; point a client at its local end.
-                    match resolve_command(
-                        kind,
-                        std::env::consts::OS,
-                        "127.0.0.1",
-                        port,
-                        username.as_deref(),
-                        &program_on_path,
-                    ) {
-                        Ok(cmd) => match std::process::Command::new(&cmd.program)
-                            .args(&cmd.args)
-                            .spawn()
-                        {
-                            Ok(_child) => Ok((Arc::new(session), port)),
-                            Err(e) => {
-                                // Client found but failed to launch: drop the
-                                // tunnel so it doesn't linger unusable.
-                                session.cancel().await;
-                                Err(format!("{}: {e}", cmd.program))
-                            }
-                        },
-                        Err(no) => {
+                    let spawned = tokio::task::spawn_blocking(move || {
+                        resolve_and_spawn(
+                            kind,
+                            "127.0.0.1",
+                            port,
+                            username.as_deref(),
+                            password_for_desktop.as_deref(),
+                        )
+                    })
+                    .await
+                    .unwrap_or_else(|e| Err(format!("remote desktop launch: {e}")));
+                    match spawned {
+                        Ok(launched) => Ok((Arc::new(session), port, launched)),
+                        Err(e) => {
+                            // No client, or one that failed to launch: drop
+                            // the tunnel so it doesn't linger unusable.
                             session.cancel().await;
-                            Err(format!(
-                                "{} ({})",
-                                crate::i18n::t("remote_desktop_no_client"),
-                                no.looked_for.join(", ")
-                            ))
+                            Err(e)
                         }
                     }
                 }
                 .await;
 
                 match outcome {
-                    Ok((session, port)) => {
+                    Ok((session, port, launched)) => {
                         // Watch for the tunnel closing (idle auto-close, owner
                         // Stop, or drop) BEFORE handing the sole `Arc` to the
                         // app, so we can tell it to drop the entry. The watch
@@ -342,6 +353,16 @@ impl Oryxis {
                         let _ = sender
                             .send(Message::RemoteDesktop(RemoteDesktopMessage::RemoteDesktopReady(conn_id, seq, Ok((session, port)))))
                             .await;
+                        // After `Ready`'s own toast, so the one the user
+                        // needs (the client is about to ask for the
+                        // password, and why) is the one that stays.
+                        if let Some(e) = launched.password_handoff_error.as_deref() {
+                            let _ = sender
+                                .send(Message::ToastShow(
+                                    crate::i18n::t("remote_desktop_password_handoff_failed").replace("{error}", e),
+                                ))
+                                .await;
+                        }
                         let _ = closed.wait_for(|&c| c).await;
                         let _ = sender
                             .send(Message::RemoteDesktop(RemoteDesktopMessage::RemoteDesktopClientClosed(conn_id, seq)))
@@ -358,6 +379,34 @@ impl Oryxis {
 
         Task::stream(stream)
     }
+}
+
+/// The spawn leaf both launch paths share: pick the client installed
+/// here, hand it the login, spawn. Blocking; runs under `spawn_blocking`.
+fn resolve_and_spawn(
+    kind: oryxis_core::models::remote_desktop::RemoteDesktopKind,
+    host: &str,
+    port: u16,
+    username: Option<&str>,
+    password: Option<&str>,
+) -> Result<Launched, String> {
+    let cmd = resolve_command(
+        kind,
+        std::env::consts::OS,
+        host,
+        port,
+        username,
+        password,
+        &program_on_path,
+    )
+    .map_err(|no| {
+        format!(
+            "{} ({})",
+            crate::i18n::t("remote_desktop_no_client"),
+            no.looked_for.join(", ")
+        )
+    })?;
+    spawn_client(cmd)
 }
 
 /// Resolve a remote-desktop gateway id to the SSH host it names. A missing

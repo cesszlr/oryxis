@@ -433,6 +433,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Uzak masaüstü {port} bağlantı noktasında açılıyor",
         "remote_desktop_no_client" => "Uzak masaüstü istemcisi bulunamadı; şunlardan birini kurun",
         "remote_desktop_tunnel_failed" => "Uzak masaüstü tüneli başarısız oldu",
+        "remote_desktop_password_handoff_failed" => "Kayıtlı parola uzak masaüstü istemcisine aktarılamadı; istemci parolayı soracak: {error}",
         "section_compatibility" => "Uyumluluk",
         "editor_preset_heading" => "Şununla başla",
         "preset_basic_ssh" => "Temel SSH",

@@ -17,6 +17,11 @@ pub enum RemoteDesktopMessage {
     /// disconnected and it went idle). Carries the launch generation so
     /// only the matching map entry is dropped.
     RemoteDesktopClientClosed(Uuid, u64),
+    /// A DIRECT launch (no SSH gateway) spawned its client, or failed
+    /// to: `Ok` may carry the reason the stored password could not be
+    /// handed over (the client asks for it instead), `Err` is a
+    /// ready-to-toast message. The `u16` is the desktop port.
+    RemoteDesktopLaunched(u16, Result<crate::remote_desktop::Launched, String>),
     /// Tear down the RDP/VNC tunnel for this host connection id.
     StopRemoteDesktop(Uuid),
 }

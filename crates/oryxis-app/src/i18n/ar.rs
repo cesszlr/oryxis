@@ -433,6 +433,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "جارٍ فتح سطح المكتب البعيد على المنفذ {port}",
         "remote_desktop_no_client" => "لم يُعثر على عميل سطح مكتب بعيد؛ ثبّت أحد",
         "remote_desktop_tunnel_failed" => "فشل نفق سطح المكتب البعيد",
+        "remote_desktop_password_handoff_failed" => "تعذر تمرير كلمة المرور المحفوظة إلى عميل سطح المكتب البعيد، وسيطلبها بنفسه: {error}",
         "section_compatibility" => "التوافق",
         "editor_preset_heading" => "ابدأ من",
         "preset_basic_ssh" => "SSH أساسي",

@@ -433,6 +433,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "포트 {port}에서 원격 데스크톱을 여는 중",
         "remote_desktop_no_client" => "원격 데스크톱 클라이언트를 찾을 수 없습니다. 다음 중 하나를 설치하세요",
         "remote_desktop_tunnel_failed" => "원격 데스크톱 터널 실패",
+        "remote_desktop_password_handoff_failed" => "저장된 비밀번호를 원격 데스크톱 클라이언트에 전달하지 못했습니다. 클라이언트에서 직접 입력해야 합니다: {error}",
         "section_compatibility" => "호환성",
         "editor_preset_heading" => "시작 방식",
         "preset_basic_ssh" => "기본 SSH",

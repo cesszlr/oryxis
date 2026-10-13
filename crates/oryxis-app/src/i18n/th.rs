@@ -452,6 +452,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "กำลังเปิดเดสก์ท็อประยะไกลที่พอร์ต {port}",
         "remote_desktop_no_client" => "ไม่พบไคลเอนต์เดสก์ท็อประยะไกล โปรดติดตั้งหนึ่งใน",
         "remote_desktop_tunnel_failed" => "ทันเนลเดสก์ท็อประยะไกลล้มเหลว",
+        "remote_desktop_password_handoff_failed" => "ไม่สามารถส่งรหัสผ่านที่บันทึกไว้ให้ไคลเอนต์เดสก์ท็อประยะไกลได้ ไคลเอนต์จะขอรหัสผ่านเอง: {error}",
         "section_compatibility" => "ความเข้ากันได้",
         "editor_preset_heading" => "เริ่มจาก",
         "preset_basic_ssh" => "SSH พื้นฐาน",

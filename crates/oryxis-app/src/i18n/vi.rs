@@ -433,6 +433,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Đang mở máy tính từ xa trên cổng {port}",
         "remote_desktop_no_client" => "Không tìm thấy ứng dụng máy tính từ xa; hãy cài một trong",
         "remote_desktop_tunnel_failed" => "Tạo tunnel máy tính từ xa thất bại",
+        "remote_desktop_password_handoff_failed" => "Không thể chuyển mật khẩu đã lưu cho ứng dụng máy tính từ xa, ứng dụng sẽ tự hỏi mật khẩu: {error}",
         "section_compatibility" => "Tương thích",
         "editor_preset_heading" => "Bắt đầu từ",
         "preset_basic_ssh" => "SSH cơ bản",

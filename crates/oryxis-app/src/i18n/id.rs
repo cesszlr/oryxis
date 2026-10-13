@@ -433,6 +433,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Membuka desktop jarak jauh di port {port}",
         "remote_desktop_no_client" => "Klien desktop jarak jauh tidak ditemukan; pasang salah satu dari",
         "remote_desktop_tunnel_failed" => "Tunnel desktop jarak jauh gagal",
+        "remote_desktop_password_handoff_failed" => "Kata sandi tersimpan tidak dapat diserahkan ke klien desktop jarak jauh, yang akan memintanya: {error}",
         "section_compatibility" => "Kompatibilitas",
         "editor_preset_heading" => "Mulai dari",
         "preset_basic_ssh" => "SSH dasar",

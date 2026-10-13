@@ -452,6 +452,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Otevírání vzdálené plochy na portu {port}",
         "remote_desktop_no_client" => "Nebyl nalezen žádný klient vzdálené plochy; nainstalujte jeden z",
         "remote_desktop_tunnel_failed" => "Tunel vzdálené plochy selhal",
+        "remote_desktop_password_handoff_failed" => "Uložené heslo se nepodařilo předat klientovi vzdálené plochy, klient si o něj řekne sám: {error}",
         "section_compatibility" => "Kompatibilita",
         "editor_preset_heading" => "Začít od",
         "preset_basic_ssh" => "Základní SSH",

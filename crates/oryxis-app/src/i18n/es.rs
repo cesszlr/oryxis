@@ -430,6 +430,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_opening" => "Abriendo escritorio remoto en el puerto {port}",
         "remote_desktop_no_client" => "No se encontró cliente de escritorio remoto; instala uno de",
         "remote_desktop_tunnel_failed" => "Error en el túnel de escritorio remoto",
+        "remote_desktop_password_handoff_failed" => "La contraseña guardada no pudo entregarse al cliente de escritorio remoto, que la pedirá: {error}",
         "section_compatibility" => "Compatibilidad",
         "editor_preset_heading" => "Empezar desde",
         "preset_basic_ssh" => "SSH básico",
