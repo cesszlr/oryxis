@@ -1887,6 +1887,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Salin jalur",
         "copy_host_address" => "Salin alamat host",
         "hotkey_terminal_paste_selection" => "Tempel pilihan (primary)",
+        "hotkey_terminal_context_menu" => "Buka menu konteks",
         "terminal_drop_no_rz" => "Host jarak jauh tidak punya rz (lrzsz). Pasang, atau gunakan mode Files tab untuk mengunggah.",
         "terminal_drop_busy" => "Ada perintah yang sedang berjalan di sini. Selesaikan, atau gunakan mode Files tab untuk mengunggah.",
         "terminal_drop_folder_no_cwd" => "Folder membutuhkan direktori shell yang tepat (integrasi shell). Gunakan mode Files tab untuk mengunggah folder.",

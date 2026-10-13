@@ -1787,6 +1787,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Copiar ruta",
         "copy_host_address" => "Copiar dirección del host",
         "hotkey_terminal_paste_selection" => "Pegar selección (primary)",
+        "hotkey_terminal_context_menu" => "Abrir menú contextual",
         "terminal_drop_no_rz" => "El host remoto no tiene rz (lrzsz). Instálalo o usa el modo Files de la pestaña para subir.",
         "terminal_drop_busy" => "Hay un comando en ejecución aquí. Termínalo o usa el modo Files de la pestaña para subir.",
         "terminal_drop_folder_no_cwd" => "Las carpetas necesitan el directorio exacto del shell (shell integration). Usa el modo Files de la pestaña para subir carpetas.",

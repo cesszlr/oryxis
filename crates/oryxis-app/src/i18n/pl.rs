@@ -1897,6 +1897,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Kopiuj ścieżkę",
         "copy_host_address" => "Kopiuj adres hosta",
         "hotkey_terminal_paste_selection" => "Wklej zaznaczenie (primary)",
+        "hotkey_terminal_context_menu" => "Otwórz menu kontekstowe",
         "terminal_drop_no_rz" => "Zdalny host nie ma rz (lrzsz). Zainstaluj go lub użyj trybu Files karty, aby wysłać.",
         "terminal_drop_busy" => "Tutaj działa polecenie. Zakończ je lub użyj trybu Files karty, aby wysłać.",
         "terminal_drop_folder_no_cwd" => "Foldery wymagają dokładnego katalogu powłoki (integracja powłoki). Użyj trybu Files karty, aby wysłać foldery.",

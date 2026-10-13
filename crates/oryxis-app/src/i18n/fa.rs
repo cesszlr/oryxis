@@ -1876,6 +1876,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "کپی مسیر",
         "copy_host_address" => "کپی نشانی میزبان",
         "hotkey_terminal_paste_selection" => "چسباندن انتخاب (primary)",
+        "hotkey_terminal_context_menu" => "باز کردن منوی زمینه",
         "terminal_drop_no_rz" => "میزبان راه دور rz (lrzsz) ندارد. آن را نصب کنید یا از حالت Files برگه برای بارگذاری استفاده کنید.",
         "terminal_drop_busy" => "فرمانی در حال اجرا است. آن را تمام کنید یا از حالت Files برگه برای بارگذاری استفاده کنید.",
         "terminal_drop_folder_no_cwd" => "پوشه‌ها به مسیر دقیق پوسته نیاز دارند (یکپارچگی پوسته). از حالت Files برگه برای بارگذاری پوشه‌ها استفاده کنید.",

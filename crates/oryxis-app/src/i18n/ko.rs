@@ -1887,6 +1887,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "경로 복사",
         "copy_host_address" => "호스트 주소 복사",
         "hotkey_terminal_paste_selection" => "선택 영역 붙여넣기 (primary)",
+        "hotkey_terminal_context_menu" => "컨텍스트 메뉴 열기",
         "terminal_drop_no_rz" => "원격에 rz(lrzsz)가 없습니다. 설치하거나 탭의 Files 모드로 업로드하세요.",
         "terminal_drop_busy" => "여기서 명령이 실행 중입니다. 먼저 끝내거나 탭의 Files 모드로 업로드하세요.",
         "terminal_drop_folder_no_cwd" => "폴더는 셸의 정확한 디렉터리(셸 통합)가 필요합니다. 탭의 Files 모드로 폴더를 업로드하세요.",

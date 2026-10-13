@@ -186,6 +186,14 @@ pub enum HotkeyAction {
     TerminalCopyScreen,
     /// Drop the focused pane's scrollback.
     TerminalClearScrollback,
+    /// Open the focused pane's context menu, anchored at the text
+    /// cursor: the keyboard's door to the menu a right-click opens. Ships
+    /// on the Menu key (the system's own context-menu key, not an
+    /// invented chord), and opens the menu whatever the right-click
+    /// scheme is, since the key is the only door a keyboard has to it.
+    /// Shift+F10, the other system gesture, stays with the PTY: it is
+    /// `ESC[21;2~` there, and programs read it.
+    TerminalContextMenu,
     /// Lock the vault, through its confirm (the burger menu's row). The
     /// palette used to carry this as a hand-written extra; it is an
     /// ordinary action now so a chord can reach it.
@@ -260,6 +268,7 @@ impl HotkeyAction {
             TerminalSaveOutput,
             TerminalCopyScreen,
             TerminalClearScrollback,
+            TerminalContextMenu,
             VaultSectionSlot,
             VaultSectionPrev,
             VaultSectionNext,
@@ -331,6 +340,7 @@ impl HotkeyAction {
             TerminalSaveOutput => "terminal_save_output",
             TerminalCopyScreen => "terminal_copy_screen",
             TerminalClearScrollback => "terminal_clear_scrollback",
+            TerminalContextMenu => "terminal_context_menu",
             LockVault => "lock_vault",
             ConnectInNewWindow => "connect_in_new_window",
         }
@@ -414,6 +424,7 @@ impl HotkeyAction {
             TerminalSaveOutput => "terminal_save_output",
             TerminalCopyScreen => "terminal_copy_screen",
             TerminalClearScrollback => "terminal_clear_scrollback",
+            TerminalContextMenu => "hotkey_terminal_context_menu",
             LockVault => "lock_vault",
             // The card menu's own row label.
             ConnectInNewWindow => "connect_new_window",
@@ -477,6 +488,7 @@ impl HotkeyAction {
                 | TerminalSaveOutput
                 | TerminalCopyScreen
                 | TerminalClearScrollback
+                | TerminalContextMenu
         )
     }
 

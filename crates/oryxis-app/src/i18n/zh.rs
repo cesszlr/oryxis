@@ -1794,6 +1794,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "复制路径",
         "copy_host_address" => "复制主机地址",
         "hotkey_terminal_paste_selection" => "粘贴选中内容 (primary)",
+        "hotkey_terminal_context_menu" => "打开上下文菜单",
         "terminal_drop_no_rz" => "远程主机没有 rz（lrzsz）。请安装它，或使用标签页的 Files 模式上传。",
         "terminal_drop_busy" => "此处有命令正在运行。请先结束它，或使用标签页的 Files 模式上传。",
         "terminal_drop_folder_no_cwd" => "文件夹需要 shell 的确切目录（shell 集成）。请使用标签页的 Files 模式上传文件夹。",

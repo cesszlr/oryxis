@@ -321,7 +321,8 @@ impl HotkeyBinding {
         if self.ctrl || self.alt || self.logo {
             return true;
         }
-        // A function key is a chord on its own (F11 = fullscreen).
+        // A function key is a chord on its own (F11 = fullscreen), and
+        // so is the Menu key (the pane's context menu).
         if self.is_function_key_primary() {
             return true;
         }
@@ -361,8 +362,10 @@ impl HotkeyBinding {
         }
     }
 
-    /// `true` when the primary is F1..F12. The only primaries a
-    /// modifier-free binding may target.
+    /// `true` when the primary is F1..F12 or the Menu key. The only
+    /// primaries a modifier-free binding may target: none of them types
+    /// anything, and the Menu key reaches no program (the encoder sends
+    /// it nowhere).
     fn is_function_key_primary(&self) -> bool {
         matches!(
             self.primary,
@@ -379,6 +382,7 @@ impl HotkeyBinding {
                     | Named::F10
                     | Named::F11
                     | Named::F12
+                    | Named::ContextMenu
             )
         )
     }
@@ -597,6 +601,7 @@ fn named_to_str(n: Named) -> &'static str {
         Named::F10 => "f10",
         Named::F11 => "f11",
         Named::F12 => "f12",
+        Named::ContextMenu => "menu",
         _ => "?",
     }
 }
@@ -630,6 +635,7 @@ fn str_to_named(s: &str) -> Option<Named> {
         "f10" => Named::F10,
         "f11" => Named::F11,
         "f12" => Named::F12,
+        "menu" => Named::ContextMenu,
         _ => return None,
     })
 }

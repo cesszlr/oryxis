@@ -1893,6 +1893,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "העתקת נתיב",
         "copy_host_address" => "העתקת כתובת מארח",
         "hotkey_terminal_paste_selection" => "הדבקת הבחירה (primary)",
+        "hotkey_terminal_context_menu" => "פתיחת תפריט ההקשר",
         "terminal_drop_no_rz" => "למארח המרוחק אין rz (lrzsz). התקינו אותו או השתמשו במצב Files של הלשונית להעלאה.",
         "terminal_drop_busy" => "פקודה רצה כאן. סיימו אותה או השתמשו במצב Files של הלשונית להעלאה.",
         "terminal_drop_folder_no_cwd" => "תיקיות דורשות את הספרייה המדויקת של המעטפת (שילוב מעטפת). השתמשו במצב Files של הלשונית להעלאת תיקיות.",

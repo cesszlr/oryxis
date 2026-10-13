@@ -1894,6 +1894,7 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "copy_path" => "Copy path",
         "copy_host_address" => "Copy host address",
         "hotkey_terminal_paste_selection" => "Paste selection (primary)",
+        "hotkey_terminal_context_menu" => "Open context menu",
         "terminal_drop_no_rz" => "The remote has no rz (lrzsz). Install it, or use the tab's Files mode to upload.",
         "terminal_drop_busy" => "A command is running here. Finish it, or use the tab's Files mode to upload.",
         "terminal_drop_folder_no_cwd" => "Folders need the shell's exact directory (shell integration). Use the tab's Files mode to upload folders.",

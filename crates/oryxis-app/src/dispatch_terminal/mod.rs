@@ -20,6 +20,7 @@
 
 #![allow(clippy::result_large_err)]
 
+mod context_menu;
 mod drop;
 mod keyboard;
 mod links;
@@ -835,6 +836,26 @@ impl Oryxis {
                 return self.update(Message::Terminal(
                     TerminalMessage::ShowTerminalContextMenu(pane_id, at.x, at.y, None),
                 ));
+            }
+            TerminalMessage::ShowTerminalContextMenuAtCursor(pane_id) => {
+                // A pane not drawn yet has no rect to anchor to; the mouse
+                // is the right-click's own anchor, and better than nothing.
+                let (x, y) = self.terminal_cursor_menu_anchor(pane_id).unwrap_or_else(|| {
+                    let at = self.cur_mouse();
+                    (at.x, at.y)
+                });
+                // The live selection, which the widget hands a right-click
+                // and nothing hands a key: read off the emulator, under the
+                // same rule as the widget (an empty range offers no Copy).
+                let selection = self.pane_by_id(pane_id).and_then(|pane| {
+                    let state = pane.terminal.lock().ok()?;
+                    let range = state.selection_range()?;
+                    let text = state.get_selection_text(&range);
+                    (!text.is_empty()).then_some(text)
+                });
+                return self.update(Message::Terminal(TerminalMessage::ShowTerminalContextMenu(
+                    pane_id, x, y, selection,
+                )));
             }
             TerminalMessage::ShowTerminalContextMenu(pane_id, x, y, selection) => {
                 // Focus the right-clicked pane first (standard context-menu

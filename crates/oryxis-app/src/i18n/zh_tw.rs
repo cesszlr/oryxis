@@ -1794,6 +1794,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "複製路徑",
         "copy_host_address" => "複製主機位址",
         "hotkey_terminal_paste_selection" => "貼上選取內容 (primary)",
+        "hotkey_terminal_context_menu" => "開啟內容功能表",
         "terminal_drop_no_rz" => "遠端主機沒有 rz（lrzsz）。請安裝它，或使用分頁的 Files 模式上傳。",
         "terminal_drop_busy" => "這裡有指令正在執行。請先結束它，或使用分頁的 Files 模式上傳。",
         "terminal_drop_folder_no_cwd" => "資料夾需要 shell 的確切目錄（shell 整合）。請使用分頁的 Files 模式上傳資料夾。",

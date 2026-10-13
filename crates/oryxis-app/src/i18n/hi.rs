@@ -1893,6 +1893,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "पथ कॉपी करें",
         "copy_host_address" => "होस्ट पता कॉपी करें",
         "hotkey_terminal_paste_selection" => "चयन चिपकाएँ (primary)",
+        "hotkey_terminal_context_menu" => "संदर्भ मेनू खोलें",
         "terminal_drop_no_rz" => "रिमोट होस्ट पर rz (lrzsz) नहीं है। इसे इंस्टॉल करें, या अपलोड के लिए टैब का Files मोड उपयोग करें।",
         "terminal_drop_busy" => "यहाँ एक कमांड चल रहा है। उसे पूरा करें, या अपलोड के लिए टैब का Files मोड उपयोग करें।",
         "terminal_drop_folder_no_cwd" => "फ़ोल्डरों के लिए शेल की सटीक डायरेक्टरी (शेल एकीकरण) आवश्यक है। फ़ोल्डर अपलोड करने के लिए टैब का Files मोड उपयोग करें।",

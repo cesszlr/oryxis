@@ -1781,6 +1781,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Copia percorso",
         "copy_host_address" => "Copia indirizzo host",
         "hotkey_terminal_paste_selection" => "Incolla selezione (primary)",
+        "hotkey_terminal_context_menu" => "Apri menu contestuale",
         "terminal_drop_no_rz" => "L'host remoto non ha rz (lrzsz). Installalo, oppure usa la modalità Files della scheda per caricare.",
         "terminal_drop_busy" => "Qui è in esecuzione un comando. Terminalo, oppure usa la modalità Files della scheda per caricare.",
         "terminal_drop_folder_no_cwd" => "Le cartelle richiedono la directory esatta della shell (shell integration). Usa la modalità Files della scheda per caricare cartelle.",

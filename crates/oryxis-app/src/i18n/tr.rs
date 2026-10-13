@@ -1887,6 +1887,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Yolu kopyala",
         "copy_host_address" => "Sunucu adresini kopyala",
         "hotkey_terminal_paste_selection" => "Seçimi yapıştır (primary)",
+        "hotkey_terminal_context_menu" => "Bağlam menüsünü aç",
         "terminal_drop_no_rz" => "Uzak sunucuda rz (lrzsz) yok. Yükleyin veya göndermek için sekmenin Files modunu kullanın.",
         "terminal_drop_busy" => "Burada bir komut çalışıyor. Bitirin veya göndermek için sekmenin Files modunu kullanın.",
         "terminal_drop_folder_no_cwd" => "Klasörler kabuğun tam dizinini gerektirir (kabuk entegrasyonu). Klasörleri göndermek için sekmenin Files modunu kullanın.",

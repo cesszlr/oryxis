@@ -918,6 +918,7 @@ the app's own actions sit on `Ctrl+Shift`.
 | `Alt+Left` / `Alt+Right` | Cycle tabs |
 | `Ctrl+1...9` | Switch to tab 1-9 |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste in the terminal |
+| `Menu` (the context-menu key) | Open the terminal's context menu at the text cursor, whatever the right-click setting |
 | `Ctrl+Shift+W` | Close tab |
 | `Ctrl+Shift+Y` | Reopen the last closed tab |
 | `Ctrl+Shift+R` | Reconnect the active tab |

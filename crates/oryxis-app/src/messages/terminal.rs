@@ -202,6 +202,11 @@ pub enum TerminalMessage {
     /// where `selection` is the live selection's text captured by the
     /// widget (`None` when empty), so the menu can offer "Copy".
     ShowTerminalContextMenu(Uuid, f32, f32, Option<String>),
+    /// Open a pane's context menu from the KEYBOARD (the Menu key, or the
+    /// palette row): anchored at the text cursor instead of a click point,
+    /// with the pane's live selection read from the emulator, since no
+    /// widget event carried it. Opens whatever the right-click scheme.
+    ShowTerminalContextMenuAtCursor(Uuid),
     /// Copy the captured selection text to the clipboard (context-menu
     /// "Copy").
     TerminalCopySelection(String),

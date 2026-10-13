@@ -1794,6 +1794,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Copier le chemin",
         "copy_host_address" => "Copier l'adresse de l'hôte",
         "hotkey_terminal_paste_selection" => "Coller la sélection (primary)",
+        "hotkey_terminal_context_menu" => "Ouvrir le menu contextuel",
         "terminal_drop_no_rz" => "L'hôte distant n'a pas rz (lrzsz). Installez-le, ou utilisez le mode Files de l'onglet pour envoyer.",
         "terminal_drop_busy" => "Une commande s'exécute ici. Terminez-la, ou utilisez le mode Files de l'onglet pour envoyer.",
         "terminal_drop_folder_no_cwd" => "Les dossiers exigent le répertoire exact du shell (shell integration). Utilisez le mode Files de l'onglet pour envoyer des dossiers.",

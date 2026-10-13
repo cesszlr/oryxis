@@ -1846,6 +1846,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Copiar caminho",
         "copy_host_address" => "Copiar endereço do host",
         "hotkey_terminal_paste_selection" => "Colar seleção (primary)",
+        "hotkey_terminal_context_menu" => "Abrir menu de contexto",
         "terminal_drop_no_rz" => "O host remoto não tem rz (lrzsz). Instale-o, ou use o modo Files da aba para enviar.",
         "terminal_drop_busy" => "Há um comando em execução aqui. Conclua-o, ou use o modo Files da aba para enviar.",
         "terminal_drop_folder_no_cwd" => "Pastas exigem o diretório exato do shell (shell integration). Use o modo Files da aba para enviar pastas.",

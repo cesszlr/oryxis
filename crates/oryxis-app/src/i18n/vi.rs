@@ -1887,6 +1887,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Sao chép đường dẫn",
         "copy_host_address" => "Sao chép địa chỉ máy chủ",
         "hotkey_terminal_paste_selection" => "Dán vùng chọn (primary)",
+        "hotkey_terminal_context_menu" => "Mở menu ngữ cảnh",
         "terminal_drop_no_rz" => "Máy chủ từ xa không có rz (lrzsz). Hãy cài đặt, hoặc dùng chế độ Files của thẻ để tải lên.",
         "terminal_drop_busy" => "Một lệnh đang chạy ở đây. Hãy hoàn tất nó, hoặc dùng chế độ Files của thẻ để tải lên.",
         "terminal_drop_folder_no_cwd" => "Thư mục cần đúng thư mục của shell (tích hợp shell). Dùng chế độ Files của thẻ để tải lên thư mục.",

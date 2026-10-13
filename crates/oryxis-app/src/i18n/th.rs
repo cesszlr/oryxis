@@ -1894,6 +1894,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "คัดลอกพาธ",
         "copy_host_address" => "คัดลอกที่อยู่โฮสต์",
         "hotkey_terminal_paste_selection" => "วางส่วนที่เลือก (primary)",
+        "hotkey_terminal_context_menu" => "เปิดเมนูบริบท",
         "terminal_drop_no_rz" => "โฮสต์ระยะไกลไม่มี rz (lrzsz) โปรดติดตั้ง หรือใช้โหมด Files ของแท็บเพื่ออัปโหลด",
         "terminal_drop_busy" => "มีคำสั่งกำลังทำงานอยู่ โปรดทำให้เสร็จ หรือใช้โหมด Files ของแท็บเพื่ออัปโหลด",
         "terminal_drop_folder_no_cwd" => "โฟลเดอร์ต้องการไดเรกทอรีที่แน่นอนของเชลล์ (การผสานเชลล์) ใช้โหมด Files ของแท็บเพื่ออัปโหลดโฟลเดอร์",

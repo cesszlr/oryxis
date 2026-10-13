@@ -547,6 +547,10 @@ pub fn default_bindings() -> HotkeyMap {
     // there is no scrollback and the running app owns the key.
     put(&mut m, ScrollbackPageUp, false, true, false, false, Named(keyboard::key::Named::PageUp));
     put(&mut m, ScrollbackPageDown, false, true, false, false, Named(keyboard::key::Named::PageDown));
+    // The Menu key opens the pane's context menu at the text cursor: the
+    // system's own key for exactly that, bare like F11, and the only door
+    // a keyboard has to the menu (Shift+F10 belongs to the PTY).
+    put(&mut m, TerminalContextMenu, false, false, false, false, Named(keyboard::key::Named::ContextMenu));
     // Ctrl+Shift+digit (Cmd+Shift on macOS): the vault-section
     // jump family, one digit per burger-menu VAULT entry. Shift
     // keeps it clear of the Ctrl+digit tab slots.

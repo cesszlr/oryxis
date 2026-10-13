@@ -1887,6 +1887,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Копіювати шлях",
         "copy_host_address" => "Копіювати адресу хоста",
         "hotkey_terminal_paste_selection" => "Вставити виділене (primary)",
+        "hotkey_terminal_context_menu" => "Відкрити контекстне меню",
         "terminal_drop_no_rz" => "На віддаленому хості немає rz (lrzsz). Встановіть його або скористайтеся режимом Files вкладки для завантаження.",
         "terminal_drop_busy" => "Тут виконується команда. Завершіть її або скористайтеся режимом Files вкладки для завантаження.",
         "terminal_drop_folder_no_cwd" => "Для тек потрібен точний каталог оболонки (інтеграція оболонки). Скористайтеся режимом Files вкладки для завантаження тек.",

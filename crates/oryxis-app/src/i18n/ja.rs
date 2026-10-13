@@ -1794,6 +1794,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "パスをコピー",
         "copy_host_address" => "ホストアドレスをコピー",
         "hotkey_terminal_paste_selection" => "選択範囲を貼り付け (primary)",
+        "hotkey_terminal_context_menu" => "コンテキストメニューを開く",
         "terminal_drop_no_rz" => "リモートに rz（lrzsz）がありません。インストールするか、タブの Files モードでアップロードしてください。",
         "terminal_drop_busy" => "ここではコマンドが実行中です。終了させるか、タブの Files モードでアップロードしてください。",
         "terminal_drop_folder_no_cwd" => "フォルダーにはシェルの正確なディレクトリ（シェル統合）が必要です。タブの Files モードでフォルダーをアップロードしてください。",

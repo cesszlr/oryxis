@@ -1906,6 +1906,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "نسخ المسار",
         "copy_host_address" => "نسخ عنوان المضيف",
         "hotkey_terminal_paste_selection" => "لصق التحديد (primary)",
+        "hotkey_terminal_context_menu" => "فتح قائمة السياق",
         "terminal_drop_no_rz" => "المضيف البعيد لا يملك rz (lrzsz). ثبّته أو استخدم وضع Files في علامة التبويب للرفع.",
         "terminal_drop_busy" => "هناك أمر قيد التشغيل هنا. أنهِه أو استخدم وضع Files في علامة التبويب للرفع.",
         "terminal_drop_folder_no_cwd" => "تحتاج المجلدات إلى الدليل الدقيق للصدفة (تكامل الصدفة). استخدم وضع Files في علامة التبويب لرفع المجلدات.",

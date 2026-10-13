@@ -1893,6 +1893,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Kopírovat cestu",
         "copy_host_address" => "Kopírovat adresu hostitele",
         "hotkey_terminal_paste_selection" => "Vložit výběr (primary)",
+        "hotkey_terminal_context_menu" => "Otevřít kontextovou nabídku",
         "terminal_drop_no_rz" => "Vzdálený hostitel nemá rz (lrzsz). Nainstalujte jej, nebo k nahrání použijte režim Files karty.",
         "terminal_drop_busy" => "Právě zde běží příkaz. Dokončete jej, nebo k nahrání použijte režim Files karty.",
         "terminal_drop_folder_no_cwd" => "Složky vyžadují přesný adresář shellu (integrace shellu). K nahrání složek použijte režim Files karty.",

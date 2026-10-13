@@ -7,6 +7,7 @@ project uses [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- The keyboard's Menu key opens the terminal's context menu under the text cursor (Copy when something is selected, Copy Screen, Save Output As…, Paste, Clear Scrollback), under every right-click setting, including the default one where a right-click pastes; rebindable in Settings > Shortcuts like any other action.
 - The MCP plugin 0.1.11 can create and edit SSH hosts (`create_host`, `update_host`) once "Allow the MCP server to add and edit hosts" is on in Settings > MCP Server (off by default): folders are resolved, never created; keys, identities and bastions are named by label or id; the password only goes in; proxies are never set over MCP. A host written over MCP appears in the running app without a restart.
 - The MCP plugin 0.1.11 tells the agent which host key a dial refused (host, port, key type, fingerprint) and adds `accept_host_key`, which pins exactly the key a refused dial reported, unknown keys only, never one that changed against the vault's pin; a pin made over MCP shows up in the running app's Known Hosts without a restart.
 - Settings > MCP Server installs the `oryxis` entry into the AI client you pick: Claude Code, Claude Desktop, Codex (TOML), Cursor, Gemini CLI, GitHub Copilot or Windsurf, detected by the folder each one reads from, merged into the client's existing config; the Windows build does the same for a client inside WSL.
@@ -22,6 +23,7 @@ project uses [SemVer](https://semver.org/spec/v2.0.0.html).
 - In the SFTP browser, Backspace goes up a folder like Left does, and keys typed into a field (the filter, the path bar) stay in that field: Left in the Local pane's filter no longer sends the pane up a folder, and Ctrl+A selects the field's text instead of every row.
 
 ### Fixed
+- Enter in the command palette and the tab switcher runs the top row of the list as typed, wherever the mouse rests.
 - An RDP host's saved username and password now reach the desktop client: on Windows, the launch stages them in Credential Manager (`TERMSRV/<host>`, the entry mstsc reads for a saved login) for the client's lifetime and removes them when it exits, never overwriting a credential you saved yourself; on Linux, xfreerdp takes the username and reads the password from a pipe, never from the command line; on macOS, the username rides the `rdp://` URI (the scheme has no password attribute, so Windows App still asks). Before, every launch asked for the password again (#251, reported by @miner1888).
 - Windows: the raw output of the network tools' `ping` and `tracert` (the binaries behind an IPv6 target, or a machine where the native ICMP probe is refused) is read in the console's OEM code page, so a localized line no longer comes out as replacement characters.
 - A P2P sync round that pulled records now shows them at once: hosts, folders, keys, identities and host-key pins a peer pushed used to stay invisible until the next unlock.

@@ -833,6 +833,18 @@ impl Oryxis {
                     None => Task::none(),
                 }
             }
+            // The focused pane of the tab in front, like the copy verbs
+            // above; the handler anchors the menu at its text cursor.
+            TerminalContextMenu => match self
+                .cur_active_tab()
+                .and_then(|i| self.tabs.get(i))
+                .map(|t| t.active().id)
+            {
+                Some(pane_id) => {
+                    Task::done(Message::Terminal(TerminalMessage::ShowTerminalContextMenuAtCursor(pane_id)))
+                }
+                None => Task::none(),
+            },
             // Through the confirm, never the teardown: the handler also
             // declines a vault with no master password, like the burger
             // menu's row.

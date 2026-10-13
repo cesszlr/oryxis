@@ -1781,6 +1781,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "copy_path" => "Pfad kopieren",
         "copy_host_address" => "Hostadresse kopieren",
         "hotkey_terminal_paste_selection" => "Auswahl einfügen (primary)",
+        "hotkey_terminal_context_menu" => "Kontextmenü öffnen",
         "terminal_drop_no_rz" => "Der Remote-Host hat kein rz (lrzsz). Installieren Sie es oder nutzen Sie den Files-Modus des Tabs zum Hochladen.",
         "terminal_drop_busy" => "Hier läuft gerade ein Befehl. Beenden Sie ihn oder nutzen Sie den Files-Modus des Tabs zum Hochladen.",
         "terminal_drop_folder_no_cwd" => "Ordner brauchen das exakte Shell-Verzeichnis (Shell-Integration). Nutzen Sie den Files-Modus des Tabs, um Ordner hochzuladen.",
