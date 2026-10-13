@@ -12,9 +12,10 @@
 //! `x86_64-pc-windows-gnu` and run through WSL interop: `CredWriteW`
 //! lands as "Generic / Local machine persistence" in `cmdkey /list`,
 //! `CredReadW` returns the exact UTF-16LE blob (CJK and accented text
-//! included), `CredEnumerateW("TERMSRV/*")` lists ours beside the user's
-//! own mstsc entries, `CredDeleteW` removes ours and a second delete
-//! answers `ERROR_NOT_FOUND`.
+//! included), `CredEnumerateW` lists ours beside the user's own mstsc
+//! entries under `TERMSRV/*` and finds it again under the exact target,
+//! `CredDeleteW` removes ours and a second delete answers
+//! `ERROR_NOT_FOUND`.
 //!
 //! A credential this user saved themselves (through mstsc's "remember
 //! me", or `cmdkey`) is never overwritten: its blob cannot be read back
@@ -24,7 +25,7 @@
 
 use windows::Win32::Security::Credentials::{
     CRED_ENUMERATE_FLAGS, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW,
-    CredEnumerateW, CredFree, CredReadW, CredWriteW,
+    CredEnumerateW, CredFree, CredWriteW,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -146,9 +147,9 @@ pub(super) fn remove(target: &str) -> Result<(), String> {
     }
 }
 
-/// Remove every entry a previous process wrote and never got to remove
-/// (killed with a desktop open): ours are the `TERMSRV/*` entries
-/// carrying the marker, nothing else is touched.
+/// Remove every entry we wrote: ours are the `TERMSRV/*` entries
+/// carrying the marker, nothing else is touched. Boot, manual lock and
+/// exit all call it.
 pub(super) fn sweep_stale() {
     let entries = match enumerate("TERMSRV/*") {
         Ok(entries) => entries,
@@ -163,27 +164,5 @@ pub(super) fn sweep_stale() {
         {
             tracing::warn!("stale remote-desktop credential {target}: {e}");
         }
-    }
-}
-
-/// Whether a `CredReadW` for `target` finds a GENERIC entry of ours.
-/// Diagnostics only (a test hook for the probe), kept for the next
-/// person who has to re-verify the shape.
-#[allow(dead_code)]
-pub(super) fn ours_present(target: &str) -> Result<bool, String> {
-    let target_w = wide(target);
-    let mut out: *mut CREDENTIALW = std::ptr::null_mut();
-    // SAFETY: `target_w` outlives the call; on success `out` is a
-    // credential the OS owns until `CredFree`.
-    match unsafe { CredReadW(PCWSTR(target_w.as_ptr()), CRED_TYPE_GENERIC, None, &mut out) } {
-        Ok(()) => {
-            // SAFETY: success leaves `out` valid.
-            let comment = pwstr_to_string(unsafe { &*out }.Comment);
-            // SAFETY: freed once.
-            unsafe { CredFree(out.cast()) };
-            Ok(comment == MARKER)
-        }
-        Err(e) if e.code().0 == NOT_FOUND => Ok(false),
-        Err(e) => Err(format!("CredRead: {e}")),
     }
 }

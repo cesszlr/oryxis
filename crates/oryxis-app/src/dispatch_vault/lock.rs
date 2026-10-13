@@ -339,6 +339,9 @@ impl Oryxis {
                         // terminal's callback tunnels go the same way, and
                         // a link waiting on an answer stops waiting.
                         self.remote_desktop_forwards.clear();
+                        // And the login staged for mstsc: a client still
+                        // up holds it in memory, the store need not.
+                        crate::remote_desktop::sweep_stale_credentials();
                         self.link_forwards.clear();
                         self.link_confirm = None;
                         // Standalone SFTP tabs ride their own SSH channels:

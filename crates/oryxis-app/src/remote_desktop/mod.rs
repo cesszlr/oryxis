@@ -20,9 +20,8 @@
 //!   (issue #251: the stored password never reached the client, which
 //!   asked again). NOT a `.rdp` file: an unsigned connection file makes
 //!   mstsc raise "The publisher of this remote connection can't be
-//!   identified" before every connect (MEASURED 2026-10-13 on Windows
-//!   11, with and without the user's `Default.rdp` lines), which trades
-//!   one prompt for another.
+//!   identified" before connecting (SEEN 2026-10-13 on Windows 11 when
+//!   a generated file was opened), which trades one prompt for another.
 //! - Linux `xfreerdp` takes `/from-stdin:force` and reads the password
 //!   from its stdin, one line, before dialling.
 //! - macOS `open rdp://` has `username=s:` in its URI scheme and no
@@ -309,9 +308,11 @@ fn remove_staged_credential(target: &str) {
 #[cfg(not(windows))]
 fn remove_staged_credential(_target: &str) {}
 
-/// Remove every credential a previous process staged for mstsc and
-/// never got to remove (killed with a desktop open). Runs at boot;
-/// no-op off Windows.
+/// Remove every credential this app staged for mstsc: at boot (a
+/// process killed with a desktop open never ran its reaper), on the
+/// manual lock and on exit (the reaper dies with the process, and the
+/// next launch may be days away). A client already connected keeps the
+/// login in memory. No-op off Windows.
 pub(crate) fn sweep_stale_credentials() {
     #[cfg(windows)]
     windows_cred::sweep_stale();

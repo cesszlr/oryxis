@@ -40,6 +40,10 @@ impl Oryxis {
         // which pane a split has focused, and this is the last chance to
         // record either (issue #206).
         self.persist_open_tabs();
+        // The login staged in the OS store for a desktop client: its
+        // reaper dies with the process, and the next launch may be days
+        // away (issue #251). The client keeps what it already read.
+        crate::remote_desktop::sweep_stale_credentials();
     }
 
     /// Gracefully drain the plugin subprocesses (flush logs / close SDK
