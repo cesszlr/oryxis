@@ -94,7 +94,7 @@ dependencies = [
 [[package]]
 name = "alacritty_terminal"
 version = "0.26.1-dev"
-source = "git+https://github.com/wilsonglasser/alacritty#0dfc9f911a9dd59041721cc33fab7a104b6b3ee9"
+source = "git+https://github.com/wilsonglasser/alacritty#7c9342525f9d93395c0b3c30065d659d55d998ac"
 dependencies = [
  "arrayvec",
  "base64 0.22.1",
@@ -1767,7 +1767,7 @@ checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
 [[package]]
 name = "cosmic-text"
 version = "0.19.0"
-source = "git+https://github.com/hecrj/cosmic-text.git?rev=19cca2bd90e73e20614964f06d44240e71e503b3#19cca2bd90e73e20614964f06d44240e71e503b3"
+source = "git+https://github.com/hecrj/cosmic-text.git?rev=6adc2364289fd241daed751948a03d0aea5a31ca#6adc2364289fd241daed751948a03d0aea5a31ca"
 dependencies = [
  "bitflags 2.13.2",
  "fontdb",
@@ -1869,7 +1869,7 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 [[package]]
 name = "cryoglyph"
 version = "0.1.0"
-source = "git+https://github.com/iced-rs/cryoglyph.git?rev=e13618df29a5593968040c12ab086b7237249ded#e13618df29a5593968040c12ab086b7237249ded"
+source = "git+https://github.com/iced-rs/cryoglyph.git?rev=cf38ed5ea0cfe95270b31ced2910560a7fcc5003#cf38ed5ea0cfe95270b31ced2910560a7fcc5003"
 dependencies = [
  "cosmic-text",
  "etagere",
@@ -2287,7 +2287,7 @@ checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 [[package]]
 name = "dpi"
 version = "0.1.2"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 
 [[package]]
 name = "dtor"
@@ -3438,7 +3438,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_core",
  "iced_debug",
@@ -3456,7 +3456,7 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "bitflags 2.13.2",
  "bytes",
@@ -3475,7 +3475,7 @@ dependencies = [
 [[package]]
 name = "iced_debug"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -3506,7 +3506,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "futures",
  "iced_core",
@@ -3520,7 +3520,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
@@ -3540,7 +3540,7 @@ dependencies = [
 [[package]]
 name = "iced_highlighter"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_core",
  "two-face",
@@ -3549,7 +3549,7 @@ dependencies = [
 [[package]]
 name = "iced_program"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_graphics",
  "iced_runtime",
@@ -3558,7 +3558,7 @@ dependencies = [
 [[package]]
 name = "iced_renderer"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_graphics",
  "iced_tiny_skia",
@@ -3570,7 +3570,7 @@ dependencies = [
 [[package]]
 name = "iced_runtime"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "bytes",
  "iced_core",
@@ -3581,7 +3581,7 @@ dependencies = [
 [[package]]
 name = "iced_selector"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_core",
 ]
@@ -3589,7 +3589,7 @@ dependencies = [
 [[package]]
 name = "iced_test"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_futures",
  "iced_program",
@@ -3605,7 +3605,7 @@ dependencies = [
 [[package]]
 name = "iced_tester"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_test",
  "iced_widget",
@@ -3616,7 +3616,7 @@ dependencies = [
 [[package]]
 name = "iced_tiny_skia"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -3633,7 +3633,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
@@ -3653,7 +3653,7 @@ dependencies = [
 [[package]]
 name = "iced_widget"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "iced_highlighter",
  "iced_renderer",
@@ -3669,7 +3669,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.15.0-dev"
-source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#3abe733d8ee4b2ff1e1b731a09b0551a9a708ac6"
+source = "git+https://github.com/wilsonglasser/iced?branch=oryxis#925fd26a0afb3507e3e177f8622b245e55b132e7"
 dependencies = [
  "arboard",
  "iced_debug",
@@ -9844,7 +9844,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "cfg_aliases 0.2.2",
@@ -9870,7 +9870,7 @@ dependencies = [
 [[package]]
 name = "winit-android"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "android-activity",
  "bitflags 2.13.2",
@@ -9885,7 +9885,7 @@ dependencies = [
 [[package]]
 name = "winit-appkit"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "block2",
@@ -9907,7 +9907,7 @@ dependencies = [
 [[package]]
 name = "winit-common"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "block2",
  "dpi 0.1.2 (git+https://github.com/wilsonglasser/winit)",
@@ -9925,7 +9925,7 @@ dependencies = [
 [[package]]
 name = "winit-core"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "cursor-icon",
@@ -9939,7 +9939,7 @@ dependencies = [
 [[package]]
 name = "winit-orbital"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "dpi 0.1.2 (git+https://github.com/wilsonglasser/winit)",
@@ -9955,7 +9955,7 @@ dependencies = [
 [[package]]
 name = "winit-uikit"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "block2",
@@ -9975,7 +9975,7 @@ dependencies = [
 [[package]]
 name = "winit-wayland"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "calloop",
@@ -10002,7 +10002,7 @@ dependencies = [
 [[package]]
 name = "winit-web"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "atomic-waker",
  "bitflags 2.13.2",
@@ -10024,7 +10024,7 @@ dependencies = [
 [[package]]
 name = "winit-win32"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "cursor-icon",
@@ -10042,7 +10042,7 @@ dependencies = [
 [[package]]
 name = "winit-x11"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#d23f972a31a383be7a585928c212852d6c4ea064"
+source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
