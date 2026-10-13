@@ -253,6 +253,25 @@ impl Oryxis {
                     self.persist_setting("sftp_console_layout", layout.code());
                 }
             }
+            SettingsMessage::SftpDirDoubleClickChanged(name) => {
+                // Matched against the translated labels, as above.
+                if let Some(action) = crate::state::SftpDirDoubleClick::ALL
+                    .into_iter()
+                    .find(|a| crate::i18n::t(a.label_key()) == name)
+                {
+                    self.prefs.sftp_dir_double_click = action;
+                    self.persist_setting("sftp_dir_double_click", action.code());
+                }
+            }
+            SettingsMessage::SftpFileDoubleClickChanged(name) => {
+                if let Some(action) = crate::state::SftpFileDoubleClick::ALL
+                    .into_iter()
+                    .find(|a| crate::i18n::t(a.label_key()) == name)
+                {
+                    self.prefs.sftp_file_double_click = action;
+                    self.persist_setting("sftp_file_double_click", action.code());
+                }
+            }
             SettingsMessage::ToggleSftpAskDownloadDir => {
                 self.prefs.sftp_ask_download_dir = !self.prefs.sftp_ask_download_dir;
                 self.persist_setting(

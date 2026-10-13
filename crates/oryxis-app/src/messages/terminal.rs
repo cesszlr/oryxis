@@ -72,6 +72,12 @@ pub enum TerminalMessage {
     /// its tab's broadcast (the per-pane observer opt-out).
     TogglePaneBroadcastOptOut(Uuid),
     KeyboardEvent(keyboard::Event),
+    /// A keyboard event a widget already CAPTURED: a focused text input
+    /// typed it (an edit, a caret move, its own Ctrl+A, an `on_submit`
+    /// Enter). Handled exactly like `KeyboardEvent` except that it never
+    /// reaches the SFTP list router, whose arrows / Backspace / type-ahead
+    /// would otherwise act on the list behind the field being typed in.
+    KeyboardEventCaptured(keyboard::Event),
     /// Text committed by the OS IME (e.g. a composed CJK character).
     /// Arrives separately from `KeyboardEvent`; forwarded to the active
     /// PTY in `dispatch_terminal` behind the same focus guards.

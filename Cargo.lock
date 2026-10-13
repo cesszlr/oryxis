@@ -5292,6 +5292,7 @@ dependencies = [
  "image",
  "libc",
  "notify-rust",
+ "objc2-app-kit",
  "open",
  "oryxis-archive",
  "oryxis-biometric",

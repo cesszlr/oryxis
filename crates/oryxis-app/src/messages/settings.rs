@@ -238,6 +238,11 @@ pub enum SettingsMessage {
     /// lands (stacked / beside / zoomed). Carries the picked label,
     /// like every other pick_list row.
     SftpConsoleLayoutChanged(String),
+    /// Settings > SFTP: what a double click on a folder / a file does
+    /// in the dual-pane browser. Carry the picked label, like every
+    /// other pick_list row.
+    SftpDirDoubleClickChanged(String),
+    SftpFileDoubleClickChanged(String),
     /// Settings > SFTP: the single external editor used by the remote
     /// "Open with default text editor" action (issue #84).
     SettingSftpDefaultEditorChanged(String),

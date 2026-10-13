@@ -1412,6 +1412,18 @@ impl Oryxis {
                 // lands.
                 self.prefs.sftp_console_layout = layout;
             }
+            // Same rule for the two double-click actions: a code this
+            // build cannot read leaves FileZilla's default in place.
+            if let Ok(Some(v)) = vault.get_setting("sftp_dir_double_click")
+                && let Some(action) = crate::state::SftpDirDoubleClick::from_code(&v)
+            {
+                self.prefs.sftp_dir_double_click = action;
+            }
+            if let Ok(Some(v)) = vault.get_setting("sftp_file_double_click")
+                && let Some(action) = crate::state::SftpFileDoubleClick::from_code(&v)
+            {
+                self.prefs.sftp_file_double_click = action;
+            }
             if let Ok(Some(v)) = vault.get_setting("sftp_default_editor") {
                 self.prefs.sftp_default_editor = v;
             }

@@ -197,6 +197,12 @@ impl Oryxis {
                     .handle_terminal_keyboard(message)
                     .unwrap_or_else(crate::dispatch::unrouted);
             }
+            // `dispatch_message` unwraps this before it gets here; one that
+            // arrives anyway is handled like any key, which is all the
+            // marker ever changes outside the SFTP list router.
+            TerminalMessage::KeyboardEventCaptured(ke) => {
+                return self.handle_terminal(TerminalMessage::KeyboardEvent(ke));
+            }
             // -- Split panes --
             TerminalMessage::FocusPane(pane) => {
                 if let Some(tab_idx) = self.cur_active_tab()
