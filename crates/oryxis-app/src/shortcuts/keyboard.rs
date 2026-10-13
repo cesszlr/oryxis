@@ -126,7 +126,7 @@ impl Oryxis {
                     return Some(super::toast_clear_after_secs(2));
                 }
                 // Conflicts: the static table and other snippets.
-                let in_table = self.hotkey_bindings.values().any(|b| b.contains(&binding));
+                let in_table = self.hotkey_bindings.values().any(|b| b.shares_keypress(&binding));
                 let in_snippets = self.snippets.iter().any(|sn| {
                     self.snippet_form.editing_id != Some(sn.id)
                         && sn.hotkey.as_deref()

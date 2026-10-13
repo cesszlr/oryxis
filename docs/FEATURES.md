@@ -937,6 +937,13 @@ the app's own actions sit on `Ctrl+Shift`.
 | `Ctrl+,` | Settings |
 | `Ctrl+= / Ctrl+- / Ctrl+0` | Zoom the terminal font for the session (also `Ctrl+Wheel` and the touchpad pinch, one chord of its own with a switch beside the font size) |
 
+Settings > Shortcuts also starts from another terminal's keys (Tabby on
+every platform, iTerm2 on macOS), taken from each app's shipped defaults:
+only the actions that terminal has a key for change, mouse and wheel
+gestures stay, and the confirm names any action left without a shortcut.
+Export… and Import… carry your shortcuts to another machine as a small
+JSON file.
+
 Some verbs ship with no chord at all and wait in Settings > Shortcuts
 for one: move the tab to a new window, duplicate it in a new window,
 rename or pin it, copy its host address, close the other tabs or all of

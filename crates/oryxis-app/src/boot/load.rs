@@ -1121,8 +1121,11 @@ impl Oryxis {
                     continue;
                 };
                 for (chord, holder) in &user_chords {
+                    // By keypress, not by equality: a user's Alt+Left
+                    // shadows the factory Alt+←/→ family just the same,
+                    // and a family cannot keep half of itself.
                     if holder.is_none_or(|h| crate::hotkeys::HotkeyAction::scopes_overlap(h, *action)) {
-                        binds.remove(chord);
+                        binds.remove_sharing(chord);
                     }
                 }
                 if binds.is_empty() {

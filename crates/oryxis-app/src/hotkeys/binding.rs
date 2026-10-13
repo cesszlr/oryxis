@@ -285,6 +285,29 @@ impl HotkeyBinding {
             && modifiers.logo() == self.logo
     }
 
+    /// Whether one keypress can fire both bindings: the same modifiers,
+    /// and the same key, or a family and one of its members (`ctrl+1`
+    /// is a key of `ctrl+1...9`, `alt+left` one of `alt+←/→`). Equality
+    /// alone cannot see that pair, and dispatch would let whichever
+    /// comes first in the catalog win in silence.
+    pub fn shares_keypress(&self, other: &HotkeyBinding) -> bool {
+        if (self.ctrl, self.shift, self.alt, self.logo) != (other.ctrl, other.shift, other.alt, other.logo) {
+            return false;
+        }
+        let member = |family: PrimaryKey, key: PrimaryKey| match (family, key) {
+            (PrimaryKey::Digit1to9, PrimaryKey::Char(c)) => ('1'..='9').contains(&c),
+            (PrimaryKey::ArrowLeftRight, PrimaryKey::Named(n)) => {
+                matches!(n, Named::ArrowLeft | Named::ArrowRight)
+            }
+            _ => false,
+        };
+        let same = match (self.primary, other.primary) {
+            (PrimaryKey::Char(a), PrimaryKey::Char(b)) => a.eq_ignore_ascii_case(&b),
+            (a, b) => a == b,
+        };
+        same || member(self.primary, other.primary) || member(other.primary, self.primary)
+    }
+
     /// Whether the primary is a mouse button.
     pub fn is_mouse(&self) -> bool {
         matches!(self.primary, PrimaryKey::Mouse(_))

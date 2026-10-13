@@ -120,6 +120,20 @@ impl HotkeyBindings {
         }
     }
 
+    /// Whether any chord here fires on a keypress `binding` fires on
+    /// (`HotkeyBinding::shares_keypress`: a family counts for its members).
+    pub fn shares_keypress(&self, binding: &HotkeyBinding) -> bool {
+        self.0.iter().any(|b| b.shares_keypress(binding))
+    }
+
+    /// Drop every chord that fires on a keypress `binding` fires on; a
+    /// family goes whole. Returns whether anything went.
+    pub fn remove_sharing(&mut self, binding: &HotkeyBinding) -> bool {
+        let before = self.0.len();
+        self.0.retain(|b| !b.shares_keypress(binding));
+        self.0.len() != before
+    }
+
     /// Drop one chord. Returns whether it was there.
     pub fn remove(&mut self, binding: &HotkeyBinding) -> bool {
         let before = self.0.len();

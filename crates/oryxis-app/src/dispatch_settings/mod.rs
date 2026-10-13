@@ -37,6 +37,7 @@ mod advanced;
 mod search;
 mod locale;
 mod hotkeys;
+mod hotkey_layouts;
 mod session_logs;
 mod timers;
 mod toggles;
@@ -386,6 +387,14 @@ impl Oryxis {
             | SettingsMessage::ResetAllHotkeys
             | SettingsMessage::ToggleSecretVisibility(..)
             ) => self.handle_settings_hotkeys(m).unwrap_or_else(crate::dispatch::unrouted),
+            m @ (
+            SettingsMessage::HotkeyPresetPicked(..)
+            | SettingsMessage::ExportHotkeys
+            | SettingsMessage::HotkeysExported(..)
+            | SettingsMessage::ImportHotkeys
+            | SettingsMessage::HotkeysFileRead(..)
+            | SettingsMessage::ApplyHotkeyLayout(..)
+            ) => self.handle_settings_hotkey_layouts(m).unwrap_or_else(crate::dispatch::unrouted),
             m @ (
             SettingsMessage::SettingToggleSessionLogging
             | SettingsMessage::SettingToggleSessionLogFull

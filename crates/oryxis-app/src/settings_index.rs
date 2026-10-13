@@ -299,6 +299,9 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     // ── Shortcuts ──────────────────────────────────────────────────
     e(S::Shortcuts, "tab_slot_includes_home", "ctrl digit tab slot home first number offset shortcut"),
     e(S::Shortcuts, "hotkey_reset_all", "reset all shortcuts hotkeys defaults keybindings"),
+    e(S::Shortcuts, "hotkey_presets_label", "preset keymap layout tabby iterm2 other terminal keys shortcuts"),
+    e(S::Shortcuts, "hotkey_export", "export save shortcuts hotkeys keybindings file backup"),
+    e(S::Shortcuts, "hotkey_import", "import load shortcuts hotkeys keybindings file restore"),
     // ── Cloud ──────────────────────────────────────────────────────
     e(S::Cloud, "settings_cloud_auto_refresh", "cloud auto refresh profiles discover"),
     e(S::Cloud, "settings_cloud_auto_refresh_interval", "cloud refresh interval minutes"),
