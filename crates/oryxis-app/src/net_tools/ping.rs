@@ -331,13 +331,11 @@ fn one_rtt(rtt: f32) -> String {
 /// thing here (fall back to the binary); a setup failure is reported,
 /// because falling back would hide a bug behind a working command.
 fn native_declined(reason: Unavailable) -> Option<Vec<NetToolCard>> {
-    match reason {
-        Unavailable::Platform | Unavailable::Denied => None,
-        Unavailable::Failed(e) => {
-            tracing::debug!(error = %e, "native ICMP probe unavailable, falling back");
-            None
-        }
-    }
+    // Every refusal is logged, the expected ones included: an IPv6
+    // target on Windows takes the Platform arm, and the binary's output
+    // in the raw card is the only other trace that it ran at all.
+    tracing::debug!(?reason, "native ICMP probe unavailable, falling back");
+    None
 }
 
 /// The address the native probe aims at. Resolved here rather than
@@ -413,8 +411,8 @@ async fn run_tool(program: &str, args: &[String], budget: Duration) -> Result<St
             .status(CardStatus::Warn));
         }
     };
-    let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
-    let err = String::from_utf8_lossy(&out.stderr);
+    let mut text = decode_output(&out.stdout);
+    let err = decode_output(&out.stderr);
     if !err.trim().is_empty() {
         // Unreachable-host messages arrive on stderr in several
         // implementations, so dropping it would blank the card in
@@ -425,6 +423,71 @@ async fn run_tool(program: &str, args: &[String], budget: Duration) -> Result<St
         text.push_str(err.trim_end());
     }
     Ok(text)
+}
+
+/// A captured pipe, read back as text.
+///
+/// UTF-8 is the right assumption everywhere but on Windows, where both
+/// tools write their localized prose in a console code page, not in
+/// UTF-8: bytes a UTF-8 decoder cannot represent, and the raw card ends
+/// up a column of replacement characters. A tool that already speaks
+/// UTF-8 (a system on the UTF-8 code page, 65001) still takes the first
+/// branch, so nothing that worked before changes.
+fn decode_output(bytes: &[u8]) -> String {
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return text.to_string();
+    }
+    #[cfg(windows)]
+    {
+        // The page the tool wrote in. Under CREATE_NO_WINDOW the child
+        // gets a console of its own, and a new console opens on the
+        // system OEM page whatever this process has: none at all in a
+        // release build (`windows_subsystem = "windows"`, where
+        // `GetConsoleOutputCP` answers 0, which `MultiByteToWideChar`
+        // reads as CP_ACP, the ANSI page: the same table as OEM on a
+        // Chinese system and a different one on a Russian or German
+        // one), or a `chcp`-ed one in a debug build run from a terminal.
+        // A per-user `HKCU\Console\CodePage` override is the one input
+        // this does not see.
+        let oem = unsafe { windows_sys::Win32::Globalization::GetOEMCP() };
+        if let Some(text) = decode_with(oem, bytes) {
+            return text;
+        }
+    }
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+/// `bytes` in Windows code page `cp`, as Unicode. `None` when the OS
+/// declines the conversion, which is the caller's cue for the lossy
+/// floor. The page is a parameter so a test can name one instead of
+/// depending on the machine it runs on.
+#[cfg(windows)]
+fn decode_with(cp: u32, bytes: &[u8]) -> Option<String> {
+    use windows_sys::Win32::Globalization::MultiByteToWideChar;
+
+    // The tools' output is bounded by what the pipe carries, so the
+    // length fits the API's i32; refuse rather than truncate otherwise.
+    let len = i32::try_from(bytes.len()).ok()?;
+    if len == 0 {
+        return Some(String::new());
+    }
+    unsafe {
+        // Two calls because only the second one can say how wide the
+        // buffer has to be; both see the same bytes and the same code
+        // page, so the count the first one returns is the count the
+        // second one fills.
+        let units = MultiByteToWideChar(cp, 0, bytes.as_ptr(), len, std::ptr::null_mut(), 0);
+        if units <= 0 {
+            return None;
+        }
+        let mut wide = vec![0u16; units as usize];
+        if MultiByteToWideChar(cp, 0, bytes.as_ptr(), len, wide.as_mut_ptr(), units) <= 0 {
+            return None;
+        }
+        // Lone surrogates cannot survive the round trip; the tools do
+        // not emit them, and the lossy form is still better than bytes.
+        Some(String::from_utf16_lossy(&wide))
+    }
 }
 
 /// Where to get the missing binary. Named per tool because the packages
@@ -896,5 +959,72 @@ over a maximum of 20 hops:\r\n\r\n\
     fn header_lines_are_not_hops() {
         let out = "traceroute to example.com (93.184.216.34), 20 hops max, 60 byte packets\n";
         assert!(parse_traceroute(out).is_empty());
+    }
+
+    #[test]
+    fn utf8_output_passes_through_unchanged() {
+        let out = "traceroute to example.com, 20 hops max\n";
+        assert_eq!(decode_output(out.as_bytes()), out);
+    }
+
+    /// GBK for "中文", what a Chinese Windows `tracert` writes.
+    const GBK_CHINESE: [u8; 4] = [0xD6, 0xD0, 0xCE, 0xC4];
+    /// CP866 for "Превышен", the first word of a Russian "request timed
+    /// out"; the same bytes read as something else in the ANSI page
+    /// (1251) of that system.
+    #[cfg(windows)]
+    const OEM866_RUSSIAN: [u8; 8] = [0x8F, 0xE0, 0xA5, 0xA2, 0xEB, 0xE8, 0xA5, 0xAD];
+
+    #[cfg(not(windows))]
+    #[test]
+    fn code_page_bytes_fall_back_to_the_lossy_form() {
+        let mut bytes = GBK_CHINESE.to_vec();
+        bytes.push(b'\n');
+        assert_eq!(decode_output(&bytes), String::from_utf8_lossy(&bytes));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn code_page_bytes_are_read_in_the_oem_page() {
+        use windows_sys::Win32::Globalization::GetOEMCP;
+
+        let mut bytes = GBK_CHINESE.to_vec();
+        bytes.push(b'\n');
+        let text = decode_output(&bytes);
+        assert!(text.ends_with('\n'));
+        // Every OEM page reads these four bytes as something (box
+        // drawing on 437, 中文 on 936); only the UTF-8 page (65001)
+        // has no character for them.
+        if unsafe { GetOEMCP() } != 65001 {
+            assert!(!text.contains('\u{FFFD}'), "{text:?}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn gbk_reads_as_chinese_in_page_936() {
+        assert_eq!(decode_with(936, &GBK_CHINESE).as_deref(), Some("中文"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn oem_866_reads_as_cyrillic_and_the_ansi_page_does_not() {
+        assert_eq!(decode_with(866, &OEM866_RUSSIAN).as_deref(), Some("Превышен"));
+        assert_ne!(decode_with(1251, &OEM866_RUSSIAN).as_deref(), Some("Превышен"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn page_zero_is_the_ansi_page_not_a_refusal() {
+        // What `GetConsoleOutputCP` answers in a process with no console:
+        // not a sentinel the conversion rejects, so it must never be the
+        // page the tool's bytes are read in.
+        assert_eq!(decode_with(0, b"abc").as_deref(), Some("abc"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn an_empty_pipe_decodes_to_nothing() {
+        assert_eq!(decode_with(866, &[]).as_deref(), Some(""));
     }
 }
