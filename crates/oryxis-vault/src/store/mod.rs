@@ -577,6 +577,11 @@ impl VaultStore {
         )
         .map_err(VaultError::from)
         .map_err(VaultError::at_open_step("pragmas"))?;
+        // Again AFTER the open: a file SQLite just created (the first
+        // run, a rebuild's staging file) did not exist for the chmod
+        // above and was made with the umask's mode, and the WAL pragma
+        // has just created its `-wal` / `-shm` siblings.
+        Self::tighten_perms(&path);
 
         let mut store = Self {
             db,
