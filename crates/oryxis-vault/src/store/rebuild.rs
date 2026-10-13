@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rusqlite::types::Value;
-use rusqlite::{params_from_iter, Connection, OpenFlags};
+use rusqlite::{params_from_iter, Connection, OpenFlags, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use super::{VaultError, VaultStore};
@@ -56,12 +56,114 @@ pub struct TableRebuild {
     /// host whose folder was lost): the reference is cleared, or the
     /// row dropped when the column cannot be empty.
     pub detached: u64,
+    /// Columns of the damaged file this file could not take (a newer
+    /// build's column whose definition the engine refused to add).
+    pub lost_columns: u64,
 }
 
 impl TableRebuild {
     /// Whether anything of this table did not survive as it was.
     pub fn lost_anything(&self) -> bool {
-        self.unreadable_stretches > 0 || self.rejected > 0 || self.detached > 0
+        self.unreadable_stretches > 0 || self.rejected > 0 || self.detached > 0 || self.lost_columns > 0
+    }
+
+    fn lost(name: &str) -> Self {
+        TableRebuild {
+            name: name.to_string(),
+            copied: 0,
+            unreadable_stretches: 1,
+            rejected: 0,
+            detached: 0,
+            lost_columns: 0,
+        }
+    }
+}
+
+/// What a table holds, as the user knows it: the rebuild report speaks
+/// in these, never in table names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum DataKind {
+    /// The salt, KDF parameters and password check: without them the
+    /// master password cannot open anything.
+    VaultData,
+    Hosts,
+    Folders,
+    SessionGroups,
+    Keys,
+    Identities,
+    Proxies,
+    Snippets,
+    PortForwards,
+    KnownHosts,
+    ApprovedProxyCommands,
+    LoginScripts,
+    CloudAccounts,
+    Recordings,
+    ConnectionLog,
+    CommandHistory,
+    AiChat,
+    Themes,
+    Sync,
+    Settings,
+    /// A table this build does not know: a newer Oryxis made it.
+    Newer,
+}
+
+impl DataKind {
+    /// The kind of `table`, and whether its rows are the ones the kind
+    /// counts (a recording is a `session_logs` row; its chunks are its
+    /// content). Every table this build creates maps to a kind other
+    /// than `Newer` (`every_table_of_this_build_has_a_kind`).
+    pub fn of_table(table: &str) -> (DataKind, bool) {
+        use DataKind::*;
+        match table {
+            "vault_meta" => (VaultData, true),
+            "connections" => (Hosts, true),
+            "groups" => (Folders, true),
+            "session_groups" => (SessionGroups, true),
+            "keys" => (Keys, true),
+            "identities" => (Identities, true),
+            "proxy_identities" => (Proxies, true),
+            "snippets" => (Snippets, true),
+            "install_runs" => (Snippets, false),
+            "port_forward_rules" => (PortForwards, true),
+            "known_hosts" => (KnownHosts, true),
+            "trusted_proxy_commands" => (ApprovedProxyCommands, true),
+            "login_scripts" => (LoginScripts, true),
+            "cloud_profiles" => (CloudAccounts, true),
+            "session_logs" => (Recordings, true),
+            "session_log_chunks" => (Recordings, false),
+            "logs" => (ConnectionLog, true),
+            "command_history" => (CommandHistory, true),
+            "chat_conversations" => (AiChat, true),
+            "chat_messages" => (AiChat, false),
+            "custom_terminal_themes" | "custom_ui_themes" => (Themes, true),
+            "sync_peers" => (Sync, true),
+            "sync_metadata" => (Sync, false),
+            "settings" => (Settings, true),
+            _ => (Newer, true),
+        }
+    }
+}
+
+/// One kind's outcome, summed over its tables.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindRebuild {
+    pub kind: DataKind,
+    /// Items of the kind kept (hosts, recordings, conversations).
+    pub kept: u64,
+    /// Damaged stretches and refused rows among those items.
+    pub skipped: u64,
+    /// The items were kept but part of their content was not (a
+    /// recording missing chunks, a conversation missing messages).
+    pub content_gaps: bool,
+    /// Items kept without a reference to something the damage took.
+    pub detached: u64,
+}
+
+impl KindRebuild {
+    pub fn lost_anything(&self) -> bool {
+        self.skipped > 0 || self.content_gaps || self.detached > 0
     }
 }
 
@@ -83,6 +185,30 @@ impl RebuildReport {
 
     pub fn copied_total(&self) -> u64 {
         self.tables.iter().map(|t| t.copied).sum()
+    }
+
+    /// The report by kind, in `DataKind` order.
+    pub fn by_kind(&self) -> Vec<KindRebuild> {
+        let mut kinds: std::collections::BTreeMap<DataKind, KindRebuild> = Default::default();
+        for t in &self.tables {
+            let (kind, counts) = DataKind::of_table(&t.name);
+            let entry = kinds.entry(kind).or_insert(KindRebuild {
+                kind,
+                kept: 0,
+                skipped: 0,
+                content_gaps: false,
+                detached: 0,
+            });
+            if counts {
+                entry.kept += t.copied;
+                entry.skipped += t.unreadable_stretches + t.rejected;
+                entry.content_gaps |= t.lost_columns > 0;
+            } else {
+                entry.content_gaps |= t.unreadable_stretches + t.rejected + t.lost_columns > 0;
+            }
+            entry.detached += t.detached;
+        }
+        kinds.into_values().collect()
     }
 }
 
@@ -129,10 +255,15 @@ pub fn rebuild_vault(path: &Path) -> Result<RebuildReport, VaultError> {
     let mut report = Vec::with_capacity(tables.len());
     let result = (|| -> Result<(), VaultError> {
         for table in &tables {
-            let Some(plan) = copy_plan(&src, dst, table)? else {
-                continue;
-            };
-            report.push(copy_table(&src, dst, &plan)?);
+            match copy_plan(&src, dst, table)? {
+                Some((plan, lost_columns)) => {
+                    let mut done = copy_table(&src, dst, &plan)?;
+                    done.lost_columns = lost_columns;
+                    report.push(done);
+                }
+                // Not even its definition could be carried over.
+                None => report.push(TableRebuild::lost(table)),
+            }
         }
         detach_dangling_references(dst, &mut report)?;
         dst.execute_batch(
@@ -175,14 +306,44 @@ fn source_tables(src: &Connection) -> Result<Vec<String>, VaultError> {
     Ok(names)
 }
 
-/// Columns both files have for `table`; `None` when the new schema no
-/// longer has the table (nothing to carry it into).
-fn copy_plan(src: &Connection, dst: &Connection, table: &str) -> Result<Option<CopyPlan>, VaultError> {
-    let dst_cols = table_columns(dst, table)?;
+/// How `table` is copied, and how many of its columns could not be.
+/// A table or a column the damaged file has and this build's schema
+/// does not (a newer Oryxis made it, then the app was downgraded) is
+/// recreated in the new file from the damaged file's own definition
+/// rather than left behind. `None` when the table could not be carried
+/// over at all.
+fn copy_plan(src: &Connection, dst: &Connection, table: &str) -> Result<Option<(CopyPlan, u64)>, VaultError> {
+    let mut dst_cols = table_columns(dst, table)?;
     if dst_cols.is_empty() {
-        return Ok(None);
+        if !recreate_newer_table(src, dst, table)? {
+            return Ok(None);
+        }
+        dst_cols = table_columns(dst, table)?;
     }
     let src_cols = table_columns(src, table)?;
+    let mut lost_columns = 0;
+    let mut added = false;
+    for c in &src_cols {
+        if dst_cols.iter().any(|d| d.name == c.name) {
+            continue;
+        }
+        // Added as a plain column of the declared type: an ALTER cannot
+        // add a NOT NULL column without a default, and the data matters
+        // more than the constraint.
+        let sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            quote_ident(table),
+            quote_ident(&c.name),
+            c.declared
+        );
+        match dst.execute_batch(&sql) {
+            Ok(()) => added = true,
+            Err(_) => lost_columns += 1,
+        }
+    }
+    if added {
+        dst_cols = table_columns(dst, table)?;
+    }
     // Only a lone `INTEGER PRIMARY KEY` aliases the rowid; a composite
     // key with an INTEGER part does not.
     let pk: Vec<&ColumnInfo> = dst_cols.iter().filter(|c| c.pk).collect();
@@ -198,7 +359,38 @@ fn copy_plan(src: &Connection, dst: &Connection, table: &str) -> Result<Option<C
     if columns.is_empty() {
         return Ok(None);
     }
-    Ok(Some(CopyPlan { name: table.to_string(), columns, rowid_is_key }))
+    Ok(Some((CopyPlan { name: table.to_string(), columns, rowid_is_key }, lost_columns)))
+}
+
+/// Create in the new file a table this build does not know, from the
+/// damaged file's own `CREATE TABLE`, with its indexes (an index the
+/// engine refuses is left out: the rows matter, the index is rebuilt by
+/// whoever needs it). Its triggers are not carried: they belong to the
+/// code of the build that wrote them.
+fn recreate_newer_table(src: &Connection, dst: &Connection, table: &str) -> Result<bool, VaultError> {
+    let sql: Option<String> = src
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            [table],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let Some(sql) = sql else {
+        return Ok(false);
+    };
+    if dst.execute_batch(&sql).is_err() {
+        return Ok(false);
+    }
+    let indexes: Vec<String> = {
+        let mut stmt = src.prepare(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ?1 AND sql IS NOT NULL",
+        )?;
+        stmt.query_map([table], |r| r.get(0))?.collect::<Result<_, _>>()?
+    };
+    for index in indexes {
+        let _ = dst.execute_batch(&index);
+    }
+    Ok(true)
 }
 
 struct ColumnInfo {
@@ -243,6 +435,7 @@ fn copy_table(src: &Connection, dst: &Connection, plan: &CopyPlan) -> Result<Tab
         unreadable_stretches: 0,
         rejected: 0,
         detached: 0,
+        lost_columns: 0,
     };
     // A statement that cannot even be prepared (the table's own schema
     // row is unreadable) is a table lost whole.

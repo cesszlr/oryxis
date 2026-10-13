@@ -331,46 +331,44 @@ impl Oryxis {
                     .push(rebuild_button(true));
             }
             VaultRebuild::Done { report, restart_failed } => {
-                col = col.push(
-                    text(t("vault_rebuild_done").replace("{rows}", &report.copied_total().to_string()))
-                        .size(14)
-                        .color(c.text_primary)
-                        .boxed(),
-                );
-                let damaged = report.damaged_tables();
-                if damaged.is_empty() {
+                col = col.push(text(t("vault_rebuild_finished")).size(14).color(c.text_primary).boxed());
+                let lost: Vec<oryxis_vault::KindRebuild> =
+                    report.by_kind().into_iter().filter(|k| k.lost_anything()).collect();
+                if lost.is_empty() {
                     col = col.push(text(t("vault_rebuild_nothing_lost")).size(13).color(c.text_secondary).boxed());
                 }
-                for table in damaged {
-                    // Rows read whole but refused by the new file are
-                    // skipped parts too, from the user's side.
-                    let skipped = table.unreadable_stretches + table.rejected;
-                    if skipped > 0 {
-                        col = col.push(
-                            text(
-                                t("vault_rebuild_table_line")
-                                    .replace("{table}", &table.name)
-                                    .replace("{rows}", &table.copied.to_string())
-                                    .replace("{stretches}", &skipped.to_string()),
-                            )
-                            .size(13)
-                            .selectable(true)
-                            .color(c.text_secondary)
-                            .boxed(),
+                for k in &lost {
+                    let label = rebuild_kind_label(k.kind);
+                    if k.kind == oryxis_vault::DataKind::VaultData {
+                        // Without its salt, parameters and password check
+                        // the rebuilt file may refuse the master password.
+                        col = col.push(text(t("vault_rebuild_vault_data_damaged")).size(13).color(c.error).boxed());
+                    }
+                    let mut lines: Vec<String> = Vec::new();
+                    if k.skipped > 0 {
+                        lines.push(
+                            t("vault_rebuild_kind_line")
+                                .replace("{kind}", label)
+                                .replace("{kept}", &k.kept.to_string())
+                                .replace("{skipped}", &k.skipped.to_string()),
                         );
                     }
-                    if table.detached > 0 {
-                        col = col.push(
-                            text(
-                                t("vault_rebuild_detached_line")
-                                    .replace("{table}", &table.name)
-                                    .replace("{count}", &table.detached.to_string()),
-                            )
-                            .size(13)
-                            .selectable(true)
-                            .color(c.text_secondary)
-                            .boxed(),
+                    if k.content_gaps {
+                        lines.push(
+                            t("vault_rebuild_kind_gaps")
+                                .replace("{kind}", label)
+                                .replace("{kept}", &k.kept.to_string()),
                         );
+                    }
+                    if k.detached > 0 {
+                        lines.push(
+                            t("vault_rebuild_kind_detached")
+                                .replace("{kind}", label)
+                                .replace("{count}", &k.detached.to_string()),
+                        );
+                    }
+                    for line in lines {
+                        col = col.push(text(line).size(13).selectable(true).color(c.text_secondary).boxed());
                     }
                 }
                 col = col.push(
@@ -396,4 +394,32 @@ impl Oryxis {
     }
 
     // -- Main layout --
+}
+
+/// The name a user knows for what a vault table holds.
+fn rebuild_kind_label(kind: oryxis_vault::DataKind) -> &'static str {
+    use oryxis_vault::DataKind as K;
+    t(match kind {
+        K::VaultData => "rebuild_kind_vault_data",
+        K::Hosts => "hosts",
+        K::Folders => "groups",
+        K::SessionGroups => "session_groups",
+        K::Keys => "keychain",
+        K::Identities => "identities",
+        K::Proxies => "proxies",
+        K::Snippets => "snippets",
+        K::PortForwards => "port_forwarding",
+        K::KnownHosts => "known_hosts",
+        K::ApprovedProxyCommands => "rebuild_kind_approved_proxies",
+        K::LoginScripts => "login_scripts",
+        K::CloudAccounts => "cloud_accounts",
+        K::Recordings => "rebuild_kind_recordings",
+        K::ConnectionLog => "rebuild_kind_connection_log",
+        K::CommandHistory => "tab_tip_history",
+        K::AiChat => "tab_tip_chat",
+        K::Themes => "rebuild_kind_themes",
+        K::Sync => "sync",
+        K::Settings => "settings",
+        K::Newer => "rebuild_kind_newer",
+    })
 }

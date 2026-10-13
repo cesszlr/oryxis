@@ -2,7 +2,7 @@
 //! (issue #250's file) refuses to open and is rebuilt around the damage.
 
 use super::*;
-use crate::store::rebuild::rebuild_vault;
+use crate::store::rebuild::{rebuild_vault, DataKind};
 use std::io::{Seek, SeekFrom, Write};
 
 /// A vault in the 0.19 shape (no `session_logs.bytes`, no triggers) so
@@ -213,4 +213,79 @@ fn hosts_in_a_folder_the_damage_took_are_kept_at_the_top_level() {
         .map(|r| r.unwrap())
         .collect();
     assert!(fk.is_empty(), "{fk:?}");
+}
+
+#[test]
+fn every_table_of_this_build_has_a_kind() {
+    let vault = temp_vault();
+    let tables: Vec<String> = vault
+        .db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    assert!(tables.len() > 20, "{tables:?}");
+    for t in &tables {
+        assert_ne!(DataKind::of_table(t).0, DataKind::Newer, "{t} has no kind in DataKind::of_table");
+    }
+}
+
+/// A downgrade leaves a newer build's table and column in the file:
+/// the rebuild carries both instead of dropping them in silence.
+#[test]
+fn a_newer_builds_table_and_column_survive_the_rebuild() {
+    let tmp = NamedTempFile::new().unwrap();
+    let path = tmp.path().to_path_buf();
+    std::mem::forget(tmp);
+    {
+        let mut v = VaultStore::open(&path).unwrap();
+        v.set_master_password("pw").unwrap();
+        v.save_connection(&Connection::new("h", "h.example.com"), None).unwrap();
+        v.db.execute_batch(
+            "CREATE TABLE future_things (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+             CREATE INDEX idx_future_payload ON future_things(payload);
+             INSERT INTO future_things VALUES ('a', 'one'), ('b', 'two'), ('c', 'three');
+             ALTER TABLE connections ADD COLUMN future_flag TEXT;
+             UPDATE connections SET future_flag = 'kept';",
+        )
+        .unwrap();
+    }
+    let report = rebuild_vault(&path).unwrap();
+    let newer = report.by_kind().into_iter().find(|k| k.kind == DataKind::Newer).unwrap();
+    assert_eq!(newer.kept, 3, "{newer:?}");
+    assert!(!newer.lost_anything(), "{newer:?}");
+    assert!(report.damaged_tables().is_empty(), "{report:?}");
+
+    let v = VaultStore::open(&path).unwrap();
+    let rows: i64 = v.db.query_row("SELECT count(*) FROM future_things", [], |r| r.get(0)).unwrap();
+    assert_eq!(rows, 3);
+    let index: i64 = v
+        .db
+        .query_row("SELECT count(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_future_payload'", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(index, 1);
+    let flag: String = v.db.query_row("SELECT future_flag FROM connections", [], |r| r.get(0)).unwrap();
+    assert_eq!(flag, "kept");
+}
+
+#[test]
+fn the_report_speaks_in_kinds() {
+    let tmp = NamedTempFile::new().unwrap();
+    let path = tmp.path().to_path_buf();
+    std::mem::forget(tmp);
+    vault_in_0_19_shape(&path);
+    damage_chunk_pages(&path);
+    let report = rebuild_vault(&path).unwrap();
+    let kinds = report.by_kind();
+    let lost: Vec<_> = kinds.iter().filter(|k| k.lost_anything()).collect();
+    assert_eq!(lost.len(), 1, "{lost:?}");
+    // Every recording survives; part of their content does not.
+    assert_eq!(lost[0].kind, DataKind::Recordings);
+    assert_eq!(lost[0].kept, 6);
+    assert_eq!(lost[0].skipped, 0);
+    assert!(lost[0].content_gaps);
+    let hosts = kinds.iter().find(|k| k.kind == DataKind::Hosts).unwrap();
+    assert_eq!(hosts.kept, 3);
 }
