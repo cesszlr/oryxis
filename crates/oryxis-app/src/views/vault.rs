@@ -2,7 +2,7 @@
 
 use iced::Widget as _;
 use iced::border::Radius;
-use iced::widget::{button, column, container, svg, text, Space};
+use iced::widget::{button, column, container, svg, text, Column, Space};
 use iced::{Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{VaultMessage, Message, Oryxis};
@@ -231,8 +231,11 @@ impl Oryxis {
     /// it: the chrome bar above is the way out.
     pub(crate) fn view_vault_open_failed(&self) -> Element<'_, Message> {
         let c = OryxisColors::t();
-        let vault_path = oryxis_core::paths::oryxis_dir()
-            .map(|d| d.join("vault.db").display().to_string())
+        // The rows this screen records for the keyboard (the rebuild and
+        // the restart), fresh every frame.
+        self.modal_nav_reset();
+        let vault_path = oryxis_vault::VaultStore::default_path()
+            .map(|p| p.display().to_string())
             .unwrap_or_else(|| "~/.oryxis/vault.db".to_string());
         let log_path = crate::logging::log_path()
             .map(|p| p.display().to_string())
@@ -259,6 +262,8 @@ impl Oryxis {
                     // Refused on purpose, with the reason: see
                     // `VaultUi::open_read_only`.
                     "vault_open_read_only_hint"
+                } else if self.vault_ui.open_corrupt {
+                    "vault_open_corrupt_hint"
                 } else {
                     "vault_open_failed_hint"
                 }))
@@ -273,6 +278,9 @@ impl Oryxis {
                     .color(c.text_secondary)
                     .boxed(),
             );
+        if self.vault_ui.open_corrupt {
+            col = col.push(self.vault_rebuild_block());
+        }
         let body: Element<'_, Message> = container(container(col).width(Length::Fixed(640.0)).padding(24))
             .center(Length::Fill)
             .style(|_| container::Style {
@@ -283,6 +291,108 @@ impl Oryxis {
             .height(Length::Fill)
             .boxed();
         with_chrome(body, self.cur_maximized())
+    }
+
+    /// The repair offered for a damaged vault file, by where it stands.
+    fn vault_rebuild_block(&self) -> Element<'_, Message> {
+        use crate::keynav::RowAction;
+        use crate::state::VaultRebuild;
+        let c = OryxisColors::t();
+        let rebuild_msg = Message::Vault(VaultMessage::RebuildDamagedVault);
+        let rebuild_button = |enabled: bool| -> Element<'_, Message> {
+            let msg = enabled.then(|| rebuild_msg.clone());
+            let el = crate::widgets::styled_button_opt(t("vault_rebuild_button"), msg.clone(), c.accent);
+            match msg {
+                Some(m) => self.modal_nav_slot(RowAction::activate(m), 8.0, true, el),
+                None => el,
+            }
+        };
+        let mut col = Column::<Element<'_, Message>>::new().spacing(10).padding(Padding::ZERO.top(8.0));
+        match &self.vault_ui.rebuild {
+            VaultRebuild::Idle => {
+                col = col
+                    .push(text(t("vault_rebuild_explain")).size(13).color(c.text_secondary).boxed())
+                    .push(rebuild_button(true));
+            }
+            VaultRebuild::Running => {
+                col = col
+                    .push(text(t("vault_rebuild_running")).size(13).color(c.text_primary).boxed())
+                    .push(rebuild_button(false));
+            }
+            VaultRebuild::Failed(e) => {
+                col = col
+                    .push(
+                        text(t("vault_rebuild_failed").replace("{error}", e))
+                            .size(13)
+                            .selectable(true)
+                            .color(c.error)
+                            .boxed(),
+                    )
+                    .push(rebuild_button(true));
+            }
+            VaultRebuild::Done { report, restart_failed } => {
+                col = col.push(
+                    text(t("vault_rebuild_done").replace("{rows}", &report.copied_total().to_string()))
+                        .size(14)
+                        .color(c.text_primary)
+                        .boxed(),
+                );
+                let damaged = report.damaged_tables();
+                if damaged.is_empty() {
+                    col = col.push(text(t("vault_rebuild_nothing_lost")).size(13).color(c.text_secondary).boxed());
+                }
+                for table in damaged {
+                    // Rows read whole but refused by the new file are
+                    // skipped parts too, from the user's side.
+                    let skipped = table.unreadable_stretches + table.rejected;
+                    if skipped > 0 {
+                        col = col.push(
+                            text(
+                                t("vault_rebuild_table_line")
+                                    .replace("{table}", &table.name)
+                                    .replace("{rows}", &table.copied.to_string())
+                                    .replace("{stretches}", &skipped.to_string()),
+                            )
+                            .size(13)
+                            .selectable(true)
+                            .color(c.text_secondary)
+                            .boxed(),
+                        );
+                    }
+                    if table.detached > 0 {
+                        col = col.push(
+                            text(
+                                t("vault_rebuild_detached_line")
+                                    .replace("{table}", &table.name)
+                                    .replace("{count}", &table.detached.to_string()),
+                            )
+                            .size(13)
+                            .selectable(true)
+                            .color(c.text_secondary)
+                            .boxed(),
+                        );
+                    }
+                }
+                col = col.push(
+                    text(t("vault_rebuild_kept_at").replace("{path}", &report.damaged_path.display().to_string()))
+                        .size(13)
+                        .selectable(true)
+                        .color(c.text_secondary)
+                        .boxed(),
+                );
+                let restart = Message::Vault(VaultMessage::RestartAfterVaultRebuild);
+                col = col.push(self.modal_nav_slot(
+                    RowAction::activate(restart.clone()),
+                    8.0,
+                    true,
+                    styled_button(t("vault_rebuild_restart"), restart, c.accent),
+                ));
+                if *restart_failed {
+                    col = col.push(text(t("vault_rebuild_restart_failed")).size(13).color(c.error).boxed());
+                }
+            }
+        }
+        col.boxed()
     }
 
     // -- Main layout --

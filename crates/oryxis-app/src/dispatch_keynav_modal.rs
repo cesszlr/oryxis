@@ -53,6 +53,11 @@ impl Oryxis {
         if self.editing_hotkey.is_some() {
             return None;
         }
+        // No vault could be opened: the error screen is the whole window,
+        // and nothing else can be on it.
+        if self.vault.is_none() && self.vault_ui.state == crate::state::VaultState::Loading {
+            return Some((ModalSurface::VaultOpenFailed, SurfaceFamily::Confirm));
+        }
         if let Some(ov) = &self.overlay {
             let family = match &ov.content {
                 // Hover popover and the floating search field have no
