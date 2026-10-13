@@ -97,13 +97,12 @@ impl Oryxis {
     }
 
     /// The toast for a client that is up: the port it was pointed at, or,
-    /// when the stored password could not be handed over, why the client
-    /// is about to ask for it (the one thing the user needs to hear).
+    /// when the stored password did not reach it, why (the one thing the
+    /// user needs to hear): the store refused, or Windows' own saved
+    /// credential for the host was used instead.
     fn toast_launched(&mut self, port: u16, launched: &Launched) {
-        match launched.password_handoff_error.as_deref() {
-            Some(e) => self.set_toast(
-                crate::i18n::t("remote_desktop_password_handoff_failed").replace("{error}", e),
-            ),
+        match launched_notice(launched) {
+            Some(text) => self.set_toast(text),
             None => self.set_toast(
                 crate::i18n::t("remote_desktop_opening").replace("{port}", &port.to_string()),
             ),
@@ -354,14 +353,10 @@ impl Oryxis {
                             .send(Message::RemoteDesktop(RemoteDesktopMessage::RemoteDesktopReady(conn_id, seq, Ok((session, port)))))
                             .await;
                         // After `Ready`'s own toast, so the one the user
-                        // needs (the client is about to ask for the
-                        // password, and why) is the one that stays.
-                        if let Some(e) = launched.password_handoff_error.as_deref() {
-                            let _ = sender
-                                .send(Message::ToastShow(
-                                    crate::i18n::t("remote_desktop_password_handoff_failed").replace("{error}", e),
-                                ))
-                                .await;
+                        // needs (the stored password did not reach the
+                        // client, and why) is the one that stays.
+                        if let Some(text) = launched_notice(&launched) {
+                            let _ = sender.send(Message::ToastShow(text)).await;
                         }
                         let _ = closed.wait_for(|&c| c).await;
                         let _ = sender
@@ -379,6 +374,18 @@ impl Oryxis {
 
         Task::stream(stream)
     }
+}
+
+/// What the user has to hear about a launch whose stored password did
+/// not reach the client, `None` when it did (or there was none).
+fn launched_notice(launched: &Launched) -> Option<String> {
+    if let Some(e) = launched.password_handoff_error.as_deref() {
+        return Some(crate::i18n::t("remote_desktop_password_handoff_failed").replace("{error}", e));
+    }
+    launched
+        .credential_kept_for
+        .as_deref()
+        .map(|host| crate::i18n::t("remote_desktop_windows_credential_kept").replace("{host}", host))
 }
 
 /// The spawn leaf both launch paths share: pick the client installed

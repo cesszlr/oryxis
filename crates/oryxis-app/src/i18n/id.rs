@@ -434,6 +434,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Klien desktop jarak jauh tidak ditemukan; pasang salah satu dari",
         "remote_desktop_tunnel_failed" => "Tunnel desktop jarak jauh gagal",
         "remote_desktop_password_handoff_failed" => "Kata sandi tersimpan tidak dapat diserahkan ke klien desktop jarak jauh, yang akan memintanya: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows sudah menyimpan kredensial untuk {host}; klien memakai kredensial itu, bukan kata sandi yang tersimpan di sini",
         "section_compatibility" => "Kompatibilitas",
         "editor_preset_heading" => "Mulai dari",
         "preset_basic_ssh" => "SSH dasar",

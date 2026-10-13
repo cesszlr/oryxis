@@ -888,9 +888,9 @@ impl Oryxis {
         // update (no-op on Unix), before the plugin tasks below may lay
         // down a fresh launcher copy.
         crate::mcp_install::sweep_stale_launcher();
-        // Connection files a crashed process left for mstsc: nothing
-        // reads them any more (issue #251).
-        crate::remote_desktop::sweep_stale_rdp_files();
+        // Credential Manager entries a crashed process staged for mstsc
+        // and never removed (no-op on Unix, issue #251).
+        crate::remote_desktop::sweep_stale_credentials();
         // Recording rows a previous process spooled under its soft lock
         // are sealed under a key that died with it (`session_spool`).
         crate::session_spool::SessionSpool::sweep_stale();

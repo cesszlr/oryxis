@@ -434,6 +434,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "کلاینت دسکتاپ راه دور یافت نشد؛ یکی از این‌ها را نصب کنید",
         "remote_desktop_tunnel_failed" => "تونل دسکتاپ راه دور ناموفق بود",
         "remote_desktop_password_handoff_failed" => "گذرواژه ذخیره‌شده به کلاینت دسکتاپ از راه دور تحویل داده نشد؛ کلاینت آن را خواهد پرسید: {error}",
+        "remote_desktop_windows_credential_kept" => "ویندوز از قبل یک اعتبارنامه ذخیره‌شده برای {host} دارد؛ کلاینت از همان استفاده کرد، نه از گذرواژه ذخیره‌شده در اینجا",
         "section_compatibility" => "سازگاری",
         "editor_preset_heading" => "شروع از",
         "preset_basic_ssh" => "SSH ساده",

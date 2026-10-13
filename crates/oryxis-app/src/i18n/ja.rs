@@ -431,6 +431,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "リモートデスクトップクライアントが見つかりません。次のいずれかをインストールしてください",
         "remote_desktop_tunnel_failed" => "リモートデスクトップのトンネルに失敗しました",
         "remote_desktop_password_handoff_failed" => "保存されたパスワードをリモートデスクトップクライアントに渡せませんでした。クライアント側で入力を求められます: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows には {host} の資格情報が既に保存されています。クライアントはここに保存されたパスワードではなく、その資格情報を使用しました",
         "section_compatibility" => "互換性",
         "editor_preset_heading" => "ここから開始",
         "preset_basic_ssh" => "基本 SSH",

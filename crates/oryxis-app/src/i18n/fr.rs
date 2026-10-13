@@ -431,6 +431,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Aucun client de bureau à distance trouvé ; installez l'un de",
         "remote_desktop_tunnel_failed" => "Échec du tunnel de bureau à distance",
         "remote_desktop_password_handoff_failed" => "Le mot de passe enregistré n'a pas pu être transmis au client de bureau à distance, qui le demandera : {error}",
+        "remote_desktop_windows_credential_kept" => "Windows a déjà un identifiant enregistré pour {host} ; le client l'a utilisé, pas le mot de passe enregistré ici",
         "section_compatibility" => "Compatibilité",
         "editor_preset_heading" => "Partir de",
         "preset_basic_ssh" => "SSH basique",

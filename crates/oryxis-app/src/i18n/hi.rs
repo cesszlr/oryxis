@@ -453,6 +453,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "कोई रिमोट-डेस्कटॉप क्लाइंट नहीं मिला; इनमें से एक इंस्टॉल करें",
         "remote_desktop_tunnel_failed" => "रिमोट डेस्कटॉप टनल विफल",
         "remote_desktop_password_handoff_failed" => "सहेजा गया पासवर्ड रिमोट डेस्कटॉप क्लाइंट को नहीं सौंपा जा सका; क्लाइंट इसे स्वयं पूछेगा: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows में {host} के लिए पहले से सहेजा गया क्रेडेंशियल है; क्लाइंट ने यहाँ सहेजे गए पासवर्ड के बजाय उसी का उपयोग किया",
         "section_compatibility" => "संगतता",
         "editor_preset_heading" => "यहाँ से शुरू करें",
         "preset_basic_ssh" => "बेसिक SSH",

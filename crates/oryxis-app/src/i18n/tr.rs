@@ -434,6 +434,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Uzak masaüstü istemcisi bulunamadı; şunlardan birini kurun",
         "remote_desktop_tunnel_failed" => "Uzak masaüstü tüneli başarısız oldu",
         "remote_desktop_password_handoff_failed" => "Kayıtlı parola uzak masaüstü istemcisine aktarılamadı; istemci parolayı soracak: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows'ta {host} için kayıtlı bir kimlik bilgisi zaten var; istemci burada saklanan parolayı değil onu kullandı",
         "section_compatibility" => "Uyumluluk",
         "editor_preset_heading" => "Şununla başla",
         "preset_basic_ssh" => "Temel SSH",

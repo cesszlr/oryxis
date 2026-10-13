@@ -453,6 +453,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Δεν βρέθηκε πρόγραμμα απομακρυσμένης επιφάνειας. Εγκαταστήστε ένα από τα",
         "remote_desktop_tunnel_failed" => "Το tunnel της απομακρυσμένης επιφάνειας απέτυχε",
         "remote_desktop_password_handoff_failed" => "Ο αποθηκευμένος κωδικός δεν μπόρεσε να δοθεί στο πρόγραμμα-πελάτη απομακρυσμένης επιφάνειας εργασίας, που θα τον ζητήσει: {error}",
+        "remote_desktop_windows_credential_kept" => "Τα Windows έχουν ήδη αποθηκευμένα διαπιστευτήρια για το {host}· το πρόγραμμα-πελάτης χρησιμοποίησε αυτά, όχι τον κωδικό που είναι αποθηκευμένος εδώ",
         "section_compatibility" => "Συμβατότητα",
         "editor_preset_heading" => "Ξεκινήστε από",
         "preset_basic_ssh" => "Βασικό SSH",

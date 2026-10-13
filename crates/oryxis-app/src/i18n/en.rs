@@ -453,6 +453,7 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "remote_desktop_no_client" => "No remote-desktop client found; install one of",
         "remote_desktop_tunnel_failed" => "Remote desktop tunnel failed",
         "remote_desktop_password_handoff_failed" => "The saved password could not be handed to the desktop client, which will ask for it: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows already holds a saved credential for {host}; the client used that one, not the password stored here",
         "section_compatibility" => "Compatibility",
         "editor_preset_heading" => "Start from",
         "preset_basic_ssh" => "Basic SSH",

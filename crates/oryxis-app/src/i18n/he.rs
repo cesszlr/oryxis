@@ -453,6 +453,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "לא נמצא לקוח שולחן עבודה מרוחק; התקינו אחד מאלה",
         "remote_desktop_tunnel_failed" => "מנהרת שולחן העבודה המרוחק נכשלה",
         "remote_desktop_password_handoff_failed" => "לא ניתן היה להעביר את הסיסמה השמורה ללקוח שולחן העבודה המרוחק, והוא יבקש אותה: {error}",
+        "remote_desktop_windows_credential_kept" => "ב-Windows כבר שמורים פרטי כניסה עבור {host}; הלקוח השתמש בהם, ולא בסיסמה השמורה כאן",
         "section_compatibility" => "תאימות",
         "editor_preset_heading" => "התחל מ",
         "preset_basic_ssh" => "SSH בסיסי",

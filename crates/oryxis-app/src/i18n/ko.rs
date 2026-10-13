@@ -434,6 +434,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "원격 데스크톱 클라이언트를 찾을 수 없습니다. 다음 중 하나를 설치하세요",
         "remote_desktop_tunnel_failed" => "원격 데스크톱 터널 실패",
         "remote_desktop_password_handoff_failed" => "저장된 비밀번호를 원격 데스크톱 클라이언트에 전달하지 못했습니다. 클라이언트에서 직접 입력해야 합니다: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows에 {host}에 대한 저장된 자격 증명이 이미 있습니다. 클라이언트는 여기에 저장된 비밀번호가 아니라 그 자격 증명을 사용했습니다",
         "section_compatibility" => "호환성",
         "editor_preset_heading" => "시작 방식",
         "preset_basic_ssh" => "기본 SSH",

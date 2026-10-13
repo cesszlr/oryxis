@@ -434,6 +434,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Клієнт віддаленого робочого столу не знайдено; встановіть один із",
         "remote_desktop_tunnel_failed" => "Помилка тунелю віддаленого робочого столу",
         "remote_desktop_password_handoff_failed" => "Збережений пароль не вдалося передати клієнту віддаленого робочого стола, він запитає його сам: {error}",
+        "remote_desktop_windows_credential_kept" => "У Windows уже збережено облікові дані для {host}; клієнт використав їх, а не пароль, збережений тут",
         "section_compatibility" => "Сумісність",
         "editor_preset_heading" => "Почати з",
         "preset_basic_ssh" => "Базовий SSH",

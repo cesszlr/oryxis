@@ -431,6 +431,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "找不到遠端桌面用戶端；請安裝以下其中之一",
         "remote_desktop_tunnel_failed" => "遠端桌面隧道失敗",
         "remote_desktop_password_handoff_failed" => "已儲存的密碼無法交給遠端桌面用戶端，用戶端將要求輸入：{error}",
+        "remote_desktop_windows_credential_kept" => "Windows 已為 {host} 儲存了認證；用戶端使用的是該認證，而不是此處儲存的密碼",
         "section_compatibility" => "相容性",
         "editor_preset_heading" => "從範本開始",
         "preset_basic_ssh" => "基礎 SSH",

@@ -247,9 +247,9 @@ windows = { version = "0.62", features = [
     "Win32_System_Memory",
     "Win32_System_DataExchange",
     "Win32_System_SystemServices",
-    # Remote desktop launch (issue #251): CryptProtectData for the
-    # `password 51:b:` line of the `.rdp` handed to mstsc.
-    "Win32_Security_Cryptography",
+    # Remote desktop launch (issue #251): the Credential Manager entry
+    # (`TERMSRV/<host>`) mstsc reads its saved login from.
+    "Win32_Security_Credentials",
 ] }
 # The toast backend notify-rust itself uses on Windows, called directly so
 # the toast carries our AppUserModelID instead of the `POWERSHELL_APP_ID`

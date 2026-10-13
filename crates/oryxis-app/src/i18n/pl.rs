@@ -434,6 +434,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Nie znaleziono klienta pulpitu zdalnego; zainstaluj jeden z",
         "remote_desktop_tunnel_failed" => "Tunel pulpitu zdalnego nie powiódł się",
         "remote_desktop_password_handoff_failed" => "Nie udało się przekazać zapisanego hasła klientowi pulpitu zdalnego; klient o nie zapyta: {error}",
+        "remote_desktop_windows_credential_kept" => "Windows ma już zapisane poświadczenie dla {host}; klient użył jego, a nie hasła zapisanego tutaj",
         "section_compatibility" => "Zgodność",
         "editor_preset_heading" => "Zacznij od",
         "preset_basic_ssh" => "Podstawowe SSH",

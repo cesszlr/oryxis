@@ -431,6 +431,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "未找到远程桌面客户端；请安装以下之一",
         "remote_desktop_tunnel_failed" => "远程桌面隧道失败",
         "remote_desktop_password_handoff_failed" => "已保存的密码无法交给远程桌面客户端，客户端将要求输入：{error}",
+        "remote_desktop_windows_credential_kept" => "Windows 已为 {host} 保存了凭据；客户端使用的是该凭据，而不是此处保存的密码",
         "section_compatibility" => "兼容性",
         "editor_preset_heading" => "从模板开始",
         "preset_basic_ssh" => "基础 SSH",

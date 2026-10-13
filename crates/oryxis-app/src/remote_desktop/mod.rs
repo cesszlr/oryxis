@@ -14,11 +14,15 @@
 //! putting the password on a command line (visible to every process on
 //! the machine for as long as the client runs):
 //!
-//! - Windows `mstsc` reads a connection file (`rdp_file`): the username
-//!   and the DPAPI-protected password (`password 51:b:`, the exact shape
-//!   mstsc itself saves) in a `.rdp` written under `~/.oryxis/runtime/rdp/`
-//!   for the launch and removed when the client exits (issue #251: the
-//!   stored password never reached the client, which asked again).
+//! - Windows `mstsc /v:host:port` reads its saved login from the
+//!   Credential Manager entry `TERMSRV/<host>` (`windows_cred`): the
+//!   launch writes it, the reaper removes it when the client exits
+//!   (issue #251: the stored password never reached the client, which
+//!   asked again). NOT a `.rdp` file: an unsigned connection file makes
+//!   mstsc raise "The publisher of this remote connection can't be
+//!   identified" before every connect (MEASURED 2026-10-13 on Windows
+//!   11, with and without the user's `Default.rdp` lines), which trades
+//!   one prompt for another.
 //! - Linux `xfreerdp` takes `/from-stdin:force` and reads the password
 //!   from its stdin, one line, before dialling.
 //! - macOS `open rdp://` has `username=s:` in its URI scheme and no
@@ -28,16 +32,33 @@
 
 use std::fmt;
 use std::io::Write as _;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use oryxis_core::models::remote_desktop::RemoteDesktopKind;
 
-mod rdp_file;
 #[cfg(windows)]
-mod dpapi;
+mod windows_cred;
 
-pub(crate) use rdp_file::RdpFile;
+/// The login staged in the OS credential store for the client to read
+/// (`mstsc`): written right before the spawn, removed when the client
+/// exits. Both fields present, or nothing is staged: a credential is a
+/// pair.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct StagedCredential {
+    pub host: String,
+    pub username: String,
+    pub password: String,
+}
+
+impl fmt::Debug for StagedCredential {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StagedCredential")
+            .field("host", &self.host)
+            .field("username", &self.username)
+            .field("password", &"<redacted>")
+            .finish()
+    }
+}
 
 /// A resolved client invocation.
 #[derive(Clone, PartialEq, Eq)]
@@ -47,9 +68,9 @@ pub(crate) struct LaunchCommand {
     /// A line the client reads from its stdin, then the pipe closes:
     /// the password for `xfreerdp /from-stdin:force`. Never an argument.
     pub stdin_line: Option<String>,
-    /// A connection file the client opens (`mstsc`): written at spawn
-    /// time, its path becomes the first argument.
-    pub rdp_file: Option<RdpFile>,
+    /// A login staged in the OS credential store before the spawn
+    /// (`mstsc` reads `TERMSRV/<host>`), removed after the client exits.
+    pub credential: Option<StagedCredential>,
 }
 
 impl fmt::Debug for LaunchCommand {
@@ -60,7 +81,7 @@ impl fmt::Debug for LaunchCommand {
             .field("program", &self.program)
             .field("args", &self.args)
             .field("stdin_line", &self.stdin_line.as_ref().map(|_| "<redacted>"))
-            .field("rdp_file", &self.rdp_file)
+            .field("credential", &self.credential)
             .finish()
     }
 }
@@ -73,12 +94,16 @@ pub(crate) struct NoClient {
 }
 
 /// What a spawn reports back. The client is running; `password_handoff_error`
-/// is set when it could NOT be given the stored password (the DPAPI
-/// call or the connection file failed) and will ask for it instead.
-/// Text only, never the secret: this rides a `Message`.
+/// is set when it could NOT be given the stored password (the
+/// credential store refused) and will ask for it instead;
+/// `credential_kept_for` names the host when the OS already held a
+/// credential of the user's own for it, which the client used instead
+/// of the stored password. Text only, never the secret: this rides a
+/// `Message`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Launched {
     pub password_handoff_error: Option<String>,
+    pub credential_kept_for: Option<String>,
 }
 
 /// `host:port`, with an IPv6 literal bracketed the way every client
@@ -126,20 +151,19 @@ fn candidates(
         program: program.to_string(),
         args,
         stdin_line: None,
-        rdp_file: None,
+        credential: None,
     };
     match (os, kind) {
-        // Windows: built-in mstsc for RDP, pointed at a connection file
-        // that carries the address AND the login (a `/v:` carries only
-        // the address); no built-in VNC, try common third-party viewers.
+        // Windows: built-in mstsc for RDP, the login staged where it
+        // reads saved credentials (`/v:` carries only the address); no
+        // built-in VNC, try common third-party viewers.
         ("windows", RemoteDesktopKind::Rdp) => vec![LaunchCommand {
-            rdp_file: Some(RdpFile {
+            credential: username.zip(password).map(|(u, p)| StagedCredential {
                 host: host.to_string(),
-                port,
-                username: username.map(str::to_string),
-                password: password.map(str::to_string),
+                username: u.to_string(),
+                password: p.to_string(),
             }),
-            ..cmd("mstsc", vec![])
+            ..cmd("mstsc", vec![format!("/v:{endpoint}")])
         }],
         ("windows", RemoteDesktopKind::Vnc) => vec![
             cmd("vncviewer", vec![endpoint.clone()]),
@@ -244,100 +268,78 @@ pub(crate) fn program_on_path(program: &str) -> bool {
     })
 }
 
-/// Where a launch's connection file lives: `~/.oryxis/runtime/rdp/`.
-/// Inside the app's own tree (sandboxed under the harness), never the
-/// OS temp folder.
-fn rdp_file_dir() -> Option<PathBuf> {
-    oryxis_core::paths::oryxis_dir().map(|d| d.join("runtime").join("rdp"))
+/// What staging a credential did. Only the Windows arm builds a value;
+/// the other targets keep the match in `spawn_client` honest.
+#[cfg_attr(not(windows), allow(dead_code))]
+enum StageOutcome {
+    /// Our entry is in the store under this target; remove it when the
+    /// client exits.
+    Written(String),
+    /// The user has a credential of their own for the host; it was left
+    /// alone and the client uses it.
+    KeptExisting,
 }
 
-/// Protect a password for `password 51:b:` the way mstsc does: DPAPI,
-/// current user, no entropy, over the UTF-16LE text; uppercase hex.
+/// Put the login where the client reads it. Windows only: `mstsc` is
+/// the one client that takes a saved credential from the OS store.
 #[cfg(windows)]
-fn protect_password(password: &str) -> Result<String, String> {
-    dpapi::protect_utf16(password)
+fn stage_credential(cred: &StagedCredential) -> Result<StageOutcome, String> {
+    let target = windows_cred::target_for(&cred.host);
+    Ok(match windows_cred::stage(&target, &cred.username, &cred.password)? {
+        windows_cred::Staged::Written => StageOutcome::Written(target),
+        windows_cred::Staged::KeptExisting => StageOutcome::KeptExisting,
+    })
 }
 
-/// `resolve_command` only produces a connection file for `os ==
-/// "windows"`, so this arm never runs; it exists so the spawn leaf
-/// compiles the same on every target.
+/// `resolve_command` only stages a credential for `os == "windows"`,
+/// so this arm never runs; it exists so the spawn leaf compiles the
+/// same on every target.
 #[cfg(not(windows))]
-fn protect_password(_password: &str) -> Result<String, String> {
-    Err("DPAPI is only available on Windows".to_string())
+fn stage_credential(_cred: &StagedCredential) -> Result<StageOutcome, String> {
+    Err("the OS credential store is only used on Windows".to_string())
 }
 
-/// Write the launch's `.rdp`: the user's own `Default.rdp` as the base
-/// (what `mstsc /v:` would have read, so display and redirection
-/// preferences carry over), with the address, the login and the
-/// protected password on top. Returns the path and, when the password
-/// could not be protected, the reason (the file is written without it
-/// and the client asks).
-fn materialize_rdp_file(file: &RdpFile) -> Result<(PathBuf, Option<String>), String> {
-    let dir = rdp_file_dir().ok_or_else(|| "no home directory".to_string())?;
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let (password_hex, handoff_error) = match file.password.as_deref() {
-        Some(pw) => match protect_password(pw) {
-            Ok(hex) => (Some(hex), None),
-            Err(e) => (None, Some(e)),
-        },
-        None => (None, None),
-    };
-    let base = rdp_file::default_rdp_base();
-    let text = rdp_file::render(&base, file, password_hex.as_deref());
-    let path = dir.join(format!("{}.rdp", uuid::Uuid::new_v4()));
-    std::fs::write(&path, rdp_file::encode(&text)).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok((path, handoff_error))
-}
-
-/// Remove every connection file a previous process left behind (a
-/// crash while a desktop was open): the password inside is DPAPI-bound
-/// to this user, like mstsc's own saved files, but nothing reads it any
-/// more. Runs at boot.
-pub(crate) fn sweep_stale_rdp_files() {
-    let Some(dir) = rdp_file_dir() else {
-        return;
-    };
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("rdp"))
-            && let Err(e) = std::fs::remove_file(&path)
-        {
-            tracing::warn!("stale rdp file {}: {e}", path.display());
-        }
+#[cfg(windows)]
+fn remove_staged_credential(target: &str) {
+    if let Err(e) = windows_cred::remove(target) {
+        tracing::warn!("remote-desktop credential {target}: {e}");
     }
 }
 
-/// Spawn the resolved client. Writes the connection file first when the
-/// command carries one (and falls back to `/v:host:port` if the file
-/// cannot be written, reporting it), feeds the stdin line, and reaps
-/// the child on a thread of its own so the connection file is removed
-/// when the client exits. Blocking (file I/O, DPAPI, the spawn): call
-/// it off the UI thread.
+#[cfg(not(windows))]
+fn remove_staged_credential(_target: &str) {}
+
+/// Remove every credential a previous process staged for mstsc and
+/// never got to remove (killed with a desktop open). Runs at boot;
+/// no-op off Windows.
+pub(crate) fn sweep_stale_credentials() {
+    #[cfg(windows)]
+    windows_cred::sweep_stale();
+}
+
+/// Spawn the resolved client. Stages the credential first when the
+/// command carries one (a refusal still launches, and is reported),
+/// feeds the stdin line, and reaps the child on a thread of its own so
+/// the staged credential is removed when the client exits. Blocking
+/// (the credential store, the spawn): call it off the UI thread.
 pub(crate) fn spawn_client(cmd: LaunchCommand) -> Result<Launched, String> {
     let LaunchCommand {
         program,
-        mut args,
+        args,
         stdin_line,
-        rdp_file,
+        credential,
     } = cmd;
-    let mut handoff_error = None;
-    let mut file_path = None;
-    if let Some(file) = rdp_file.as_ref() {
-        match materialize_rdp_file(file) {
-            Ok((path, warning)) => {
-                args.insert(0, path.to_string_lossy().into_owned());
-                file_path = Some(path);
-                handoff_error = warning;
-            }
-            Err(e) => {
-                // No file, no login: the plain address still opens the
-                // client, and the user hears why it asks.
-                args.insert(0, format!("/v:{}", endpoint(&file.host, file.port)));
-                handoff_error = Some(e);
-            }
+    let mut launched = Launched {
+        password_handoff_error: None,
+        credential_kept_for: None,
+    };
+    // The store entry to remove once the client exits: only one WE wrote.
+    let mut staged_target: Option<String> = None;
+    if let Some(cred) = credential.as_ref() {
+        match stage_credential(cred) {
+            Ok(StageOutcome::Written(target)) => staged_target = Some(target),
+            Ok(StageOutcome::KeptExisting) => launched.credential_kept_for = Some(cred.host.clone()),
+            Err(e) => launched.password_handoff_error = Some(e),
         }
     }
 
@@ -352,8 +354,8 @@ pub(crate) fn spawn_client(cmd: LaunchCommand) -> Result<Launched, String> {
     let mut child = match command.spawn() {
         Ok(child) => child,
         Err(e) => {
-            if let Some(path) = file_path {
-                let _ = std::fs::remove_file(path);
+            if let Some(target) = staged_target {
+                remove_staged_credential(&target);
             }
             return Err(format!("{program}: {e}"));
         }
@@ -366,20 +368,18 @@ pub(crate) fn spawn_client(cmd: LaunchCommand) -> Result<Launched, String> {
         let _ = stdin.write_all(line.as_bytes()).and_then(|()| stdin.write_all(b"\n"));
     }
     // The reaper: waits out the client (a desktop session can last
-    // hours, the thread sleeps in `wait`) and only then drops the
-    // connection file. Reaps the zombie on unix as well.
+    // hours, the thread sleeps in `wait`) and only then removes the
+    // staged credential. Reaps the zombie on unix as well.
     std::thread::Builder::new()
         .name("remote-desktop-reaper".into())
         .spawn(move || {
             let _ = child.wait();
-            if let Some(path) = file_path {
-                let _ = std::fs::remove_file(path);
+            if let Some(target) = staged_target {
+                remove_staged_credential(&target);
             }
         })
         .map_err(|e| format!("reaper thread: {e}"))?;
-    Ok(Launched {
-        password_handoff_error: handoff_error,
-    })
+    Ok(launched)
 }
 
 #[cfg(test)]
@@ -392,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn windows_rdp_hands_mstsc_a_connection_file() {
+    fn windows_rdp_stages_the_login_beside_a_plain_v_switch() {
         let c = resolve_command(
             RemoteDesktopKind::Rdp,
             "windows",
@@ -404,23 +404,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.program, "mstsc");
-        // The address rides the file, never a `/v:` beside it.
-        assert!(c.args.is_empty());
+        // The address on the switch, as before; the login in the store.
+        assert_eq!(c.args, vec!["/v:127.0.0.1:55001"]);
         assert!(c.stdin_line.is_none());
-        let file = c.rdp_file.unwrap();
-        assert_eq!(file.host, "127.0.0.1");
-        assert_eq!(file.port, 55001);
-        assert_eq!(file.username.as_deref(), Some("admin"));
-        assert_eq!(file.password.as_deref(), Some("s3cret"));
+        let cred = c.credential.unwrap();
+        assert_eq!(cred.host, "127.0.0.1");
+        assert_eq!(cred.username, "admin");
+        assert_eq!(cred.password, "s3cret");
     }
 
     #[test]
-    fn windows_rdp_file_without_login_still_carries_the_address() {
-        let c = resolve_command(RemoteDesktopKind::Rdp, "windows", "desk.example", 3389, None, None, &all).unwrap();
-        let file = c.rdp_file.unwrap();
-        assert_eq!(file.username, None);
-        assert_eq!(file.password, None);
-        assert_eq!(file.host, "desk.example");
+    fn windows_rdp_stages_nothing_without_both_halves() {
+        // A credential is a pair: a username alone or a password alone
+        // has nothing to put in the store, and the client asks.
+        for (u, p) in [(None, None), (Some("admin"), None), (None, Some("pw"))] {
+            let c = resolve_command(RemoteDesktopKind::Rdp, "windows", "desk.example", 3389, u, p, &all).unwrap();
+            assert_eq!(c.args, vec!["/v:desk.example:3389"]);
+            assert!(c.credential.is_none());
+        }
     }
 
     #[test]
@@ -449,7 +450,7 @@ mod tests {
             vec!["rdp://full%20address=s%3Adesk.example%3A3389&username=s%3ACORP%5Cjane%20doe"]
         );
         assert!(rdp.stdin_line.is_none());
-        assert!(rdp.rdp_file.is_none());
+        assert!(rdp.credential.is_none());
     }
 
     #[test]
@@ -536,9 +537,7 @@ mod tests {
         assert_eq!(c.args, vec!["/v:127.0.0.1:3389"]);
         assert!(c.stdin_line.is_none());
         let w = resolve_command(RemoteDesktopKind::Rdp, "windows", "127.0.0.1", 3389, Some("  "), Some(""), &all).unwrap();
-        let file = w.rdp_file.unwrap();
-        assert_eq!(file.username, None);
-        assert_eq!(file.password, None);
+        assert!(w.credential.is_none());
     }
 
     #[test]

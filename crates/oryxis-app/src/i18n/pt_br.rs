@@ -431,6 +431,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "remote_desktop_no_client" => "Nenhum cliente de área de trabalho remota encontrado; instale um de",
         "remote_desktop_tunnel_failed" => "Falha no túnel da área de trabalho remota",
         "remote_desktop_password_handoff_failed" => "A senha salva não pôde ser entregue ao cliente de área de trabalho remota, que vai pedi-la: {error}",
+        "remote_desktop_windows_credential_kept" => "O Windows já tem uma credencial salva para {host}; o cliente usou essa, não a senha guardada aqui",
         "section_compatibility" => "Compatibilidade",
         "editor_preset_heading" => "Começar de",
         "preset_basic_ssh" => "SSH básico",
