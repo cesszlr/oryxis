@@ -664,7 +664,7 @@ impl Oryxis {
                 self.link_tunnel_closed(pane_id, port);
             }
             TerminalMessage::TriggerConfirmDecision(allow) => {
-                self.resolve_trigger_confirm(allow);
+                return self.resolve_trigger_confirm(allow);
             }
             TerminalMessage::TerminalSyncFlush(pane_id) => {
                 if let Some(pane) = self

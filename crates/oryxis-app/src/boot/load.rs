@@ -1383,6 +1383,10 @@ impl Oryxis {
                 self.prefs.session_log_file_dir =
                     (!v.trim().is_empty()).then(|| v.trim().to_string());
             }
+            if let Ok(Some(v)) = vault.get_setting("snippet_output_dir") {
+                self.prefs.snippet_output_dir =
+                    (!v.trim().is_empty()).then(|| v.trim().to_string());
+            }
             if let Ok(Some(v)) = vault.get_setting("connection_history") {
                 self.prefs.connection_history = v == "true";
             }

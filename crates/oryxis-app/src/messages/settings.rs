@@ -587,6 +587,12 @@ pub enum SettingsMessage {
     /// Reset the plain-text session-log folder to the default
     /// (`~/.oryxis/session-logs/`).
     ClearSessionLogFileDir,
+    /// Pick the folder a snippet's save steps write into.
+    PickSnippetOutputDir,
+    /// The folder the picker came back with (`None` = cancelled).
+    SnippetOutputDirPicked(Option<String>),
+    /// Reset the snippet output folder to the default.
+    ClearSnippetOutputDir,
     /// Toggle the global "record connection events" (history) setting.
     SettingToggleConnectionHistory,
     // ── Login automations (issue #122) ──
