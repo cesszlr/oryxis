@@ -472,15 +472,20 @@ pub(crate) fn strip_vault_password_everywhere(token: &str) -> Result<(), String>
     // Every file an install may have written, not only the one each
     // client reads today: an install from before an environment override
     // or a folder move still holds the password where it was written.
-    let home = home_dir_for_config()?;
-    for client in McpClient::available() {
-        for path in client.candidate_config_paths(&home) {
-            let has_entry = std::fs::read_to_string(&path)
-                .is_ok_and(|c| mcp_clients::has_entry(client.format(), &c));
-            if has_entry && let Err(e) = rewrite_entry_at(client, &path, token, None) {
-                errors.push(e);
+    match home_dir_for_config() {
+        Ok(home) => {
+            for client in McpClient::available() {
+                for path in client.candidate_config_paths(&home) {
+                    let has_entry = std::fs::read_to_string(&path)
+                        .is_ok_and(|c| mcp_clients::has_entry(client.format(), &c));
+                    if has_entry && let Err(e) = rewrite_entry_at(client, &path, token, None) {
+                        errors.push(e);
+                    }
+                }
             }
         }
+        // The WSL side below does not need this home; it still runs.
+        Err(e) => errors.push(e),
     }
     #[cfg(target_os = "windows")]
     {
@@ -596,8 +601,19 @@ fn rewrite_entry_at(
 fn write_config_private(path: &std::path::Path, contents: &str) -> Result<(), String> {
     use std::io::Write as _;
     let fail = |e: std::io::Error| format!("Failed to write {}: {e}", path.display());
+    // A link whose target does not exist yet is written where it points
+    // (the old in-place write created it there too).
     let target = if path.is_symlink() {
-        std::fs::canonicalize(path).map_err(fail)?
+        match std::fs::canonicalize(path) {
+            Ok(t) => t,
+            Err(_) => {
+                let link = std::fs::read_link(path).map_err(fail)?;
+                match path.parent() {
+                    Some(dir) if link.is_relative() => dir.join(link),
+                    _ => link,
+                }
+            }
+        }
     } else {
         path.to_path_buf()
     };
@@ -608,7 +624,11 @@ fn write_config_private(path: &std::path::Path, contents: &str) -> Result<(), St
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let tmp = dir.join(format!(".{name}.oryxis-{}.tmp", std::process::id()));
+    // Unique per write, not only per process: two writes of one file from
+    // this process (an install racing a refresh) must not share it.
+    static WRITE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = WRITE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = dir.join(format!(".{name}.oryxis-{}-{seq}.tmp", std::process::id()));
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -616,7 +636,7 @@ fn write_config_private(path: &std::path::Path, contents: &str) -> Result<(), St
         use std::os::unix::fs::OpenOptionsExt as _;
         options.mode(0o600);
     }
-    // A leftover of a write this PID's predecessor never finished.
+    // A leftover of a write a predecessor with this PID never finished.
     let _ = std::fs::remove_file(&tmp);
     let written = (|| {
         let mut file = options.open(&tmp)?;
