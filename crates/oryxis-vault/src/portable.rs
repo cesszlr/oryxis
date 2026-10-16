@@ -333,8 +333,11 @@ pub(crate) fn is_portable_setting(key: &str) -> bool {
     //   the one SFTP Edit runs: a file deciding them decides what runs
     //   here. `sftp_file_double_click` at "open" hands a downloaded file
     //   to the system's opener on a double click, which for an `.exe` or
-    //   a `.bat` from a server is running it.
+    //   a `.bat` from a server is running it, and `terminal_link_confirm`
+    //   off hands a link a server printed to the system's opener on a
+    //   click with no question.
     const DENY_SECURITY: &[&str] = &[
+        "terminal_link_confirm",
         "local_terminals",
         "local_terminal_default",
         "sftp_default_editor",
