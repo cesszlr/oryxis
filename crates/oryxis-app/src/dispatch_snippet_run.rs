@@ -149,10 +149,9 @@ impl Oryxis {
                     // the shell sat at its prompt as the first went out,
                     // or when the subject is the command already running.
                     let ready = if sent > 0 { at_prompt_at_send } else { busy };
-                    let skip = sent.saturating_sub(1);
                     tasks.push(self.arm_snippet_wait(
                         run_id,
-                        RunWait::CommandEnd { continue_on_error, ready, skip },
+                        RunWait::CommandEnd { continue_on_error, ready },
                         Some(timeout_ms),
                     ));
                     break;
@@ -384,11 +383,11 @@ impl Oryxis {
         let Some(run) = self.snippet_runs.iter_mut().find(|r| r.pane_id == pane_id) else {
             return Task::none();
         };
-        let Some(RunWait::CommandEnd { continue_on_error, ready, skip }) = run.wait.as_mut() else {
+        let Some(RunWait::CommandEnd { continue_on_error, ready }) = run.wait.as_mut() else {
             return Task::none();
         };
         let continue_on_error = *continue_on_error;
-        let Some(exit) = crate::snippet_run::command_end_in(ready, skip, marks) else {
+        let Some(exit) = crate::snippet_run::command_end_in(ready, marks) else {
             return Task::none();
         };
         let id = run.id;

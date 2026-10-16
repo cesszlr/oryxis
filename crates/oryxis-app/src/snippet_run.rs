@@ -203,9 +203,10 @@ pub(crate) struct SnippetRun {
     /// it guarded has ended.
     pub timer: Option<iced::task::Handle>,
     /// Commands sent since the last wait: a command-end wait has
-    /// something to wait for even before the shell marks it running, and
-    /// with several sent it is about the LAST one, so the ends of the
-    /// ones before it are passed over.
+    /// something to wait for even before the shell marks it running. Not
+    /// a count of the ends to come: a step is a line typed, and a line
+    /// read by a program (a REPL, a heredoc body, the inside of a `for`)
+    /// is no command of the shell's, so it marks no end.
     pub sent_commands: u32,
     /// Whether the shell sat at its prompt when the first of those went
     /// out, read BEFORE the send: typing the command moves the pane's
@@ -226,9 +227,11 @@ pub(crate) enum RunWait {
     /// previous command's, in the same read; a command still running
     /// when a trigger fired; the D a PS1 scheme prints with the session's
     /// first prompt), so D marks are passed over until the shell shows it
-    /// is ready (`RunMark::Ready`). `skip` is how many ends of the run's
-    /// own commands come before the subject's (several sent, one wait).
-    CommandEnd { continue_on_error: bool, ready: bool, skip: u32 },
+    /// is ready (`RunMark::Ready`). After several commands the wait ends
+    /// at the first end the shell marks (one wait per command when each
+    /// has to finish): counting steps as ends would hang on any line a
+    /// program reads.
+    CommandEnd { continue_on_error: bool, ready: bool },
     /// A pattern in the pane's output.
     Output(OutputMatcher),
     /// A timer.
@@ -254,11 +257,10 @@ pub(crate) enum RunMark {
 /// What a command-end wait makes of one batch's marks: the exit of the
 /// command it waits for, if this batch ended it. `ready` is updated as the
 /// marks go by.
-pub(crate) fn command_end_in(ready: &mut bool, skip: &mut u32, marks: &[RunMark]) -> Option<Option<i32>> {
+pub(crate) fn command_end_in(ready: &mut bool, marks: &[RunMark]) -> Option<Option<i32>> {
     for mark in marks {
         match *mark {
             RunMark::Ready => *ready = true,
-            RunMark::End(_) if *ready && *skip > 0 => *skip -= 1,
             RunMark::End(code) if *ready => return Some(code),
             RunMark::End(_) => {}
         }
@@ -282,16 +284,7 @@ mod tests {
     #[test]
     fn a_ready_wait_takes_the_next_end() {
         let mut ready = true;
-        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::End(Some(0))]), Some(Some(0)));
-    }
-
-    #[test]
-    fn several_commands_one_wait_takes_the_last_end() {
-        // `a`, `b`, then one wait: `a`'s end goes by, `b`'s ends it.
-        let mut ready = true;
-        let mut skip = 1;
-        assert_eq!(command_end_in(&mut ready, &mut skip, &[RunMark::End(Some(0)), RunMark::Ready]), None);
-        assert_eq!(command_end_in(&mut ready, &mut skip, &[RunMark::End(Some(3))]), Some(Some(3)));
+        assert_eq!(command_end_in(&mut ready, &[RunMark::End(Some(0))]), Some(Some(0)));
     }
 
     #[test]
@@ -300,10 +293,10 @@ mod tests {
         // command the run sent has not run yet.
         let mut ready = false;
         let batch = [RunMark::End(Some(0)), RunMark::Ready];
-        assert_eq!(command_end_in(&mut ready, &mut 0, &batch), None);
+        assert_eq!(command_end_in(&mut ready, &batch), None);
         assert!(ready);
         // Its own C and D come later.
-        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::Ready, RunMark::End(Some(2))]), Some(Some(2)));
+        assert_eq!(command_end_in(&mut ready, &[RunMark::Ready, RunMark::End(Some(2))]), Some(Some(2)));
     }
 
     #[test]
@@ -311,8 +304,8 @@ mod tests {
         // A PS1-only scheme prints D;A;B with every prompt and nothing at
         // the command's start: the prompt's B is the readiness.
         let mut ready = false;
-        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::End(None), RunMark::Ready]), None);
-        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::End(Some(1)), RunMark::Ready]), Some(Some(1)));
+        assert_eq!(command_end_in(&mut ready, &[RunMark::End(None), RunMark::Ready]), None);
+        assert_eq!(command_end_in(&mut ready, &[RunMark::End(Some(1)), RunMark::Ready]), Some(Some(1)));
     }
 
     fn snip(label: &str, steps: Vec<SnippetStep>) -> Snippet {
