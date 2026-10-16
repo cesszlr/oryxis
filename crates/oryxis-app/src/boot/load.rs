@@ -70,6 +70,13 @@ impl Oryxis {
                 })
         };
         let group_before = stored_group(self);
+        let group_id_of = |app: &Self| {
+            app.editor_form
+                .editing_id
+                .and_then(|id| app.connections.iter().find(|c| c.id == id))
+                .map(|c| c.group_id)
+        };
+        let group_id_before = group_id_of(self);
         self.load_vault_entities();
         if let Some(vault) = &self.vault {
             self.known_hosts = vault.list_known_hosts().unwrap_or_default();
@@ -88,7 +95,10 @@ impl Oryxis {
         // field alone too: a typed, not yet flushed Parent Group is an
         // edit the signature cannot see (`GroupWrite::Skip`), and
         // following the row there threw it away.
-        if stored_group(self) != group_before {
+        // A folder renamed under a typed Parent Group leaves the typed
+        // value: it is the user's answer, and the host itself did not move.
+        let host_moved = group_id_of(self) != group_id_before;
+        if stored_group(self) != group_before && (host_moved || !group_typed) {
             self.editor_follow_moved_host(was_dirty);
         }
         if !was_dirty && !group_typed {
