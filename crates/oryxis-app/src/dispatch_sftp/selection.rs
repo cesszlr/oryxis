@@ -798,6 +798,15 @@ impl Oryxis {
                         return Ok(Task::none());
                     }
                 }
+                // Past the inline edits' own Esc: a modal over the view
+                // owns the rest of the keyboard (a close-session confirm,
+                // a host-key or proxy prompt raised by the other pane's
+                // mount). Its Enter is the dialog's answer; read
+                // here it would also act on the selected row (Transfer is
+                // the default for a file), and Backspace would go up.
+                if self.any_modal_blocks_input() {
+                    return Err(ke);
+                }
                 let editing = self.cur_sftp().rename.is_some()
                     || self.cur_sftp().new_entry.is_some()
                     || self.cur_sftp().overwrite_prompt.is_some()

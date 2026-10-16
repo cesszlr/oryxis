@@ -139,6 +139,14 @@ impl Oryxis {
     /// the sudo-password autofill, which writes directly so a secret never
     /// touches the capture's line mirror.
     pub(crate) fn write_input_to_tab(&mut self, tab_idx: usize, bytes: &[u8]) {
+        // A tab in Files mode shows no terminal: the keyboard belongs to
+        // the file browser (its filter, its path bar), and nothing below
+        // reaches the hidden PTY (`write_ring_injection_to_tab` drops the
+        // bytes). Neither may its side effects: a character typed into
+        // the filter is not the user taking over from a login script.
+        if self.tabs.get(tab_idx).is_some_and(|t| t.files_mode) {
+            return;
+        }
         // Typing into the terminal DISENGAGES the sidebar keynav ring: the
         // user has moved on, and a lingering ring would keep consuming
         // Enter (live-QA bug: Enter appeared dead on an SSH tab because a
