@@ -80,7 +80,10 @@ impl SshEngine {
     /// to show an error: a server at its `MaxSessions` cap and a
     /// half-dead connection both surface as a channel-open error, and
     /// neither is something to bother the user with when a new
-    /// connection would just work.
+    /// connection would just work. The open runs under the same
+    /// `session_timeout` a fresh dial's does: a connection that passes
+    /// `looks_healthy` but never answers the channel open would
+    /// otherwise leave the pane waiting with no outcome at all.
     pub async fn open_session_on(
         &self,
         transport: Arc<super::SshTransport>,
@@ -95,23 +98,86 @@ impl SshEngine {
         // No port-forward listeners: those are bound once per
         // CONNECTION by the dial that created it, and binding them
         // again for a second tab would fight over the same local ports.
-        self.open_pty_session(transport, cols, rows, Vec::new()).await
+        self.open_pty_session(transport, cols, rows, Vec::new())
+            .await
+            .map_err(|failure| {
+                failure.into_error(|budget| {
+                    SshError::Channel(format!(
+                        "session open on the live connection timed out after {}s",
+                        budget.as_secs()
+                    ))
+                })
+            })
     }
 
+    /// Open the shell channel on `transport`, the whole chain (channel
+    /// open, PTY, the forwarding and env requests, shell) inside the
+    /// engine's `session_timeout`.
+    ///
+    /// The budget lives HERE rather than in a caller's `timeout` because
+    /// of what a deadline would drop: once the server has confirmed the
+    /// channel, abandoning the future leaves it open on the server (a
+    /// russh `Channel` does not close on drop), and on a reused
+    /// connection that is a slot of `MaxSessions` held for as long as
+    /// the other tabs keep the connection. So a channel this call opened
+    /// and could not finish setting up is closed before the error
+    /// returns. A pending open dropped at the deadline holds nothing on
+    /// this side yet.
     pub(crate) async fn open_pty_session(
         &self,
         transport: Arc<super::SshTransport>,
         cols: u32,
         rows: u32,
         pf_listeners: Vec<(PortForward, ForwardListener)>,
-    ) -> Result<(SshSession, mpsc::UnboundedReceiver<Vec<u8>>), SshError> {
+    ) -> Result<(SshSession, mpsc::UnboundedReceiver<Vec<u8>>), PtyOpenFailure> {
+        let budget = self.session_timeout;
+        let deadline = tokio::time::Instant::now() + budget;
+
         // Open session channel. Nothing here holds the connection: the
         // other sessions and forwards riding it open their own channels
         // meanwhile.
         let handle = transport.handle();
-        let channel = handle.channel_open_session().await
-            .map_err(|e| SshError::Channel(format!("Failed to open session channel: {}", e)))?;
+        let channel = match tokio::time::timeout_at(deadline, handle.channel_open_session()).await {
+            Err(_) => return Err(PtyOpenFailure::TimedOut(budget)),
+            Ok(Err(e)) => {
+                return Err(PtyOpenFailure::Failed(SshError::Channel(format!(
+                    "Failed to open session channel: {}",
+                    e
+                ))));
+            }
+            Ok(Ok(channel)) => channel,
+        };
 
+        let setup = tokio::time::timeout_at(
+            deadline,
+            self.request_pty_and_shell(handle, &channel, cols, rows),
+        )
+        .await;
+        let term_fallback = match setup {
+            Ok(Ok(term_fallback)) => term_fallback,
+            Ok(Err(e)) => {
+                close_abandoned_channel(&channel).await;
+                return Err(PtyOpenFailure::Failed(e));
+            }
+            Err(_) => {
+                close_abandoned_channel(&channel).await;
+                return Err(PtyOpenFailure::TimedOut(budget));
+            }
+        };
+
+        Ok(self.bridge_pty_channel(transport, channel, pf_listeners, term_fallback))
+    }
+
+    /// Everything a shell channel is asked before it carries bytes: the
+    /// PTY (with the terminfo fallback), agent and X11 forwarding, the
+    /// environment, then the shell. Answers the TERM switch, if any.
+    async fn request_pty_and_shell(
+        &self,
+        handle: &SharedHandle,
+        channel: &russh::Channel<russh::client::Msg>,
+        cols: u32,
+        rows: u32,
+    ) -> Result<Option<TermFallback>, SshError> {
         // Request PTY. A custom TERM is first checked against the
         // host's own terminfo db (issue #88: e.g. CentOS 7 has no
         // `tmux-256color`, which leaves vim/nano unusable) and swapped
@@ -209,7 +275,17 @@ impl SshEngine {
         // Request shell
         channel.request_shell(false).await
             .map_err(|e| SshError::Channel(format!("Shell request failed: {}", e)))?;
+        Ok(term_fallback)
+    }
 
+    /// Hand a set-up shell channel to its reader and writer tasks.
+    fn bridge_pty_channel(
+        &self,
+        transport: Arc<super::SshTransport>,
+        channel: russh::Channel<russh::client::Msg>,
+        pf_listeners: Vec<(PortForward, ForwardListener)>,
+        term_fallback: Option<TermFallback>,
+    ) -> (SshSession, mpsc::UnboundedReceiver<Vec<u8>>) {
         // I/O bridging
         let (output_tx, output_rx) = mpsc::unbounded_channel::<Vec<u8>>();
         let (writer_tx, mut writer_rx) = mpsc::unbounded_channel::<Vec<u8>>();
@@ -365,7 +441,7 @@ impl SshEngine {
         let pf_tasks = spawn_port_forward_tasks(pf_listeners, transport.handle());
         transport.adopt_port_forwards(pf_tasks);
 
-        Ok((
+        (
             SshSession {
                 transport,
                 writer_tx,
@@ -374,12 +450,46 @@ impl SshEngine {
                 writer_task,
                 closed: std::sync::atomic::AtomicBool::new(false),
                 reader_done,
-                // Default, overridden by the engine right after this
-                // returns via `sftp_open_timeout` assignment.
-                sftp_open_timeout: std::time::Duration::from_secs(10),
+                // Siblings opened later (sidebar Files, the transfer
+                // pool) honour the same configured limit.
+                sftp_open_timeout: self.session_timeout,
                 term_fallback,
             },
             output_rx,
-        ))
+        )
+    }
+}
+
+/// Why [`SshEngine::open_pty_session`] gave no session. The timeout is
+/// kept apart so each caller words it in its own error: a fresh dial
+/// reports a failed connection, a reused one a channel error (its cue to
+/// dial fresh).
+pub(crate) enum PtyOpenFailure {
+    /// `session_timeout` ran out; carries the budget for the message.
+    TimedOut(std::time::Duration),
+    Failed(SshError),
+}
+
+impl PtyOpenFailure {
+    pub(crate) fn into_error(
+        self,
+        timed_out: impl FnOnce(std::time::Duration) -> SshError,
+    ) -> SshError {
+        match self {
+            PtyOpenFailure::TimedOut(budget) => timed_out(budget),
+            PtyOpenFailure::Failed(e) => e,
+        }
+    }
+}
+
+/// Close a shell channel whose setup was given up on, so the server
+/// releases it. Bounded: the close only queues a message, but the queue
+/// belongs to a connection that may be the reason the setup stalled.
+async fn close_abandoned_channel(channel: &russh::Channel<russh::client::Msg>) {
+    const CLOSE_BUDGET: std::time::Duration = std::time::Duration::from_secs(2);
+    match tokio::time::timeout(CLOSE_BUDGET, channel.close()).await {
+        Ok(Ok(())) => tracing::info!("closed an unfinished session channel"),
+        Ok(Err(e)) => tracing::warn!("closing an unfinished session channel failed: {e}"),
+        Err(_) => tracing::warn!("closing an unfinished session channel timed out"),
     }
 }

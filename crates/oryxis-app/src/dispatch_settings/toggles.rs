@@ -100,6 +100,13 @@ impl Oryxis {
                 self.prefs.keepalive_interval = sanitize_uint(&val, 86_400);
                 self.persist_setting("keepalive_interval", &self.prefs.keepalive_interval);
             }
+            SettingsMessage::SettingSshSessionTimeoutChanged(val) => {
+                self.prefs.ssh_session_timeout = sanitize_uint(&val, 600);
+                if self.prefs.ssh_session_timeout == "0" {
+                    self.prefs.ssh_session_timeout = "1".into();
+                }
+                self.persist_setting("ssh_session_timeout", &self.prefs.ssh_session_timeout);
+            }
             SettingsMessage::SettingCloudAutoRefreshToggle => {
                 self.prefs.cloud_auto_refresh_enabled =
                     !self.prefs.cloud_auto_refresh_enabled;

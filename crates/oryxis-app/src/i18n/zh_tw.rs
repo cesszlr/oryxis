@@ -1951,6 +1951,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings
         "setting_keepalive_desc" => "每隔多久（秒）傳送一次 SSH keepalive 封包。0 表示停用。",
+        "session_open_timeout" => "工作階段開啟逾時（秒）",
+        "session_open_timeout_desc" => "終端連線在登入後開啟 shell（工作階段通道、PTY 與 shell 請求）允許的最長時間，逾時則失敗。登入較慢的伺服器可調高此值。預設 30。",
         "setting_scrollback_desc" => "限制終端機的行數。0 表示最大值。",
         "setting_font_desc" => "SauceCodePro Nerd Font 已內建（Source Code Pro 加上 Powerline、Font Awesome、Devicons 和 Material）；其他字型依賴系統，如果字型未安裝，作業系統會退回預設的等寬字型。",
         "setting_update_check_desc" => "啟動時查詢 GitHub 檢查新版本。會出現包含略過、稍後或安裝選項的彈出視窗。",

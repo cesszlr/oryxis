@@ -1938,6 +1938,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings
         "setting_keepalive_desc" => "Wie oft (in Sekunden) SSH-Keepalive-Pakete senden. 0 deaktiviert.",
+        "session_open_timeout" => "Timeout für das Öffnen der Sitzung (s)",
+        "session_open_timeout_desc" => "Wie lange eine Terminalverbindung nach der Anmeldung zum Öffnen der Shell brauchen darf (Sitzungskanal, PTY und Shell-Anfrage), bevor sie fehlschlägt. Für Server mit langsamer Anmeldung erhöhen. Standard 30.",
         "setting_scrollback_desc" => "Begrenzt die Anzahl der Terminalzeilen. 0 für maximal.",
         "setting_font_desc" => "SauceCodePro Nerd Font ist enthalten (Source Code Pro mit Powerline, Font Awesome, Devicons und Material); andere hängen vom System ab, wenn eine Schriftart nicht installiert ist, fällt das OS auf seine Standard-Monospace zurück.",
         "setting_update_check_desc" => "Fragt GitHub beim Start nach neuen Versionen ab. Ein Modal mit Optionen zum Überspringen, Verschieben oder Installieren erscheint.",

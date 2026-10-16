@@ -469,6 +469,12 @@ pub(crate) struct AppPrefs {
     /// the renderer keeps the current shape.
     pub(crate) default_host_icon: String,
     pub(crate) keepalive_interval: String,
+    /// How long a terminal dial may take to open its shell once
+    /// authenticated (channel open + PTY request + shell request), in
+    /// seconds. A slow PAM session stack (pam_systemd waits up to 25 s
+    /// on logind) or a home directory on a slow mount lands here, after
+    /// the login already succeeded (issue #256).
+    pub(crate) ssh_session_timeout: String,
     /// Defaults pre-filled into the form for a NEW connection, so the user
     /// doesn't re-set the same fields every time. Persisted as
     /// `default_agent_forwarding` / `default_port` / `default_keepalive` /
@@ -725,6 +731,7 @@ impl Default for AppPrefs {
             nav_rail_expanded: false,
             default_host_icon: "circular".into(),
             keepalive_interval: "30".into(),
+            ssh_session_timeout: "30".into(),
             default_agent_forwarding: false,
             default_port: "22".into(),
             default_keepalive: String::new(),

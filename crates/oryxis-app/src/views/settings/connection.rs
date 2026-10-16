@@ -311,10 +311,10 @@ impl Oryxis {
         }
         let new_conn_defaults_section = panel_section(new_conn_defaults_col);
 
-        // Session behaviour shares one card: keepalive, the
-        // auto-reconnect pair and OS detection are all "what happens
-        // while connected" knobs, so they live together instead of
-        // one box per item.
+        // Session behaviour shares one card: keepalive, the shell's
+        // open budget, the auto-reconnect pair and OS detection are all
+        // "what happens while connected" knobs, so they live together
+        // instead of one box per item.
         let session_section = panel_section(column![
             text(crate::i18n::t("keepalive_interval")).size(13).color(OryxisColors::t().text_primary),
             Space::new().height(4),
@@ -328,6 +328,24 @@ impl Oryxis {
                 text_input("30", &self.prefs.keepalive_interval)
                     .id(iced::widget::Id::new("set-connection-keepalive"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingKeepaliveChanged(v)))
+                    .padding(10)
+                    .width(240)
+                    .style(crate::widgets::rounded_input_style).align_x(dir_align_x())
+                    .boxed(),
+            ),
+            Space::new().height(16),
+            text(t("session_open_timeout")).size(13).color(OryxisColors::t().text_primary),
+            Space::new().height(4),
+            text(t("session_open_timeout_desc"))
+                .size(11).color(OryxisColors::t().text_muted),
+            Space::new().height(8),
+            self.settings_nav_slot_labeled(
+                t("session_open_timeout"),
+                crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-session-timeout")),
+                10.0,
+                text_input("30", &self.prefs.ssh_session_timeout)
+                    .id(iced::widget::Id::new("set-connection-session-timeout"))
+                    .on_input(|v| Message::Settings(SettingsMessage::SettingSshSessionTimeoutChanged(v)))
                     .padding(10)
                     .width(240)
                     .style(crate::widgets::rounded_input_style).align_x(dir_align_x())

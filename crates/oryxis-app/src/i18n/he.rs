@@ -2050,6 +2050,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "באיזו תדירות (בשניות) לשלוח חבילות keepalive של SSH. 0 להשבתה.",
+        "session_open_timeout" => "פסק זמן לפתיחת הפעלה (שניות)",
+        "session_open_timeout_desc" => "כמה זמן חיבור מסוף רשאי לפתוח את המעטפת אחרי ההתחברות (ערוץ ההפעלה, PTY ובקשת המעטפת) לפני שהוא נכשל. הגדילו עבור שרתים עם התחברות איטית. ברירת המחדל 30.",
         "setting_scrollback_desc" => "הגבלת מספר שורות הטרמינל. 0 למקסימום.",
         "setting_font_desc" => "SauceCodePro Nerd Font מגיע מובנה (Source Code Pro עם תוספות Powerline, Font Awesome, Devicons ואייקוני Material); גופנים אחרים תלויים במערכת, אם גופן לא מותקן, מערכת ההפעלה נסוגה לגופן ה-monospace שלה.",
         "setting_update_check_desc" => "שאילתה ל-GitHub בהפעלה לאיתור גרסאות חדשות. יוצג חלון עם אפשרויות לדלג, לדחות או להתקין.",

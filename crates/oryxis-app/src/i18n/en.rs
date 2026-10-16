@@ -2051,6 +2051,8 @@ pub(super) fn lookup(key: &str) -> &'static str {
 
         // Settings descriptions
         "setting_keepalive_desc" => "How often (in seconds) to send SSH keepalive packets. Set to 0 to disable.",
+        "session_open_timeout" => "Session open timeout (s)",
+        "session_open_timeout_desc" => "How long a terminal connection may take to open its shell once logged in (session channel, PTY and shell request) before it fails. Raise it for servers with a slow login stack. Default 30.",
         "setting_scrollback_desc" => "Limit number of terminal rows. Set to 0 for maximum.",
         "setting_font_desc" => "SauceCodePro Nerd Font is bundled (Source Code Pro patched with Powerline, Font Awesome, Devicons and Material icons); others rely on the system, if a font isn't installed, the OS falls back to its default monospace.",
         "setting_update_check_desc" => "Query GitHub on startup for newer releases. You'll see a modal with options to skip, defer, or install.",

@@ -2044,6 +2044,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "SSH keepalive paketlerinin ne sıklıkla (saniye cinsinden) gönderileceği. Devre dışı bırakmak için 0 yapın.",
+        "session_open_timeout" => "Oturum açma zaman aşımı (sn)",
+        "session_open_timeout_desc" => "Bir terminal bağlantısının oturum açıldıktan sonra kabuğu açması (oturum kanalı, PTY ve kabuk isteği) için tanınan süre; aşılırsa bağlantı başarısız olur. Girişi yavaş sunucular için artırın. Varsayılan 30.",
         "setting_scrollback_desc" => "Terminal satır sayısını sınırlar. Maksimum için 0 yapın.",
         "setting_font_desc" => "SauceCodePro Nerd Font dahildir (Powerline, Font Awesome, Devicons ve Material simgeleriyle yamalanmış Source Code Pro); diğerleri sisteme dayanır, bir yazı tipi kurulu değilse OS varsayılan tek aralıklı yazı tipine geri döner.",
         "setting_update_check_desc" => "Başlangıçta yeni sürümler için GitHub'ı sorgular. Atlama, erteleme veya kurma seçeneklerini içeren bir pencere görürsünüz.",

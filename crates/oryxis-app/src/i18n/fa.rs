@@ -2033,6 +2033,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "هر چند ثانیه بسته‌های keepalive ارسال شود. 0 برای غیرفعال‌سازی.",
+        "session_open_timeout" => "مهلت باز کردن نشست (ثانیه)",
+        "session_open_timeout_desc" => "مدتی که یک اتصال ترمینال پس از ورود می‌تواند برای باز کردن پوسته (کانال نشست، PTY و درخواست پوسته) صرف کند پیش از خطا. برای سرورهایی با ورود کند آن را افزایش دهید. پیش‌فرض 30.",
         "setting_scrollback_desc" => "محدود کردن تعداد سطرهای ترمینال. 0 برای حداکثر.",
         "setting_font_desc" => "SauceCodePro Nerd Font همراه است (Source Code Pro به همراه Powerline، Font Awesome، Devicons و Material)؛ سایرین به سیستم وابسته‌اند, اگر فونت نصب نباشد، سیستم‌عامل به فونت تک‌فاصله پیش‌فرض برمی‌گردد.",
         "setting_update_check_desc" => "هنگام راه‌اندازی، GitHub را برای نسخه‌های جدید بررسی می‌کند. یک پنجره با گزینه‌های رد، تعویق یا نصب نمایش داده می‌شود.",

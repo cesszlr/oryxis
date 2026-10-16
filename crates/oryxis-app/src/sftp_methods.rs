@@ -148,6 +148,12 @@ impl Oryxis {
     pub(crate) fn sftp_op_timeout(&self) -> std::time::Duration {
         Self::parse_secs(&self.prefs.sftp_op_timeout, 30)
     }
+    /// The terminal dials' budget for opening the shell on an
+    /// authenticated connection (channel open + PTY + shell request),
+    /// Settings > Connection. Fresh dials and reused connections alike.
+    pub(crate) fn ssh_session_timeout(&self) -> std::time::Duration {
+        Self::parse_secs(&self.prefs.ssh_session_timeout, 30)
+    }
 
     /// Build the ordered list of paths currently shown in a pane
     /// applies the same hide-hidden + filter rules the view uses so

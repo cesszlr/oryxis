@@ -449,6 +449,8 @@ pub enum SettingsMessage {
     ToggleNavRailExpanded,
     SettingDefaultHostIconChanged(String),
     SettingKeepaliveChanged(String),
+    /// Terminal dials: seconds to open the shell once authenticated.
+    SettingSshSessionTimeoutChanged(String),
     /// New-connection defaults (pre-filled into a fresh host form).
     ToggleDefaultAgentForwarding,
     DefaultPortChanged(String),

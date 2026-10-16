@@ -279,8 +279,10 @@ impl SshEngine {
     }
 
     /// Override the session/SFTP-channel-open timeout (default 10s).
-    /// Applies to PTY session open, SFTP subsystem open, and sibling
-    /// channel opens for the parallel transfer pool.
+    /// Applies to PTY session open (the channel open, the PTY request
+    /// and the shell request, on a fresh dial and on a reused
+    /// connection alike), SFTP subsystem open, and sibling channel
+    /// opens for the parallel transfer pool.
     pub fn with_session_timeout(mut self, t: std::time::Duration) -> Self {
         self.session_timeout = t;
         self

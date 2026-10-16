@@ -475,6 +475,7 @@ impl Oryxis {
                 })
                 .to_string();
                 let keepalive = self.effective_keepalive(&conn);
+                let session_timeout = self.ssh_session_timeout();
                 let address_family = conn.address_family;
                 let rekey_limit_mb = conn.rekey_limit_mb;
                 let agent_forwarding = conn.agent_forwarding;
@@ -616,6 +617,7 @@ impl Oryxis {
                                 crate::i18n::t("password").to_string(),
                             )
                             .with_keepalive(keepalive)
+                            .with_session_timeout(session_timeout)
                             .with_address_family(address_family)
                             .with_rekey_limit_mb(rekey_limit_mb)
                             .with_agent_forwarding(agent_forwarding)
@@ -1375,6 +1377,7 @@ impl Oryxis {
             .map(|e| (e.key.clone(), e.value.clone()))
             .collect();
         let engine = oryxis_ssh::SshEngine::new()
+            .with_session_timeout(self.ssh_session_timeout())
             .with_agent_forwarding(conn.agent_forwarding)
             .with_x11_forwarding(conn.x11_forwarding)
             .with_env_vars(env_vars)
@@ -1536,6 +1539,7 @@ impl Oryxis {
         let resolver = self.make_jump_resolver(&mut conn);
         let host_key_check = self.make_host_key_check();
         let keepalive = self.effective_keepalive(&conn);
+        let session_timeout = self.ssh_session_timeout();
         let address_family = conn.address_family;
         let rekey_limit_mb = conn.rekey_limit_mb;
         // Parity with the full-tab `ConnectSsh` path: agent forwarding, env
@@ -1639,6 +1643,7 @@ impl Oryxis {
                     crate::i18n::t("password").to_string(),
                 )
                 .with_keepalive(keepalive)
+                .with_session_timeout(session_timeout)
                 .with_address_family(address_family)
                 .with_rekey_limit_mb(rekey_limit_mb)
                 .with_agent_forwarding(agent_forwarding)

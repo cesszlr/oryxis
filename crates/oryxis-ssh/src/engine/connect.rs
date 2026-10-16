@@ -251,8 +251,8 @@ impl SshEngine {
     }
 
     /// Step 3: Open PTY session on an authenticated handle. The session
-    /// timeout (default 10s) covers the channel-open + pty-request +
-    /// shell-request chain.
+    /// timeout (default 10s, `with_session_timeout`) covers the
+    /// channel-open + pty-request + shell-request chain.
     pub async fn open_session(
         &self,
         handle: SshHandle,
@@ -260,25 +260,10 @@ impl SshEngine {
         rows: u32,
         port_forwards: &[PortForward],
     ) -> Result<(SshSession, mpsc::UnboundedReceiver<Vec<u8>>), SshError> {
-        let session_timeout = self.session_timeout;
         let listeners = bind_port_forward_listeners(port_forwards).await?;
-        tokio::time::timeout(
-            session_timeout,
-            self.open_pty_session(super::SshTransport::new(handle.0), cols, rows, listeners),
-        )
-        .await
-        .map_err(|_| {
-            SshError::ConnectionFailed(format!(
-                "session open timed out after {}s",
-                session_timeout.as_secs()
-            ))
-        })?
-        .map(|(mut session, rx)| {
-            // Propagate the SFTP-open timeout so siblings opened later
-            // honour the same configured limit.
-            session.sftp_open_timeout = session_timeout;
-            (session, rx)
-        })
+        self.open_pty_session(super::SshTransport::new(handle.0), cols, rows, listeners)
+            .await
+            .map_err(|failure| failure.into_error(session_open_timed_out))
     }
 
     /// Open a `-L` forward on an OS-assigned ephemeral local port and
@@ -833,6 +818,15 @@ impl SshEngine {
             .map_err(|e| SshError::JumpHost(format!("SSH handshake to target: {}", e)))
     }
 
+}
+
+/// How a fresh dial words a shell that did not open within
+/// `session_timeout` (the reused-connection path words its own).
+pub(super) fn session_open_timed_out(budget: std::time::Duration) -> SshError {
+    SshError::ConnectionFailed(format!(
+        "session open timed out after {}s",
+        budget.as_secs()
+    ))
 }
 
 #[cfg(test)]

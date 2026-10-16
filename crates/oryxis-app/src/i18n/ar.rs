@@ -2063,6 +2063,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "كم ثانية بين حزم الإبقاء على الاتصال. ٠ للتعطيل.",
+        "session_open_timeout" => "مهلة فتح الجلسة (ثوان)",
+        "session_open_timeout_desc" => "المدة التي يُسمح بها لاتصال الطرفية لفتح الصدفة بعد تسجيل الدخول (قناة الجلسة وPTY وطلب الصدفة) قبل الإخفاق. ارفعها للخوادم ذات تسجيل الدخول البطيء. الافتراضي ٣٠.",
         "setting_scrollback_desc" => "تحديد عدد أسطر الطرفية. ٠ للحد الأقصى.",
         "setting_font_desc" => "SauceCodePro Nerd Font مرفق (Source Code Pro مع Powerline و Font Awesome و Devicons و Material)؛ الباقي يعتمد على النظام, إذا لم يكن الخط مثبتًا، يعود نظام التشغيل إلى الخط أحادي المسافة الافتراضي.",
         "setting_update_check_desc" => "يتحقق من GitHub بحثًا عن إصدارات أحدث عند بدء التشغيل. يظهر مربع حوار بخيارات التخطي أو التأجيل أو التثبيت.",

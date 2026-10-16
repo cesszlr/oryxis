@@ -1951,6 +1951,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings
         "setting_keepalive_desc" => "SSH keepalive パケットを送信する頻度（秒）。0 で無効。",
+        "session_open_timeout" => "セッションオープンタイムアウト（秒）",
+        "session_open_timeout_desc" => "ログイン後にターミナル接続がシェルを開く（セッションチャネル、PTY、シェル要求）までの許容時間。超えると失敗します。ログインが遅いサーバーでは値を上げてください。デフォルト 30。",
         "setting_scrollback_desc" => "ターミナルの行数を制限。0 で最大。",
         "setting_font_desc" => "SauceCodePro Nerd Font はバンドル済み (Source Code Pro に Powerline、Font Awesome、Devicons、Material を追加)。他はシステム依存, フォントがインストールされていない場合、OS のデフォルト等幅フォントにフォールバックします。",
         "setting_update_check_desc" => "起動時に GitHub で新バージョンを確認。スキップ、後で、インストールのオプション付きモーダルが表示されます。",

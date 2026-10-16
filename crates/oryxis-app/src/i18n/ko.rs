@@ -2044,6 +2044,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "SSH keepalive 패킷을 보내는 빈도(초). 비활성화하려면 0으로 설정하세요.",
+        "session_open_timeout" => "세션 열기 시간 초과 (초)",
+        "session_open_timeout_desc" => "로그인 후 터미널 연결이 셸을 여는 데(세션 채널, PTY, 셸 요청) 허용되는 시간. 초과하면 실패합니다. 로그인이 느린 서버라면 값을 늘리세요. 기본값 30.",
         "setting_scrollback_desc" => "터미널 행 수를 제한합니다. 최대로 하려면 0으로 설정하세요.",
         "setting_font_desc" => "SauceCodePro Nerd Font가 번들로 제공됩니다(Powerline, Font Awesome, Devicons, Material 아이콘이 패치된 Source Code Pro). 그 외에는 시스템에 의존하며, 글꼴이 설치되지 않은 경우 OS가 기본 고정폭 글꼴로 대체합니다.",
         "setting_update_check_desc" => "시작 시 GitHub에서 새 릴리스를 조회합니다. 건너뛰기, 연기 또는 설치 옵션이 있는 모달이 표시됩니다.",

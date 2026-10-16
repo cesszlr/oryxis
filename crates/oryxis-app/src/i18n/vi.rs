@@ -2044,6 +2044,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "Tần suất (tính bằng giây) gửi gói keepalive SSH. Đặt 0 để tắt.",
+        "session_open_timeout" => "Hết giờ mở phiên (s)",
+        "session_open_timeout_desc" => "Thời gian một kết nối terminal được phép dùng để mở shell sau khi đăng nhập (kênh phiên, PTY và yêu cầu shell) trước khi báo lỗi. Tăng giá trị này cho máy chủ đăng nhập chậm. Mặc định 30.",
         "setting_scrollback_desc" => "Giới hạn số dòng terminal. Đặt 0 cho tối đa.",
         "setting_font_desc" => "SauceCodePro Nerd Font được đóng gói sẵn (Source Code Pro vá thêm Powerline, Font Awesome, Devicons và biểu tượng Material); các phông khác dựa vào hệ thống, nếu một phông chưa được cài, HĐH sẽ dùng phông monospace mặc định của nó.",
         "setting_update_check_desc" => "Truy vấn GitHub khi khởi động để tìm bản phát hành mới hơn. Bạn sẽ thấy một hộp thoại với các lựa chọn bỏ qua, hoãn, hoặc cài đặt.",

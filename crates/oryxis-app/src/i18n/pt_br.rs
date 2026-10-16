@@ -2003,6 +2003,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "Com qual frequência (em segundos) enviar pacotes keepalive SSH. 0 desativa.",
+        "session_open_timeout" => "Timeout de abertura da sessão (s)",
+        "session_open_timeout_desc" => "Quanto tempo uma conexão de terminal pode levar para abrir o shell depois do login (canal de sessão, PTY e pedido de shell) antes de falhar. Aumente para servidores com login lento. Padrão 30.",
         "setting_scrollback_desc" => "Limita o número de linhas no terminal. 0 para máximo.",
         "setting_font_desc" => "SauceCodePro Nerd Font vem incluso (Source Code Pro com Powerline, Font Awesome, Devicons e Material); outras dependem do sistema, se uma fonte não estiver instalada, o SO usa a fonte monoespaçada padrão.",
         "setting_update_check_desc" => "Consulta o GitHub na inicialização por novas releases. Um modal aparecerá com opções de pular, adiar ou instalar.",

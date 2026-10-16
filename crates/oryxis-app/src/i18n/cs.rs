@@ -2050,6 +2050,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "Jak často (v sekundách) posílat SSH keepalive pakety. 0 = vypnout.",
+        "session_open_timeout" => "Časový limit otevření relace (s)",
+        "session_open_timeout_desc" => "Jak dlouho smí terminálové připojení po přihlášení otevírat shell (kanál relace, PTY a požadavek na shell), než skončí chybou. U serverů s pomalým přihlášením hodnotu zvyšte. Výchozí 30.",
         "setting_scrollback_desc" => "Omezí počet řádků terminálu. 0 = maximum.",
         "setting_font_desc" => "SauceCodePro Nerd Font je přibalen (Source Code Pro s patchem Powerline, Font Awesome, Devicons a Material ikon); ostatní písma spoléhají na systém, pokud písmo není nainstalováno, OS použije výchozí monospace.",
         "setting_update_check_desc" => "Při spuštění se dotáže GitHubu na novější vydání. Zobrazí se okno s možnostmi přeskočit, odložit nebo nainstalovat.",

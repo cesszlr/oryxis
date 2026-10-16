@@ -179,6 +179,7 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     e(S::Connection, "host_encoding", "encoding charset utf-8 default terminal"),
     e(S::Connection, "env_vars", "environment variables env default"),
     e(S::Connection, "keepalive_interval", "keepalive interval seconds connection alive ping"),
+    e(S::Connection, "session_open_timeout", "session open timeout seconds shell pty slow login terminal setup"),
     e(S::Connection, "auto_reconnect", "auto reconnect disconnect retry drop"),
     e(S::Connection, "max_reconnect_attempts", "max reconnect attempts retries limit"),
     e(S::Connection, "os_detection", "os detection detect remote operating system probe"),

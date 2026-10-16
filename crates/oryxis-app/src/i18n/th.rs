@@ -2051,6 +2051,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "ความถี่ (วินาที) ในการส่งแพ็กเก็ต SSH keepalive ตั้งเป็น 0 เพื่อปิด",
+        "session_open_timeout" => "หมดเวลาเปิดเซสชัน (วินาที)",
+        "session_open_timeout_desc" => "ระยะเวลาที่การเชื่อมต่อเทอร์มินัลใช้เปิดเชลล์ได้หลังเข้าสู่ระบบ (ช่องเซสชัน, PTY และคำขอเชลล์) ก่อนจะล้มเหลว เพิ่มค่านี้สำหรับเซิร์ฟเวอร์ที่เข้าสู่ระบบช้า ค่าเริ่มต้น 30",
         "setting_scrollback_desc" => "จำกัดจำนวนแถวของเทอร์มินัล ตั้งเป็น 0 เพื่อใช้ค่าสูงสุด",
         "setting_font_desc" => "SauceCodePro Nerd Font ถูกรวมมาให้ (Source Code Pro ที่แพตช์ด้วย Powerline, Font Awesome, Devicons และไอคอน Material) ฟอนต์อื่นขึ้นกับระบบ ถ้าฟอนต์ไม่ได้ติดตั้ง OS จะถอยไปใช้ monospace เริ่มต้นของมัน",
         "setting_update_check_desc" => "สอบถาม GitHub เมื่อเริ่มโปรแกรมเพื่อหารุ่นใหม่ คุณจะเห็นหน้าต่างพร้อมตัวเลือกข้าม เลื่อนไว้ก่อน หรือติดตั้ง",

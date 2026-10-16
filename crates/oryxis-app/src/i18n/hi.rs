@@ -2050,6 +2050,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "SSH कीपअलाइव पैकेट कितनी बार (सेकंड में) भेजने हैं। बंद करने के लिए 0 सेट करें।",
+        "session_open_timeout" => "सत्र खोलने का टाइमआउट (से.)",
+        "session_open_timeout_desc" => "लॉगिन के बाद टर्मिनल कनेक्शन को शेल खोलने (सत्र चैनल, PTY और शेल अनुरोध) के लिए विफल होने से पहले कितना समय मिलता है। धीमे लॉगिन वाले सर्वर के लिए इसे बढ़ाएँ। डिफ़ॉल्ट 30।",
         "setting_scrollback_desc" => "टर्मिनल पंक्तियों की संख्या सीमित करें। अधिकतम के लिए 0 सेट करें।",
         "setting_font_desc" => "SauceCodePro Nerd Font साथ आता है (Source Code Pro, Powerline, Font Awesome, Devicons और Material आइकॉन के साथ); बाकी सिस्टम पर निर्भर हैं, फ़ॉन्ट इंस्टॉल न हो तो OS अपने डिफ़ॉल्ट मोनोस्पेस पर लौटता है।",
         "setting_update_check_desc" => "शुरू होते समय नई रिलीज़ के लिए GitHub से पूछें। छोड़ने, टालने या इंस्टॉल करने के विकल्पों वाला एक मोडल दिखेगा।",

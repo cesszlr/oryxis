@@ -1443,23 +1443,12 @@ impl SshEngine {
         // bypassing them, leaving auth/session free to hang on the OS
         // default ceilings. Auth honours the Interactive exemption (human
         // input isn't a network stall) via `authenticate_handle_bounded`.
-        let session_timeout = self.session_timeout;
         self.authenticate_handle_bounded(&mut handle, connection, password, key_material)
             .await?;
         let listeners = bind_port_forward_listeners(&connection.port_forwards).await?;
-        let (mut session, rx) = tokio::time::timeout(
-            session_timeout,
-            self.open_pty_session(super::SshTransport::new(handle), cols, rows, listeners),
-        )
-        .await
-        .map_err(|_| {
-            SshError::ConnectionFailed(format!(
-                "session open timed out after {}s",
-                session_timeout.as_secs()
-            ))
-        })??;
-        session.sftp_open_timeout = session_timeout;
-        Ok((session, rx))
+        self.open_pty_session(super::SshTransport::new(handle), cols, rows, listeners)
+            .await
+            .map_err(|failure| failure.into_error(super::connect::session_open_timed_out))
     }
 }
 

@@ -427,6 +427,7 @@ impl Oryxis {
             | SettingsMessage::SettingToggleMinimizeToTray
             | SettingsMessage::SettingToggleSftpEnabled
             | SettingsMessage::SettingKeepaliveChanged(..)
+            | SettingsMessage::SettingSshSessionTimeoutChanged(..)
             | SettingsMessage::SettingCloudAutoRefreshToggle
             | SettingsMessage::SettingCloudAutoRefreshIntervalChanged(..)
             | SettingsMessage::SettingCloudAutoArchiveToggle

@@ -2054,6 +2054,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "Jak często (w sekundach) wysyłać pakiety keepalive SSH. Ustaw 0, aby wyłączyć.",
+        "session_open_timeout" => "Limit czasu otwarcia sesji (s)",
+        "session_open_timeout_desc" => "Jak długo połączenie terminalowe może otwierać powłokę po zalogowaniu (kanał sesji, PTY i żądanie powłoki), zanim zakończy się błędem. Zwiększ dla serwerów z wolnym logowaniem. Domyślnie 30.",
         "setting_scrollback_desc" => "Ogranicz liczbę wierszy terminala. Ustaw 0 dla maksymalnej.",
         "setting_font_desc" => "SauceCodePro Nerd Font jest dołączona (Source Code Pro z dodatkami Powerline, Font Awesome, Devicons i ikonami Material); pozostałe zależą od systemu, jeśli czcionka nie jest zainstalowana, system użyje domyślnej czcionki o stałej szerokości.",
         "setting_update_check_desc" => "Odpytuje GitHub przy uruchomieniu o nowsze wydania. Zobaczysz okno z opcjami pominięcia, odroczenia lub instalacji.",

@@ -2044,6 +2044,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "Seberapa sering (dalam detik) mengirim paket keepalive SSH. Atur ke 0 untuk menonaktifkan.",
+        "session_open_timeout" => "Batas waktu buka sesi (d)",
+        "session_open_timeout_desc" => "Berapa lama koneksi terminal boleh membuka shell setelah login (kanal sesi, PTY, dan permintaan shell) sebelum gagal. Naikkan untuk server dengan proses login yang lambat. Default 30.",
         "setting_scrollback_desc" => "Batasi jumlah baris terminal. Atur ke 0 untuk maksimum.",
         "setting_font_desc" => "SauceCodePro Nerd Font disertakan (Source Code Pro dengan patch Powerline, Font Awesome, Devicons dan ikon Material); lainnya mengandalkan sistem, jika font tidak terpasang, OS beralih ke monospace default-nya.",
         "setting_update_check_desc" => "Kueri GitHub saat memulai untuk rilis lebih baru. Anda akan melihat modal dengan opsi untuk melewati, menunda, atau memasang.",

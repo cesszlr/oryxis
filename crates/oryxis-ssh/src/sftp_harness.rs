@@ -268,7 +268,21 @@ struct SshHarness {
     /// parked here instead, which is what a link that died after the
     /// last exchange looks like to the client (no accept, no refusal).
     stall_opens: Arc<std::sync::atomic::AtomicBool>,
+    /// Session opens still answered while `stall_opens` is set: lets a
+    /// test hold the server's answer to a SECOND channel (the terminfo
+    /// probe) after the first one went through.
+    stall_grace: Arc<std::sync::atomic::AtomicUsize>,
+    /// Every channel the client closed, in order.
+    closed: Arc<std::sync::Mutex<Vec<ChannelId>>>,
     parked: Vec<russh::server::ChannelOpenHandle>,
+}
+
+/// What a test can see and steer on the server side of
+/// [`connect_owned_handle_in_memory`].
+struct ServerSwitches {
+    stall_opens: Arc<std::sync::atomic::AtomicBool>,
+    stall_grace: Arc<std::sync::atomic::AtomicUsize>,
+    closed: Arc<std::sync::Mutex<Vec<ChannelId>>>,
 }
 
 impl russh::server::Handler for SshHarness {
@@ -288,12 +302,26 @@ impl russh::server::Handler for SshHarness {
         reply: russh::server::ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), russh::Error> {
-        if self.stall_opens.load(std::sync::atomic::Ordering::SeqCst) {
+        use std::sync::atomic::Ordering;
+        let graced = self
+            .stall_grace
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok();
+        if self.stall_opens.load(Ordering::SeqCst) && !graced {
             self.parked.push(reply);
             return Ok(());
         }
         reply.accept().await;
         self.channels.lock().await.insert(channel.id(), channel);
+        Ok(())
+    }
+
+    async fn channel_close(
+        &mut self,
+        channel: ChannelId,
+        _session: &mut Session,
+    ) -> Result<(), russh::Error> {
+        self.closed.lock().expect("closed log").push(channel);
         Ok(())
     }
 
@@ -473,6 +501,17 @@ async fn connect_in_memory_stallable() -> (SftpClient, SharedFs, Arc<std::sync::
 /// The authenticated connection itself, before any channel: what a
 /// forward rides.
 async fn connect_handle_in_memory() -> (SharedHandle, SharedFs, Arc<std::sync::atomic::AtomicBool>) {
+    let (handle, fs, switches) = connect_owned_handle_in_memory().await;
+    (Arc::new(handle), fs, switches.stall_opens)
+}
+
+/// [`connect_handle_in_memory`] before it is shared: what an
+/// [`crate::SshTransport`] wraps.
+async fn connect_owned_handle_in_memory() -> (
+    russh::client::Handle<ClientHandler>,
+    SharedFs,
+    ServerSwitches,
+) {
     use russh::keys::PrivateKey;
 
     let fs: SharedFs = Arc::new(Mutex::new(Fs::default()));
@@ -485,11 +524,17 @@ async fn connect_handle_in_memory() -> (SharedHandle, SharedFs, Arc<std::sync::a
     let host_key = PrivateKey::from_openssh(HARNESS_HOST_KEY).expect("parse host key");
     server_config.keys.push(host_key);
     let server_config = Arc::new(server_config);
-    let stall_opens = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let switches = ServerSwitches {
+        stall_opens: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        stall_grace: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        closed: Arc::new(std::sync::Mutex::new(Vec::new())),
+    };
     let server_handler = SshHarness {
         channels: Arc::new(Mutex::new(HashMap::new())),
         fs: fs.clone(),
-        stall_opens: stall_opens.clone(),
+        stall_opens: switches.stall_opens.clone(),
+        stall_grace: switches.stall_grace.clone(),
+        closed: switches.closed.clone(),
         parked: Vec::new(),
     };
     tokio::spawn(async move {
@@ -511,7 +556,7 @@ async fn connect_handle_in_memory() -> (SharedHandle, SharedFs, Arc<std::sync::a
         .await
         .expect("authenticate_password");
     assert!(auth.success(), "harness auth rejected");
-    (Arc::new(handle), fs, stall_opens)
+    (handle, fs, switches)
 }
 
 // ---------------------------------------------------------------------------
@@ -1130,6 +1175,70 @@ async fn harness_exec_timeout_bounds_an_unanswered_channel_open() {
         "an unanswered open reads as a timeout"
     );
     assert!(started.elapsed() < std::time::Duration::from_secs(5));
+}
+
+/// A second shell on a live connection (F2 reuse) runs under the
+/// engine's `session_timeout` like a fresh dial's: a connection that
+/// still looks healthy but never answers the channel open must hand the
+/// caller an error (its cue to dial fresh), not a pane that waits
+/// forever (issue #256).
+#[tokio::test]
+async fn harness_session_open_on_a_live_connection_is_bounded() {
+    let (handle, _fs, switches) = connect_owned_handle_in_memory().await;
+    switches.stall_opens.store(true, std::sync::atomic::Ordering::SeqCst);
+    let transport = crate::SshTransport::new(handle);
+    assert!(transport.looks_healthy(), "a fresh connection is offered for reuse");
+    let engine = crate::SshEngine::new()
+        .with_session_timeout(std::time::Duration::from_millis(300));
+    let started = std::time::Instant::now();
+    let outcome = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        engine.open_session_on(transport, 80, 24),
+    )
+    .await
+    .expect("the session open must not outlive its own limit");
+    assert!(
+        matches!(outcome, Err(crate::SshError::Channel(_))),
+        "an unanswered open on a reused connection reads as a channel error"
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+}
+
+/// A shell channel the server ACCEPTED but whose setup ran past
+/// `session_timeout` is closed, not dropped: a russh `Channel` does not
+/// close on drop, so on a reused connection the server would keep the
+/// session for as long as the other tabs keep the link. The setup is
+/// held here by a custom TERM, whose terminfo probe opens a second
+/// channel the server never answers.
+#[tokio::test]
+async fn harness_session_setup_past_its_budget_closes_the_channel() {
+    use std::sync::atomic::Ordering;
+    let (handle, _fs, switches) = connect_owned_handle_in_memory().await;
+    switches.stall_grace.store(1, Ordering::SeqCst);
+    switches.stall_opens.store(true, Ordering::SeqCst);
+    let transport = crate::SshTransport::new(handle);
+    let engine = crate::SshEngine::new()
+        .with_terminal_type(Some("tmux-256color".into()))
+        .with_session_timeout(std::time::Duration::from_millis(300));
+    let outcome = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        engine.open_session_on(transport.clone(), 80, 24),
+    )
+    .await
+    .expect("the session setup must not outlive its own limit");
+    assert!(matches!(outcome, Err(crate::SshError::Channel(_))));
+    // The close is a message on the connection: give the server a beat
+    // to read it.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while switches.closed.lock().expect("closed log").is_empty() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the accepted shell channel was left open on the server"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert_eq!(switches.closed.lock().expect("closed log").len(), 1);
+    assert!(transport.looks_healthy(), "the connection itself stays up for the other tabs");
 }
 
 /// One SOCKS5 CONNECT by domain name, returning the reply code.

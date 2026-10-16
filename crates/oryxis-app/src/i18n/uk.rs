@@ -2044,6 +2044,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
 
         // Settings descriptions
         "setting_keepalive_desc" => "Як часто (у секундах) надсилати пакети SSH keepalive. Встановіть 0, щоб вимкнути.",
+        "session_open_timeout" => "Тайм-аут відкриття сеансу (с)",
+        "session_open_timeout_desc" => "Скільки часу термінальне з'єднання може відкривати оболонку після входу (канал сеансу, PTY і запит оболонки), перш ніж завершитися помилкою. Збільште для серверів із повільним входом. Типово 30.",
         "setting_scrollback_desc" => "Обмежити кількість рядків термінала. Встановіть 0 для максимуму.",
         "setting_font_desc" => "SauceCodePro Nerd Font входить до комплекту (Source Code Pro з патчем Powerline, Font Awesome, Devicons і Material icons); інші покладаються на систему, якщо шрифт не встановлено, ОС повертається до свого типового моноширинного.",
         "setting_update_check_desc" => "Запитувати GitHub під час запуску про новіші релізи. Ви побачите вікно з опціями пропустити, відкласти або встановити.",

@@ -1253,6 +1253,9 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("keepalive_interval") {
                 self.prefs.keepalive_interval = v;
             }
+            if let Ok(Some(v)) = vault.get_setting("ssh_session_timeout") {
+                self.prefs.ssh_session_timeout = v;
+            }
             // New-connection defaults (pre-filled into a fresh host form).
             if let Ok(Some(v)) = vault.get_setting("default_agent_forwarding") {
                 self.prefs.default_agent_forwarding = v == "true";
