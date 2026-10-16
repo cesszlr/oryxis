@@ -13,9 +13,11 @@
 //! Two guards keep this from being trust-on-first-use with extra steps:
 //! the tool only pins a key this process saw refused, with the exact
 //! four values the refusal recorded (the agent cannot invent a
-//! fingerprint and have it trusted), and it never pins over a different
-//! pin for the same (host, port, key type): a CHANGED key is the one
-//! case a person has to look at, in the app's Known Hosts.
+//! fingerprint and have it trusted), and it never pins next to any other
+//! pin for the same (host, port): a CHANGED key is the one case a person
+//! has to look at, in the app's Known Hosts, and a server that suddenly
+//! offers a key of ANOTHER type than the one pinned is changed too (an
+//! interceptor that speaks only RSA would otherwise read as a new host).
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -31,9 +33,12 @@ pub struct Refusal {
     pub port: u16,
     pub key_type: String,
     pub fingerprint: String,
-    /// The pinned fingerprint it disagreed with (`Changed`), or `None`
-    /// for a host with no pin at all (`Unknown`).
+    /// The pin it disagreed with (`Changed`): its fingerprint, and its
+    /// key type, which differs from `key_type` when the vault pins the
+    /// endpoint under another algorithm. `None` for an endpoint with no
+    /// pin at all (`Unknown`).
     pub old_fingerprint: Option<String>,
+    pub old_key_type: Option<String>,
 }
 
 type Key = (String, u16, String);
@@ -59,7 +64,7 @@ impl RefusalLog {
         port: u16,
         key_type: &str,
         fingerprint: &str,
-        old_fingerprint: Option<&str>,
+        old: Option<(&str, &str)>,
     ) {
         self.lock().insert(
             (host.to_string(), port, key_type.to_string()),
@@ -68,7 +73,8 @@ impl RefusalLog {
                 port,
                 key_type: key_type.to_string(),
                 fingerprint: fingerprint.to_string(),
-                old_fingerprint: old_fingerprint.map(str::to_string),
+                old_fingerprint: old.map(|(_, fp)| fp.to_string()),
+                old_key_type: old.map(|(kt, _)| kt.to_string()),
             },
         );
     }
@@ -140,10 +146,12 @@ pub fn describe_refusals(log: &RefusalLog, endpoints: &[(String, u16)]) -> Optio
                 }));
             }
             Some(old) => {
+                let old_type = r.old_key_type.as_deref().unwrap_or(&r.key_type);
                 lines.push(format!(
-                    "HOST KEY CHANGED for {endpoint}: the vault pins {} {old}, the server offered \
-                     {}. This can be a reinstalled server or an interception; accept_host_key \
-                     refuses changed keys. A person has to review it in Oryxis > Known Hosts.",
+                    "HOST KEY CHANGED for {endpoint}: the vault pins {old_type} {old}, the server \
+                     offered {} {}. This can be a reinstalled server or an interception; \
+                     accept_host_key refuses changed keys. A person has to review it in Oryxis > \
+                     Known Hosts.",
                     r.key_type, r.fingerprint
                 ));
                 keys.push(json!({
@@ -151,6 +159,7 @@ pub fn describe_refusals(log: &RefusalLog, endpoints: &[(String, u16)]) -> Optio
                     "port": r.port,
                     "key_type": r.key_type,
                     "fingerprint": r.fingerprint,
+                    "pinned_key_type": old_type,
                     "pinned_fingerprint": old,
                     "status": "changed",
                 }));
@@ -210,11 +219,22 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
     // have pinned (or re-pinned) the host meanwhile, and `save_known_host`
     // replaces a different fingerprint without complaint.
     let vault = server.vault();
-    let existing = vault
+    let pins: Vec<_> = vault
         .list_known_hosts()
         .map_err(|e| e.to_string())?
         .into_iter()
-        .find(|k| k.hostname == host && k.port == port && k.key_type == key_type);
+        .filter(|k| k.hostname == host && k.port == port)
+        .collect();
+    if let Some(other) = pins.iter().find(|k| k.key_type != key_type) {
+        return Err(format!(
+            "The vault pins a {} key for {} ({}); a server that now offers a {key_type} key is a \
+             changed key, never accepted here. Review it in Oryxis > Known Hosts.",
+            other.key_type,
+            oryxis_core::net::host_port(&host, port),
+            other.fingerprint
+        ));
+    }
+    let existing = pins.into_iter().find(|k| k.key_type == key_type);
     match existing {
         Some(k) if k.fingerprint == fingerprint => {
             server.refusals.remove(&host, port, &key_type);

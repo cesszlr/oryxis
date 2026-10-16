@@ -30,23 +30,35 @@ use crate::server::Server;
 /// fingerprint, and the pin it disagreed with): the callback is the one
 /// place that sees the key, and `accept_host_key` pins only what it
 /// recorded (`hostkey.rs`).
-fn make_host_key_check(
+pub(crate) fn make_host_key_check(
     vault: &VaultStore,
     refusals: std::sync::Arc<crate::hostkey::RefusalLog>,
 ) -> oryxis_ssh::HostKeyCheckCallback {
     let pinned = vault.list_known_hosts().unwrap_or_default();
     std::sync::Arc::new(move |host, port, key_type, fingerprint| {
-        if let Some(existing) = pinned
-            .iter()
-            .find(|h| h.hostname == host && h.port == port && h.key_type == key_type)
-        {
+        let mut at_endpoint = pinned.iter().filter(|h| h.hostname == host && h.port == port);
+        if let Some(existing) = at_endpoint.clone().find(|h| h.key_type == key_type) {
             if existing.fingerprint != fingerprint {
-                refusals.record(host, port, key_type, fingerprint, Some(&existing.fingerprint));
+                refusals.record(
+                    host,
+                    port,
+                    key_type,
+                    fingerprint,
+                    Some((&existing.key_type, &existing.fingerprint)),
+                );
                 return oryxis_ssh::HostKeyStatus::Changed {
                     old_fingerprint: existing.fingerprint.clone(),
                 };
             }
             return oryxis_ssh::HostKeyStatus::Known;
+        }
+        // Pinned, but under another algorithm: a server that switched
+        // key types (or a man in the middle that speaks only the other
+        // one). Changed, never Unknown, so `accept_host_key` cannot
+        // pin it beside the real one.
+        if let Some(other) = at_endpoint.next() {
+            refusals.record(host, port, key_type, fingerprint, Some((&other.key_type, &other.fingerprint)));
+            return oryxis_ssh::HostKeyStatus::Changed { old_fingerprint: other.fingerprint.clone() };
         }
         refusals.record(host, port, key_type, fingerprint, None);
         oryxis_ssh::HostKeyStatus::Unknown

@@ -553,11 +553,14 @@ panel turns it on, next to the other optional ones). Switching it back off close
   hosts and change their fields. Folders are resolved, never created;
   keys, identities and bastions are named by label or id; the password is
   the one secret accepted and it only goes in; proxies stay the app's.
-  The running app picks the change up at once.
+  A stored password never follows a host to a new address, and an
+  identity with a password is attached only where an MCP host already
+  uses it. The running app picks the change up at once.
 - **Host keys stay pinned, and the agent is told.** A dial to a host whose
   key the vault has not pinned fails with the key type and fingerprint;
   `accept_host_key` pins exactly that key once the user has checked it. A
-  key that changed against the pin is never accepted over MCP.
+  key that changed against the pin, or a key of another type than the
+  pinned one, is never accepted over MCP.
 - **Per-host control.** Toggle MCP exposure per connection.
 - **One login per host.** Calls to the same host share one authenticated
   connection, closed after five idle minutes; requests run concurrently, a

@@ -757,7 +757,7 @@ mod tests {
             .unwrap();
         server
             .refusals
-            .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:new", Some("SHA256:old"));
+            .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:new", Some(("ssh-ed25519", "SHA256:old")));
         let (err, text) = call(
             &server,
             "accept_host_key",
@@ -769,6 +769,40 @@ mod tests {
         let pins = server.vault().list_known_hosts().unwrap();
         assert_eq!(pins.len(), 1);
         assert_eq!(pins[0].fingerprint, "SHA256:old");
+    }
+
+    /// A server that offers a key of ANOTHER type than the pinned one is
+    /// changed, not new: the check calls it Changed and records the pin
+    /// it disagreed with, and the tool refuses it even if a refusal of
+    /// the old shape (Unknown) is on record.
+    #[tokio::test]
+    async fn a_key_of_another_type_than_the_pin_is_changed() {
+        let server = Server::new(test_vault());
+        server
+            .vault()
+            .save_known_host(&pin("10.0.0.5", 22, "ssh-ed25519", "SHA256:real"))
+            .unwrap();
+        let check = crate::handlers::make_host_key_check(&server.vault(), server.refusals.clone());
+        assert!(matches!(
+            check("10.0.0.5", 22, "ssh-rsa", "SHA256:mitm"),
+            oryxis_ssh::HostKeyStatus::Changed { .. }
+        ));
+        let r = server.refusals.get("10.0.0.5", 22, "ssh-rsa").unwrap();
+        assert_eq!(r.old_key_type.as_deref(), Some("ssh-ed25519"));
+        assert_eq!(r.old_fingerprint.as_deref(), Some("SHA256:real"));
+        let text = crate::hostkey::describe_refusals(&server.refusals, &[("10.0.0.5".into(), 22)]).unwrap();
+        assert!(text.contains("pins ssh-ed25519 SHA256:real"), "{text}");
+
+        server.refusals.record("10.0.0.5", 22, "ssh-rsa", "SHA256:mitm", None);
+        let (err, text) = call(
+            &server,
+            "accept_host_key",
+            json!({"host": "10.0.0.5", "port": 22, "key_type": "ssh-rsa", "fingerprint": "SHA256:mitm"}),
+        )
+        .await;
+        assert!(err);
+        assert!(text.contains("changed key"), "{text}");
+        assert_eq!(server.vault().list_known_hosts().unwrap().len(), 1);
     }
 
     /// The vault is re-read at the moment of writing: a pin the app made
@@ -812,7 +846,7 @@ mod tests {
         // A refusal for a host this dial never touched is not reported.
         assert!(!text.contains("bastion.example:22"));
 
-        log.record("bastion.example", 22, "ssh-rsa", "SHA256:new", Some("SHA256:old"));
+        log.record("bastion.example", 22, "ssh-rsa", "SHA256:new", Some(("ssh-rsa", "SHA256:old")));
         let text = crate::hostkey::describe_refusals(&log, &target).unwrap();
         assert!(text.contains("HOST KEY CHANGED for bastion.example:22"), "{text}");
         assert!(text.contains("SHA256:old") && text.contains("SHA256:new"));
@@ -920,12 +954,12 @@ mod tests {
         let (err, text) = call(
             &server,
             "update_host",
-            json!({"id": host.id.to_string(), "hostname": "10.0.0.2", "username": null}),
+            json!({"id": host.id.to_string(), "label": "web-1", "username": null}),
         )
         .await;
         assert!(!err, "{text}");
         let row = server.vault().list_connections().unwrap().remove(0);
-        assert_eq!(row.hostname, "10.0.0.2");
+        assert_eq!(row.label, "web-1");
         assert_eq!(row.username, None, "null clears");
         assert_eq!(row.notes.as_deref(), Some("keep me"), "unnamed fields stay");
         assert_eq!(row.tags, vec!["a"]);
@@ -990,5 +1024,188 @@ mod tests {
         .await;
         assert!(err);
         assert!(text.contains("Proxies are not set over MCP"), "{text}");
+    }
+
+    /// The agent picks the address and can make any server it runs
+    /// trusted, so a stored password never follows a host to a new one:
+    /// the move is refused unless the call gives (or clears) the password,
+    /// and a TOTP secret never follows at all.
+    #[tokio::test]
+    async fn a_stored_secret_never_follows_a_move() {
+        let server = Server::new(test_vault());
+        allow_writes(&server);
+        let host = Connection::new("db", "10.0.0.1");
+        server.vault().save_connection(&host, Some("pw")).unwrap();
+        for moved in [json!({"hostname": "attacker.example"}), json!({"port": 2222})] {
+            let mut args = moved.clone();
+            args["id"] = json!(host.id.to_string());
+            let (err, text) = call(&server, "update_host", args).await;
+            assert!(err, "{moved}");
+            assert!(text.contains("stores a password"), "{text}");
+        }
+        let row = server.vault().list_connections().unwrap().remove(0);
+        assert_eq!((row.hostname.as_str(), row.port), ("10.0.0.1", 22));
+
+        let (err, text) = call(
+            &server,
+            "update_host",
+            json!({"id": host.id.to_string(), "hostname": "10.0.0.2", "password": "fresh"}),
+        )
+        .await;
+        assert!(!err, "{text}");
+        assert_eq!(server.vault().get_connection_password(&host.id).unwrap().as_deref(), Some("fresh"));
+
+        server.vault().set_connection_totp_secret(&host.id, Some("JBSWY3DPEHPK3PXP")).unwrap();
+        let (err, text) = call(
+            &server,
+            "update_host",
+            json!({"id": host.id.to_string(), "hostname": "10.0.0.3", "password": "x"}),
+        )
+        .await;
+        assert!(err);
+        assert!(text.contains("TOTP"), "{text}");
+    }
+
+    /// An identity that stores a password is attached (directly or by a
+    /// folder's default) only where an MCP host already uses it; one with
+    /// only a key goes anywhere, and a host with its own password never
+    /// sends the identity's.
+    #[tokio::test]
+    async fn an_identity_password_goes_only_where_it_is_used() {
+        let server = Server::new(test_vault());
+        allow_writes(&server);
+        let prod = oryxis_core::models::Identity::new("prod-root");
+        server.vault().save_identity(&prod, Some("idpw")).unwrap();
+        let keyonly = oryxis_core::models::Identity::new("deploy-key");
+        server.vault().save_identity(&keyonly, None).unwrap();
+
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "x", "hostname": "attacker.example", "identity": "prod-root"}),
+        )
+        .await;
+        assert!(err);
+        assert!(text.contains("stores a password"), "{text}");
+
+        let mut folder = Group::new("Prod");
+        folder.defaults = Some(oryxis_core::models::group::GroupDefaults {
+            identity_id: Some(prod.id),
+            ..Default::default()
+        });
+        server.vault().save_group(&folder).unwrap();
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "x", "hostname": "attacker.example", "group": "Prod"}),
+        )
+        .await;
+        assert!(err, "a folder's default is attached too");
+        assert!(text.contains("folder"), "{text}");
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "x", "hostname": "attacker.example", "group": "Prod", "password": "own"}),
+        )
+        .await;
+        assert!(!err, "its own password wins the dial: {text}");
+
+        let mut known = Connection::new("db", "10.0.0.9");
+        known.identity_id = Some(prod.id);
+        server.vault().save_connection(&known, None).unwrap();
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "db-2", "hostname": "10.0.0.9", "identity": "prod-root"}),
+        )
+        .await;
+        assert!(!err, "an MCP host at that address already uses it: {text}");
+
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "y", "hostname": "elsewhere.example", "identity": "deploy-key"}),
+        )
+        .await;
+        assert!(!err, "{text}");
+    }
+
+    /// An address the user keeps out of MCP is not reachable under a new
+    /// entry either.
+    #[tokio::test]
+    async fn an_excluded_address_is_not_copied() {
+        let server = Server::new(test_vault());
+        allow_writes(&server);
+        let mut hidden = Connection::new("vault", "10.0.0.7");
+        hidden.mcp_enabled = false;
+        server.vault().save_connection(&hidden, None).unwrap();
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "copy", "hostname": "10.0.0.7"}),
+        )
+        .await;
+        assert!(err);
+        assert!(text.contains("kept out of MCP"), "{text}");
+        let (err, text) = call(&server, "create_host", json!({"label": "bad", "identity": "nope", "hostname": "10.0.0.8"})).await;
+        assert!(err);
+        assert!(!text.contains("vault"), "a miss lists no labels: {text}");
+    }
+
+    /// The hostname is a host: the parts the editor would split are
+    /// refused with where they go, and a leading dash never lands.
+    #[tokio::test]
+    async fn the_hostname_is_only_a_host() {
+        let server = Server::new(test_vault());
+        allow_writes(&server);
+        for bad in ["root@10.0.0.1", "10.0.0.1:2222", "-oProxyCommand=x", "a b"] {
+            let (err, text) = call(&server, "create_host", json!({"label": "x", "hostname": bad})).await;
+            assert!(err, "{bad}: {text}");
+        }
+        assert!(server.vault().list_connections().unwrap().is_empty());
+        let (err, text) = call(&server, "create_host", json!({"label": "x", "hostname": "ssh://web.example"})).await;
+        assert!(!err, "{text}");
+        assert_eq!(server.vault().list_connections().unwrap()[0].hostname, "web.example");
+    }
+
+    /// A password is stored verbatim; a host written with MCP off is
+    /// saved and the answer says so instead of "not found".
+    #[tokio::test]
+    async fn the_password_is_verbatim_and_an_mcp_off_write_answers() {
+        let server = Server::new(test_vault());
+        allow_writes(&server);
+        let (err, text) = call(
+            &server,
+            "create_host",
+            json!({"label": "x", "hostname": "10.0.0.1", "password": " pw ", "mcp_enabled": false}),
+        )
+        .await;
+        assert!(!err, "{text}");
+        let v: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["saved"], true);
+        assert_eq!(v["mcp_enabled"], false);
+        let id = server.vault().list_connections().unwrap()[0].id;
+        assert_eq!(server.vault().get_connection_password(&id).unwrap().as_deref(), Some(" pw "));
+    }
+
+    /// A folder label two folders share is refused with their paths.
+    #[tokio::test]
+    async fn an_ambiguous_folder_label_names_the_paths() {
+        let server = Server::new(test_vault());
+        allow_writes(&server);
+        let prod = Group::new("Prod");
+        let staging = Group::new("Staging");
+        let mut a = Group::new("Web");
+        a.parent_id = Some(prod.id);
+        let mut b = Group::new("Web");
+        b.parent_id = Some(staging.id);
+        for g in [&prod, &staging, &a, &b] {
+            server.vault().save_group(g).unwrap();
+        }
+        let (err, text) = call(&server, "create_host", json!({"label": "x", "hostname": "10.0.0.1", "group": "Web"})).await;
+        assert!(err);
+        assert!(text.contains("pass the path"), "{text}");
+        let (err, text) = call(&server, "create_host", json!({"label": "x", "hostname": "10.0.0.1", "group": "Prod / Web"})).await;
+        assert!(!err, "{text}");
     }
 }

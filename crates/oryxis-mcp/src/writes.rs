@@ -8,14 +8,35 @@
 //!
 //! - A folder is RESOLVED (path or label), never created: a typo must
 //!   not mint a folder that then rides sync. The error lists the folders
-//!   that exist.
+//!   that exist (`list_groups` lists them anyway); an ambiguous label is
+//!   refused with the paths it could mean.
 //! - A key, an identity and a jump hop are named by id or by label; an
-//!   ambiguous label is refused with a request for the id, never guessed.
-//!   Hops resolve among ALL hosts (a bastion is a route, not a tool
-//!   target), and a host is never its own hop.
+//!   ambiguous label is refused with a request for the id, never guessed,
+//!   and a name that matches nothing is just "not found": no error lists
+//!   identities or hosts, which no read tool exposes (hosts kept out of
+//!   MCP among them). Hops resolve among ALL hosts (a bastion is a route,
+//!   not a tool target), and a host is never its own hop.
+//! - The hostname is a host: `user@host`, `host:port`, a URL or anything
+//!   the host grammar rejects is refused with where the part belongs,
+//!   and so is a name starting with `-` (it would reach a command proxy's
+//!   `%h` as an option).
 //! - The password is the one secret accepted, tri-state like the vault's
 //!   API: absent keeps what is stored, `null` clears it, a string stores
-//!   it encrypted. Nothing a write returns ever carries it.
+//!   it encrypted, verbatim (never trimmed). Nothing a write returns ever
+//!   carries it.
+//! - **A stored secret never goes to an address the user did not give
+//!   it to** (`credential_guard`). The agent picks the address, and with
+//!   `accept_host_key` it can make any server it runs trusted, so a write
+//!   that pointed a stored credential at a new address would hand it to
+//!   whoever answers. Refused: moving (hostname or port) a host that
+//!   stores its own password or TOTP secret, unless the call replaces or
+//!   clears the password and the host has no TOTP secret; and attaching,
+//!   directly or through a folder's default, an identity that stores a
+//!   password, unless an MCP host at that same address already uses it.
+//!   Keys stay attachable: a public-key signature is bound to its session
+//!   and gives the server nothing to reuse. An address the user keeps out
+//!   of MCP (a host there with MCP off) is refused outright: a copy of it
+//!   would reach it anyway.
 //! - No proxy fields: `ProxyType::Command` becomes a LOCAL process, and
 //!   only what the user TYPED is ever pre-approved; an AI-supplied proxy
 //!   is not typed. A host that needs one is edited in the app.
@@ -64,10 +85,19 @@ enum Field<T> {
 }
 
 fn str_field(params: Option<&Value>, name: &str) -> Result<Field<String>, String> {
+    Ok(match raw_str_field(params, name)? {
+        Field::Set(s) => Field::Set(s.trim().to_string()),
+        other => other,
+    })
+}
+
+/// `str_field` without the trim: a password is stored as given, its
+/// spaces included, and only `null` clears it.
+fn raw_str_field(params: Option<&Value>, name: &str) -> Result<Field<String>, String> {
     match params.and_then(|p| p.get(name)) {
         None => Ok(Field::Absent),
         Some(Value::Null) => Ok(Field::Clear),
-        Some(Value::String(s)) => Ok(Field::Set(s.trim().to_string())),
+        Some(Value::String(s)) => Ok(Field::Set(s.clone())),
         Some(_) => Err(format!("Parameter {name} must be a string")),
     }
 }
@@ -125,9 +155,9 @@ fn parse_auth_method(s: &str) -> Result<AuthMethod, String> {
     })
 }
 
-/// Resolve `input` to one entry of `items` by id or by exact label,
-/// naming the entries when it fails. An ambiguous label is refused: the
-/// caller must say which one by id.
+/// Resolve `input` to one entry of `items` by id or by exact label. An
+/// ambiguous label is refused: the caller must say which one by id. A
+/// miss names nothing: the list would expose labels no read tool shows.
 fn resolve_named<T>(
     what: &str,
     input: &str,
@@ -145,14 +175,7 @@ fn resolve_named<T>(
     let matches: Vec<&T> = items.iter().filter(|i| label_of(i) == input).collect();
     match matches.len() {
         1 => Ok(id_of(matches[0])),
-        0 => {
-            let mut labels: Vec<&str> = items.iter().map(&label_of).collect();
-            labels.sort_unstable();
-            Err(format!(
-                "No {what} named \"{input}\". Existing: {}",
-                if labels.is_empty() { "(none)".to_string() } else { labels.join(", ") }
-            ))
-        }
+        0 => Err(format!("No {what} named \"{input}\"")),
         n => Err(format!(
             "{n} {what}s are named \"{input}\"; pass the id instead ({})",
             matches
@@ -168,6 +191,24 @@ fn resolve_named<T>(
 /// folders. Never creates one.
 fn resolve_group(vault: &VaultStore, input: &str) -> Result<Uuid, String> {
     let groups = vault.list_groups().map_err(|e| e.to_string())?;
+    // A path is exact; a bare label can name several folders, and the
+    // first one found would put the host (and what it inherits) in the
+    // wrong one.
+    let manual = || groups.iter().filter(|g| g.cloud_query.is_none());
+    if !manual().any(|g| Group::path_of(&groups, g.id) == input.trim()) {
+        let same_label: Vec<String> = manual()
+            .filter(|g| g.label == input.trim())
+            .map(|g| Group::path_of(&groups, g.id))
+            .collect();
+        if same_label.len() > 1 {
+            return Err(format!(
+                "{} folders are named \"{}\"; pass the path instead ({})",
+                same_label.len(),
+                input.trim(),
+                same_label.join(", ")
+            ));
+        }
+    }
     Group::resolve_path_or_label(&groups, input, &HashSet::new()).ok_or_else(|| {
         let mut paths: Vec<String> = groups
             .iter()
@@ -197,10 +238,7 @@ fn apply_fields(
         conn.label = label;
     }
     if let Field::Set(hostname) = str_field(params, "hostname")? {
-        if hostname.is_empty() {
-            return Err("Parameter hostname must not be empty".to_string());
-        }
-        conn.hostname = hostname;
+        conn.hostname = host_only(&hostname)?;
     }
     if let Some(port) = port_field(params)? {
         conn.port = port;
@@ -285,11 +323,151 @@ fn apply_fields(
             );
         }
     }
-    Ok(match str_field(params, "password")? {
+    Ok(match raw_str_field(params, "password")? {
         Field::Absent => None,
         Field::Clear => Some(String::new()),
         Field::Set(pw) => Some(pw),
     })
+}
+
+/// The hostname the call gave, as the host it must be: the editor's host
+/// grammar (`SshTarget::from_host_field`), with nothing beside the host.
+/// Where the editor splits `user@host:port` for a person, a caller that
+/// is not one is told where each part goes.
+fn host_only(input: &str) -> Result<String, String> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Err("Parameter hostname must not be empty".to_string());
+    }
+    let Some(target) = oryxis_core::ssh_target::SshTarget::from_host_field(input) else {
+        return Err(format!("\"{input}\" is not a host name or address"));
+    };
+    if target.username.is_some() || target.password.is_some() || target.port.is_some() {
+        return Err(format!(
+            "\"{input}\" is more than a host: pass the user in username and the port in port"
+        ));
+    }
+    if target.host.starts_with('-') {
+        return Err(format!("\"{input}\" is not a host name or address"));
+    }
+    Ok(target.host)
+}
+
+/// The address a host dials, as compared by the guard: DNS names are
+/// case-insensitive.
+fn endpoint(conn: &Connection) -> (String, u16) {
+    (conn.hostname.to_ascii_lowercase(), conn.port)
+}
+
+/// The identity a host authenticates with once its folders are applied:
+/// its own, else the nearest folder default (the dial's own resolution,
+/// `VaultStore::apply_effective`).
+fn effective_identity(
+    vault: &VaultStore,
+    conn: &Connection,
+    groups: &[Group],
+    identities: &[oryxis_core::models::Identity],
+) -> Option<Uuid> {
+    let mut c = conn.clone();
+    vault.apply_effective(&mut c, groups, identities);
+    c.identity_id
+}
+
+/// The rule in the module doc: a stored secret never goes to an address
+/// the user did not give it to. `original` is the row before an
+/// `update_host` (`None` for `create_host`); `password` is what the call
+/// does to the host's own password (`None` = keeps the stored one).
+fn credential_guard(
+    vault: &VaultStore,
+    original: Option<&Connection>,
+    conn: &Connection,
+    password: Option<&str>,
+) -> Result<(), String> {
+    let all = vault.list_connections().map_err(|e| e.to_string())?;
+    let here = endpoint(conn);
+    let addr = oryxis_core::net::host_port(&conn.hostname, conn.port);
+    let moved = original.is_none_or(|o| endpoint(o) != here);
+    // A host that already dials this address keeps doing so; a NEW way
+    // there (a create, a move) must not reach what the user excluded.
+    if moved
+        && all
+            .iter()
+            .any(|h| h.id != conn.id && !h.mcp_enabled && endpoint(h) == here)
+    {
+        return Err(format!(
+            "{addr} belongs to a host kept out of MCP; it is not reachable over MCP under \
+             another entry either."
+        ));
+    }
+    let stored_password = match original {
+        Some(o) => vault.connection_has_password(&o.id).map_err(|e| e.to_string())?,
+        None => false,
+    };
+    if let Some(o) = original.filter(|_| moved) {
+        if password.is_none() && stored_password {
+            return Err(format!(
+                "\"{}\" stores a password, which never follows a host to a new address over MCP. \
+                 Pass the password for {addr} in this call (or null to clear it), or move the \
+                 host in the app.",
+                o.label
+            ));
+        }
+        if vault
+            .get_connection_totp_secret(&o.id)
+            .map_err(|e| e.to_string())?
+            .is_some()
+        {
+            return Err(format!(
+                "\"{}\" stores a TOTP secret, which never follows a host to a new address over \
+                 MCP. Move the host in the app.",
+                o.label
+            ));
+        }
+    }
+    // A host with its own password never sends its identity's: the own
+    // one wins the dial (`resolve_credentials`).
+    let own_password = match password {
+        Some(p) => !p.is_empty(),
+        None => stored_password,
+    };
+    if own_password {
+        return Ok(());
+    }
+    let groups = vault.list_groups().map_err(|e| e.to_string())?;
+    let identities = vault.list_identities().map_err(|e| e.to_string())?;
+    let with_password = vault.list_identity_ids_with_password().map_err(|e| e.to_string())?;
+    let Some(identity) = effective_identity(vault, conn, &groups, &identities) else {
+        return Ok(());
+    };
+    if !with_password.contains(&identity) {
+        return Ok(());
+    }
+    // Whoever already dials this address with this identity vouches for
+    // it: the row as it was (the user set it up), or another MCP host.
+    let vouched = original
+        .filter(|o| !moved && effective_identity(vault, o, &groups, &identities) == Some(identity))
+        .is_some()
+        || all.iter().any(|h| {
+            h.id != conn.id
+                && h.mcp_enabled
+                && h.protocol == ConnectionProtocol::Ssh
+                && endpoint(h) == here
+                && effective_identity(vault, h, &groups, &identities) == Some(identity)
+        });
+    if vouched {
+        return Ok(());
+    }
+    let label = identities
+        .iter()
+        .find(|i| i.id == identity)
+        .map(|i| i.label.as_str())
+        .unwrap_or("?");
+    Err(format!(
+        "The identity \"{label}\" stores a password and no MCP host at {addr} uses it, so it is \
+         not attached to {addr} over MCP (directly or through the folder's default): a stored \
+         password only goes to an address the user gave it to. Attach it in the app, or give \
+         this host its own password."
+    ))
 }
 
 fn finish(vault: &VaultStore, conn: &Connection, password: Option<&str>) -> Result<Value, String> {
@@ -298,6 +476,18 @@ fn finish(vault: &VaultStore, conn: &Connection, password: Option<&str>) -> Resu
         .map_err(|e| e.to_string())?;
     if let Err(e) = oryxis_vault::change_notice::announce("oryxis-mcp") {
         tracing::warn!(error = %e, "could not announce the vault change");
+    }
+    // A host written with MCP off is saved, and `get_host` (which sees
+    // MCP hosts only) would answer "not found" for it: a client reading
+    // that as a failure would write it again.
+    if !conn.mcp_enabled {
+        return Ok(json!({
+            "id": conn.id.to_string(),
+            "label": conn.label,
+            "mcp_enabled": false,
+            "saved": true,
+            "note": "Saved with MCP off: the host is no longer visible to MCP tools.",
+        }));
     }
     handle_get_host(vault, Some(&json!({ "id": conn.id.to_string() })))
 }
@@ -313,11 +503,12 @@ pub fn handle_create_host(server: &Server, params: Option<&Value>) -> Result<Val
     let Field::Set(hostname) = str_field(params, "hostname")? else {
         return Err("Missing required parameter: hostname".to_string());
     };
-    if label.is_empty() || hostname.is_empty() {
+    if label.is_empty() {
         return Err("label and hostname must not be empty".to_string());
     }
-    let mut conn = Connection::new(label, hostname);
+    let mut conn = Connection::new(label, host_only(&hostname)?);
     let password = apply_fields(&vault, &mut conn, params)?;
+    credential_guard(&vault, None, &conn, password.as_deref())?;
     conn.updated_at = chrono::Utc::now();
     tracing::info!(host = %conn.label, id = %conn.id, "create_host");
     finish(&vault, &conn, password.as_deref())
@@ -341,7 +532,9 @@ pub fn handle_update_host(server: &Server, params: Option<&Value>) -> Result<Val
     if conn.protocol != ConnectionProtocol::Ssh {
         return Err("Only SSH hosts are edited over MCP".to_string());
     }
+    let original = conn.clone();
     let password = apply_fields(&vault, &mut conn, params)?;
+    credential_guard(&vault, Some(&original), &conn, password.as_deref())?;
     conn.updated_at = chrono::Utc::now();
     tracing::info!(host = %conn.label, id = %conn.id, "update_host");
     finish(&vault, &conn, password.as_deref())

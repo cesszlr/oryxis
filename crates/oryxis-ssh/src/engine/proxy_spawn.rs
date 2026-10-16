@@ -107,8 +107,14 @@ impl<'a> ProxyTokens<'a> {
 ///   single-character file name matches one. `%h` accepts the bracketed
 ///   spelling anyway and substitutes the address inside it, which is
 ///   what OpenSSH's own `%h` would have been.
+///
+/// And no value starts with `-`: the slot feeds a program's argument
+/// list (`ssh -l %r`, `nc %h %p`), where a leading dash is an option
+/// (`-oProxyCommand=...`, `-F/path`), not a host or a login. OpenSSH
+/// refuses such a host name and such a user name for the same reason.
 fn is_substitutable(value: &str) -> bool {
     !value.is_empty()
+        && !value.starts_with('-')
         && value.len() <= 255
         && value.chars().all(|c| {
             c.is_ascii_alphanumeric()
@@ -681,6 +687,20 @@ mod tests {
             let out = expand_proxy_tokens("nc %h %p", &host_only(spelling, 22)).unwrap();
             assert_eq!(out, "nc 2001:db8::1 22", "for {spelling:?}");
         }
+    }
+
+    #[test]
+    fn a_value_that_reads_as_an_option_is_refused() {
+        for (token, t) in [
+            ("%h", tokens("-oProxyCommand=x", 22, "root", "h")),
+            ("%r", tokens("h.example", 22, "-F/tmp/cfg", "h")),
+            ("%n", tokens("h.example", 22, "root", "-E/tmp/log")),
+        ] {
+            let err = expand_proxy_tokens("ssh -l %r -W %h:%p %n", &t).unwrap_err();
+            assert!(matches!(err, ProxyCommandError::UnsafeValue { token: tok, .. } if tok == token), "{token}");
+        }
+        // A dash inside a value is an ordinary character.
+        assert!(expand_proxy_tokens("nc %h %p", &host_only("web-01.example", 22)).is_ok());
     }
 
     #[test]
