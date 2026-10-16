@@ -64,7 +64,7 @@ impl Oryxis {
         ShortcutPreset::available()
             .iter()
             .find(|p| {
-                let (map, _) = layout::apply_layout(&p.layout(), &reserved, Mode::KeyboardOnly);
+                let (map, _) = layout::apply_layout(&p.layout(), &reserved, Mode::KeyboardOnly, &self.hotkey_bindings);
                 same_bindings(&map, &self.hotkey_bindings)
             })
             .map(|p| Some(*p))
@@ -88,7 +88,7 @@ impl Oryxis {
         refused: Vec<Refused>,
         mode: Mode,
     ) -> Task<Message> {
-        let (target, applied) = layout::apply_layout(&entries, &self.snippet_chords(), mode);
+        let (target, applied) = layout::apply_layout(&entries, &self.snippet_chords(), mode, &self.hotkey_bindings);
         if same_bindings(&target, &self.hotkey_bindings) && refused.is_empty() {
             return self.show_toast(crate::i18n::t("hotkey_layout_already").replace("{name}", &name));
         }
@@ -144,7 +144,7 @@ impl Oryxis {
     fn apply_hotkey_layout(&mut self, entries: &[LayoutEntry], name: &str, mode: Mode) -> Task<Message> {
         // Recomputed, not carried from the offer: a snippet can have taken
         // a chord while the confirm was up.
-        let (map, _) = layout::apply_layout(entries, &self.snippet_chords(), mode);
+        let (map, _) = layout::apply_layout(entries, &self.snippet_chords(), mode, &self.hotkey_bindings);
         for (action, value) in layout::settings_rows(&map) {
             self.persist_setting(&format!("hotkey_{}", action.id()), &value);
         }

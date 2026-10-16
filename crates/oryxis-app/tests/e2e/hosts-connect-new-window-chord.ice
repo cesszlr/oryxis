@@ -1,4 +1,4 @@
-viewport: 1200x750
+viewport: 1200x850
 mode: Zen
 -----
 # Ctrl+Enter connects a host in a NEW window: the card menu's "Connect
@@ -20,7 +20,9 @@ mode: Zen
 # on its own; what this asserts is the WINDOW: the emulator adopts the
 # last window opened and draws it, and `window <n>` looks at another.
 # The move-tab chip is clicked by position (eleven chips share the
-# "(unbound)" text): the second one with the list at the top.
+# "(unbound)" text): the second one with the list at the top, under the
+# preset selector, which is why the viewport is taller than the default
+# (`shortcuts-unbound-verbs.ice` clicks the same chip).
 expect "Welcome to Oryxis"
 click "Skip"
 click "Continue without password"
@@ -40,7 +42,8 @@ settle
 click "Shortcuts"
 settle
 expect "Connect in New Window"
-click (251, 714)
+expect "Move tab to new window"
+click (251, 790)
 settle 250
 expect "Press a key or mouse button…"
 type ctrl+enter

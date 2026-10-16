@@ -211,12 +211,17 @@ impl Oryxis {
         // window is the same pair the hosts screen offers, and the
         // picker is where a keyboard user picks a host from inside a
         // terminal (the reporter's own case). The arm reads the
-        // picker's highlighted row while it is open.
+        // picker's highlighted row while it is open. Not while a split
+        // is pending, for the SFTP row's reason: a new window is not a
+        // pane, and the pending split would be taken by the queued
+        // dial (`ConnectSsh` reads it) and fill the old tab instead.
         let picker_exempt = |a: HotkeyAction| {
             self.panels.new_tab_picker
                 && match a {
-                    HotkeyAction::OpenLocalShell | HotkeyAction::ConnectInNewWindow => true,
-                    HotkeyAction::OpenSftp => self.pending_pane_split.is_none(),
+                    HotkeyAction::OpenLocalShell => true,
+                    HotkeyAction::OpenSftp | HotkeyAction::ConnectInNewWindow => {
+                        self.pending_pane_split.is_none()
+                    }
                     _ => false,
                 }
         };
@@ -857,7 +862,10 @@ impl Oryxis {
             ConnectInNewWindow if self.panels.new_tab_picker => {
                 match self.new_tab_picker_highlighted_host() {
                     Some(id) => {
+                        // `HideNewTabPicker`'s teardown, then the dial.
                         self.panels.new_tab_picker = false;
+                        self.pending_pane_split = None;
+                        self.new_tab_picker_group = None;
                         Task::done(Message::Tabs(TabsMessage::ConnectHostsInNewWindow(vec![id])))
                     }
                     None => Task::none(),

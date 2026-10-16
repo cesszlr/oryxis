@@ -222,7 +222,7 @@ const TABBY_LINUX: &[(HotkeyAction, &str)] = &[
 const TABBY_MACOS: &[(HotkeyAction, &str)] = &[
     (ShowNewTabPicker, "logo+e"),             // profile-selector '⌘-E'
     (OpenLocalShell, "logo+t"),               // new-tab '⌘-T'
-    (CloseActiveTab, "shift+logo+w"),         // close-pane '⌘-Shift-W'
+    (CloseActiveTab, "logo+w"),               // close-tab '⌘-W' ('⌘-Shift-W' is close-pane)
     (ReopenClosedTab, "shift+logo+t"),        // reopen-tab '⌘-Shift-T'
     (RenameTab, "logo+r"),                    // rename-tab '⌘-R'
     (SwitchToTabSlot, "logo+digit"),          // tab-1..9 '⌘-1'..'⌘-9'
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn each_preset_unbinds_exactly_what_it_must() {
         for preset in ShortcutPreset::available() {
-            let (_, applied) = apply_layout(&preset.layout(), &[], Mode::KeyboardOnly);
+            let (_, applied) = apply_layout(&preset.layout(), &[], Mode::KeyboardOnly, &default_bindings());
             assert!(applied.skipped.is_empty());
             let expected: &[HotkeyAction] = match preset {
                 // Alt+arrows becomes pane focus, and tab cycling is the
@@ -307,7 +307,7 @@ mod tests {
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn windows_terminal_unbinds_tab_cycling_and_the_files_toggle() {
-        let (map, applied) = apply_layout(&rows_layout(WINDOWS_TERMINAL), &[], Mode::KeyboardOnly);
+        let (map, applied) = apply_layout(&rows_layout(WINDOWS_TERMINAL), &[], Mode::KeyboardOnly, &default_bindings());
         assert!(applied.skipped.is_empty());
         let mut got = applied.unbound.clone();
         got.sort_by_key(|a| a.id());
@@ -324,7 +324,7 @@ mod tests {
     fn a_preset_keeps_the_middle_click_and_ctrl_wheel() {
         let factory = default_bindings();
         for preset in ShortcutPreset::available() {
-            let (map, _) = apply_layout(&preset.layout(), &[], Mode::KeyboardOnly);
+            let (map, _) = apply_layout(&preset.layout(), &[], Mode::KeyboardOnly, &default_bindings());
             for (action, chords) in &factory {
                 for chord in chords.iter().filter(|c| c.is_mouse() || c.is_wheel()) {
                     assert!(map.get(action).is_some_and(|b| b.contains(chord)), "{preset:?} dropped {action:?} {}", chord.serialize());

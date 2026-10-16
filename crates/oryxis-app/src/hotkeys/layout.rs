@@ -71,9 +71,54 @@ fn effective(map: &HotkeyMap, action: HotkeyAction) -> Option<&HotkeyBindings> {
 
 /// The factory table with `layout` applied, in order (a later entry wins a
 /// chord over an earlier one). `reserved` are the chords snippets hold.
-pub fn apply_layout(layout: &[LayoutEntry], reserved: &[HotkeyBinding], mode: Mode) -> (HotkeyMap, Applied) {
+/// `current` is the table in use: under [`Mode::KeyboardOnly`] every mouse
+/// and wheel chord comes from it rather than from the factory, so a
+/// middle-click paste or a Ctrl+wheel zoom the user switched off stays off
+/// and a side button they bound keeps its action. [`Mode::Exact`] ignores it.
+pub fn apply_layout(
+    layout: &[LayoutEntry],
+    reserved: &[HotkeyBinding],
+    mode: Mode,
+    current: &HotkeyMap,
+) -> (HotkeyMap, Applied) {
     let mut map = default_bindings();
     let mut applied = Applied::default();
+    let gesture = |c: &HotkeyBinding| c.is_mouse() || c.is_wheel();
+    if mode == Mode::KeyboardOnly {
+        for held in map.values_mut() {
+            let factory: Vec<HotkeyBinding> = held.iter().filter(|c| gesture(c)).copied().collect();
+            for chord in &factory {
+                held.remove(chord);
+            }
+        }
+        for (action, held) in current {
+            for chord in held.iter().filter(|c| gesture(c)) {
+                map.entry(*action).or_default().push(*chord);
+            }
+        }
+        map.retain(|_, held| !held.is_empty());
+    }
+    // A factory chord a snippet holds is not the table's either: the boot
+    // pass strips it on every launch, and handing it back here would let
+    // the table (which dispatches first) silence the snippet.
+    let mut stripped = Vec::new();
+    for (action, held) in map.iter_mut() {
+        let taken: Vec<HotkeyBinding> = held
+            .iter()
+            .filter(|h| reserved.iter().any(|r| r.shares_keypress(h)))
+            .copied()
+            .collect();
+        for chord in &taken {
+            held.remove(chord);
+        }
+        if !taken.is_empty() && held.is_empty() {
+            stripped.push(*action);
+        }
+    }
+    for action in stripped {
+        map.remove(&action);
+        applied.unbound.push(action);
+    }
     for (action, wanted) in layout {
         let mut chords = HotkeyBindings::default();
         for chord in wanted.iter() {
@@ -113,7 +158,7 @@ pub fn apply_layout(layout: &[LayoutEntry], reserved: &[HotkeyBinding], mode: Mo
         if mode == Mode::KeyboardOnly
             && let Some(kept) = map.get(action)
         {
-            for chord in kept.iter().filter(|c| c.is_mouse() || c.is_wheel()) {
+            for chord in kept.iter().filter(|c| gesture(c)) {
                 chords.push(*chord);
             }
         }
@@ -287,7 +332,7 @@ mod tests {
 
     #[test]
     fn an_empty_layout_is_the_factory_table() {
-        let (map, applied) = apply_layout(&[], &[], Mode::Exact);
+        let (map, applied) = apply_layout(&[], &[], Mode::Exact, &default_bindings());
         assert_eq!(map, default_bindings());
         assert_eq!(applied, Applied::default());
         assert!(layout_of(&map).is_empty());
@@ -300,7 +345,7 @@ mod tests {
         let factory = default_bindings()[&HotkeyAction::CloseActiveTab].clone();
         let held = factory.primary().expect("close tab ships bound");
         let (map, applied) =
-            apply_layout(&[(HotkeyAction::TerminalSaveOutput, HotkeyBindings::single(held))], &[], Mode::Exact);
+            apply_layout(&[(HotkeyAction::TerminalSaveOutput, HotkeyBindings::single(held))], &[], Mode::Exact, &default_bindings());
         assert!(map[&HotkeyAction::TerminalSaveOutput].contains(&held));
         assert!(map.get(&HotkeyAction::CloseActiveTab).is_none_or(|b| !b.contains(&held)));
         // It keeps any other chord it had; with none left it is reported.
@@ -319,7 +364,7 @@ mod tests {
             return; // macOS ships Cmd+Enter; the rule is the same.
         }
         let (map, _) =
-            apply_layout(&[(HotkeyAction::MoveTabToNewWindow, HotkeyBindings::single(enter))], &[], Mode::Exact);
+            apply_layout(&[(HotkeyAction::MoveTabToNewWindow, HotkeyBindings::single(enter))], &[], Mode::Exact, &default_bindings());
         assert!(map[&HotkeyAction::ConnectInNewWindow].contains(&enter));
         assert!(map[&HotkeyAction::MoveTabToNewWindow].contains(&enter));
     }
@@ -328,12 +373,49 @@ mod tests {
     fn a_snippet_chord_is_never_taken() {
         let snip = chord("ctrl+alt+k");
         let (map, applied) =
-            apply_layout(&[(HotkeyAction::TerminalSaveOutput, HotkeyBindings::single(snip))], &[snip], Mode::Exact);
+            apply_layout(&[(HotkeyAction::TerminalSaveOutput, HotkeyBindings::single(snip))], &[snip], Mode::Exact, &default_bindings());
         assert!(!map.contains_key(&HotkeyAction::TerminalSaveOutput));
         assert_eq!(
             applied.skipped,
             vec![Skipped::Snippet { action: HotkeyAction::TerminalSaveOutput, chord: snip }]
         );
+    }
+
+    #[test]
+    fn a_factory_chord_a_snippet_holds_stays_with_the_snippet() {
+        // The user freed Duplicate Tab's chord and gave it to a snippet;
+        // a set that does not mention Duplicate Tab must not hand the
+        // factory chord back to it (the table dispatches first).
+        let factory = default_bindings()[&HotkeyAction::DuplicateTab].clone();
+        let held = factory.primary().expect("duplicate tab ships bound");
+        let (map, applied) = apply_layout(&[], &[held], Mode::Exact, &default_bindings());
+        assert!(map.get(&HotkeyAction::DuplicateTab).is_none_or(|b| !b.contains(&held)));
+        assert!(map.values().all(|b| !b.iter().any(|c| c.shares_keypress(&held))));
+        assert_eq!(applied.unbound.contains(&HotkeyAction::DuplicateTab), factory.len() == 1);
+    }
+
+    #[test]
+    fn a_keyboard_preset_keeps_the_users_gestures_not_the_factorys() {
+        // Middle-click paste switched off, Back bound to close the tab:
+        // a keyboard set leaves both exactly as the user has them.
+        let mut current = default_bindings();
+        let middle = crate::hotkeys::middle_click_chord();
+        for held in current.values_mut() {
+            held.remove(&middle);
+        }
+        current.retain(|_, b| !b.is_empty());
+        let back = HotkeyBinding::mouse(crate::hotkeys::MouseButton::Back);
+        current.entry(HotkeyAction::CloseActiveTab).or_default().push(back);
+        let layout = vec![(HotkeyAction::FontZoomIn, chords("ctrl+shift+u"))];
+        let (map, _) = apply_layout(&layout, &[], Mode::KeyboardOnly, &current);
+        assert!(map.values().all(|b| !b.contains(&middle)), "the middle click came back");
+        assert!(map[&HotkeyAction::CloseActiveTab].contains(&back), "the side button was lost");
+        // Every gesture of the current table is still there, on its action.
+        for (action, held) in &current {
+            for c in held.iter().filter(|c| c.is_mouse() || c.is_wheel()) {
+                assert!(map.get(action).is_some_and(|b| b.contains(c)), "{action:?} lost {}", c.serialize());
+            }
+        }
     }
 
     #[test]
@@ -344,7 +426,7 @@ mod tests {
         let Some(cycle) = family.primary() else { return };
         let left = HotkeyBinding { primary: PrimaryKey::Named(Named::ArrowLeft), ..cycle };
         let (map, applied) =
-            apply_layout(&[(HotkeyAction::FocusPaneLeft, HotkeyBindings::single(left))], &[], Mode::Exact);
+            apply_layout(&[(HotkeyAction::FocusPaneLeft, HotkeyBindings::single(left))], &[], Mode::Exact, &default_bindings());
         assert!(map.get(&HotkeyAction::CycleTabs).is_none_or(|b| !b.contains(&cycle)));
         assert_eq!(applied.unbound.contains(&HotkeyAction::CycleTabs), family.len() == 1);
     }
@@ -358,14 +440,14 @@ mod tests {
             (HotkeyAction::TerminalPasteSelection, chords("ctrl+shift+o")),
             (HotkeyAction::FontZoomIn, chords("ctrl+shift+u")),
         ];
-        let (map, _) = apply_layout(&layout, &[], Mode::KeyboardOnly);
+        let (map, _) = apply_layout(&layout, &[], Mode::KeyboardOnly, &default_bindings());
         for (action, factory) in [(HotkeyAction::TerminalPasteSelection, paste_sel), (HotkeyAction::FontZoomIn, zoom_in)] {
             for chord in factory.iter().filter(|c| c.is_mouse() || c.is_wheel()) {
                 assert!(map[&action].contains(chord), "{action:?} lost {chord:?}");
             }
             assert!(map[&action].iter().all(|c| c.is_mouse() || c.is_wheel() || layout.iter().any(|(a, b)| *a == action && b.contains(c))));
         }
-        let (exact, _) = apply_layout(&layout, &[], Mode::Exact);
+        let (exact, _) = apply_layout(&layout, &[], Mode::Exact, &default_bindings());
         assert!(exact[&HotkeyAction::FontZoomIn].iter().all(|c| !c.is_wheel()));
     }
 
@@ -375,10 +457,10 @@ mod tests {
             (HotkeyAction::TerminalSaveOutput, chords("ctrl+shift+o")),
             (HotkeyAction::CloseActiveTab, HotkeyBindings::default()),
         ];
-        let (map, _) = apply_layout(&layout, &[], Mode::Exact);
+        let (map, _) = apply_layout(&layout, &[], Mode::Exact, &default_bindings());
         let plan = parse_import(&export_file(&map)).expect("own file");
         assert!(plan.refused.is_empty(), "{:?}", plan.refused);
-        let (again, _) = apply_layout(&plan.layout, &[], Mode::Exact);
+        let (again, _) = apply_layout(&plan.layout, &[], Mode::Exact, &default_bindings());
         assert_eq!(layout_of(&again), layout_of(&map));
     }
 
