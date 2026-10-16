@@ -1255,6 +1255,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "lệnh thất bại (mã thoát {detail})",
         "snippet_run_cycle" => "“{name}” tự chạy chính nó qua các hành động.",
         "snippet_run_missing" => "“{name}” chạy một đoạn lệnh không còn tồn tại.",
+        "snippet_run_nested_install" => "“{name}” là tập lệnh cài đặt: chỉ chạy riêng, không bao giờ chạy từ một đoạn lệnh khác.",
         "snippet_run_no_integration" => "shell không báo khi nào lệnh kết thúc (OSC 133); hãy chờ đầu ra hoặc chờ một khoảng thời gian",
         "snippet_run_no_last_command" => "không có lệnh đã xong nào để lưu",
         "snippet_run_pane_unavailable" => "terminal không nhận đầu vào",

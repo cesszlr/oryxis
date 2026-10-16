@@ -1052,6 +1052,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "la commande a échoué (code {detail})",
         "snippet_run_cycle" => "« {name} » se lance lui-même par ses actions.",
         "snippet_run_missing" => "« {name} » lance un snippet qui n'existe plus.",
+        "snippet_run_nested_install" => "« {name} » est un script d'installation : il ne s'exécute que seul, jamais depuis un autre snippet.",
         "snippet_run_no_integration" => "le shell n'indique pas quand une commande se termine (OSC 133) ; attendez plutôt une sortie ou une durée",
         "snippet_run_no_last_command" => "il n'y a aucune commande terminée à enregistrer",
         "snippet_run_pane_unavailable" => "le terminal n'accepte pas de saisie",

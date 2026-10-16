@@ -145,7 +145,10 @@ pub enum SnippetWait {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         continue_on_error: bool,
     },
-    /// A pattern in the output, matched like a login script's prompt.
+    /// A pattern in the output: text found anywhere in what the terminal
+    /// printed since the wait began (case-insensitive), or a regex
+    /// (`login_script::OutputMatcher`). The text rides the wire as
+    /// `ExpectPattern::Suffix`, the login-script type it shares.
     Output {
         pattern: ExpectPattern,
         /// `0` = [`DEFAULT_WAIT_TIMEOUT_MS`].

@@ -1257,6 +1257,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "فرمان ناموفق بود (کد خروج {detail})",
         "snippet_run_cycle" => "«{name}» از طریق کنش‌هایش خودش را اجرا می‌کند.",
         "snippet_run_missing" => "«{name}» قطعه‌کدی را اجرا می‌کند که دیگر وجود ندارد.",
+        "snippet_run_nested_install" => "«{name}» اسکریپت نصب است: فقط به‌تنهایی اجرا می‌شود، هرگز از درون قطعه‌کد دیگر.",
         "snippet_run_no_integration" => "پوسته پایان فرمان را اعلام نمی‌کند (OSC 133)؛ به‌جای آن منتظر خروجی یا یک زمان بمانید",
         "snippet_run_no_last_command" => "فرمان تمام‌شده‌ای برای ذخیره وجود ندارد",
         "snippet_run_pane_unavailable" => "ترمینال ورودی نمی‌پذیرد",

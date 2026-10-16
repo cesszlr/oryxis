@@ -1287,6 +1287,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "فشل الأمر (رمز الخروج {detail})",
         "snippet_run_cycle" => "«{name}» يشغّل نفسه عبر إجراءاته.",
         "snippet_run_missing" => "«{name}» يشغّل مقتطفًا لم يعد موجودًا.",
+        "snippet_run_nested_install" => "«{name}» سكربت تثبيت: يعمل وحده فقط، ولا يُشغَّل من مقتطف آخر أبدًا.",
         "snippet_run_no_integration" => "الصدفة لا تُبلغ بانتهاء الأمر (OSC 133)؛ انتظر مخرجات أو مدة بدلًا من ذلك",
         "snippet_run_no_last_command" => "لا يوجد أمر منتهٍ لحفظه",
         "snippet_run_pane_unavailable" => "الطرفية لا تقبل الإدخال",

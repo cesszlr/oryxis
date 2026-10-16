@@ -97,6 +97,15 @@ impl Oryxis {
         if let Some(name) = crate::snippet_run::would_cycle(&self.snippets, id, &form.label, &steps) {
             return Err(t("snippet_run_cycle").replace("{name}", &name));
         }
+        // The picker offers no install script; one that became one since
+        // (or a row kept from before) is refused here, as the run would.
+        for step in &steps {
+            if let SnippetStep::RunSnippet { id } = step
+                && let Some(inner) = self.snippets.iter().find(|s| s.id == *id && s.install)
+            {
+                return Err(t("snippet_run_nested_install").replace("{name}", &inner.label));
+            }
+        }
         Ok(steps)
     }
 }

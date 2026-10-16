@@ -781,13 +781,12 @@ impl Oryxis {
                     .pane_by_id(pane_id)
                     .is_some_and(|p| p.login_script.is_some());
                 self.feed_login_script(pane_id, &bytes);
-                // A snippet run waiting on a pattern reads the same bytes,
-                // and a startup snippet whose login script just finished
-                // starts here.
-                let snippet_output_task = Task::batch([
-                    self.snippet_run_output(pane_id, &bytes),
-                    self.start_due_startup_runs(),
-                ]);
+                // A startup snippet whose login script just finished starts
+                // here, BEFORE the batch, so a first step waiting on output
+                // reads it. Which output wait the batch is for is fixed now
+                // too; it is fed once the emulator drew the batch (below).
+                let startup_runs_task = self.start_due_startup_runs();
+                let snippet_output_wait = self.snippet_output_wait(pane_id);
                 // Route to the specific pane (a tab may have several, each
                 // with its own PTY). Scan is trivial at these counts.
                 let mut over_threshold = false;
@@ -885,7 +884,7 @@ impl Oryxis {
                 // The shell marked a command's end (OSC 133 D) in this
                 // batch, with its exit code when reported: a snippet run
                 // waiting on it goes on (or stops on a failure).
-                let mut command_ended: Option<Option<i32>> = None;
+                let mut run_marks: Vec<crate::snippet_run::RunMark> = Vec::new();
                 // Alternate-screen edge this batch produced, if any:
                 // `Some(entered)`. Attaching a tmux session draws the
                 // alternate screen and detaching restores the primary,
@@ -981,10 +980,19 @@ impl Oryxis {
                         // Applied inside the lock: the marks' grid positions
                         // refer to rows this very batch drew.
                         let new_marks = state.take_shell_marks();
-                        command_ended = new_marks.iter().rev().find_map(|m| match m.mark {
-                            oryxis_terminal::ShellMark::CommandEnd(code) => Some(code),
-                            _ => None,
-                        });
+                        run_marks = new_marks
+                            .iter()
+                            .filter_map(|m| match m.mark {
+                                oryxis_terminal::ShellMark::PromptEnd
+                                | oryxis_terminal::ShellMark::OutputStart => {
+                                    Some(crate::snippet_run::RunMark::Ready)
+                                }
+                                oryxis_terminal::ShellMark::CommandEnd(code) => {
+                                    Some(crate::snippet_run::RunMark::End(code))
+                                }
+                                _ => None,
+                            })
+                            .collect();
                         if !new_marks.is_empty() {
                             // Drained in the same breath as the marks: a
                             // `CommandLine` mark resolves its text by id
@@ -1484,10 +1492,17 @@ impl Oryxis {
                 // the no-other-tasks path below too (the zmodem early
                 // return above carries its own copy).
                 tasks.push(startup_task);
-                tasks.push(snippet_output_task);
+                tasks.push(startup_runs_task);
                 tasks.extend(trigger_tasks);
-                if let Some(exit) = command_ended {
-                    tasks.push(self.snippet_run_command_ended(pane_id, exit));
+                // A run's waits read the batch as drawn: its marks first (a
+                // command-end wait), then its text (an output wait armed
+                // before the batch; one the marks just replaced is not fed
+                // what came before it).
+                if !run_marks.is_empty() {
+                    tasks.push(self.snippet_run_marks(pane_id, &run_marks));
+                }
+                if let Some(wait) = snippet_output_wait {
+                    tasks.push(self.snippet_run_output(pane_id, &bytes, wait));
                 }
                 Ok(Task::batch(tasks))
             }

@@ -1039,6 +1039,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "il comando è fallito (uscita {detail})",
         "snippet_run_cycle" => "“{name}” esegue sé stesso tramite le sue azioni.",
         "snippet_run_missing" => "“{name}” esegue un frammento che non esiste più.",
+        "snippet_run_nested_install" => "“{name}” è uno script di installazione: si esegue solo da solo, mai da un altro frammento.",
         "snippet_run_no_integration" => "la shell non segnala quando un comando termina (OSC 133); attendi invece un output o un tempo",
         "snippet_run_no_last_command" => "non c’è nessun comando terminato da salvare",
         "snippet_run_pane_unavailable" => "il terminale non accetta input",

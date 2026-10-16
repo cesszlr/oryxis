@@ -1265,6 +1265,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "polecenie zakończyło się błędem (kod {detail})",
         "snippet_run_cycle" => "„{name}” uruchamia sam siebie przez swoje akcje.",
         "snippet_run_missing" => "„{name}” uruchamia fragment, który już nie istnieje.",
+        "snippet_run_nested_install" => "„{name}” to skrypt instalacyjny: uruchamia się tylko samodzielnie, nigdy z innego fragmentu.",
         "snippet_run_no_integration" => "powłoka nie zgłasza końca polecenia (OSC 133); czekaj zamiast tego na wyjście lub na czas",
         "snippet_run_no_last_command" => "nie ma zakończonego polecenia do zapisania",
         "snippet_run_pane_unavailable" => "terminal nie przyjmuje danych",

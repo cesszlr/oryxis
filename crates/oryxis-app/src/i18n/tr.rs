@@ -1255,6 +1255,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "komut başarısız oldu (çıkış kodu {detail})",
         "snippet_run_cycle" => "“{name}” eylemleri üzerinden kendini çalıştırıyor.",
         "snippet_run_missing" => "“{name}” artık var olmayan bir snippet'i çalıştırıyor.",
+        "snippet_run_nested_install" => "“{name}” bir kurulum betiği: yalnızca tek başına çalışır, asla başka bir snippet'ten çalışmaz.",
         "snippet_run_no_integration" => "kabuk bir komutun ne zaman bittiğini bildirmiyor (OSC 133); bunun yerine çıktı ya da süre bekleyin",
         "snippet_run_no_last_command" => "kaydedilecek bitmiş bir komut yok",
         "snippet_run_pane_unavailable" => "terminal girdi kabul etmiyor",

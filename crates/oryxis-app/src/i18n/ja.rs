@@ -1052,6 +1052,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "コマンドが失敗しました（終了コード {detail}）",
         "snippet_run_cycle" => "「{name}」はアクションを通じて自分自身を実行します。",
         "snippet_run_missing" => "「{name}」はもう存在しないスニペットを実行します。",
+        "snippet_run_nested_install" => "「{name}」はインストールスクリプトです。単独でのみ実行され、ほかのスニペットからは実行されません。",
         "snippet_run_no_integration" => "シェルがコマンドの終了を通知しません（OSC 133）。代わりに出力か時間を待ってください",
         "snippet_run_no_last_command" => "保存できる終了済みのコマンドがありません",
         "snippet_run_pane_unavailable" => "ターミナルが入力を受け付けません",

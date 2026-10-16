@@ -1261,6 +1261,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "הפקודה נכשלה (קוד יציאה {detail})",
         "snippet_run_cycle" => "״{name}״ מריץ את עצמו דרך הפעולות שלו.",
         "snippet_run_missing" => "״{name}״ מריץ סניפט שכבר לא קיים.",
+        "snippet_run_nested_install" => "״{name}״ הוא סקריפט התקנה: הוא רץ רק בפני עצמו, אף פעם לא מתוך סניפט אחר.",
         "snippet_run_no_integration" => "המעטפת לא מדווחת מתי פקודה מסתיימת (OSC 133); המתינו לפלט או לזמן במקום",
         "snippet_run_no_last_command" => "אין פקודה שהסתיימה לשמירה",
         "snippet_run_pane_unavailable" => "המסוף לא מקבל קלט",

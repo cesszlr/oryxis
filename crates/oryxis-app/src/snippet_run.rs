@@ -43,6 +43,11 @@ pub(crate) enum PlanError {
     /// Expansion past [`MAX_PLAN_STEPS`] (a snippet called many times
     /// over through others).
     TooLong,
+    /// A "run snippet" step names an install script (its label), which
+    /// only ever runs on its own, after its confirmation shows the body
+    /// (#147); copied into another run it would skip both that and the
+    /// per-host "already ran here" memory.
+    Install(String),
 }
 
 /// The most steps one run may expand to.
@@ -68,6 +73,9 @@ fn expand(
         match step {
             SnippetStep::RunSnippet { id } => {
                 let inner = snippets.iter().find(|s| s.id == id).ok_or(PlanError::Missing)?;
+                if inner.install {
+                    return Err(PlanError::Install(inner.label.clone()));
+                }
                 if stack.contains(&id) {
                     return Err(PlanError::Cycle(inner.label.clone()));
                 }
@@ -148,20 +156,28 @@ pub(crate) fn save_file_name(template: &str, host: &str, date: &str) -> Option<S
     while name.starts_with('.') || name.starts_with('-') {
         name.replace_range(0..1, "_");
     }
+    // 120 characters, and never past 240 bytes: ext4 and APFS take 255
+    // BYTES per name, which 120 CJK characters (360) overrun.
     let mut name: String = name.chars().take(120).collect();
+    while name.len() > 240 {
+        name.pop();
+    }
     // Windows drops trailing dots and spaces, and reads these stems as
-    // devices (`NUL.txt` "succeeds" and writes nowhere).
+    // devices (`NUL.txt` "succeeds" and writes nowhere), the superscript
+    // digits included (`COM¹` is COM1). `$` never survives the mapping
+    // above, so `CONIN$` / `CONOUT$` cannot arrive here.
     while name.ends_with('.') || name.ends_with(' ') {
         name.pop();
     }
     if name.chars().all(|c| c == '_' || c == '.') {
         return None;
     }
-    let stem = name.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
-    let device = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
-        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+    let stem: Vec<char> = name.split('.').next().unwrap_or("").trim_end().to_uppercase().chars().collect();
+    let word: String = stem.iter().take(3).collect();
+    let device = (matches!(word.as_str(), "CON" | "PRN" | "AUX" | "NUL") && stem.len() == 3)
+        || (matches!(word.as_str(), "COM" | "LPT")
             && stem.len() == 4
-            && stem.as_bytes()[3].is_ascii_digit());
+            && matches!(stem[3], '0'..='9' | '¹' | '²' | '³'));
     if device {
         name.insert(0, '_');
     }
@@ -193,9 +209,18 @@ pub(crate) struct SnippetRun {
 
 /// What a run is waiting for.
 pub(crate) enum RunWait {
-    /// The shell's end-of-command mark (OSC 133 D); `true` = a failure
-    /// does not stop the run.
-    CommandEnd { continue_on_error: bool },
+    /// The shell's end-of-command mark (OSC 133 D) of the command this
+    /// wait is about; `continue_on_error` = a failure does not stop the
+    /// run. `ready` says whether the NEXT D is that command's: it is when
+    /// the wait was armed with the shell idle at its prompt (the command
+    /// just sent is the next one it runs) or with nothing sent and a
+    /// command already running (that one is the subject). Otherwise a D
+    /// may still be in flight from before the shell read the command (the
+    /// previous command's, in the same read; a command still running when
+    /// a trigger fired; the D a PS1 scheme prints with the session's first
+    /// prompt), so D marks are passed over until the shell shows it is
+    /// ready (`RunMark::Ready`).
+    CommandEnd { continue_on_error: bool, ready: bool },
     /// A pattern in the pane's output.
     Output(OutputMatcher),
     /// A timer.
@@ -206,9 +231,71 @@ pub(crate) enum RunWait {
     Dialog,
 }
 
+/// The shell-integration marks a command-end wait reads, in the order a
+/// batch carried them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RunMark {
+    /// The shell is at a prompt (OSC 133 B) or has started a command
+    /// (OSC 133 C): a D after this one ends a command the shell read
+    /// after it was ready.
+    Ready,
+    /// OSC 133 D, with the exit code when the shell reported one.
+    End(Option<i32>),
+}
+
+/// What a command-end wait makes of one batch's marks: the exit of the
+/// command it waits for, if this batch ended it. `ready` is updated as the
+/// marks go by.
+pub(crate) fn command_end_in(ready: &mut bool, marks: &[RunMark]) -> Option<Option<i32>> {
+    for mark in marks {
+        match *mark {
+            RunMark::Ready => *ready = true,
+            RunMark::End(code) if *ready => return Some(code),
+            RunMark::End(_) => {}
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_install_script_is_never_run_from_another_snippet() {
+        let mut install = snip("setup", vec![SnippetStep::Command { text: "curl x | sh".into() }]);
+        install.install = true;
+        let outer = snip("outer", vec![SnippetStep::RunSnippet { id: install.id }]);
+        let all = vec![install.clone(), outer.clone()];
+        assert_eq!(flatten(&all, &outer), Err(PlanError::Install("setup".into())));
+    }
+
+    #[test]
+    fn a_ready_wait_takes_the_next_end() {
+        let mut ready = true;
+        assert_eq!(command_end_in(&mut ready, &[RunMark::End(Some(0))]), Some(Some(0)));
+    }
+
+    #[test]
+    fn an_end_in_flight_before_the_prompt_is_passed_over() {
+        // The previous command's D, then the prompt, in one read: the
+        // command the run sent has not run yet.
+        let mut ready = false;
+        let batch = [RunMark::End(Some(0)), RunMark::Ready];
+        assert_eq!(command_end_in(&mut ready, &batch), None);
+        assert!(ready);
+        // Its own C and D come later.
+        assert_eq!(command_end_in(&mut ready, &[RunMark::Ready, RunMark::End(Some(2))]), Some(Some(2)));
+    }
+
+    #[test]
+    fn a_command_with_no_c_mark_still_ends_after_its_prompt() {
+        // A PS1-only scheme prints D;A;B with every prompt and nothing at
+        // the command's start: the prompt's B is the readiness.
+        let mut ready = false;
+        assert_eq!(command_end_in(&mut ready, &[RunMark::End(None), RunMark::Ready]), None);
+        assert_eq!(command_end_in(&mut ready, &[RunMark::End(Some(1)), RunMark::Ready]), Some(Some(1)));
+    }
 
     fn snip(label: &str, steps: Vec<SnippetStep>) -> Snippet {
         let mut s = Snippet::new(label, "");
@@ -280,6 +367,11 @@ mod tests {
         assert_eq!(save_file_name("..", "h", "d"), None);
         assert_eq!(save_file_name("nul.txt", "h", "d").as_deref(), Some("_nul.txt"));
         assert_eq!(save_file_name("COM1", "h", "d").as_deref(), Some("_COM1"));
+        assert_eq!(save_file_name("com¹.txt", "h", "d").as_deref(), Some("_com¹.txt"));
+        assert_eq!(save_file_name("LPT³", "h", "d").as_deref(), Some("_LPT³"));
+        assert_eq!(save_file_name("COM10", "h", "d").as_deref(), Some("COM10"));
+        let cjk = save_file_name(&"日".repeat(200), "h", "d").unwrap();
+        assert!(cjk.len() <= 240 && cjk.chars().all(|c| c == '日'));
         assert_eq!(save_file_name("console.log", "h", "d").as_deref(), Some("console.log"));
         assert_eq!(save_file_name("out. . ", "h", "d").as_deref(), Some("out"));
         assert_eq!(save_file_name("   ", "h", "d"), None);

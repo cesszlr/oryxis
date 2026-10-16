@@ -1255,6 +1255,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "perintah gagal (kode keluar {detail})",
         "snippet_run_cycle" => "“{name}” menjalankan dirinya sendiri lewat aksinya.",
         "snippet_run_missing" => "“{name}” menjalankan snippet yang sudah tidak ada.",
+        "snippet_run_nested_install" => "“{name}” adalah skrip instalasi: hanya berjalan sendiri, tidak pernah dari snippet lain.",
         "snippet_run_no_integration" => "shell tidak melaporkan kapan perintah selesai (OSC 133); tunggu keluaran atau waktu saja",
         "snippet_run_no_last_command" => "tidak ada perintah selesai untuk disimpan",
         "snippet_run_pane_unavailable" => "terminal tidak menerima masukan",

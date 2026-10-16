@@ -1261,6 +1261,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "η εντολή απέτυχε (κωδικός εξόδου {detail})",
         "snippet_run_cycle" => "Το «{name}» εκτελεί τον εαυτό του μέσω των ενεργειών του.",
         "snippet_run_missing" => "Το «{name}» εκτελεί ένα snippet που δεν υπάρχει πια.",
+        "snippet_run_nested_install" => "Το «{name}» είναι σενάριο εγκατάστασης: εκτελείται μόνο αυτόνομα, ποτέ από άλλο snippet.",
         "snippet_run_no_integration" => "το κέλυφος δεν αναφέρει πότε τελειώνει μια εντολή (OSC 133)· περιμένετε έξοδο ή χρόνο αντί γι’ αυτό",
         "snippet_run_no_last_command" => "δεν υπάρχει ολοκληρωμένη εντολή για αποθήκευση",
         "snippet_run_pane_unavailable" => "το τερματικό δεν δέχεται είσοδο",

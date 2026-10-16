@@ -1255,6 +1255,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "명령이 실패했습니다(종료 코드 {detail})",
         "snippet_run_cycle" => "“{name}”이(가) 동작을 통해 자기 자신을 실행합니다.",
         "snippet_run_missing" => "“{name}”이(가) 더 이상 없는 스니펫을 실행합니다.",
+        "snippet_run_nested_install" => "“{name}”은(는) 설치 스크립트입니다. 단독으로만 실행되며 다른 스니펫에서는 실행되지 않습니다.",
         "snippet_run_no_integration" => "셸이 명령 종료를 알리지 않습니다(OSC 133). 대신 출력이나 시간을 기다리세요",
         "snippet_run_no_last_command" => "저장할 끝난 명령이 없습니다",
         "snippet_run_pane_unavailable" => "터미널이 입력을 받을 수 없습니다",

@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::app::{Message, Oryxis};
 use crate::messages::{SnippetMessage, TerminalMessage};
-use crate::snippet_run::{RunWait, SnippetRun};
+use crate::snippet_run::{RunMark, RunWait, SnippetRun};
 
 impl Oryxis {
     /// Start `steps` (already expanded, variables filled) on the active
@@ -116,13 +116,17 @@ impl Oryxis {
                     }
                 }
                 SnippetStep::Wait(SnippetWait::CommandEnd { timeout_ms, continue_on_error }) => {
-                    let (integrated, busy) = self
+                    let (integrated, busy, at_prompt) = self
                         .pane_by_id(pane_id)
                         .map(|p| {
                             use crate::state::PromptState as P;
-                            (!matches!(p.prompt, P::NoIntegration), matches!(p.prompt, P::Busy))
+                            (
+                                !matches!(p.prompt, P::NoIntegration),
+                                matches!(p.prompt, P::Busy),
+                                matches!(p.prompt, P::AtPrompt { .. }),
+                            )
                         })
-                        .unwrap_or((false, false));
+                        .unwrap_or((false, false, false));
                     // A command this run just sent is waited for even
                     // before the shell has marked anything: at the start
                     // of a session the first prompt (and its marks) may
@@ -133,9 +137,13 @@ impl Oryxis {
                         // Nothing is running: there is no end to wait for.
                         continue;
                     }
+                    // The next D is the subject's when the shell sat at
+                    // its prompt as the command went out, or when the
+                    // subject is the command already running.
+                    let ready = if sent { at_prompt } else { busy };
                     tasks.push(self.arm_snippet_wait(
                         run_id,
-                        RunWait::CommandEnd { continue_on_error },
+                        RunWait::CommandEnd { continue_on_error, ready },
                         Some(timeout_ms),
                     ));
                     break;
@@ -314,10 +322,27 @@ impl Oryxis {
         }
     }
 
+    /// The output wait on `pane_id` this batch belongs to, read BEFORE the
+    /// batch is processed: (run, generation). The batch is fed to it only
+    /// after the emulator drew it (`snippet_run_output`), so an action
+    /// right after the match (Copy Screen, a save) sees the matched text;
+    /// a wait that ended or changed in between (the same batch's marks
+    /// resumed the run) is not fed output that predates it.
+    pub(crate) fn snippet_output_wait(&self, pane_id: Uuid) -> Option<(u64, u64)> {
+        self.snippet_runs
+            .iter()
+            .find(|r| r.pane_id == pane_id && matches!(r.wait, Some(RunWait::Output(_))))
+            .map(|r| (r.id, r.generation))
+    }
+
     /// One output batch of `pane_id` (the cleaned bytes the emulator
-    /// gets): a run waiting on a pattern reads it.
-    pub(crate) fn snippet_run_output(&mut self, pane_id: Uuid, bytes: &[u8]) -> Task<Message> {
-        let Some(run) = self.snippet_runs.iter_mut().find(|r| r.pane_id == pane_id) else {
+    /// got), for the output wait `wait` (`snippet_output_wait`).
+    pub(crate) fn snippet_run_output(&mut self, pane_id: Uuid, bytes: &[u8], wait: (u64, u64)) -> Task<Message> {
+        let Some(run) = self
+            .snippet_runs
+            .iter_mut()
+            .find(|r| r.pane_id == pane_id && (r.id, r.generation) == wait)
+        else {
             return Task::none();
         };
         let Some(RunWait::Output(matcher)) = run.wait.as_mut() else {
@@ -330,14 +355,20 @@ impl Oryxis {
         Task::none()
     }
 
-    /// The shell marked a command's end on `pane_id`, with the exit code
-    /// when it reported one. A failure stops the run unless its wait says
-    /// to go on (Ctrl+C on the command is then also how a run is stopped).
-    pub(crate) fn snippet_run_command_ended(&mut self, pane_id: Uuid, exit: Option<i32>) -> Task<Message> {
-        let Some(run) = self.snippet_runs.iter().find(|r| r.pane_id == pane_id) else {
+    /// The shell-integration marks one batch of `pane_id` carried, in
+    /// order, after the emulator processed it. A command-end wait takes
+    /// the D of ITS command (`command_end_in`); a failure stops the run
+    /// unless the wait says to go on (Ctrl+C on the command is then also
+    /// how a run is stopped).
+    pub(crate) fn snippet_run_marks(&mut self, pane_id: Uuid, marks: &[RunMark]) -> Task<Message> {
+        let Some(run) = self.snippet_runs.iter_mut().find(|r| r.pane_id == pane_id) else {
             return Task::none();
         };
-        let Some(RunWait::CommandEnd { continue_on_error }) = run.wait else {
+        let Some(RunWait::CommandEnd { continue_on_error, ready }) = run.wait.as_mut() else {
+            return Task::none();
+        };
+        let continue_on_error = *continue_on_error;
+        let Some(exit) = crate::snippet_run::command_end_in(ready, marks) else {
             return Task::none();
         };
         let id = run.id;
@@ -508,6 +539,7 @@ pub(crate) fn plan_error_text(label: &str, error: &crate::snippet_run::PlanError
         E::Cycle(name) => crate::i18n::t("snippet_run_cycle").replace("{name}", name),
         E::Missing => crate::i18n::t("snippet_run_missing").replace("{name}", label),
         E::TooLong => crate::i18n::t("snippet_run_too_long").replace("{name}", label),
+        E::Install(name) => crate::i18n::t("snippet_run_nested_install").replace("{name}", name),
     }
 }
 

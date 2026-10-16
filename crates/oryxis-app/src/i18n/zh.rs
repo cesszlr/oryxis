@@ -1052,6 +1052,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "命令失败（退出码 {detail}）",
         "snippet_run_cycle" => "“{name}”通过其操作调用了自身。",
         "snippet_run_missing" => "“{name}”运行的片段已不存在。",
+        "snippet_run_nested_install" => "“{name}”是安装脚本：只能单独运行，不能从其他片段中运行。",
         "snippet_run_no_integration" => "shell 不报告命令何时结束（OSC 133）；请改为等待输出或等待一段时间",
         "snippet_run_no_last_command" => "没有已结束的命令可保存",
         "snippet_run_pane_unavailable" => "终端无法接收输入",

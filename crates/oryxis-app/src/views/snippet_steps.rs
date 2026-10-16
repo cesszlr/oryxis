@@ -254,7 +254,7 @@ impl Oryxis {
                 let others: Vec<Uuid> = self
                     .snippets
                     .iter()
-                    .filter(|s| Some(s.id) != self.snippet_form.editing_id)
+                    .filter(|s| Some(s.id) != self.snippet_form.editing_id && !s.install)
                     .map(|s| s.id)
                     .collect();
                 if others.is_empty() {

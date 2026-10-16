@@ -1262,6 +1262,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "คำสั่งล้มเหลว (รหัสออก {detail})",
         "snippet_run_cycle" => "“{name}” เรียกตัวเองผ่านการกระทำของมัน",
         "snippet_run_missing" => "“{name}” รัน Snippet ที่ไม่มีอยู่แล้ว",
+        "snippet_run_nested_install" => "“{name}” เป็นสคริปต์ติดตั้ง: รันได้เฉพาะตัวเองเท่านั้น ไม่รันจาก Snippet อื่น",
         "snippet_run_no_integration" => "เชลล์ไม่แจ้งว่าคำสั่งจบเมื่อไร (OSC 133) ให้รอเอาต์พุตหรือรอตามเวลาแทน",
         "snippet_run_no_last_command" => "ไม่มีคำสั่งที่จบแล้วให้บันทึก",
         "snippet_run_pane_unavailable" => "เทอร์มินัลไม่รับอินพุต",

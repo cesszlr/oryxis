@@ -1261,6 +1261,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "příkaz selhal (kód {detail})",
         "snippet_run_cycle" => "„{name}“ spouští sám sebe přes své akce.",
         "snippet_run_missing" => "„{name}“ spouští snippet, který už neexistuje.",
+        "snippet_run_nested_install" => "„{name}“ je instalační skript: spouští se jen samostatně, nikdy z jiného snippetu.",
         "snippet_run_no_integration" => "shell nehlásí konec příkazu (OSC 133); čekejte raději na výstup nebo na čas",
         "snippet_run_no_last_command" => "není žádný dokončený příkaz k uložení",
         "snippet_run_pane_unavailable" => "terminál nepřijímá vstup",

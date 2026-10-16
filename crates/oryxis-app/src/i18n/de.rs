@@ -1039,6 +1039,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "der Befehl ist fehlgeschlagen (Exit-Code {detail})",
         "snippet_run_cycle" => "„{name}“ ruft sich über seine Aktionen selbst auf.",
         "snippet_run_missing" => "„{name}“ startet ein Snippet, das es nicht mehr gibt.",
+        "snippet_run_nested_install" => "„{name}“ ist ein Installationsskript: Es läuft nur für sich, nie aus einem anderen Snippet.",
         "snippet_run_no_integration" => "die Shell meldet nicht, wann ein Befehl endet (OSC 133); warte stattdessen auf Ausgabe oder eine Zeit",
         "snippet_run_no_last_command" => "es gibt keinen beendeten Befehl zum Speichern",
         "snippet_run_pane_unavailable" => "das Terminal nimmt keine Eingabe an",

@@ -458,27 +458,44 @@ fn trim_tail(tail: &mut String) {
     }
 }
 
-/// One pattern watched over a live output stream: a login script step's
-/// matcher, for anything else that waits on output (a snippet's wait
-/// step). Same rules: ANSI stripped, a suffix compared case-insensitively
-/// against the end of what arrived, a regex anywhere in the kept tail.
+/// One pattern watched over a live output stream for anything that waits
+/// on output (a snippet's wait step). ANSI is stripped as for a login
+/// script, but the match is not a prompt's: text is found ANYWHERE in what
+/// arrived since the wait began (case-insensitive), not only at its end,
+/// because what a run waits for ("Build complete") is followed by more
+/// output or by the next prompt, usually in the same read. A regex is
+/// searched the same way. A match may straddle two batches: the end of
+/// the earlier one is carried into the next.
 #[derive(Debug)]
 pub struct OutputMatcher {
     pattern: CompiledPattern,
-    tail: String,
+    /// The end of what was already searched, long enough to hold every
+    /// prefix of a match that the next batch could complete.
+    carry: String,
 }
 
 impl OutputMatcher {
     pub fn new(pattern: &ExpectPattern) -> Result<Self, regex::Error> {
-        Ok(Self { pattern: CompiledPattern::compile(pattern)?, tail: String::new() })
+        Ok(Self { pattern: CompiledPattern::compile(pattern)?, carry: String::new() })
     }
 
     /// Feed one output batch; `true` once the pattern matches.
     pub fn feed(&mut self, output: &[u8]) -> bool {
-        self.tail.push_str(&strip_ansi_lossy(output));
-        trim_tail(&mut self.tail);
-        let lower = self.tail.to_lowercase();
-        self.pattern.matches(&self.tail, &lower)
+        let mut window = std::mem::take(&mut self.carry);
+        window.push_str(&strip_ansi_lossy(output));
+        let (hit, keep) = match &self.pattern {
+            // Lowercasing can grow a char's bytes, so the carry is sized
+            // with room to spare rather than to the byte.
+            CompiledPattern::Suffix(s) => (window.to_lowercase().contains(s.as_str()), (s.len() * 4).max(TAIL_CAP)),
+            CompiledPattern::Regex(re) => (re.is_match(&window), TAIL_CAP),
+        };
+        if window.len() > keep {
+            let cut = window.len() - keep;
+            let cut = (cut..window.len()).find(|i| window.is_char_boundary(*i)).unwrap_or(window.len());
+            window.drain(..cut);
+        }
+        self.carry = window;
+        hit
     }
 }
 
@@ -568,6 +585,27 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn an_output_matcher_finds_text_followed_by_more_output() {
+        // The usual read: the text, its newline and the next prompt in
+        // one batch. A suffix test never matched this.
+        let mut m = OutputMatcher::new(&ExpectPattern::Suffix("Done.".into())).unwrap();
+        assert!(m.feed(b"Done.\r\n$ "));
+        let mut m = OutputMatcher::new(&ExpectPattern::Suffix("BUILD SUCCESSFUL".into())).unwrap();
+        let summary = "x".repeat(4096);
+        assert!(m.feed(format!("build successful\r\n{summary}\r\n").as_bytes()));
+    }
+
+    #[test]
+    fn an_output_matcher_carries_a_match_across_a_long_gap_only_for_its_own_length() {
+        let mut m = OutputMatcher::new(&ExpectPattern::Suffix("ready".into())).unwrap();
+        assert!(!m.feed(b"rea"));
+        assert!(!m.feed("y".repeat(1000).as_bytes()));
+        assert!(!m.feed(b"dy"), "a prefix far behind does not complete a match");
+        assert!(!m.feed(b"r"));
+        assert!(m.feed(b"eady"));
     }
 
     #[test]

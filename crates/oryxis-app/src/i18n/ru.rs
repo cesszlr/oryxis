@@ -1039,6 +1039,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "команда завершилась с ошибкой (код {detail})",
         "snippet_run_cycle" => "«{name}» запускает сам себя через свои действия.",
         "snippet_run_missing" => "«{name}» запускает сниппет, которого больше нет.",
+        "snippet_run_nested_install" => "«{name}» — скрипт установки: он запускается только сам по себе, никогда из другого сниппета.",
         "snippet_run_no_integration" => "оболочка не сообщает о завершении команды (OSC 133); ждите вывода или времени",
         "snippet_run_no_last_command" => "нет завершённой команды для сохранения",
         "snippet_run_pane_unavailable" => "терминал не принимает ввод",

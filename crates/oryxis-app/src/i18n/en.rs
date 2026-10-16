@@ -1262,6 +1262,7 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "snippet_run_command_failed" => "the command failed (exit {detail})",
         "snippet_run_cycle" => "\"{name}\" runs itself through its actions.",
         "snippet_run_missing" => "\"{name}\" runs a snippet that no longer exists.",
+        "snippet_run_nested_install" => "\"{name}\" is an install script: it runs only on its own, never from another snippet.",
         "snippet_run_no_integration" => "the shell does not report when a command ends (OSC 133); wait for output or for a time instead",
         "snippet_run_no_last_command" => "there is no finished command to save",
         "snippet_run_pane_unavailable" => "the terminal cannot take input",

@@ -1261,6 +1261,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "snippet_run_command_failed" => "कमांड विफल रही (एग्ज़िट कोड {detail})",
         "snippet_run_cycle" => "“{name}” अपनी क्रियाओं के ज़रिए खुद को चलाता है।",
         "snippet_run_missing" => "“{name}” ऐसा स्निपेट चलाता है जो अब मौजूद नहीं है।",
+        "snippet_run_nested_install" => "“{name}” एक इंस्टॉल स्क्रिप्ट है: यह केवल अपने आप चलती है, किसी दूसरे स्निपेट से कभी नहीं।",
         "snippet_run_no_integration" => "शेल यह नहीं बताता कि कमांड कब खत्म हुई (OSC 133); इसके बजाय आउटपुट या समय का इंतज़ार करें",
         "snippet_run_no_last_command" => "सेव करने के लिए कोई पूरी हुई कमांड नहीं है",
         "snippet_run_pane_unavailable" => "टर्मिनल इनपुट नहीं ले रहा",
