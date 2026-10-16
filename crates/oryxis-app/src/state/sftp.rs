@@ -423,12 +423,6 @@ pub(crate) struct SftpState {
     /// the Size / Modified / empty area of an already-selected row can
     /// never start an edit.
     pub hovered_name: Option<(SftpPaneSide, String)>,
-    /// Swallow the next row-activation keypress. Set when an inline input
-    /// (rename / new-entry) commits on Enter: the same physical Enter also
-    /// reaches the global keyboard subscription, which would otherwise
-    /// activate the still-selected row (re-opening the just-renamed file).
-    /// Consumed by the first keyboard event that follows the commit.
-    pub swallow_next_activate: bool,
     /// Generation counter for the debounced type-ahead search. Each
     /// keystroke bumps it and schedules a deferred fire; only the fire
     /// whose generation still matches runs, so fast typing searches once
@@ -545,7 +539,6 @@ impl Default for SftpState {
             press_verdict: None,
             pending_rename: None,
             hovered_name: None,
-            swallow_next_activate: false,
             type_ahead_gen: 0,
             type_ahead_cycle: false,
             log: Vec::new(),

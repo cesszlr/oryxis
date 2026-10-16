@@ -798,22 +798,6 @@ impl Oryxis {
                 if self.any_modal_blocks_input() {
                     return Err(ke);
                 }
-                // Consume the activation-swallow flag on the first keyboard
-                // event after an inline-input commit: the trailing Enter from
-                // that submit must not activate the still-selected row. Past
-                // the modal gate, so a key a modal took does not spend it.
-                let swallow = std::mem::take(&mut self.sftp.swallow_next_activate);
-                if swallow
-                    && matches!(
-                        &ke,
-                        iced::keyboard::Event::KeyPressed {
-                            key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter),
-                            ..
-                        }
-                    )
-                {
-                    return Ok(Task::none());
-                }
                 let editing = self.cur_sftp().rename.is_some()
                     || self.cur_sftp().new_entry.is_some()
                     || self.cur_sftp().overwrite_prompt.is_some()

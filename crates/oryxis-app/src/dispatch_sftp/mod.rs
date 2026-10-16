@@ -61,8 +61,7 @@ impl Oryxis {
     /// Apply the in-progress inline rename (Enter, or a click outside the
     /// input). Logs on success; a remote rename runs async and re-lists the
     /// directory via `SftpRenamed`. No-op when nothing is being renamed or
-    /// the new name is blank. Does not touch `swallow_next_activate` (the
-    /// keyboard-commit path sets that itself).
+    /// the new name is blank.
     fn commit_rename(&mut self) -> Task<Message> {
         let Some(rn) = self.sftp.rename.take() else {
             return Task::none();

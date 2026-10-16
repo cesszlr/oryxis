@@ -41,11 +41,9 @@ impl Oryxis {
                 }
             }
             SftpMessage::SftpRenameCommit => {
-                // The Enter that submits this rename also reaches the global
-                // keyboard subscription; swallow the row-activation it would
-                // otherwise trigger (which re-opens the just-renamed file).
-                // Not set on the click-to-commit path (no trailing Enter there).
-                self.sftp.swallow_next_activate = true;
+                // The Enter that submits this rename arrives at the list
+                // router as a CAPTURED key (`KeyboardEventCaptured`), which
+                // skips it: it cannot also activate the renamed row.
                 return Ok(self.commit_rename());
             }
             SftpMessage::SftpRenamed(side, reload_path, new_name) => {
@@ -231,8 +229,6 @@ impl Oryxis {
                 let Some(ne) = self.sftp.new_entry.take() else {
                     return Ok(Task::none());
                 };
-                // See SftpRenameCommit: swallow the trailing Enter's activation.
-                self.sftp.swallow_next_activate = true;
                 let name = ne.input.trim().to_string();
                 // One plain path component (rejects empty, ".", ".." and
                 // separators), same guard as the rename commit.
