@@ -138,6 +138,10 @@ matching installer. Windows binaries are Authenticode-signed (see
   MesloLGS and more), smart tabs that flag long-running commands,
   per-host command history, and a per-host East Asian ambiguous-width
   setting so CJK TUIs line up.
+- **Snippets that run a sequence.** One snippet can type commands, wait
+  for a command to finish or for a line in its output, copy or save what
+  it printed, and call other snippets, all on the terminal you started it
+  on, with variables asked once.
 - **As many windows as you like.** One process, any number of windows,
   each with its own tabs, hosts screen and search. Drag a tab past the
   edge to tear it off, drop it on another window's tab bar to dock it,
@@ -161,14 +165,16 @@ matching installer. Windows binaries are Authenticode-signed (see
 - **AI where you work.** A per-tab assistant (bring your own key:
   Anthropic, OpenAI, Gemini, or compatible) with layered auto-exec safety,
   plus an [MCP server](docs/FEATURES.md#mcp-server) that exposes your
-  hosts to AI clients like Claude Code.
+  hosts to AI clients like Claude Code, installs itself into seven of
+  them, and adds or edits hosts when you allow it.
 - **P2P sync, no cloud.** End-to-end encrypted (X25519 +
   XChaCha20-Poly1305) over QUIC; mDNS on the LAN, optional
   [self-hosted](SELF_HOSTING.md) signaling/relay across networks. No
   account, no vendor server.
 - **Keyboard-first.** `user@host` quick connect (Ctrl+K), MRU tab
   switching, full keyboard navigation down to the last toggle, every
-  hotkey rebindable.
+  hotkey rebindable, or start from Windows Terminal's, Tabby's or
+  iTerm2's keys.
 - **Private by design.** No telemetry, Privacy Mode masking, a paste guard
   that reads what you're pasting, and
   [23 languages](docs/FEATURES.md#themes--internationalization) with full
@@ -262,7 +268,7 @@ The full security model and the vulnerability disclosure policy live in
 
 Oryxis ships small and often (roughly weekly). This section is
 forward-looking: items land incrementally as they are ready rather than
-being tied to a specific version. Latest stable is **v0.20.1**;
+being tied to a specific version. Latest stable is **v0.21.0**;
 [CHANGELOG.md](CHANGELOG.md) has the full history, and the
 [roadmap discussion](https://github.com/wilsonglasser/oryxis/discussions/67)
 tracks it interactively.

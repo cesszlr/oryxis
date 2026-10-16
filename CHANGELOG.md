@@ -4,40 +4,58 @@ All notable changes to Oryxis are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.21.0] - 2026-10-16
+
+A snippet can now hold several actions, run in order on one terminal, and Settings > Shortcuts can start from another terminal's keys. A vault file damaged on disk says why it does not open and can be rebuilt, and the MCP plugin can add and edit hosts.
 
 ### Added
-- A snippet can hold several actions, run in order on the terminal it was started on: commands; a wait for the command to finish (as the shell marks it with OSC 133), for a text or regular expression in the output, or for a time; a terminal action (Copy Screen, Copy Last Command + Output, Save Output As…, Clear Scrollback); another snippet; and a save of the screen, the whole buffer or the last command to a file in the snippet output folder (Settings > Terminal). A failed command stops the run unless its wait says to go on. The status bar shows the run with a Cancel, and the terminal's context menu can stop it too. A snippet with one command works as before; one with several actions runs and is never pasted, asks for its variables once, and runs every action from a highlight rule (whose confirmation lists them) or as a host's startup snippet.
-- Copy Last Command + Output (command palette, and Settings > Shortcuts with no key out of the box): the last command the shell ran and everything it printed, as the shell marked them with OSC 133 shell integration, whole and without the next prompt. A command still running copies what it printed so far; when there is nothing to copy (a shell that marks nothing, a full-screen program up, output that left the scrollback) a toast says which.
-- Settings > Shortcuts can start from another terminal's keys: Windows Terminal (Windows), Tabby (Windows, Linux and macOS) and iTerm2 (macOS), each read from the app's own shipped defaults. A preset changes only the actions that terminal has a key for and keeps every mouse and wheel gesture; before applying, the dialog names any action it would leave with no shortcut. Export… writes your shortcuts to a file and Import… reads one back, listing any row this version cannot use instead of dropping it.
-- The keyboard's Menu key opens the terminal's context menu under the text cursor (Copy when something is selected, Copy Screen, Save Output As…, Paste, Clear Scrollback), under every right-click setting, including the default one where a right-click pastes; rebindable in Settings > Shortcuts like any other action.
-- The MCP plugin 0.1.11 can create and edit SSH hosts (`create_host`, `update_host`) once "Allow the MCP server to add and edit hosts" is on in Settings > MCP Server (off by default): folders are resolved, never created; keys, identities and bastions are named by label or id; the password only goes in; proxies are never set over MCP. A host written over MCP appears in the running app without a restart.
-- The MCP plugin 0.1.11 tells the agent which host key a dial refused (host, port, key type, fingerprint) and adds `accept_host_key`, which pins exactly the key a refused dial reported, unknown keys only, never one that changed against the vault's pin; a pin made over MCP shows up in the running app's Known Hosts without a restart.
-- Settings > MCP Server installs the `oryxis` entry into the AI client you pick: Claude Code, Claude Desktop, Codex (TOML), Cursor, Gemini CLI, GitHub Copilot or Windsurf, detected by the folder each one reads from, merged into the client's existing config; the Windows build does the same for a client inside WSL.
-- Settings > Shortcuts offers a chord for eleven verbs that only the menus reached: move the tab to a new window, duplicate it in a new window, rename or pin it, copy its host address, close the other tabs or all of them, save the pane's output or copy its screen, clear its scrollback, and lock the vault. They ship unbound; the command palette lists them too.
-- Ctrl+Enter (Cmd+Enter on macOS) on a host card focused with the keyboard, on the dashboard selection, or on the row the new-tab picker highlights, connects in a new window: the card menu's "Connect in New Window" on a chord, rebindable like the rest.
-- Settings > Connection sets how long a terminal connection may take to open its shell once logged in (the session channel, the PTY and the shell request): 30 seconds by default instead of a fixed 10, which a server with a slow login stack (a PAM session module waiting on logind, a home directory on a slow mount) overran right after "Authenticated" (#256, reported by @raulitospb-boop). A second tab riding a live connection gets the same limit and dials fresh when it runs out.
-- A chord may serve two actions that never apply on the same screen, a vault one and a tab one: binding it to the second no longer takes it from the first, and a stored binding no longer disarms a new factory chord on the other side (Ctrl+Enter on "Move tab to new window" keeps the new Ctrl+Enter on the host card).
+- Snippets hold a list of actions run in order on one terminal: commands, waits, terminal actions, other snippets, and saving output to a file (#254, by @hamidrg20001379).
+- A snippet waits for a command to finish (OSC 133), for text or a regular expression in the output, or for a time; a failed command stops the run.
+- A running snippet shows in the status bar with Cancel, and the terminal's context menu can stop it.
+- Save steps write into the snippet output folder, Settings > Terminal.
+- Copy Last Command + Output copies the shell's last command and everything it printed, for shells with OSC 133 integration (#253, by @hamidrg20001379).
+- Settings > Shortcuts presets: Windows Terminal (Windows), Tabby, and iTerm2 (macOS); a preset changes only the keys that terminal has.
+- Settings > Shortcuts exports your shortcuts to a file and imports them back.
+- The keyboard's Menu key opens the terminal's context menu at the text cursor.
+- Eleven menu verbs can take a shortcut (move or duplicate a tab in a new window, rename, pin, close others, Save Output and more); they ship unbound.
+- Ctrl+Enter (Cmd+Enter on macOS) connects the focused card, the selected hosts or the picker's row in a new window.
+- Settings > Connection sets how long a session may take to open its shell, 30 seconds by default (#256, reported by @raulitospb-boop).
+- A vault file damaged on disk can be rebuilt from the error screen; the damaged file stays beside it (#250, reported by @petrcech).
+- Settings > MCP Server installs the entry into Claude Code, Claude Desktop, Codex, Cursor, Gemini CLI, GitHub Copilot or Windsurf, inside WSL too.
+- The MCP plugin can create and edit SSH hosts once "Allow the MCP server to add and edit hosts" is on (Settings > MCP Server, off by default).
+- The MCP plugin reports a refused host key with its fingerprint, and `accept_host_key` pins exactly that key.
 
 ### Changed
-- Sync moves to protocol 10 (snapshot format 6) for snippets with actions: a device still on an older version is refused at the handshake instead of saving snippets back without their actions.
-- The terminal's "Copy All" became "Save Output As…": the pane's whole buffer, scrollback included, read at the click, then a question with two answers, the clipboard or a file (the system's save dialog, with the session's name and the time already filled in). Under the default right-click scheme, where the terminal menu never opens, the tab's menu carries it next to Copy Screen.
-- The environment report (About, debug log header) tells a portable Windows copy and an MSIX install apart from a system or per-user one.
-- The debug log no longer carries the window and taskbar icons' pixel values that `iced_winit` reports at startup (8.8 MB per launch), so a session's log survives the next launch.
-- The SFTP browser opens rows the way FileZilla does: a single click selects, a double click or Enter acts, and the `..` row follows the same rule instead of going up on a single click (discussion #67, @just-nobody). A double click is judged by the system's double-click speed and distance instead of a fixed half second, so a slow or a jittery double click lands the same way it does in the file manager. Settings > SFTP picks what a double click or Enter does on a folder (open it, which stays the default, transfer it, or nothing) and on a file (transfer it to the other pane, FileZilla's default, open it, or nothing); Enter on several selected rows transfers them all. Before, Enter opened a file and a double click on one did nothing: "Open the file" brings that back. The sidebar Files tab's `..` row also selects on a single click and goes up on a double one.
-- In the SFTP browser, Backspace goes up a folder like Left does, and keys typed into a field (the filter, the path bar) stay in that field: Left in the Local pane's filter no longer sends the pane up a folder, and Ctrl+A selects the field's text instead of every row.
+- Sync protocol 10 (snapshot format 6) carries snippet actions: update every synced device, an older one is refused at the handshake.
+- "Copy All" became "Save Output As…": the pane's whole buffer to the clipboard or a file.
+- SFTP rows open the FileZilla way: a click selects, a double click or Enter acts, at the system's double-click speed ([discussion #67](https://github.com/wilsonglasser/oryxis/discussions/67), @just-nobody).
+- Settings > SFTP picks what a double click does on a folder and on a file; a file now transfers to the other pane by default.
+- In the SFTP browser, Backspace goes up a folder, and keys typed into a field stay in that field.
+- A vault that does not open shows the reason, the vault path and the debug log path (#250).
+- A read-only vault file is refused at startup with the reason; an owner's file without write permission is repaired first.
+- The environment report tells a portable Windows copy and an MSIX install apart.
+- The debug log no longer records the window icons' pixels, 8.8 MB per launch.
 
 ### Fixed
-- The Snippets view previews every command, accented and CJK text included.
-- Settings > Shortcuts leaves a snippet's shortcut with the snippet: recording it for an action names the snippet that holds it and waits for another key.
-- Enter in the command palette and the tab switcher runs the top row of the list as typed, wherever the mouse rests.
-- An RDP host's saved username and password now reach the desktop client: on Windows, the launch stages them in Credential Manager (`TERMSRV/<host>`, the entry mstsc reads for a saved login) for the client's lifetime and removes them when it exits, never overwriting a credential you saved yourself; on Linux, xfreerdp takes the username and reads the password from a pipe, never from the command line; on macOS, the username rides the `rdp://` URI (the scheme has no password attribute, so Windows App still asks). Before, every launch asked for the password again (#251, reported by @miner1888).
-- Windows: the raw output of the network tools' `ping` and `tracert` (the binaries behind an IPv6 target, or a machine where the native ICMP probe is refused) is read in the console's OEM code page, so a localized line no longer comes out as replacement characters.
-- A P2P sync round that pulled records now shows them at once: hosts, folders, keys, identities and host-key pins a peer pushed used to stay invisible until the next unlock.
-- Windows: an Oryxis window killed from Task Manager (or by a crash) no longer counts as still running once another program receives its process id, which refused the in-place update ("close the other Oryxis windows") and left a deep link unanswered until a reboot (#247, reported by @britarok2).
+- An RDP host's saved login reaches the desktop client; on macOS only the username does (#251, reported by @miner1888).
+- Windows: ping and traceroute raw output reads correctly in localized consoles (#249, by @shideqin).
+- Windows: a window that crashed or was killed no longer blocks updates and deep links (#247, reported by @britarok2).
+- A P2P sync round shows the hosts, folders, keys and snippets it pulled at once.
+- A host leaves its folder from its own editor.
+- A cancelled ZMODEM transfer sends the cancel sequence once.
+- The Snippets view previews accented and CJK text whole.
+- A snippet's shortcut stays with the snippet when an action tries to record the same keys.
+- Enter in the command palette and the tab switcher runs the top row as typed.
+
+### Security
+- MCP plugin 0.1.12: a host written over MCP never takes a stored password or TOTP secret to a new address or route.
+- MCP plugin 0.1.12: an identity with a stored password is attached over MCP only where an MCP host already uses it.
+- MCP plugin 0.1.12: a server offering a key of another type than the pinned one is treated as a changed key.
+- An imported `.oryxis` file no longer sets the folders this device writes into or the programs it runs.
+- A command proxy's `%h`, `%r` and `%n` refuse values that start with `-`.
 
 ### Removed
-- The SignPath signing step: Windows binaries and installers ship without an Authenticode signature; the updater keeps verifying every download with the project's Ed25519 key.
+- Windows binaries and installers ship without the SignPath signature; the updater still verifies every download with the project's Ed25519 key.
 
 ## [0.20.1] - 2026-10-08
 

@@ -69,6 +69,19 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.21.0" date="2026-10-16">
+      <description>
+        <p>
+          A snippet can hold several actions, run in order on one
+          terminal: commands, waits on a command's end or its output,
+          copies and saves of what it printed, other snippets. Settings
+          can start from Windows Terminal's, Tabby's or iTerm2's
+          shortcuts, a vault file damaged on disk can be rebuilt from the
+          error screen, and SFTP rows open the FileZilla way.
+        </p>
+      </description>
+      <url>https://github.com/wilsonglasser/oryxis/releases/tag/v0.21.0</url>
+    </release>
     <release version="0.20.1" date="2026-10-08">
       <description>
         <p>
