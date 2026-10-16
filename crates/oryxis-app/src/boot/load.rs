@@ -56,11 +56,18 @@ impl Oryxis {
         // A typed Parent Group is an edit too, one the dirty signature
         // cannot see; the refill below would overwrite it.
         let group_typed = self.editor_group_pending();
+        // The PATH, not the id: a folder renamed or moved elsewhere keeps
+        // its id and changes what the field shows and what the flush
+        // compares against.
         let stored_group = |app: &Self| {
             app.editor_form
                 .editing_id
                 .and_then(|id| app.connections.iter().find(|c| c.id == id))
-                .map(|c| c.group_id)
+                .map(|c| {
+                    c.group_id
+                        .filter(|gid| app.groups.iter().any(|g| g.id == *gid))
+                        .map(|gid| oryxis_core::models::Group::path_of(&app.groups, gid))
+                })
         };
         let group_before = stored_group(self);
         self.load_vault_entities();
@@ -71,8 +78,9 @@ impl Oryxis {
             // row by id, so a re-sorted list cannot redirect its save.
             self.snippets = vault.list_snippets().unwrap_or_default();
         }
-        // When the external write MOVED the host, the form's Parent Group
-        // follows the row FIRST, in both branches: `editor_group_pending`
+        // When the external write MOVED the host (or renamed or moved its
+        // folder), the form's Parent Group follows the row FIRST, in both
+        // branches: `editor_group_pending`
         // compares the typed path against the live row, so the move would
         // otherwise read as a pending edit and the drawer's closing flush
         // would write the old folder back with a newer stamp that then
@@ -85,6 +93,10 @@ impl Oryxis {
         }
         if !was_dirty && !group_typed {
             self.editor_refresh_from_vault();
+            // The baseline is recorded now, not by the next editor
+            // message: that one is the user's first edit, and a baseline
+            // taken after it would swallow it.
+            self.editor_autosave_kick();
         }
     }
 
