@@ -57,10 +57,14 @@ impl Oryxis {
     /// Oryxis; the outer `None` is a hand-made set). Derived every time,
     /// never stored, so an edit in the table below is reflected at once.
     pub(crate) fn current_hotkey_preset(&self) -> Option<Option<ShortcutPreset>> {
-        if layout::layout_of(&self.hotkey_bindings).is_empty() {
+        let reserved = self.snippet_chords();
+        // Oryxis's own is what picking it applies: the factory table less
+        // the chords snippets hold (the boot pass's table), not a bare
+        // "no override" test that a snippet-held factory chord fails.
+        let (oryxis, _) = layout::apply_layout(&[], &reserved, Mode::Exact, &self.hotkey_bindings);
+        if same_bindings(&oryxis, &self.hotkey_bindings) {
             return Some(None);
         }
-        let reserved = self.snippet_chords();
         ShortcutPreset::available()
             .iter()
             .find(|p| {
@@ -100,9 +104,17 @@ impl Oryxis {
             .iter()
             .map(refused_line)
             .chain(applied.skipped.iter().map(skipped_line))
-            .chain(applied.unbound.iter().map(|a| {
-                crate::i18n::t("hotkey_layout_unbinds").replace("{action}", crate::i18n::t(a.label_key()))
-            }))
+            // Only an action that has a shortcut NOW loses one; a factory
+            // chord a snippet already holds left its action long ago.
+            .chain(
+                applied
+                    .unbound
+                    .iter()
+                    .filter(|a| self.hotkey_bindings.get(a).is_some_and(|b| !b.is_empty()))
+                    .map(|a| {
+                        crate::i18n::t("hotkey_layout_unbinds").replace("{action}", crate::i18n::t(a.label_key()))
+                    }),
+            )
             .collect();
         if !hand_made && notes.is_empty() {
             return self.apply_hotkey_layout(&entries, &name, mode);
