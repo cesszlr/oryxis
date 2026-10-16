@@ -202,25 +202,33 @@ pub(crate) struct SnippetRun {
     /// dropped: a 60 s timeout must not keep sleeping after the command
     /// it guarded has ended.
     pub timer: Option<iced::task::Handle>,
-    /// A command was sent since the last wait: a command-end wait has
-    /// something to wait for even before the shell marks it running.
-    pub sent_command: bool,
+    /// Commands sent since the last wait: a command-end wait has
+    /// something to wait for even before the shell marks it running, and
+    /// with several sent it is about the LAST one, so the ends of the
+    /// ones before it are passed over.
+    pub sent_commands: u32,
+    /// Whether the shell sat at its prompt when the first of those went
+    /// out, read BEFORE the send: typing the command moves the pane's
+    /// prompt state to Busy at once (the input capture), so reading it
+    /// after would always say Busy on the pane in front.
+    pub at_prompt_at_send: bool,
 }
 
 /// What a run is waiting for.
 pub(crate) enum RunWait {
     /// The shell's end-of-command mark (OSC 133 D) of the command this
     /// wait is about; `continue_on_error` = a failure does not stop the
-    /// run. `ready` says whether the NEXT D is that command's: it is when
-    /// the wait was armed with the shell idle at its prompt (the command
-    /// just sent is the next one it runs) or with nothing sent and a
-    /// command already running (that one is the subject). Otherwise a D
-    /// may still be in flight from before the shell read the command (the
-    /// previous command's, in the same read; a command still running when
-    /// a trigger fired; the D a PS1 scheme prints with the session's first
-    /// prompt), so D marks are passed over until the shell shows it is
-    /// ready (`RunMark::Ready`).
-    CommandEnd { continue_on_error: bool, ready: bool },
+    /// run. `ready` says whether D marks already belong to the commands
+    /// the run sent: it is when the first of them went out with the
+    /// shell idle at its prompt, or when nothing was sent and a command
+    /// is already running (that one is the subject). Otherwise a D may
+    /// still be in flight from before the shell read the commands (the
+    /// previous command's, in the same read; a command still running
+    /// when a trigger fired; the D a PS1 scheme prints with the session's
+    /// first prompt), so D marks are passed over until the shell shows it
+    /// is ready (`RunMark::Ready`). `skip` is how many ends of the run's
+    /// own commands come before the subject's (several sent, one wait).
+    CommandEnd { continue_on_error: bool, ready: bool, skip: u32 },
     /// A pattern in the pane's output.
     Output(OutputMatcher),
     /// A timer.
@@ -246,10 +254,11 @@ pub(crate) enum RunMark {
 /// What a command-end wait makes of one batch's marks: the exit of the
 /// command it waits for, if this batch ended it. `ready` is updated as the
 /// marks go by.
-pub(crate) fn command_end_in(ready: &mut bool, marks: &[RunMark]) -> Option<Option<i32>> {
+pub(crate) fn command_end_in(ready: &mut bool, skip: &mut u32, marks: &[RunMark]) -> Option<Option<i32>> {
     for mark in marks {
         match *mark {
             RunMark::Ready => *ready = true,
+            RunMark::End(_) if *ready && *skip > 0 => *skip -= 1,
             RunMark::End(code) if *ready => return Some(code),
             RunMark::End(_) => {}
         }
@@ -273,7 +282,16 @@ mod tests {
     #[test]
     fn a_ready_wait_takes_the_next_end() {
         let mut ready = true;
-        assert_eq!(command_end_in(&mut ready, &[RunMark::End(Some(0))]), Some(Some(0)));
+        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::End(Some(0))]), Some(Some(0)));
+    }
+
+    #[test]
+    fn several_commands_one_wait_takes_the_last_end() {
+        // `a`, `b`, then one wait: `a`'s end goes by, `b`'s ends it.
+        let mut ready = true;
+        let mut skip = 1;
+        assert_eq!(command_end_in(&mut ready, &mut skip, &[RunMark::End(Some(0)), RunMark::Ready]), None);
+        assert_eq!(command_end_in(&mut ready, &mut skip, &[RunMark::End(Some(3))]), Some(Some(3)));
     }
 
     #[test]
@@ -282,10 +300,10 @@ mod tests {
         // command the run sent has not run yet.
         let mut ready = false;
         let batch = [RunMark::End(Some(0)), RunMark::Ready];
-        assert_eq!(command_end_in(&mut ready, &batch), None);
+        assert_eq!(command_end_in(&mut ready, &mut 0, &batch), None);
         assert!(ready);
         // Its own C and D come later.
-        assert_eq!(command_end_in(&mut ready, &[RunMark::Ready, RunMark::End(Some(2))]), Some(Some(2)));
+        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::Ready, RunMark::End(Some(2))]), Some(Some(2)));
     }
 
     #[test]
@@ -293,8 +311,8 @@ mod tests {
         // A PS1-only scheme prints D;A;B with every prompt and nothing at
         // the command's start: the prompt's B is the readiness.
         let mut ready = false;
-        assert_eq!(command_end_in(&mut ready, &[RunMark::End(None), RunMark::Ready]), None);
-        assert_eq!(command_end_in(&mut ready, &[RunMark::End(Some(1)), RunMark::Ready]), Some(Some(1)));
+        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::End(None), RunMark::Ready]), None);
+        assert_eq!(command_end_in(&mut ready, &mut 0, &[RunMark::End(Some(1)), RunMark::Ready]), Some(Some(1)));
     }
 
     fn snip(label: &str, steps: Vec<SnippetStep>) -> Snippet {

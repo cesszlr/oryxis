@@ -781,12 +781,17 @@ impl Oryxis {
                     .pane_by_id(pane_id)
                     .is_some_and(|p| p.login_script.is_some());
                 self.feed_login_script(pane_id, &bytes);
-                // A startup snippet whose login script just finished starts
-                // here, BEFORE the batch, so a first step waiting on output
-                // reads it. Which output wait the batch is for is fixed now
-                // too; it is fed once the emulator drew the batch (below).
-                let startup_runs_task = self.start_due_startup_runs();
+                // Which output wait the batch is for is fixed BEFORE it is
+                // processed; it is fed once the emulator drew it (below). A
+                // startup snippet whose login script just finished starts
+                // here too: its output wait reads this batch only when no
+                // command of the run went out before it (a first step
+                // waiting for the prompt), never when the batch predates
+                // the run's own command (a MOTD line matching "password").
                 let snippet_output_wait = self.snippet_output_wait(pane_id);
+                let startup_runs_task = self.start_due_startup_runs();
+                let snippet_output_wait =
+                    snippet_output_wait.or_else(|| self.snippet_output_wait_unsent(pane_id));
                 // Route to the specific pane (a tab may have several, each
                 // with its own PTY). Scan is trivial at these counts.
                 let mut over_threshold = false;

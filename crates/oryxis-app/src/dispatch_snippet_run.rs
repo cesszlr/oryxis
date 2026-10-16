@@ -60,7 +60,8 @@ impl Oryxis {
             generation: 0,
             wait: None,
             timer: None,
-            sent_command: false,
+            sent_commands: 0,
+            at_prompt_at_send: false,
         });
         self.advance_snippet_run(id)
     }
@@ -84,12 +85,20 @@ impl Oryxis {
                     if text.trim().is_empty() {
                         continue;
                     }
+                    // Read before the send: the input capture moves the
+                    // pane to Busy as the command goes out.
+                    let at_prompt = self
+                        .pane_by_id(pane_id)
+                        .is_some_and(|p| matches!(p.prompt, crate::state::PromptState::AtPrompt { .. }));
                     if !self.write_snippet_command(pane_id, &text) {
                         tasks.push(self.stop_snippet_run(run_id, "snippet_run_pane_unavailable", None));
                         break;
                     }
                     if let Some(run) = self.snippet_run_mut(run_id) {
-                        run.sent_command = true;
+                        if run.sent_commands == 0 {
+                            run.at_prompt_at_send = at_prompt;
+                        }
+                        run.sent_commands += 1;
                     }
                 }
                 SnippetStep::Action { id } => {
@@ -116,34 +125,34 @@ impl Oryxis {
                     }
                 }
                 SnippetStep::Wait(SnippetWait::CommandEnd { timeout_ms, continue_on_error }) => {
-                    let (integrated, busy, at_prompt) = self
+                    let (integrated, busy) = self
                         .pane_by_id(pane_id)
                         .map(|p| {
                             use crate::state::PromptState as P;
-                            (
-                                !matches!(p.prompt, P::NoIntegration),
-                                matches!(p.prompt, P::Busy),
-                                matches!(p.prompt, P::AtPrompt { .. }),
-                            )
+                            (!matches!(p.prompt, P::NoIntegration), matches!(p.prompt, P::Busy))
                         })
-                        .unwrap_or((false, false, false));
+                        .unwrap_or((false, false));
                     // A command this run just sent is waited for even
                     // before the shell has marked anything: at the start
                     // of a session the first prompt (and its marks) may
                     // not have arrived yet. A shell that never marks lets
                     // the timeout say so.
-                    let sent = self.snippet_run_mut(run_id).is_some_and(|r| r.sent_command);
-                    if !sent && !(integrated && busy) {
+                    let (sent, at_prompt_at_send) = self
+                        .snippet_run_mut(run_id)
+                        .map(|r| (r.sent_commands, r.at_prompt_at_send))
+                        .unwrap_or((0, false));
+                    if sent == 0 && !(integrated && busy) {
                         // Nothing is running: there is no end to wait for.
                         continue;
                     }
-                    // The next D is the subject's when the shell sat at
-                    // its prompt as the command went out, or when the
-                    // subject is the command already running.
-                    let ready = if sent { at_prompt } else { busy };
+                    // D marks belong to the run's commands at once when
+                    // the shell sat at its prompt as the first went out,
+                    // or when the subject is the command already running.
+                    let ready = if sent > 0 { at_prompt_at_send } else { busy };
+                    let skip = sent.saturating_sub(1);
                     tasks.push(self.arm_snippet_wait(
                         run_id,
-                        RunWait::CommandEnd { continue_on_error, ready },
+                        RunWait::CommandEnd { continue_on_error, ready, skip },
                         Some(timeout_ms),
                     ));
                     break;
@@ -214,7 +223,8 @@ impl Oryxis {
             run.wait = None;
             run.timer = None;
             run.generation += 1;
-            run.sent_command = false;
+            run.sent_commands = 0;
+            run.at_prompt_at_send = false;
         }
         self.advance_snippet_run(run_id)
     }
@@ -335,6 +345,16 @@ impl Oryxis {
             .map(|r| (r.id, r.generation))
     }
 
+    /// `snippet_output_wait` for a run that sent nothing before arming
+    /// its output wait: a run started inside the batch reads that batch
+    /// only then.
+    pub(crate) fn snippet_output_wait_unsent(&self, pane_id: Uuid) -> Option<(u64, u64)> {
+        self.snippet_runs
+            .iter()
+            .find(|r| r.pane_id == pane_id && r.sent_commands == 0 && matches!(r.wait, Some(RunWait::Output(_))))
+            .map(|r| (r.id, r.generation))
+    }
+
     /// One output batch of `pane_id` (the cleaned bytes the emulator
     /// got), for the output wait `wait` (`snippet_output_wait`).
     pub(crate) fn snippet_run_output(&mut self, pane_id: Uuid, bytes: &[u8], wait: (u64, u64)) -> Task<Message> {
@@ -364,11 +384,11 @@ impl Oryxis {
         let Some(run) = self.snippet_runs.iter_mut().find(|r| r.pane_id == pane_id) else {
             return Task::none();
         };
-        let Some(RunWait::CommandEnd { continue_on_error, ready }) = run.wait.as_mut() else {
+        let Some(RunWait::CommandEnd { continue_on_error, ready, skip }) = run.wait.as_mut() else {
             return Task::none();
         };
         let continue_on_error = *continue_on_error;
-        let Some(exit) = crate::snippet_run::command_end_in(ready, marks) else {
+        let Some(exit) = crate::snippet_run::command_end_in(ready, skip, marks) else {
             return Task::none();
         };
         let id = run.id;
