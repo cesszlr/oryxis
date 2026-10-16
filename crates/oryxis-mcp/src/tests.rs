@@ -1066,6 +1066,27 @@ mod tests {
         assert!(!err, "{text}");
         assert_eq!(server.vault().get_connection_password(&host.id).unwrap().as_deref(), Some("fresh"));
 
+        // A key-only bastion in front of a host that stores a password
+        // does not move: moving it would take that password with it.
+        let mut behind = Connection::new("db-behind", "10.0.0.20");
+        behind.jump_chain = vec![bastion.id];
+        server.vault().save_connection(&behind, Some("db-pw")).unwrap();
+        let (err, text) = call(
+            &server,
+            "update_host",
+            json!({"id": bastion.id.to_string(), "hostname": "attacker.example"}),
+        )
+        .await;
+        assert!(err);
+        assert!(text.contains("route through"), "{text}");
+        let (err, text) = call(
+            &server,
+            "update_host",
+            json!({"id": bastion.id.to_string(), "label": "jump"}),
+        )
+        .await;
+        assert!(!err, "a rename is no move: {text}");
+
         server.vault().set_connection_totp_secret(&host.id, Some("JBSWY3DPEHPK3PXP")).unwrap();
         let (err, text) = call(
             &server,

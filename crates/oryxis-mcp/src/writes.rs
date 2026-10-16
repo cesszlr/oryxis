@@ -40,7 +40,8 @@
 //!   Keys stay attachable: a public-key signature is bound to its session
 //!   and gives the server nothing to reuse. An address the user keeps out
 //!   of MCP (a host there with MCP off) is refused outright: a copy of it
-//!   would reach it anyway.
+//!   would reach it anyway. A host that is a hop of a host storing a
+//!   secret does not move either: moving it moves them.
 //! - No proxy fields: `ProxyType::Command` becomes a LOCAL process, and
 //!   only what the user TYPED is ever pre-approved; an AI-supplied proxy
 //!   is not typed. A host that needs one is edited in the app.
@@ -445,6 +446,38 @@ fn credential_guard(
             return Err(format!(
                 "\"{}\" stores a TOTP secret, which never follows a host to a new address or \
                  route over MCP. Move the host in the app.",
+                o.label
+            ));
+        }
+        // A host that is a hop moves every host behind it (a hop's own
+        // chain is expanded too, so behind it reaches through hops of
+        // hops): one of them storing a secret is that secret moving.
+        let identity_passwords = vault.list_identity_ids_with_password().map_err(|e| e.to_string())?;
+        let mut behind: Vec<Uuid> = Vec::new();
+        let mut frontier = vec![o.id];
+        while let Some(hop) = frontier.pop() {
+            for h in all.iter().filter(|h| h.jump_chain.contains(&hop) && h.id != o.id) {
+                if !behind.contains(&h.id) {
+                    behind.push(h.id);
+                    frontier.push(h.id);
+                }
+            }
+        }
+        let mut carrying: Vec<&str> = Vec::new();
+        for h in all.iter().filter(|h| behind.contains(&h.id)) {
+            let secret = vault.connection_has_password(&h.id).map_err(|e| e.to_string())?
+                || vault.get_connection_totp_secret(&h.id).map_err(|e| e.to_string())?.is_some()
+                || effective_identity(vault, h, &groups, &identities)
+                    .is_some_and(|i| identity_passwords.contains(&i));
+            if secret {
+                carrying.push(h.label.as_str());
+            }
+        }
+        if !carrying.is_empty() {
+            return Err(format!(
+                "{} host(s) route through \"{}\" and store a password or a TOTP secret; moving \
+                 it moves them, which never happens over MCP. Edit the bastion in the app.",
+                carrying.len(),
                 o.label
             ));
         }
