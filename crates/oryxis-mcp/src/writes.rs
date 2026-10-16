@@ -474,6 +474,7 @@ fn credential_guard(
             h.id != conn.id
                 && h.mcp_enabled
                 && h.protocol == ConnectionProtocol::Ssh
+                && endpoint(h) == here
                 && route(vault, h, &groups, &identities) == way
                 && effective_identity(vault, h, &groups, &identities) == Some(identity)
         });
