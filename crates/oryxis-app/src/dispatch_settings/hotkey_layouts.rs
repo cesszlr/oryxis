@@ -96,7 +96,10 @@ impl Oryxis {
         if same_bindings(&target, &self.hotkey_bindings) && refused.is_empty() {
             return self.show_toast(crate::i18n::t("hotkey_layout_already").replace("{name}", &name));
         }
-        let hand_made = !layout::layout_of(&self.hotkey_bindings).is_empty();
+        // Hand-made = differs from what Oryxis's own set is here (the
+        // factory table less the chords snippets hold), the selector's test.
+        let (oryxis, _) = layout::apply_layout(&[], &self.snippet_chords(), Mode::Exact, &self.hotkey_bindings);
+        let hand_made = !same_bindings(&oryxis, &self.hotkey_bindings);
         // Everything the user would not see coming: rows that do not
         // land, chords a snippet keeps, and actions left with no
         // shortcut at all because the set took their only chord.
