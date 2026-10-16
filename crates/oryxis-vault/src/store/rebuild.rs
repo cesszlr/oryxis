@@ -22,7 +22,8 @@
 //! new schema refuses are skipped and counted (a row the walk meets twice
 //! is not), and references to rows the damage took (a host in a lost
 //! folder) are cleared after the copy. One rebuild at a time per vault
-//! file, across processes (`vault.db.rebuild-lock`, an OS lock). The rebuilt file replaces the damaged one by
+//! file, across processes (`vault.db.rebuild-lock`, an OS lock, kept
+//! on disk between rebuilds). The rebuilt file replaces the damaged one by
 //! rename, which stays beside it as `vault.db.damaged-<stamp>` with its
 //! `-wal` / `-shm` siblings (a WAL left behind belongs to the file it
 //! was written for).
@@ -315,11 +316,12 @@ pub fn rebuild_vault(path: &Path) -> Result<RebuildReport, VaultError> {
 }
 
 /// The one rebuild of a vault file running, across processes: an OS lock
-/// on `vault.db.rebuild-lock`, released (and the file removed) when the
-/// rebuild ends whichever way, and by the OS when the process dies.
+/// on `vault.db.rebuild-lock`, released when the rebuild ends whichever
+/// way, and by the OS when the process dies. The file stays: removing a
+/// lock file lets a process that opened it just before lock the removed
+/// copy while a third one locks a new file, two holders at once.
 struct RebuildLock {
-    file: Option<std::fs::File>,
-    path: PathBuf,
+    _file: std::fs::File,
 }
 
 impl RebuildLock {
@@ -330,23 +332,20 @@ impl RebuildLock {
             .truncate(false)
             .write(true)
             .open(&path)?;
-        if file.try_lock().is_err() {
-            return Err(VaultError::Io(std::io::Error::new(
+        match file.try_lock() {
+            Ok(()) => Ok(Self { _file: file }),
+            Err(std::fs::TryLockError::WouldBlock) => Err(VaultError::Io(std::io::Error::new(
                 std::io::ErrorKind::WouldBlock,
                 "another Oryxis window is rebuilding this vault",
-            )));
+            ))),
+            // A file system with no locks (some network mounts): the
+            // in-process gate still holds, and refusing would leave the
+            // vault unrepairable there.
+            Err(std::fs::TryLockError::Error(e)) => {
+                tracing::warn!(error = %e, "no file lock for the rebuild; going on without one");
+                Ok(Self { _file: file })
+            }
         }
-        Ok(Self { file: Some(file), path })
-    }
-}
-
-impl Drop for RebuildLock {
-    fn drop(&mut self) {
-        // Removed while still held, so no other process can take a lock
-        // on a file that is about to vanish and think it holds the only
-        // one.
-        let _ = std::fs::remove_file(&self.path);
-        drop(self.file.take());
     }
 }
 
@@ -588,13 +587,14 @@ fn copy_table(src: &Connection, dst: &Connection, plan: &CopyPlan) -> Result<Tab
         }
 
         out.unreadable_stretches += 1;
-        // A read that failed on its very first row, from a key a probe
+        // A round that copied nothing past the cursor, from a key a probe
         // found: that row's key is readable and its content is not (a
-        // damaged overflow page). The probe would find the same key again
-        // and the walk would never end, so the row is walked past as
-        // lost. `start` is then above `last` (a probe only answers past
-        // it), which is what makes the walk advance on every round.
-        let walked = if rows.is_empty() && start > last { start } else { last };
+        // damaged overflow page), or every row it read sat below the
+        // cursor. The probe would find the same key again and the walk
+        // would never end, so the key is walked past as lost. `start` is
+        // then above `last` (a probe only answers past it), which is what
+        // makes the walk advance on every round.
+        let walked = if last <= before && start > last { start } else { last };
         match next_readable(&mut probe, walked) {
             Some(next) => start = next,
             None => break,
