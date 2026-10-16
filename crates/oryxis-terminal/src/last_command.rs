@@ -296,6 +296,19 @@ mod tests {
     }
 
     #[test]
+    fn clearing_the_scrollback_lets_go_of_output_held_in_it() {
+        // Output that starts in the history and ends on screen: after
+        // Clear Scrollback its first rows are gone, and the copy says so
+        // instead of handing back the visible tail as the whole output.
+        let mut term = TerminalState::new_no_pty_with_scrollback(40, 4, 100).unwrap();
+        let output: String = (1..=20).map(|i| format!("{i}\r\n")).collect();
+        run(&mut term, "seq 20", &output);
+        assert!(term.last_command().is_ok());
+        term.clear_scrollback();
+        assert_eq!(term.last_command(), Err(LastCommandUnavailable::Gone));
+    }
+
+    #[test]
     fn output_still_in_a_full_history_reads_its_own_text() {
         let mut term = TerminalState::new_no_pty_with_scrollback(40, 4, 5).unwrap();
         for i in 0..20 {

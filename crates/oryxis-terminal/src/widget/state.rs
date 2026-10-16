@@ -704,9 +704,14 @@ impl TerminalState {
 
     /// Drop the scrollback history, keeping the visible screen (the PuTTY
     /// / Windows Terminal "Clear Scrollback" action). No-op when there is
-    /// no history.
+    /// no history. Through the emulator's own ED 3 path, never a bare
+    /// `Grid::clear_history`: that path is the one that also drops the
+    /// rows held in the history (`row_anchors`, what Copy Last Command
+    /// reads) and a selection reaching into it; the grid alone left both
+    /// naming rows that no longer exist.
     pub fn clear_scrollback(&mut self) {
-        self.backend.term.grid_mut().clear_history();
+        use alacritty_terminal::vte::ansi::{ClearMode, Handler};
+        self.backend.term.clear_screen(ClearMode::Saved);
     }
 
     /// Serialize the visible screen (the active grid's viewport, no
