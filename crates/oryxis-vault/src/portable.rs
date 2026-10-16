@@ -328,7 +328,17 @@ pub(crate) fn is_portable_setting(key: &str) -> bool {
     //   session printed. A file that points one at an autostart folder
     //   turns the next session into a program run at logon. They are
     //   paths of one machine anyway.
+    // - `local_terminals` / `local_terminal_default` name the programs a
+    //   local tab spawns (with their arguments) and `sftp_default_editor`
+    //   the one SFTP Edit runs: a file deciding them decides what runs
+    //   here. `sftp_file_double_click` at "open" hands a downloaded file
+    //   to the system's opener on a double click, which for an `.exe` or
+    //   a `.bat` from a server is running it.
     const DENY_SECURITY: &[&str] = &[
+        "local_terminals",
+        "local_terminal_default",
+        "sftp_default_editor",
+        "sftp_file_double_click",
         "snippet_output_dir",
         "zmodem_download_dir",
         "session_log_file_dir",
@@ -380,6 +390,10 @@ pub(crate) fn is_portable_setting(key: &str) -> bool {
         "mcp_server_enabled",
         "skipped_update_version",
         "pinned_tabs",
+        // The last session's tabs and the one in front: this install's
+        // state, like the pins (they reference its sessions).
+        "open_tabs",
+        "open_tabs_active",
         // Files-sidebar folder history: per-host browsing trail, and
         // encrypted under THIS vault's master key, so the verbatim value
         // `list_settings` hands out would arrive in the target vault as

@@ -780,6 +780,10 @@ fn security_settings_never_ride_a_portable_file() {
         ("zmodem_download_dir", "/home/x/.config/autostart"),
         ("session_log_file_dir", "/home/x/.config/autostart"),
         ("command_history_file_dir", "/home/x/.config/autostart"),
+        ("local_terminals", r#"[{"id":"x","label":"sh","program":"/bin/sh","args":["-c","id"]}]"#),
+        ("local_terminal_default", "x"),
+        ("sftp_default_editor", "/tmp/evil"),
+        ("sftp_file_double_click", "open"),
     ];
     for (k, v) in planted {
         vault.set_setting(k, v).unwrap();
