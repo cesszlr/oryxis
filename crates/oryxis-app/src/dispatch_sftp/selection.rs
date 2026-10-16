@@ -767,10 +767,6 @@ impl Oryxis {
                 if self.cur_sftp().row_menu.is_some() {
                     return Err(ke);
                 }
-                // Consume the activation-swallow flag on the first keyboard
-                // event after an inline-input commit: the trailing Enter from
-                // that submit must not activate the still-selected row.
-                let swallow = std::mem::take(&mut self.sftp.swallow_next_activate);
                 if let iced::keyboard::Event::KeyPressed { key, .. } = &ke {
                     // Escape cancels an in-progress inline rename / new-entry
                     // instead of falling through to the terminal handler.
@@ -792,11 +788,6 @@ impl Oryxis {
                             return Ok(Task::none());
                         }
                     }
-                    if swallow
-                        && matches!(key, iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter))
-                    {
-                        return Ok(Task::none());
-                    }
                 }
                 // Past the inline edits' own Esc: a modal over the view
                 // owns the rest of the keyboard (a close-session confirm,
@@ -806,6 +797,22 @@ impl Oryxis {
                 // the default for a file), and Backspace would go up.
                 if self.any_modal_blocks_input() {
                     return Err(ke);
+                }
+                // Consume the activation-swallow flag on the first keyboard
+                // event after an inline-input commit: the trailing Enter from
+                // that submit must not activate the still-selected row. Past
+                // the modal gate, so a key a modal took does not spend it.
+                let swallow = std::mem::take(&mut self.sftp.swallow_next_activate);
+                if swallow
+                    && matches!(
+                        &ke,
+                        iced::keyboard::Event::KeyPressed {
+                            key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter),
+                            ..
+                        }
+                    )
+                {
+                    return Ok(Task::none());
                 }
                 let editing = self.cur_sftp().rename.is_some()
                     || self.cur_sftp().new_entry.is_some()
