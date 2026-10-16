@@ -23,7 +23,7 @@ impl Oryxis {
                 self.editor_flush_pending();
                 self.card_context_menu = None;
                 self.overlay = None;
-                if let Some(conn) = self.connections.iter().find(|c| c.id == id) {
+                if self.connections.iter().any(|c| c.id == id) {
                     // Mutually exclusive right-panel slot.
                     self.cloud_form.visible = false;
                     self.cloud_dynamic_form.visible = false;
@@ -42,53 +42,8 @@ impl Oryxis {
                         self.active_tab = None;
                         self.active_view = crate::state::View::Dashboard;
                     }
-                    // Inline panel_nav_clear: a method call would
-                    // borrow all of self while `conn` holds it.
-                    self.keynav.panel_selected = None;
-                    self.keynav.panel_last_row.set(None);
-                    self.host_panel_error = None;
-                    let has_pw = self.vault.as_ref()
-                        .and_then(|v| v.get_connection_password(&conn.id).ok())
-                        .flatten()
-                        .is_some();
-                    let has_proxy_pw = self.vault.as_ref()
-                        .and_then(|v| v.get_proxy_password(&conn.id).ok())
-                        .flatten()
-                        .is_some();
-                    let has_totp = self.vault.as_ref()
-                        .and_then(|v| v.get_connection_totp_secret(&conn.id).ok())
-                        .flatten()
-                        .is_some();
-                    let has_target_pw = self.vault.as_ref()
-                        .and_then(|v| v.get_connection_target_password(&conn.id).ok())
-                        .flatten()
-                        .is_some();
-                    self.editor_form = self.form_from_connection(
-                        conn,
-                        has_pw,
-                        has_proxy_pw,
-                        has_totp,
-                        has_target_pw,
-                    );
-                    let cmd = conn.initial_command.as_deref().unwrap_or_default();
-                    self.editor_initial_command =
-                        iced::widget::text_editor::Content::with_text(cmd);
-                    // Recover the startup source: a live snippet reference
-                    // (whose snippet still exists) wins; else a non-empty
-                    // literal command is Custom; else None. A dangling
-                    // snippet id falls back to None.
-                    self.editor_startup_choice = match conn.startup_snippet_id {
-                        Some(id) if self.snippets.iter().any(|s| s.id == id) => {
-                            crate::state::StartupChoice::Snippet(id)
-                        }
-                        _ if !cmd.trim().is_empty() => crate::state::StartupChoice::Custom,
-                        _ => crate::state::StartupChoice::None,
-                    };
-                    self.rebuild_editor_combos();
-                    // Fresh host in the form: drop the previous
-                    // baseline; the post-dispatch kick records the new
-                    // one before any edit can land.
-                    self.editor_saved_snapshot = None;
+                    self.panel_nav_clear();
+                    self.editor_prefill_existing(id);
                     return crate::widgets::focus_input(iced::widget::Id::new(
                         "editor-hostname",
                     ));

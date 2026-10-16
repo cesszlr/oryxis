@@ -169,19 +169,75 @@ impl Oryxis {
     }
 
     /// The vault was re-read under an open editor whose form holds no
-    /// edits: reopen the same host so the form shows the row as it is
-    /// now. The open path is the one `EditConnection` runs (prefill,
-    /// combos, a fresh baseline), so nothing here can drift from it. A
-    /// host that vanished meanwhile keeps its drawer: `editor_owns_write`
+    /// edits: refill the form from the row as it is now. Only the
+    /// prefill `EditConnection` runs (`editor_prefill_existing`), never
+    /// the open itself: the drawer may be hidden behind a focused tab
+    /// (`host_panel` stays up there), and the open would pull the user
+    /// out of the terminal onto the Dashboard on every external write.
+    /// A host that vanished meanwhile keeps its drawer: `editor_owns_write`
     /// is false for it, so the closing flush writes nothing back.
     pub(crate) fn editor_refresh_from_vault(&mut self) {
         let Some(id) = self.editor_form.editing_id else {
             return;
         };
-        if !self.panels.host_panel || !self.connections.iter().any(|c| c.id == id) {
+        if !self.panels.host_panel {
             return;
         }
-        let _ = self.handle_editor(crate::app::EditorMessage::EditConnection(id));
+        self.editor_prefill_existing(id);
+    }
+
+    /// Fill the form from the stored row of host `id`: the half of
+    /// `EditConnection` that touches nothing but the form, so a re-read
+    /// under an open (or hidden) editor can run it without moving the
+    /// user off the surface they are on. Leaves the baseline empty; the
+    /// post-dispatch kick records it from this very form.
+    pub(crate) fn editor_prefill_existing(&mut self, id: uuid::Uuid) {
+        let Some(conn) = self.connections.iter().find(|c| c.id == id) else {
+            return;
+        };
+        self.host_panel_error = None;
+        let has_pw = self.vault.as_ref()
+            .and_then(|v| v.get_connection_password(&conn.id).ok())
+            .flatten()
+            .is_some();
+        let has_proxy_pw = self.vault.as_ref()
+            .and_then(|v| v.get_proxy_password(&conn.id).ok())
+            .flatten()
+            .is_some();
+        let has_totp = self.vault.as_ref()
+            .and_then(|v| v.get_connection_totp_secret(&conn.id).ok())
+            .flatten()
+            .is_some();
+        let has_target_pw = self.vault.as_ref()
+            .and_then(|v| v.get_connection_target_password(&conn.id).ok())
+            .flatten()
+            .is_some();
+        self.editor_form = self.form_from_connection(
+            conn,
+            has_pw,
+            has_proxy_pw,
+            has_totp,
+            has_target_pw,
+        );
+        let cmd = conn.initial_command.as_deref().unwrap_or_default();
+        self.editor_initial_command =
+            iced::widget::text_editor::Content::with_text(cmd);
+        // Recover the startup source: a live snippet reference
+        // (whose snippet still exists) wins; else a non-empty
+        // literal command is Custom; else None. A dangling
+        // snippet id falls back to None.
+        self.editor_startup_choice = match conn.startup_snippet_id {
+            Some(id) if self.snippets.iter().any(|s| s.id == id) => {
+                crate::state::StartupChoice::Snippet(id)
+            }
+            _ if !cmd.trim().is_empty() => crate::state::StartupChoice::Custom,
+            _ => crate::state::StartupChoice::None,
+        };
+        self.rebuild_editor_combos();
+        // Fresh host in the form: drop the previous
+        // baseline; the post-dispatch kick records the new
+        // one before any edit can land.
+        self.editor_saved_snapshot = None;
     }
 
     /// Whether the typed Parent Group value differs from the host's
@@ -189,7 +245,7 @@ impl Oryxis {
     /// ONLY change (`GroupWrite::Skip` builds the signature, so the
     /// signature cannot see it) and because the interrupted flush
     /// deliberately declines to apply it.
-    fn editor_group_pending(&self) -> bool {
+    pub(crate) fn editor_group_pending(&self) -> bool {
         if !self.editor_owns_write() {
             return false;
         }

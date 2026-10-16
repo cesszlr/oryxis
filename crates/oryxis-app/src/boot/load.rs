@@ -40,11 +40,10 @@ impl Oryxis {
         self.restore_open_tabs_dormant();
     }
 
-    /// Auto-archive sweep (uses the previously-loaded orphan setting)
     /// Another process wrote the vault (`VaultMessage::VaultChangedOutside`):
-    /// re-read the entity lists and the host-key pins, nothing else. Not
-    /// `load_data_from_vault`, which also restores tabs and runs the boot
-    /// migrations. The open host editor follows the row it is on when the
+    /// re-read the entity lists, the snippets, the host-key pins and the
+    /// forward rules, nothing else. Not `load_data_from_vault`, which also
+    /// restores tabs and runs the boot migrations. The open host editor follows the row it is on when the
     /// form holds no edits (the same courtesy a folder move gets,
     /// `editor_follow_moved_host`); a form with edits keeps them, and its
     /// closing flush writes them over the external change, which is the
@@ -54,23 +53,42 @@ impl Oryxis {
             return;
         }
         let was_dirty = self.editor_autosave_dirty();
+        // A typed Parent Group is an edit too, one the dirty signature
+        // cannot see; the refill below would overwrite it.
+        let group_typed = self.editor_group_pending();
+        let stored_group = |app: &Self| {
+            app.editor_form
+                .editing_id
+                .and_then(|id| app.connections.iter().find(|c| c.id == id))
+                .map(|c| c.group_id)
+        };
+        let group_before = stored_group(self);
         self.load_vault_entities();
         if let Some(vault) = &self.vault {
             self.known_hosts = vault.list_known_hosts().unwrap_or_default();
             self.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
+            // A P2P round pulls snippets too; the snippet editor holds its
+            // row by id, so a re-sorted list cannot redirect its save.
+            self.snippets = vault.list_snippets().unwrap_or_default();
         }
-        // The form's Parent Group follows the row FIRST, in both branches:
-        // `editor_group_pending` compares the typed path against the live
-        // row, so an external folder move would otherwise read as a
-        // pending edit and the next flush (the one `EditConnection` runs
-        // on reopen, or the drawer's close) would write the old folder
-        // back with a newer stamp that then wins on sync.
-        self.editor_follow_moved_host(was_dirty);
-        if !was_dirty {
+        // When the external write MOVED the host, the form's Parent Group
+        // follows the row FIRST, in both branches: `editor_group_pending`
+        // compares the typed path against the live row, so the move would
+        // otherwise read as a pending edit and the drawer's closing flush
+        // would write the old folder back with a newer stamp that then
+        // wins on sync. A write that left the folder alone leaves the
+        // field alone too: a typed, not yet flushed Parent Group is an
+        // edit the signature cannot see (`GroupWrite::Skip`), and
+        // following the row there threw it away.
+        if stored_group(self) != group_before {
+            self.editor_follow_moved_host(was_dirty);
+        }
+        if !was_dirty && !group_typed {
             self.editor_refresh_from_vault();
         }
     }
 
+    /// Auto-archive sweep (uses the previously-loaded orphan setting)
     /// then the core entity lists: connections, groups (parent repair),
     /// session groups, keys, identities, proxy identities, cloud profiles.
     fn load_vault_entities(&mut self) {
