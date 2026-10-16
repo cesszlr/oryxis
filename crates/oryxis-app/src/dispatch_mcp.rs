@@ -64,6 +64,14 @@ impl Oryxis {
                 return iced::clipboard::write(snippet).discard();
             }
             McpMessage::InstallMcpConfig => {
+                // The button is inert for a client not detected, but the
+                // keyboard row (and anything else that sends this) is not
+                // the button: Claude Code's config sits in `~`, a folder
+                // that always exists, so the write's own folder test
+                // cannot stand in for the detection.
+                if !self.mcp.detected.contains(&self.mcp.client) {
+                    return Task::none();
+                }
                 self.mcp.install_status = None;
                 let token = self.mcp.server_token.clone();
                 let vault_pw = self.mcp_vault_pw();

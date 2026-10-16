@@ -202,6 +202,37 @@ impl McpClient {
         }
     }
 
+    /// Every file an install of this client may have written, the one
+    /// `config_path` names now first: the default beside an environment
+    /// override (a Codex home moved after the install), and every folder
+    /// a client that moved folders has used (Windsurf). What revoking the
+    /// embedded vault password walks, so a copy written under an earlier
+    /// layout is not left holding it. Paths, not files: callers check
+    /// which exist.
+    pub(crate) fn candidate_config_paths(self, home: &Path) -> Vec<PathBuf> {
+        let mut out: Vec<PathBuf> = self.config_path(home).into_iter().collect();
+        let mut push = |p: PathBuf| {
+            if !out.contains(&p) {
+                out.push(p);
+            }
+        };
+        match self {
+            McpClient::ClaudeCode => push(home.join(".claude.json")),
+            McpClient::Codex => push(home.join(".codex").join("config.toml")),
+            McpClient::Copilot => push(home.join(".copilot").join("mcp-config.json")),
+            McpClient::Windsurf => {
+                if let Some(appdata) = windows_appdata() {
+                    push(appdata.join("devin").join("mcp_config.json"));
+                }
+                for dir in self.marker_dirs() {
+                    push(home.join(dir).join("mcp_config.json"));
+                }
+            }
+            McpClient::ClaudeDesktop | McpClient::Cursor | McpClient::GeminiCli => {}
+        }
+        out
+    }
+
     /// The same file as a `~`-relative POSIX path, for a client living
     /// inside a WSL distro (read and written through `wsl.exe`, where
     /// `$HOME` is the distro's). `existing` is the distro's marker

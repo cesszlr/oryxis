@@ -469,11 +469,17 @@ fn wsl_client_has_entry(client: McpClient, markers: &[String]) -> bool {
 /// plaintext credential still on disk.
 pub(crate) fn strip_vault_password_everywhere(token: &str) -> Result<(), String> {
     let mut errors: Vec<String> = Vec::new();
+    // Every file an install may have written, not only the one each
+    // client reads today: an install from before an environment override
+    // or a folder move still holds the password where it was written.
+    let home = home_dir_for_config()?;
     for client in McpClient::available() {
-        if client_has_entry(client)
-            && let Err(e) = install_mcp_config_to_file(client, token, None)
-        {
-            errors.push(e);
+        for path in client.candidate_config_paths(&home) {
+            let has_entry = std::fs::read_to_string(&path)
+                .is_ok_and(|c| mcp_clients::has_entry(client.format(), &c));
+            if has_entry && let Err(e) = rewrite_entry_at(client, &path, token, None) {
+                errors.push(e);
+            }
         }
     }
     #[cfg(target_os = "windows")]
@@ -549,17 +555,7 @@ pub(crate) fn install_mcp_config_to_file(
         ));
     }
 
-    // A parse failure aborts rather than clobbering whatever the
-    // client has stored there.
-    let existing = if config_path.exists() {
-        std::fs::read_to_string(&config_path)
-            .map_err(|e| format!("Failed to read {}: {e}", config_path.display()))?
-    } else {
-        String::new()
-    };
-    let output = mcp_clients::merge_into(client.format(), &existing, native_entry(token, vault_pw))
-        .map_err(|e| format!("{e} ({})", config_path.display()))?;
-    write_config_private(&config_path, &output)?;
+    rewrite_entry_at(client, &config_path, token, vault_pw)?;
 
     if client == McpClient::ClaudeCode {
         sweep_legacy_mcp_config();
@@ -568,35 +564,72 @@ pub(crate) fn install_mcp_config_to_file(
     Ok(config_path.display().to_string())
 }
 
-/// Write a client config with owner-only permissions (0600) on Unix.
-/// The opt-in vault password embed puts a plaintext credential in this
-/// file, so it must never be left world-readable under the default
-/// umask (0644). On non-Unix the ACL story differs and there is no
-/// mode bit to set, so this is a plain write there.
+/// Merge the `oryxis` entry into the config at `path`, in `client`'s
+/// shape. A parse failure aborts rather than clobbering whatever the
+/// client has stored there.
+fn rewrite_entry_at(
+    client: McpClient,
+    path: &std::path::Path,
+    token: &str,
+    vault_pw: Option<&str>,
+) -> Result<(), String> {
+    let existing = if path.exists() {
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {e}", path.display()))?
+    } else {
+        String::new()
+    };
+    let output = mcp_clients::merge_into(client.format(), &existing, native_entry(token, vault_pw))
+        .map_err(|e| format!("{e} ({})", path.display()))?;
+    write_config_private(path, &output)
+}
+
+/// Write a client config with owner-only permissions (0600) on Unix,
+/// ATOMICALLY: the new contents go to a temporary file beside it, which
+/// then replaces the config in one rename. These files are the clients'
+/// whole state (`~/.claude.json` holds every project Claude Code knows),
+/// and a write in place that a crash or a full disk cut short left them
+/// empty. A config that is a symlink (a dotfiles checkout) is written
+/// where it points, so the link survives. The opt-in vault password
+/// embed puts a plaintext credential in this file, so it must never be
+/// left world-readable under the default umask (0644); on non-Unix the
+/// ACL story differs and there is no mode bit to set.
 fn write_config_private(path: &std::path::Path, contents: &str) -> Result<(), String> {
+    use std::io::Write as _;
+    let fail = |e: std::io::Error| format!("Failed to write {}: {e}", path.display());
+    let target = if path.is_symlink() {
+        std::fs::canonicalize(path).map_err(fail)?
+    } else {
+        path.to_path_buf()
+    };
+    let dir = target
+        .parent()
+        .ok_or_else(|| format!("{} has no folder", target.display()))?;
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let tmp = dir.join(format!(".{name}.oryxis-{}.tmp", std::process::id()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
     #[cfg(unix)]
     {
-        use std::io::Write as _;
-        use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(path)
-            .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
-        // `mode` only bites on creation; tighten an existing looser file too.
-        let perms = std::fs::Permissions::from_mode(0o600);
-        let _ = file.set_permissions(perms);
-        file.write_all(contents.as_bytes())
-            .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
-        Ok(())
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
     }
-    #[cfg(not(unix))]
-    {
-        std::fs::write(path, contents)
-            .map_err(|e| format!("Failed to write {}: {e}", path.display()))
+    // A leftover of a write this PID's predecessor never finished.
+    let _ = std::fs::remove_file(&tmp);
+    let written = (|| {
+        let mut file = options.open(&tmp)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&tmp, &target)
+    })();
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(fail(e));
     }
+    Ok(())
 }
 
 /// Write/merge the oryxis MCP entry into `client`'s config inside the
@@ -668,6 +701,32 @@ impl crate::app::Oryxis {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_config_is_replaced_whole_and_a_symlink_survives() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("real.json");
+        std::fs::write(&real, "{\"old\": true}").unwrap();
+        super::write_config_private(&real, "{\"new\": true}").unwrap();
+        assert_eq!(std::fs::read_to_string(&real).unwrap(), "{\"new\": true}");
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "the temporary file is gone");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = std::fs::metadata(&real).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+            let link = dir.path().join("link.json");
+            std::os::unix::fs::symlink(&real, &link).unwrap();
+            super::write_config_private(&link, "{\"via\": \"link\"}").unwrap();
+            assert!(link.is_symlink(), "the link is kept");
+            assert_eq!(std::fs::read_to_string(&real).unwrap(), "{\"via\": \"link\"}");
+        }
+    }
+
     use super::{
         cmd_escape, mcp_config_snippet_display, oryxis_mcp_entry, oryxis_mcp_entry_wsl, McpClient,
     };
