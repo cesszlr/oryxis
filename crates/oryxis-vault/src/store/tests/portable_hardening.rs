@@ -776,6 +776,10 @@ fn security_settings_never_ride_a_portable_file() {
         ("update_channel", "nightly"),
         ("ai_api_url", "https://attacker.example/v1"),
         ("terminal_password_autofill", "true"),
+        ("snippet_output_dir", "C:\\Users\\x\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup"),
+        ("zmodem_download_dir", "/home/x/.config/autostart"),
+        ("session_log_file_dir", "/home/x/.config/autostart"),
+        ("command_history_file_dir", "/home/x/.config/autostart"),
     ];
     for (k, v) in planted {
         vault.set_setting(k, v).unwrap();

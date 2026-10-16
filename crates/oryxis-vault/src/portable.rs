@@ -320,7 +320,19 @@ pub(crate) fn is_portable_setting(key: &str) -> bool {
     //   AI requests (which carry the user's own key) at another endpoint;
     //   `terminal_password_autofill` decides when a stored password is
     //   typed into a session.
+    // - the four folders this device writes files into decide WHERE a
+    //   name and content someone else chose land: a snippet's save step
+    //   names its file and fills it with what the server printed (and a
+    //   host's startup snippet runs with no confirm), `sz` names the file
+    //   it sends, the session and command-history mirrors write what the
+    //   session printed. A file that points one at an autostart folder
+    //   turns the next session into a program run at logon. They are
+    //   paths of one machine anyway.
     const DENY_SECURITY: &[&str] = &[
+        "snippet_output_dir",
+        "zmodem_download_dir",
+        "session_log_file_dir",
+        "command_history_file_dir",
         "download_mirror",
         "terminal_clipboard_access",
         "agent_server_enabled",
