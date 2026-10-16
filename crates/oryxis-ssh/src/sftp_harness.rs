@@ -305,7 +305,7 @@ impl russh::server::Handler for SshHarness {
         use std::sync::atomic::Ordering;
         let graced = self
             .stall_grace
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
             .is_ok();
         if self.stall_opens.load(Ordering::SeqCst) && !graced {
             self.parked.push(reply);
