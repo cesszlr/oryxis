@@ -74,6 +74,70 @@ fn damage_chunk_pages(path: &std::path::Path) -> u64 {
     hit.iter().map(|(_, n)| n).sum()
 }
 
+/// One rebuild per vault file: a second one (another process on the same
+/// error screen) is refused while the first holds the lock, and the
+/// file it would have renamed stays where it is.
+#[test]
+fn a_second_rebuild_of_the_same_file_is_refused() {
+    let tmp = NamedTempFile::new().unwrap();
+    let path = tmp.path().to_path_buf();
+    std::mem::forget(tmp);
+    VaultStore::open(&path).unwrap();
+    let mut lock_path = path.clone().into_os_string();
+    lock_path.push(".rebuild-lock");
+    let held = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(&lock_path).unwrap();
+    held.lock().unwrap();
+    let err = rebuild_vault(&path).unwrap_err();
+    assert!(err.to_string().contains("rebuilding"), "{err}");
+    assert!(path.exists());
+    drop(held);
+    rebuild_vault(&path).expect("free again once the other one ended");
+}
+
+/// A chunk whose key is readable and whose content is not: its row sits
+/// intact on its leaf, the overflow page holding the rest of it is junk.
+/// The probe finds the row, the read of it fails; the walk has to step
+/// past it as lost instead of finding it again forever.
+#[test]
+fn a_row_whose_overflow_page_is_damaged_is_walked_past() {
+    let tmp = NamedTempFile::new().unwrap();
+    let path = tmp.path().to_path_buf();
+    std::mem::forget(tmp);
+    {
+        let mut v = VaultStore::open(&path).unwrap();
+        v.set_master_password("pw").unwrap();
+        let log = Uuid::new_v4();
+        v.create_session_log(&log, &Uuid::new_v4(), "big").unwrap();
+        for k in 0..12u32 {
+            // Several pages per chunk: the record overflows its leaf.
+            let data: Vec<u8> = (0..20_000).map(|i| ((i * 13 + k as usize) % 251) as u8).collect();
+            v.append_session_data(&log, &data, Some(k as i64), false).unwrap();
+        }
+        v.end_session_log(&log).unwrap();
+    }
+    let db = rusqlite::Connection::open(&path).unwrap();
+    let page_size = db.query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0)).unwrap() as u64;
+    let overflow: Vec<u64> = db
+        .prepare("SELECT pageno FROM dbstat WHERE name = 'session_log_chunks' AND pagetype = 'overflow' ORDER BY path")
+        .unwrap()
+        .query_map([], |r| r.get::<_, i64>(0))
+        .unwrap()
+        .map(|r| r.unwrap() as u64)
+        .collect();
+    drop(db);
+    assert!(overflow.len() > 12, "{} overflow pages", overflow.len());
+    // One page in the middle of the chain set: exactly one chunk loses
+    // part of its content.
+    junk_pages(&path, page_size, &[overflow[overflow.len() / 2]]);
+
+    let report = rebuild_vault(&path).expect("the walk ends");
+    let chunks = report.tables.iter().find(|t| t.name == "session_log_chunks").unwrap();
+    assert_eq!(chunks.copied, 11, "{chunks:?}");
+    assert!(chunks.unreadable_stretches >= 1, "{chunks:?}");
+    let mut v = VaultStore::open(&path).expect("the rebuilt vault opens");
+    v.unlock("pw").unwrap();
+}
+
 #[test]
 fn a_damaged_recordings_table_refuses_the_open_and_is_rebuilt_around_the_damage() {
     let tmp = NamedTempFile::new().unwrap();

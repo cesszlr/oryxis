@@ -15,9 +15,14 @@
 //! the walk then probes forward with a doubling step until the engine
 //! answers again, then narrows back by binary search so the rows right
 //! after the damage are kept. A probe never accepts a rowid at or below
-//! the last row copied. Rows read whole that the new schema refuses are
-//! skipped and counted, and references to rows the damage took (a host
-//! in a lost folder) are cleared after the copy. The rebuilt file replaces the damaged one by
+//! the last row copied, nor one a read already failed on: a row whose key
+//! is readable and whose content is not (a damaged overflow page, the
+//! usual shape of a large recording chunk's damage) answers the probe and
+//! fails the read, and is stepped past as lost. Rows read whole that the
+//! new schema refuses are skipped and counted (a row the walk meets twice
+//! is not), and references to rows the damage took (a host in a lost
+//! folder) are cleared after the copy. One rebuild at a time per vault
+//! file, across processes (`vault.db.rebuild-lock`, an OS lock). The rebuilt file replaces the damaged one by
 //! rename, which stays beside it as `vault.db.damaged-<stamp>` with its
 //! `-wal` / `-shm` siblings (a WAL left behind belongs to the file it
 //! was written for).
@@ -232,6 +237,11 @@ struct CopyPlan {
 /// failure to READ is what the rebuild is for and never fails it.
 pub fn rebuild_vault(path: &Path) -> Result<RebuildReport, VaultError> {
     let started = Instant::now();
+    // A second process on the same error screen (a second launch is a
+    // second process on Linux and macOS) would delete this one's staging
+    // file and rename half a copy into place. The OS lock goes with the
+    // process, so a crash leaves nothing to clear by hand.
+    let _lock = RebuildLock::take(path)?;
     let src = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -243,17 +253,23 @@ pub fn rebuild_vault(path: &Path) -> Result<RebuildReport, VaultError> {
     let staging = sibling(path, ".rebuilding");
     remove_with_siblings(&staging)?;
     // `VaultStore::open` makes the current schema, migrations included.
-    let fresh = VaultStore::open(&staging)?;
+    let fresh = match VaultStore::open(&staging) {
+        Ok(fresh) => fresh,
+        Err(e) => {
+            let _ = remove_with_siblings(&staging);
+            return Err(e);
+        }
+    };
     let dst = &fresh.db;
-    // Bulk inserts: the file is private until the rename below, so a
-    // crash mid-copy costs nothing durable. Foreign keys OFF while
-    // copying: the bundled engine enforces them by default, and a child
-    // whose parent the damage took (a host in a lost folder) would be
-    // refused; the references are repaired after the copy instead.
-    dst.execute_batch("PRAGMA synchronous=OFF; PRAGMA foreign_keys=OFF;")?;
 
     let mut report = Vec::with_capacity(tables.len());
     let result = (|| -> Result<(), VaultError> {
+        // Bulk inserts: the file is private until the rename below, so a
+        // crash mid-copy costs nothing durable. Foreign keys OFF while
+        // copying: the bundled engine enforces them by default, and a
+        // child whose parent the damage took (a host in a lost folder)
+        // would be refused; the references are repaired after the copy.
+        dst.execute_batch("PRAGMA synchronous=OFF; PRAGMA foreign_keys=OFF;")?;
         for table in &tables {
             match copy_plan(&src, dst, table)? {
                 Some((plan, lost_columns)) => {
@@ -279,7 +295,12 @@ pub fn rebuild_vault(path: &Path) -> Result<RebuildReport, VaultError> {
     }
 
     let damaged_path = sibling(path, &format!(".damaged-{}", stamp()));
-    rename_with_siblings(path, &damaged_path)?;
+    if let Err(e) = rename_with_siblings(path, &damaged_path) {
+        // Whatever moved goes back (`rename_with_siblings` undid its own
+        // half); the copy is not left behind either.
+        let _ = remove_with_siblings(&staging);
+        return Err(e);
+    }
     if let Err(e) = rename_with_siblings(&staging, path) {
         // Put the damaged file back where the app looks for it rather
         // than leave no vault at all.
@@ -291,6 +312,42 @@ pub fn rebuild_vault(path: &Path) -> Result<RebuildReport, VaultError> {
         damaged_path,
         elapsed_ms: started.elapsed().as_millis() as u64,
     })
+}
+
+/// The one rebuild of a vault file running, across processes: an OS lock
+/// on `vault.db.rebuild-lock`, released (and the file removed) when the
+/// rebuild ends whichever way, and by the OS when the process dies.
+struct RebuildLock {
+    file: Option<std::fs::File>,
+    path: PathBuf,
+}
+
+impl RebuildLock {
+    fn take(vault: &Path) -> Result<Self, VaultError> {
+        let path = sibling(vault, ".rebuild-lock");
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)?;
+        if file.try_lock().is_err() {
+            return Err(VaultError::Io(std::io::Error::new(
+                std::io::ErrorKind::WouldBlock,
+                "another Oryxis window is rebuilding this vault",
+            )));
+        }
+        Ok(Self { file: Some(file), path })
+    }
+}
+
+impl Drop for RebuildLock {
+    fn drop(&mut self) {
+        // Removed while still held, so no other process can take a lock
+        // on a file that is about to vanish and think it holds the only
+        // one.
+        let _ = std::fs::remove_file(&self.path);
+        drop(self.file.take());
+    }
 }
 
 /// The damaged file's tables, in `sqlite_master` order, with the
@@ -443,12 +500,16 @@ fn copy_table(src: &Connection, dst: &Connection, plan: &CopyPlan) -> Result<Tab
         out.unreadable_stretches = 1;
         return Ok(out);
     };
+    // A plain INSERT, never OR IGNORE: IGNORE also drops a row that
+    // breaks NOT NULL or CHECK and reports it as written, and those rows
+    // are losses the report has to count. A key already present is a row
+    // the walk met twice (an out-of-order tree), told apart by its code.
     let insert_sql = if plan.rowid_is_key {
         let marks = vec!["?"; plan.columns.len()].join(", ");
-        format!("INSERT OR IGNORE INTO {table} ({cols}) VALUES ({marks})")
+        format!("INSERT INTO {table} ({cols}) VALUES ({marks})")
     } else {
         let marks = vec!["?"; plan.columns.len() + 1].join(", ");
-        format!("INSERT OR IGNORE INTO {table} (rowid, {cols}) VALUES ({marks})")
+        format!("INSERT INTO {table} (rowid, {cols}) VALUES ({marks})")
     };
     let mut insert = dst.prepare(&insert_sql)?;
 
@@ -477,6 +538,13 @@ fn copy_table(src: &Connection, dst: &Connection, plan: &CopyPlan) -> Result<Tab
                 };
                 match result {
                     Ok(_) => out.copied += 1,
+                    // Its key is already in the new file: this row was
+                    // copied when the walk first met it.
+                    Err(rusqlite::Error::SqliteFailure(e, _))
+                        if matches!(
+                            e.extended_code,
+                            rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY | rusqlite::ffi::SQLITE_CONSTRAINT_ROWID
+                        ) => {}
                     // Values read whole that the schema refuses: the
                     // row's own damage, skipped. Anything else (a full
                     // disk, an I/O error) is the WRITE side failing,
@@ -495,8 +563,8 @@ fn copy_table(src: &Connection, dst: &Connection, plan: &CopyPlan) -> Result<Tab
                     }
                 }
                 // A row from an out-of-order tree below the cursor is one
-                // already copied under its own rowid (OR IGNORE) or one
-                // the tree lost its place for; never let it move the
+                // already copied under its own rowid (its key is taken) or
+                // one the tree lost its place for; never let it move the
                 // cursor backwards.
                 if *rowid > last {
                     last = *rowid;
@@ -520,7 +588,14 @@ fn copy_table(src: &Connection, dst: &Connection, plan: &CopyPlan) -> Result<Tab
         }
 
         out.unreadable_stretches += 1;
-        match next_readable(&mut probe, last) {
+        // A read that failed on its very first row, from a key a probe
+        // found: that row's key is readable and its content is not (a
+        // damaged overflow page). The probe would find the same key again
+        // and the walk would never end, so the row is walked past as
+        // lost. `start` is then above `last` (a probe only answers past
+        // it), which is what makes the walk advance on every round.
+        let walked = if rows.is_empty() && start > last { start } else { last };
+        match next_readable(&mut probe, walked) {
             Some(next) => start = next,
             None => break,
         }
@@ -683,13 +758,31 @@ fn remove_with_siblings(path: &Path) -> Result<(), VaultError> {
     Ok(())
 }
 
+/// Move a database and its `-wal` / `-shm` together. The main file has
+/// to exist (a missing one is somebody else's rename, never a success);
+/// the siblings move when present. A move that fails partway puts back
+/// what it had moved, so a `-wal` never ends up beside the wrong file.
 fn rename_with_siblings(from: &Path, to: &Path) -> Result<(), VaultError> {
+    if !from.exists() {
+        return Err(VaultError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{} is gone", from.display()),
+        )));
+    }
     let from = with_siblings(from);
     let to = with_siblings(to);
+    let mut moved: Vec<(&PathBuf, &PathBuf)> = Vec::new();
     for (f, t) in from.iter().zip(to.iter()) {
-        if f.exists() {
-            std::fs::rename(f, t)?;
+        if !f.exists() {
+            continue;
         }
+        if let Err(e) = std::fs::rename(f, t) {
+            for (f, t) in moved.into_iter().rev() {
+                let _ = std::fs::rename(t, f);
+            }
+            return Err(e.into());
+        }
+        moved.push((f, t));
     }
     Ok(())
 }
