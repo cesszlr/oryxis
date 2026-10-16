@@ -1045,6 +1045,17 @@ mod tests {
         }
         let row = server.vault().list_connections().unwrap().remove(0);
         assert_eq!((row.hostname.as_str(), row.port), ("10.0.0.1", 22));
+        // Another route to the same address is another server.
+        let bastion = Connection::new("bastion", "203.0.113.5");
+        server.vault().save_connection(&bastion, None).unwrap();
+        let (err, text) = call(
+            &server,
+            "update_host",
+            json!({"id": host.id.to_string(), "jump_chain": ["bastion"]}),
+        )
+        .await;
+        assert!(err);
+        assert!(text.contains("route"), "{text}");
 
         let (err, text) = call(
             &server,
@@ -1147,9 +1158,22 @@ mod tests {
         .await;
         assert!(err);
         assert!(text.contains("kept out of MCP"), "{text}");
-        let (err, text) = call(&server, "create_host", json!({"label": "bad", "identity": "nope", "hostname": "10.0.0.8"})).await;
-        assert!(err);
-        assert!(!text.contains("vault"), "a miss lists no labels: {text}");
+        server
+            .vault()
+            .save_identity(&oryxis_core::models::Identity::new("prod-root-secret"), None)
+            .unwrap();
+        for (field, miss) in [("identity", "nope"), ("jump_chain", "nope")] {
+            let value = if field == "jump_chain" { json!([miss]) } else { json!(miss) };
+            let mut args = json!({"label": "bad", "hostname": "10.0.0.8"});
+            args[field] = value;
+            let (err, text) = call(&server, "create_host", args).await;
+            assert!(err, "{field}");
+            assert!(text.contains("nope"), "{text}");
+            assert!(
+                !text.contains("prod-root-secret") && !text.contains("\"vault\""),
+                "a miss lists no labels: {text}"
+            );
+        }
     }
 
     /// The hostname is a host: the parts the editor would split are

@@ -225,16 +225,17 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
         .into_iter()
         .filter(|k| k.hostname == host && k.port == port)
         .collect();
-    if let Some(other) = pins.iter().find(|k| k.key_type != key_type) {
+    let existing = pins.iter().find(|k| k.key_type == key_type).cloned();
+    if let Some(other) = pins.iter().find(|k| k.key_type != key_type).filter(|_| existing.is_none()) {
         return Err(format!(
-            "The vault pins a {} key for {} ({}); a server that now offers a {key_type} key is a \
-             changed key, never accepted here. Review it in Oryxis > Known Hosts.",
+            "The vault pins a {} key for {} ({}); a server that now offers a {key_type} key is \
+             treated as a changed key and never accepted here. A person reviews it by \
+             connecting to the host once in Oryxis, or in Known Hosts.",
             other.key_type,
             oryxis_core::net::host_port(&host, port),
             other.fingerprint
         ));
     }
-    let existing = pins.into_iter().find(|k| k.key_type == key_type);
     match existing {
         Some(k) if k.fingerprint == fingerprint => {
             server.refusals.remove(&host, port, &key_type);

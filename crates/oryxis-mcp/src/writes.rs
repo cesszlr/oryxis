@@ -16,10 +16,11 @@
 //!   identities or hosts, which no read tool exposes (hosts kept out of
 //!   MCP among them). Hops resolve among ALL hosts (a bastion is a route,
 //!   not a tool target), and a host is never its own hop.
-//! - The hostname is a host: `user@host`, `host:port`, a URL or anything
-//!   the host grammar rejects is refused with where the part belongs,
-//!   and so is a name starting with `-` (it would reach a command proxy's
-//!   `%h` as an option).
+//! - The hostname is a host: `user@host`, `host:port` or anything the
+//!   host grammar rejects is refused with where the part belongs (an
+//!   `ssh://` prefix alone is dropped, as the editor does), and so is a
+//!   name starting with `-` (it would reach a command proxy's `%h` as an
+//!   option).
 //! - The password is the one secret accepted, tri-state like the vault's
 //!   API: absent keeps what is stored, `null` clears it, a string stores
 //!   it encrypted, verbatim (never trimmed). Nothing a write returns ever
@@ -30,9 +31,12 @@
 //!   that pointed a stored credential at a new address would hand it to
 //!   whoever answers. Refused: moving (hostname or port) a host that
 //!   stores its own password or TOTP secret, unless the call replaces or
-//!   clears the password and the host has no TOTP secret; and attaching,
+//!   clears the password and the host has no TOTP secret (a new jump
+//!   chain or a folder whose proxy differs is a move too: the same
+//!   private address through another route is another server); and attaching,
 //!   directly or through a folder's default, an identity that stores a
-//!   password, unless an MCP host at that same address already uses it.
+//!   password, unless an MCP host at that same address, by the same
+//!   route, already uses it.
 //!   Keys stay attachable: a public-key signature is bound to its session
 //!   and gives the server nothing to reuse. An address the user keeps out
 //!   of MCP (a host there with MCP off) is refused outright: a copy of it
@@ -359,6 +363,21 @@ fn endpoint(conn: &Connection) -> (String, u16) {
     (conn.hostname.to_ascii_lowercase(), conn.port)
 }
 
+/// Where a dial of `conn` lands: its address, its jump chain and the
+/// proxy it ends up with once its folders are applied (compared by its
+/// serialized form; `ProxyConfig` keeps its secret out of it).
+fn route(
+    vault: &VaultStore,
+    conn: &Connection,
+    groups: &[Group],
+    identities: &[oryxis_core::models::Identity],
+) -> ((String, u16), Vec<Uuid>, Option<String>) {
+    let mut c = conn.clone();
+    vault.apply_effective(&mut c, groups, identities);
+    let proxy = c.proxy.as_ref().and_then(|p| serde_json::to_string(p).ok());
+    (endpoint(conn), conn.jump_chain.clone(), proxy)
+}
+
 /// The identity a host authenticates with once its folders are applied:
 /// its own, else the nearest folder default (the dial's own resolution,
 /// `VaultStore::apply_effective`).
@@ -384,9 +403,15 @@ fn credential_guard(
     password: Option<&str>,
 ) -> Result<(), String> {
     let all = vault.list_connections().map_err(|e| e.to_string())?;
+    let groups = vault.list_groups().map_err(|e| e.to_string())?;
+    let identities = vault.list_identities().map_err(|e| e.to_string())?;
     let here = endpoint(conn);
     let addr = oryxis_core::net::host_port(&conn.hostname, conn.port);
-    let moved = original.is_none_or(|o| endpoint(o) != here);
+    // The address is only half of where a dial lands: the same private
+    // address through another bastion (or another folder's proxy) is
+    // another server.
+    let way = route(vault, conn, &groups, &identities);
+    let moved = original.is_none_or(|o| route(vault, o, &groups, &identities) != way);
     // A host that already dials this address keeps doing so; a NEW way
     // there (a create, a move) must not reach what the user excluded.
     if moved
@@ -406,9 +431,9 @@ fn credential_guard(
     if let Some(o) = original.filter(|_| moved) {
         if password.is_none() && stored_password {
             return Err(format!(
-                "\"{}\" stores a password, which never follows a host to a new address over MCP. \
-                 Pass the password for {addr} in this call (or null to clear it), or move the \
-                 host in the app.",
+                "\"{}\" stores a password, which never follows a host to a new address or route \
+                 over MCP. Pass the password for {addr} in this call (or null to clear it), or \
+                 move the host in the app.",
                 o.label
             ));
         }
@@ -418,8 +443,8 @@ fn credential_guard(
             .is_some()
         {
             return Err(format!(
-                "\"{}\" stores a TOTP secret, which never follows a host to a new address over \
-                 MCP. Move the host in the app.",
+                "\"{}\" stores a TOTP secret, which never follows a host to a new address or \
+                 route over MCP. Move the host in the app.",
                 o.label
             ));
         }
@@ -433,8 +458,6 @@ fn credential_guard(
     if own_password {
         return Ok(());
     }
-    let groups = vault.list_groups().map_err(|e| e.to_string())?;
-    let identities = vault.list_identities().map_err(|e| e.to_string())?;
     let with_password = vault.list_identity_ids_with_password().map_err(|e| e.to_string())?;
     let Some(identity) = effective_identity(vault, conn, &groups, &identities) else {
         return Ok(());
@@ -451,7 +474,7 @@ fn credential_guard(
             h.id != conn.id
                 && h.mcp_enabled
                 && h.protocol == ConnectionProtocol::Ssh
-                && endpoint(h) == here
+                && route(vault, h, &groups, &identities) == way
                 && effective_identity(vault, h, &groups, &identities) == Some(identity)
         });
     if vouched {
