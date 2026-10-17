@@ -2,7 +2,7 @@
   "provider_id": "mcp",
   "versions": [
     {
-      "version": "0.1.11",
+      "version": "0.1.12",
       "protocol_versions": [
         1
       ],
@@ -11,42 +11,42 @@
         {
           "os": "linux",
           "arch": "aarch64",
-          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.11/oryxis-mcp-linux-aarch64",
-          "sha256": "640ddc61b8aa216927a4c864564aeb71fb9e807061e56398d1df1ff66ba3e273",
-          "signature": "W2AlBU45aDafYwyELGDu5F0S1x2C/eF00EaQasF7buY2cfBDQ7CQHHx3iRG4Do5R5Vt1oHYUV6LPAJJlbhZwBQ==",
+          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.12/oryxis-mcp-linux-aarch64",
+          "sha256": "a8b8b0b27baab41a26b87132b69d224565afb913ffaade8efd274b1f619093f3",
+          "signature": "GoYIRzfKJ5qKTCFHjZFIdfs3H3dxM3mtR++2j+YQl54hir17HaiPTc7gnJ9mv4Ece6dehSydJq1pP497Zw9DAA==",
           "size": 10314704
         },
         {
           "os": "linux",
           "arch": "x86_64",
-          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.11/oryxis-mcp-linux-x86_64",
-          "sha256": "f0a4451ba02997d0a32cc9dd14abb67017dc9917a5cb252b8821c4eb11006ed3",
-          "signature": "Qjv4ZHe+cXOQJBo/+WvQcISpavlgEukI3xLiyuOjZKZ3SmruMe4fNTfGLiQjNxMSieAbCuYGdr+PmJHD3WPCBw==",
-          "size": 12079376
+          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.12/oryxis-mcp-linux-x86_64",
+          "sha256": "f2de3c8d058b69c7e46899ad444df5dbe2c6a9c41c6124c6bc190214d8d9cf5e",
+          "signature": "PRvI0lakqTBTlFFmxtaD3J6oUxAgqPJOn/PtkLmJAMP95soifqsFf7ZYA91PWylbvq+bm4xGKsIVx3/M3EYgAQ==",
+          "size": 12165584
         },
         {
           "os": "macos",
           "arch": "aarch64",
-          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.11/oryxis-mcp-macos-aarch64",
-          "sha256": "117d1d0ffd853da6a0f95a02e60585bad26c706a9b765926cf920eb3beb25310",
-          "signature": "1RC7PM5G818HEVUGsifQOErg6CCwlai2YZqrbWOYW9mdvvPM45zUjRXRfGwAFAb537z/ScQ3N1S1+pcDuQ0KBQ==",
-          "size": 10321960
+          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.12/oryxis-mcp-macos-aarch64",
+          "sha256": "99a5baff15ffc1caa2f2b6efa6b47715e0f066490ee46f2d670cff06c42f6807",
+          "signature": "yKOlSefw9xiacAgOWFnPEMPTYaE7mfS3mPIIMUbgVChjmpDVIA6eAmHKh0K9aw8JFphnqyZZHd+CWNSg7IEpBw==",
+          "size": 10355096
         },
         {
           "os": "windows",
           "arch": "aarch64",
-          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.11/oryxis-mcp-windows-aarch64.exe",
-          "sha256": "9862299a2097299c70a41f3a4e961da41dba4969cc22ca4f43e61fc865285c81",
-          "signature": "noZ7DFsaOXUZpObFguVmguK4fjbIgSl9EddbxwrTEpGjCRph0LWsArhcbQsKbbtM1Rm4J086NLvG8hSPXR/wCw==",
-          "size": 11280384
+          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.12/oryxis-mcp-windows-aarch64.exe",
+          "sha256": "597389d7ac0abc23753e74e5359949fbc163a751083cc0d90df655e5d4d8f9d4",
+          "signature": "YuPSD5H4tt1Bxx5pET6PESDS9IgYqcS9fCfEt1z5/6WjuJaj7/5CCDuZNMP7Nb86tNbTNjtvwf1ZC2Zjlqo7Dg==",
+          "size": 11293184
         },
         {
           "os": "windows",
           "arch": "x86_64",
-          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.11/oryxis-mcp-windows-x86_64.exe",
-          "sha256": "af86bc3f8e7f8d5627b44435917a9cfe533b0dfb172c2f8dfd5853d7e9e1bb79",
-          "signature": "he2AnjTO7+QASPQYQy+XH6QY2VXRDOOmRHUlFe8ZRlstiWqekmk0dxFfQz/mp2T1PMvGlloACK8R3SWcMd9eDw==",
-          "size": 12807168
+          "url": "https://github.com/wilsonglasser/oryxis/releases/download/mcp-v0.1.12/oryxis-mcp-windows-x86_64.exe",
+          "sha256": "95641e19e024b25ee55b35afb53ea2b7066c2a7894b330debe7b58838d795c7c",
+          "signature": "Q+pv9AaYcYnmLNj1N+9cRWqMQyVqNNeUSua5tSN7cqXb5AbjGXy2sb2nGXarVjm4UXWbzFaouKri3+aOyzzpDQ==",
+          "size": 12889600
         }
       ]
     }
