@@ -85,20 +85,9 @@ impl Oryxis {
                     if text.trim().is_empty() {
                         continue;
                     }
-                    // Read before the send: the input capture moves the
-                    // pane to Busy as the command goes out.
-                    let at_prompt = self
-                        .pane_by_id(pane_id)
-                        .is_some_and(|p| matches!(p.prompt, crate::state::PromptState::AtPrompt { .. }));
-                    if !self.write_snippet_command(pane_id, &text) {
+                    if !self.send_snippet_command(run_id, pane_id, &text) {
                         tasks.push(self.stop_snippet_run(run_id, "snippet_run_pane_unavailable", None));
                         break;
-                    }
-                    if let Some(run) = self.snippet_run_mut(run_id) {
-                        if run.sent_commands == 0 {
-                            run.at_prompt_at_send = at_prompt;
-                        }
-                        run.sent_commands += 1;
                     }
                 }
                 SnippetStep::Action { id } => {
@@ -180,6 +169,25 @@ impl Oryxis {
                     }
                     break;
                 }
+                SnippetStep::PasteClipboard { confirm } => {
+                    tasks.push(self.arm_snippet_wait(run_id, RunWait::Clipboard { confirm }, None));
+                    let generation = self.snippet_run_mut(run_id).map_or(0, |r| r.generation);
+                    // The text is read now, when the step runs. The answer
+                    // is about the run's pane, so it runs in the window
+                    // that pane's tab is in by then (a confirmation floats
+                    // there).
+                    tasks.push(crate::dispatch_global::read_clipboard_text(move |text| {
+                        Message::ForPane(
+                            pane_id,
+                            Box::new(Message::Snippet(SnippetMessage::SnippetClipboardRead(
+                                run_id,
+                                generation,
+                                text.map(Into::into),
+                            ))),
+                        )
+                    }));
+                    break;
+                }
                 // Expanded before the run started (`snippet_run::flatten`).
                 SnippetStep::RunSnippet { .. } => continue,
                 SnippetStep::Unknown(_) => {
@@ -226,6 +234,60 @@ impl Oryxis {
             run.at_prompt_at_send = false;
         }
         self.advance_snippet_run(run_id)
+    }
+
+    /// Type `text` into the run's pane as a command and count it: a
+    /// command-end wait after it has something to wait for. `false` when
+    /// the pane cannot take it.
+    fn send_snippet_command(&mut self, run_id: u64, pane_id: Uuid, text: &str) -> bool {
+        // Read before the send: the input capture moves the pane to Busy
+        // as the command goes out.
+        let at_prompt = self
+            .pane_by_id(pane_id)
+            .is_some_and(|p| matches!(p.prompt, crate::state::PromptState::AtPrompt { .. }));
+        if !self.write_snippet_command(pane_id, text) {
+            return false;
+        }
+        if let Some(run) = self.snippet_run_mut(run_id) {
+            if run.sent_commands == 0 {
+                run.at_prompt_at_send = at_prompt;
+            }
+            run.sent_commands += 1;
+        }
+        true
+    }
+
+    /// A paste step's text goes out: into the RUN's pane like a command
+    /// step (bracketed when the shell asked, Enter after), never the pane
+    /// in front nor a broadcast, then the run goes on. The wait ends
+    /// without the reset a satisfied wait does: what was sent before the
+    /// paste is still unwaited for.
+    fn send_snippet_paste(&mut self, run_id: u64, text: &str) -> Task<Message> {
+        let Some(run) = self.snippet_run_mut(run_id) else {
+            return Task::none();
+        };
+        run.wait = None;
+        run.timer = None;
+        run.generation += 1;
+        let pane_id = run.pane_id;
+        if !self.send_snippet_command(run_id, pane_id, text) {
+            return self.stop_snippet_run(run_id, "snippet_run_pane_unavailable", None);
+        }
+        self.advance_snippet_run(run_id)
+    }
+
+    /// The paste confirmation's Confirm, for a paste step: `(run_id,
+    /// generation)` is the marker the dialog carried. A run that moved on
+    /// or ended meanwhile gets nothing, and nothing is pasted anywhere
+    /// else in its place.
+    pub(crate) fn confirm_snippet_paste(&mut self, run_id: u64, generation: u64, text: &str) -> Task<Message> {
+        let current = self.snippet_runs.iter().any(|r| {
+            r.id == run_id && r.generation == generation && matches!(r.wait, Some(RunWait::PasteConfirm))
+        });
+        if !current {
+            return Task::none();
+        }
+        self.send_snippet_paste(run_id, text)
     }
 
     /// End the run and say why (`key` an i18n key, `{step}` its detail).
@@ -400,10 +462,16 @@ impl Oryxis {
     }
 
     /// Once per update: drop the runs whose pane is gone (closed, its tab
-    /// torn down), and resume a run whose Save Output dialog has closed,
-    /// whichever way it closed (a destination, Cancel, Esc).
+    /// torn down), resume a run whose Save Output dialog has closed,
+    /// whichever way it closed (a destination, Cancel, Esc), and settle a
+    /// paste step's confirmation: a run whose dialog ended without the
+    /// confirm (Cancel, Esc, the lock, another paste parked over it) is
+    /// stopped, a dialog whose run is gone closes.
     pub(crate) fn snippet_runs_housekeeping(&mut self) -> Vec<Task<Message>> {
-        if self.snippet_runs.is_empty() {
+        if self.pending_paste.is_none() {
+            self.pending_paste_snippet = None;
+        }
+        if self.snippet_runs.is_empty() && self.pending_paste_snippet.is_none() {
             return Vec::new();
         }
         let alive: Vec<u64> = self
@@ -413,8 +481,26 @@ impl Oryxis {
             .map(|r| r.id)
             .collect();
         self.snippet_runs.retain(|r| alive.contains(&r.id));
+        if let Some((id, generation)) = self.pending_paste_snippet
+            && !self.snippet_runs.iter().any(|r| {
+                r.id == id && r.generation == generation && matches!(r.wait, Some(RunWait::PasteConfirm))
+            })
+        {
+            self.close_modal(crate::state::Modal::CarefulPaste);
+            self.pending_paste_snippet = None;
+        }
+        let refused: Vec<u64> = self
+            .snippet_runs
+            .iter()
+            .filter(|r| {
+                matches!(r.wait, Some(RunWait::PasteConfirm)) && self.pending_paste_snippet != Some((r.id, r.generation))
+            })
+            .map(|r| r.id)
+            .collect();
+        let mut tasks: Vec<Task<Message>> =
+            refused.into_iter().map(|id| self.stop_snippet_run(id, "snippet_run_paste_refused", None)).collect();
         if self.save_output.is_some() {
-            return Vec::new();
+            return tasks;
         }
         let answered: Vec<u64> = self
             .snippet_runs
@@ -422,7 +508,8 @@ impl Oryxis {
             .filter(|r| matches!(r.wait, Some(RunWait::Dialog)))
             .map(|r| r.id)
             .collect();
-        answered.into_iter().map(|id| self.resume_snippet_run(id)).collect()
+        tasks.extend(answered.into_iter().map(|id| self.resume_snippet_run(id)));
+        tasks
     }
 
     /// The run on `pane_id`, for the status line: (label, step, steps).
@@ -455,7 +542,11 @@ impl Oryxis {
                         self.stop_snippet_run(run_id, key, None)
                     }
                     Some(RunWait::Output(_)) => self.stop_snippet_run(run_id, "snippet_run_timed_out", None),
-                    Some(RunWait::File) | Some(RunWait::Dialog) | None => Task::none(),
+                    Some(RunWait::File)
+                    | Some(RunWait::Dialog)
+                    | Some(RunWait::Clipboard { .. })
+                    | Some(RunWait::PasteConfirm)
+                    | None => Task::none(),
                 })
             }
             SnippetMessage::SnippetRunFileWritten(run_id, generation, outcome) => {
@@ -478,6 +569,42 @@ impl Oryxis {
                         crate::i18n::t("terminal_save_output_failed").replace("{error}", &e),
                     )),
                 }
+            }
+            SnippetMessage::SnippetClipboardRead(run_id, generation, text) => {
+                let Some(run) = self.snippet_runs.iter().find(|r| r.id == run_id && r.generation == generation) else {
+                    return Ok(Task::none());
+                };
+                let Some(RunWait::Clipboard { confirm }) = run.wait else {
+                    return Ok(Task::none());
+                };
+                let pane_id = run.pane_id;
+                let text = text.map(crate::messages::Redacted::into_inner).unwrap_or_default();
+                if text.trim().is_empty() {
+                    return Ok(self.stop_snippet_run(run_id, "snippet_run_clipboard_empty", None));
+                }
+                // Off, the step pastes as a hand-made paste would: the
+                // user's careful paste and paste guard still stop it.
+                let ask = confirm
+                    || crate::paste_guard::needs_confirmation(&text, self.prefs.careful_paste, self.prefs.paste_guard);
+                if !ask {
+                    crate::dispatch_terminal::paste_trace("snippet", "to run pane", &text, None);
+                    return Ok(self.send_snippet_paste(run_id, &text));
+                }
+                // One dialog at a time: a paste already waiting there is
+                // the user's, and is not replaced by the run's.
+                if self.pending_paste.is_some() {
+                    return Ok(self.stop_snippet_run(run_id, "snippet_run_paste_busy", None));
+                }
+                let Some(tab_id) = self.pane_tab_index(pane_id).and_then(|i| self.tabs.get(i)).map(|t| t._id) else {
+                    return Ok(self.stop_snippet_run(run_id, "snippet_run_pane_unavailable", None));
+                };
+                let task = self.arm_snippet_wait(run_id, RunWait::PasteConfirm, None);
+                let generation = self.snippet_run_mut(run_id).map_or(0, |r| r.generation);
+                crate::dispatch_terminal::paste_trace("snippet", "parked for confirm", &text, None);
+                self.pending_paste = Some((tab_id, text));
+                self.pending_paste_install = None;
+                self.pending_paste_snippet = Some((run_id, generation));
+                Ok(task)
             }
             SnippetMessage::CancelSnippetRun(run_id) => {
                 self.snippet_runs.retain(|r| r.id != run_id);
@@ -597,6 +724,9 @@ impl Oryxis {
             SnippetStep::SaveFile(file) => t("snippet_step_save_line")
                 .replace("{content}", t(save_content_key(file.content)))
                 .replace("{name}", &file.name),
+            SnippetStep::PasteClipboard { confirm } => {
+                t(if *confirm { "snippet_step_paste_line_confirm" } else { "snippet_step_paste_line" }).to_string()
+            }
             SnippetStep::Unknown(_) => t("snippet_step_unknown").to_string(),
         }
     }

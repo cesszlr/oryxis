@@ -240,6 +240,11 @@ pub(crate) enum RunWait {
     File,
     /// The Save Output dialog an action step opened.
     Dialog,
+    /// A paste step's clipboard read (`confirm`: the step asks first).
+    Clipboard { confirm: bool },
+    /// A paste step's text, parked in the paste confirmation
+    /// (`Oryxis::pending_paste_snippet` names the run).
+    PasteConfirm,
 }
 
 /// The shell-integration marks a command-end wait reads, in the order a

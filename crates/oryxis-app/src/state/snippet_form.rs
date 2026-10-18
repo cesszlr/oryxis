@@ -65,13 +65,14 @@ pub(crate) enum StepKind {
     WaitTime,
     RunSnippet,
     SaveFile,
+    PasteClipboard,
     /// A step from a newer build: shown, kept, never edited.
     Unknown,
 }
 
 impl StepKind {
     /// The kinds a row may be switched to, in picker order.
-    pub(crate) const PICKABLE: [StepKind; 7] = [
+    pub(crate) const PICKABLE: [StepKind; 8] = [
         StepKind::Command,
         StepKind::Action,
         StepKind::WaitCommandEnd,
@@ -79,6 +80,7 @@ impl StepKind {
         StepKind::WaitTime,
         StepKind::RunSnippet,
         StepKind::SaveFile,
+        StepKind::PasteClipboard,
     ];
 
     pub(crate) fn label_key(self) -> &'static str {
@@ -90,6 +92,7 @@ impl StepKind {
             StepKind::WaitTime => "snippet_step_wait_time",
             StepKind::RunSnippet => "snippet_step_run_snippet",
             StepKind::SaveFile => "snippet_step_save_file",
+            StepKind::PasteClipboard => "snippet_step_paste_clipboard",
             StepKind::Unknown => "snippet_step_unknown",
         }
     }
@@ -113,6 +116,8 @@ pub(crate) struct StepForm {
     pub(crate) file_name: String,
     pub(crate) file_mode: SaveFileMode,
     pub(crate) file_content: SaveFileContent,
+    /// A paste step asks before pasting (on for a new row).
+    pub(crate) paste_confirm: bool,
     /// The step a newer build wrote, written back as it came.
     pub(crate) unknown: Option<serde_json::Value>,
 }
@@ -132,6 +137,7 @@ impl StepForm {
             file_name: "{host}-{date}.log".into(),
             file_mode: SaveFileMode::Append,
             file_content: SaveFileContent::LastCommand,
+            paste_confirm: true,
             unknown: None,
         }
     }
@@ -176,6 +182,9 @@ impl StepForm {
                 file_content: f.content,
                 ..Self::new(StepKind::SaveFile)
             },
+            SnippetStep::PasteClipboard { confirm } => {
+                Self { paste_confirm: *confirm, ..Self::new(StepKind::PasteClipboard) }
+            }
             SnippetStep::Unknown(raw) => Self { unknown: Some(raw.clone()), ..Self::new(StepKind::Unknown) },
         }
     }
@@ -229,6 +238,7 @@ impl StepForm {
                     content: self.file_content,
                 })
             }
+            StepKind::PasteClipboard => SnippetStep::PasteClipboard { confirm: self.paste_confirm },
             StepKind::Unknown => match &self.unknown {
                 Some(raw) => serde_json::from_value(raw.clone()).unwrap_or_else(|_| SnippetStep::Unknown(raw.clone())),
                 None => return Err("snippet_step_unknown"),
@@ -281,6 +291,8 @@ mod tests {
                 mode: SaveFileMode::NewFile,
                 content: SaveFileContent::Screen,
             }),
+            SnippetStep::PasteClipboard { confirm: true },
+            SnippetStep::PasteClipboard { confirm: false },
             SnippetStep::Unknown(serde_json::json!({"kind": "teleport", "to": "mars"})),
             SnippetStep::Action { id: "from_a_newer_build".into() },
         ];

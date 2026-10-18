@@ -347,6 +347,15 @@ impl Oryxis {
                 ]
                 .boxed()
             }
+            StepKind::PasteClipboard => column![
+                toggle(t("snippet_step_paste_confirm"), row.paste_confirm, SnippetMessage::SnippetStepTogglePasteConfirm(i)),
+                Space::new().height(6),
+                hint(
+                    t(if row.paste_confirm { "snippet_step_paste_hint_confirm" } else { "snippet_step_paste_hint" })
+                        .to_string(),
+                ),
+            ]
+            .boxed(),
             StepKind::Unknown => text(t("snippet_step_unknown_hint")).size(12).color(c.text_secondary).boxed(),
         }
     }

@@ -43,6 +43,9 @@ pub enum SnippetMessage {
     /// A save step's write finished (`run id`, `generation`, the path
     /// written or the error).
     SnippetRunFileWritten(u64, u64, Result<String, String>),
+    /// A paste step's clipboard read came back (`run id`, `generation`,
+    /// the text, `None` when the clipboard holds none).
+    SnippetClipboardRead(u64, u64, Option<super::Redacted>),
     /// Stop a snippet run (its status line's Cancel).
     CancelSnippetRun(u64),
     /// Snippet editor: arm the shortcut recorder (next chord binds).
@@ -70,6 +73,7 @@ pub enum SnippetMessage {
     SnippetStepFileNameChanged(usize, String),
     SnippetStepToggleRegex(usize),
     SnippetStepToggleContinue(usize),
+    SnippetStepTogglePasteConfirm(usize),
     SnippetStepSaveModePicked(usize, oryxis_core::models::SaveFileMode),
     SnippetStepSaveContentPicked(usize, oryxis_core::models::SaveFileContent),
     SaveSnippet,
