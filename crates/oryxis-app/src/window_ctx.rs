@@ -630,6 +630,10 @@ impl Oryxis {
         };
         self.parked_views.insert(from, left);
         self.vaults.switch_window_to(target);
+        // Brought up by the user: its idle clock starts now, or a vault
+        // left in the background for longer than its threshold would
+        // lock under the user at the next tick.
+        self.vaults.cur_mut().last_user_activity = std::time::Instant::now();
         let back = self.parked_views.remove(&target).unwrap_or(ParkedView {
             order: Vec::new(),
             active: None,

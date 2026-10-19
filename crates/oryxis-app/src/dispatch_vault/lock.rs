@@ -116,8 +116,12 @@ impl Oryxis {
                     // dialog that exists (so the close-window guard can
                     // ask there), and a "Delete?" from before the lock
                     // would be one click from acting on a vault whose
-                    // owner walked away.
-                    self.error_dialog = None;
+                    // owner walked away. Only a dialog raised over this
+                    // vault: an idle lock of a vault in the background
+                    // leaves another vault's dialog alone.
+                    if self.vault_of_window(self.float_window) == self.vaults.current_id() {
+                        self.error_dialog = None;
+                    }
                     self.vaults.cur_mut().panels.host_panel = false;
                     self.vaults.cur_mut().host_panel_error = None;
                     self.vaults.cur_mut().editor_form = crate::state::ConnectionForm::default();

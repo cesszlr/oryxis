@@ -41,6 +41,19 @@ pub(crate) struct OpenVault {
     /// `load_data_from_vault` ran for it in this process (a vault opened
     /// unlocked by a window switching to it loads on the switch).
     pub(crate) loaded: bool,
+    /// Instant of the last user input (keyboard / mouse / IME) in a
+    /// window on this vault: the idle anchor of its own
+    /// `auto_lock_minutes`. A vault no window shows idles. Not persisted.
+    pub(crate) last_user_activity: std::time::Instant,
+    /// Instant of the last free-space / size-cap check on this vault's
+    /// recordings. The flush runs every 2 s (and on a 64 KiB burst),
+    /// while a `statvfs` plus a `SUM(LENGTH(data))` are far too costly
+    /// at that cadence, so the check is throttled to
+    /// `SESSION_LOG_CAPACITY_INTERVAL`. Not persisted.
+    pub(crate) last_session_log_capacity_check: std::time::Instant,
+    /// Where this vault's recordings go while it is soft-locked
+    /// (`session_spool`).
+    pub(crate) spool: crate::session_spool::VaultSpool,
     // Data
     pub(crate) connections: Vec<Connection>,
     pub(crate) groups: Vec<Group>,
@@ -466,6 +479,31 @@ pub(crate) struct OpenVault {
 }
 
 impl OpenVault {
+    /// Its `auto_lock_minutes`, `None` while off (`"0"` or unparseable).
+    pub(crate) fn auto_lock_after(&self) -> Option<std::time::Duration> {
+        self.prefs
+            .auto_lock_minutes
+            .parse::<u64>()
+            .ok()
+            .filter(|m| *m > 0)
+            .map(|m| std::time::Duration::from_secs(m * 60))
+    }
+
+    /// Whether the idle auto-lock could ever fire for it: unlocked, with a
+    /// threshold, and a master password (without one, locking reopens at
+    /// once; auto-locking would just churn).
+    pub(crate) fn auto_lock_armed(&self) -> bool {
+        self.vault_ui.state == crate::state::VaultState::Unlocked
+            && self.vault_ui.has_user_password
+            && self.auto_lock_after().is_some()
+    }
+
+    /// Armed, and idle past its threshold.
+    pub(crate) fn auto_lock_due(&self) -> bool {
+        self.auto_lock_armed()
+            && self.auto_lock_after().is_some_and(|after| self.last_user_activity.elapsed() >= after)
+    }
+
     /// A vault just opened, nothing loaded from it yet (`load_data_from_vault`
     /// fills it after the unlock).
     pub(crate) fn new(id: Uuid, store: Option<VaultStore>) -> Self {
@@ -475,6 +513,9 @@ impl OpenVault {
             path: None,
             created_from: None,
             loaded: false,
+            last_user_activity: std::time::Instant::now(),
+            last_session_log_capacity_check: std::time::Instant::now(),
+            spool: crate::session_spool::VaultSpool::default(),
             connections: Vec::new(),
             connections_with_password: std::collections::HashSet::new(),
             groups: Vec::new(),
@@ -787,6 +828,13 @@ impl VaultSlots {
     pub(crate) fn cur_mut(&mut self) -> &mut OpenVault {
         self.open.get_mut(&self.current).expect("the current vault is always open")
     }
+
+    /// The vault of the window in the fields, to change it, even while a
+    /// `ForVault` message acts on another: what the user does in a
+    /// window is that window's vault's (its auto-lock idle anchor).
+    pub(crate) fn window_vault_mut(&mut self) -> &mut OpenVault {
+        self.open.get_mut(&self.window).expect("the window's vault is always open")
+    }
 }
 
 #[cfg(test)]
@@ -858,4 +906,57 @@ mod tests {
             assert_eq!(slots.cur().id, a);
         });
     }
+
+    /// An unlocked vault with a master password and a threshold, its
+    /// last input `idle` ago.
+    fn idle_for(minutes: &str, idle: std::time::Duration) -> OpenVault {
+        let mut v = bare(Uuid::new_v4());
+        v.vault_ui.state = crate::state::VaultState::Unlocked;
+        v.vault_ui.has_user_password = true;
+        v.prefs.auto_lock_minutes = minutes.into();
+        v.last_user_activity = std::time::Instant::now()
+            .checked_sub(idle)
+            .expect("an instant that far back");
+        v
+    }
+
+    #[test]
+    fn each_vault_locks_by_its_own_threshold_and_its_own_input() {
+        let min = std::time::Duration::from_secs(60);
+        // Idle past its own five minutes: due, whatever the others do.
+        assert!(idle_for("5", 6 * min).auto_lock_due());
+        // The same idle under a longer threshold of its own: not yet.
+        let patient = idle_for("10", 6 * min);
+        assert!(patient.auto_lock_armed());
+        assert!(!patient.auto_lock_due());
+        // Fresh input in its windows: not due.
+        assert!(!idle_for("5", std::time::Duration::ZERO).auto_lock_due());
+    }
+
+    #[test]
+    fn the_auto_lock_never_arms_where_a_lock_could_not_hold() {
+        let long = std::time::Duration::from_secs(3600);
+        // Off ("0") or a row that does not parse.
+        assert!(!idle_for("0", long).auto_lock_armed());
+        assert!(!idle_for("soon", long).auto_lock_armed());
+        // No master password: locking would reopen at once.
+        let mut open = idle_for("1", long);
+        open.vault_ui.has_user_password = false;
+        assert!(!open.auto_lock_due());
+        // Already locked: nothing to do.
+        let mut locked = idle_for("1", long);
+        locked.vault_ui.state = crate::state::VaultState::Locked;
+        assert!(!locked.auto_lock_due());
+    }
+
+    #[test]
+    fn input_counts_for_the_windows_vault_while_another_acts() {
+        let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+        let mut slots = VaultSlots::single(bare(a));
+        slots.insert_for_test(bare(b));
+        let previous = slots.act_on(b);
+        assert_eq!(slots.window_vault_mut().id, a);
+        slots.act_back(previous);
+    }
+
 }

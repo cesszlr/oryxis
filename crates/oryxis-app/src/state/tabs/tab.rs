@@ -525,6 +525,13 @@ impl PinnedTabSpec {
 }
 
 impl TerminalTab {
+    /// The vault this tab belongs to, a tab not claimed yet
+    /// (`reconcile_tab_order` claims it at the end of the update that
+    /// made it) being that of the window it was made in, `window`.
+    pub fn vault_or(&self, window: Uuid) -> Uuid {
+        self.vault.unwrap_or(window)
+    }
+
     /// Whether the given sidebar region is open on this tab.
     pub fn sidebar_visible(&self, side: crate::state::SidebarSide) -> bool {
         self.sidebar_open[side.idx()]

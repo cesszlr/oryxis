@@ -712,6 +712,8 @@ impl Oryxis {
             tracing::warn!("could not unregister vault {id}: {e}");
             return Err(e.to_string());
         }
+        // Its spool was sealed under a key that went with it.
+        crate::session_spool::SessionSpool::remove_for(id);
         if delete && let Some(path) = path {
             if self.biometric_available {
                 crate::biometric::forget_account_of(&path);

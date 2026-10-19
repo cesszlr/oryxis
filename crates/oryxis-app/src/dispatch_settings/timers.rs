@@ -44,25 +44,26 @@ impl Oryxis {
                 self.persist_setting("manual_lock_action", normalized);
             }
             SettingsMessage::AutoLockTick => {
-                // Idle check. Guarded on Unlocked so a tick racing the
-                // lock is a no-op, and on a parseable non-zero threshold
-                // (the subscription only mounts then, but the setting can
-                // change between mount and fire).
-                let minutes = self
-                    .vaults.cur().prefs.auto_lock_minutes
-                    .parse::<u64>()
-                    .ok()
-                    .filter(|m| *m > 0);
-                if let Some(minutes) = minutes
-                    && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
-                    // Without a master password, locking reopens
-                    // immediately; auto-locking would just churn.
-                    && self.vaults.cur().vault_ui.has_user_password
-                    && self.last_user_activity.elapsed().as_secs() >= minutes * 60
-                {
-                    tracing::info!("vault auto-lock after {minutes} min idle");
-                    return Ok(Task::done(Message::Vault(VaultMessage::SoftLockVault)));
-                }
+                // Idle check, per open vault: each against its own
+                // threshold and the input in ITS windows, so a vault
+                // nobody is looking at locks on time while the user
+                // works in another. Guarded on Unlocked so a tick racing
+                // the lock is a no-op, and on a parseable non-zero
+                // threshold (the subscription only mounts then, but the
+                // setting can change between mount and fire).
+                let idle: Vec<uuid::Uuid> = self
+                    .vaults
+                    .all()
+                    .filter(|v| v.auto_lock_due())
+                    .map(|v| v.id)
+                    .collect();
+                return Ok(Task::batch(idle.into_iter().map(|vault| {
+                    tracing::info!(%vault, "vault auto-lock after its idle threshold");
+                    Task::done(Message::ForVault(
+                        vault,
+                        Box::new(Message::Vault(VaultMessage::SoftLockVault)),
+                    ))
+                })));
             }
             SettingsMessage::ConnectAnimTick => {
                 self.connect_anim_tick = self.connect_anim_tick.wrapping_add(1);
@@ -87,62 +88,72 @@ impl Oryxis {
                     .map(|p| p.id)
                     .collect();
                 if !dead.is_empty() {
-                    return Ok(Task::batch(
-                        dead.into_iter()
-                            .map(|id| Task::done(Message::Ssh(SshMessage::SshDisconnected(id)))),
-                    ));
+                    // As the pane's own stream would say it: on the
+                    // vault of its tab, in the window holding it.
+                    return Ok(Task::batch(dead.into_iter().map(|id| {
+                        Task::done(Message::ForPane(
+                            id,
+                            Box::new(Message::Ssh(SshMessage::SshDisconnected(id))),
+                        ))
+                    })));
                 }
-                if !self.vaults.cur().prefs.auto_reconnect {
-                    // fall through, nothing to do
-                } else {
-                    let max_attempts: u32 =
-                        self.vaults.cur().prefs.max_reconnect_attempts.parse().unwrap_or(5);
-                    // Find the first disconnected SSH tab whose counter is under the limit.
-                    // Only reconnect one per tick to avoid thrashing; next tick picks up
-                    // the next candidate.
-                    let candidate: Option<usize> = (0..self.tabs.len()).find(|&i| {
-                        let tab = &self.tabs[i];
-                        if !tab.label.ends_with(" (disconnected)") {
-                            return false;
-                        }
-                        // Never auto-reconnect a split tab: `ReconnectTab`
-                        // removes + rebuilds the whole tab, which would kill
-                        // the live sibling panes. (Belt + suspenders: a
-                        // multi-pane tab isn't relabeled "(disconnected)" in
-                        // the first place, see `SshDisconnected`.)
-                        if tab.pane_grid.panes.len() > 1 {
-                            return false;
-                        }
-                        let base = tab.label.trim_end_matches(" (disconnected)");
-                        // Quick-connect hosts resolve via the same label
-                        // lookup; their counters key on the ephemeral id,
-                        // which is stable for the life of the entry.
-                        let Some(conn) = self.any_connection_by_label(base) else {
-                            return false;
-                        };
-                        // Nobody started this dial, so it may not ask for a
-                        // touch: a security-key host waits for a click.
-                        if self.host_signs_with_token(conn) {
-                            return false;
-                        }
-                        let attempts = self.reconnect_counters.get(&conn.id).copied().unwrap_or(0);
-                        attempts < max_attempts
-                    });
-                    if let Some(tab_idx) = candidate {
-                        let base = self.tabs[tab_idx]
-                            .label
-                            .trim_end_matches(" (disconnected)")
-                            .to_string();
-                        if let Some(cid) = self.any_connection_by_label(&base).map(|c| c.id) {
-                            let entry = self.reconnect_counters.entry(cid).or_insert(0);
-                            *entry += 1;
-                        }
-                        return Ok(Task::done(Message::Tabs(TabsMessage::ReconnectTab(tab_idx))));
-                    }
-                }
+                // Each open vault by its own setting, over its own tabs
+                // and hosts: a tab of another vault does not resolve
+                // against this one's connections.
+                let reconnects = self.on_each_open_vault(|app| app.auto_reconnect_candidate());
+                return Ok(Task::batch(reconnects.into_iter().map(Task::done)));
             }
             m => return Err(m),
         }
         Ok(Task::none())
+    }
+
+    /// The acting vault's next auto-reconnect, as the message to send:
+    /// the first of its disconnected SSH tabs whose host is under the
+    /// attempt limit, one per tick to avoid thrashing (the next tick
+    /// picks up the next candidate). `None` with the setting off or the
+    /// vault locked (a reconnect needs its credentials).
+    fn auto_reconnect_candidate(&mut self) -> Option<Message> {
+        let ov = self.vaults.cur();
+        if !ov.prefs.auto_reconnect || ov.vault_ui.state != crate::state::VaultState::Unlocked {
+            return None;
+        }
+        let max_attempts: u32 = ov.prefs.max_reconnect_attempts.parse().unwrap_or(5);
+        let (here, window) = (self.vaults.current_id(), self.vaults.window_id());
+        let tab_idx = (0..self.tabs.len()).find(|&i| {
+            let tab = &self.tabs[i];
+            if tab.vault_or(window) != here || !tab.label.ends_with(" (disconnected)") {
+                return false;
+            }
+            // Never auto-reconnect a split tab: `ReconnectTab` removes +
+            // rebuilds the whole tab, which would kill the live sibling
+            // panes. (Belt + suspenders: a multi-pane tab isn't relabeled
+            // "(disconnected)" in the first place, see `SshDisconnected`.)
+            if tab.pane_grid.panes.len() > 1 {
+                return false;
+            }
+            let base = tab.label.trim_end_matches(" (disconnected)");
+            // Quick-connect hosts resolve via the same label lookup; their
+            // counters key on the ephemeral id, which is stable for the
+            // life of the entry.
+            let Some(conn) = self.any_connection_by_label(base) else {
+                return false;
+            };
+            // Nobody started this dial, so it may not ask for a touch: a
+            // security-key host waits for a click.
+            if self.host_signs_with_token(conn) {
+                return false;
+            }
+            let attempts = self.reconnect_counters.get(&conn.id).copied().unwrap_or(0);
+            attempts < max_attempts
+        })?;
+        let base = self.tabs[tab_idx].label.trim_end_matches(" (disconnected)").to_string();
+        if let Some(cid) = self.any_connection_by_label(&base).map(|c| c.id) {
+            *self.reconnect_counters.entry(cid).or_insert(0) += 1;
+        }
+        // On the tab's vault, in the window holding it, so a prompt the
+        // dial raises floats where the tab is.
+        let pane = self.tabs[tab_idx].active().id;
+        Some(Message::ForPane(pane, Box::new(Message::Tabs(TabsMessage::ReconnectTab(tab_idx)))))
     }
 }

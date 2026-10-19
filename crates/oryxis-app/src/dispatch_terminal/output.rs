@@ -226,10 +226,10 @@ impl Oryxis {
 
     /// Why recording stopped, so the toast can say which limit was hit.
     fn session_log_capacity_stop(&mut self) -> Option<&'static str> {
-        if self.last_session_log_capacity_check.elapsed() < SESSION_LOG_CAPACITY_INTERVAL {
+        if self.vaults.cur().last_session_log_capacity_check.elapsed() < SESSION_LOG_CAPACITY_INTERVAL {
             return None;
         }
-        self.last_session_log_capacity_check = std::time::Instant::now();
+        self.vaults.cur_mut().last_session_log_capacity_check = std::time::Instant::now();
         let vault = self.vaults.cur().store.as_ref()?;
 
         // The size cap is the user's own quota, so reaching it drops the
@@ -260,13 +260,14 @@ impl Oryxis {
         (free < SESSION_LOG_MIN_FREE_BYTES).then_some("session_log_stopped_disk")
     }
 
-    /// Stop every live recording, flag each one as cut short, and say so
-    /// once. Marking matters as much as stopping: an audit feature that
-    /// hands back a partial stream presenting itself as the whole
-    /// session fails worse than one that stops.
+    /// Stop every live recording of the acting vault, flag each one as
+    /// cut short, and say so once. Marking matters as much as stopping:
+    /// an audit feature that hands back a partial stream presenting
+    /// itself as the whole session fails worse than one that stops.
     fn stop_all_session_logs(&mut self, reason: &'static str) {
         let mut stopped: Vec<uuid::Uuid> = Vec::new();
-        for tab in &mut self.tabs {
+        let (here, window) = (self.vaults.current_id(), self.vaults.window_id());
+        for tab in self.tabs.iter_mut().filter(|t| t.vault_or(window) == here) {
             for pane in tab.pane_grid.panes.values_mut() {
                 if let Some(log_id) = pane.session_log_id.take() {
                     pane.session_log_buf.clear();
@@ -294,18 +295,13 @@ impl Oryxis {
         self.set_toast_secs(crate::i18n::t(reason).to_string(), 8);
     }
 
-    /// The spool for rows that arrive under a soft lock, opened on the
-    /// first such flush. `None` when it could not be opened, in which
-    /// case the rows stay on their panes the way they always did.
+    /// The acting vault's spool for rows that arrive under its soft
+    /// lock, opened on the first such flush. `None` when it could not be
+    /// opened, in which case the rows stay on their panes the way they
+    /// always did.
     fn session_spool(&mut self) -> Option<&crate::session_spool::SessionSpool> {
-        if self.session_spool_unavailable {
-            return None;
-        }
-        if self.session_spool.is_none() {
-            self.session_spool = crate::session_spool::SessionSpool::open();
-            self.session_spool_unavailable = self.session_spool.is_none();
-        }
-        self.session_spool.as_ref()
+        let vault = self.vaults.current_id();
+        self.vaults.cur_mut().spool.get(vault)
     }
 
     /// Stamp a recording ended, or spool the stamp when the vault is
@@ -326,17 +322,60 @@ impl Oryxis {
             Some(spool) => {
                 if let Err(e) = spool.append(log_id, &[PendingSessionRow::End]) {
                     tracing::warn!("spooling the end of session log {log_id} failed: {e}");
-                    self.session_log_end_pending.push(log_id);
+                    self.vaults.cur_mut().spool.end_pending.push(log_id);
                 }
             }
             // No spool to carry it: the stamp waits for the drain, where
             // every end taken under a lock lands anyway (the vault stamps
             // the drain's clock, and takes a chunk after the stamp).
-            None => self.session_log_end_pending.push(log_id),
+            None => self.vaults.cur_mut().spool.end_pending.push(log_id),
         }
     }
 
+    /// Whether a pane of vault `vault`'s tabs is recording (a tab not
+    /// claimed yet is its window's vault's).
+    pub(crate) fn vault_records(&self, vault: uuid::Uuid) -> bool {
+        let window = self.vaults.window_id();
+        self.tabs
+            .iter()
+            .filter(|t| t.vault_or(window) == vault)
+            .any(|t| t.pane_grid.panes.values().any(|p| p.session_log_id.is_some()))
+    }
+
+    /// One pass per open vault, each over that vault's tabs and into
+    /// its own store (or its own spool while it is locked): `self.tabs`
+    /// holds every vault's tabs, parked ones included.
     fn flush_session_logs_inner(&mut self, final_flush: bool) {
+        // What the mirror thread could not write is the app's to read,
+        // once; each pass takes its own vault's recordings out of it, and
+        // what a locked vault's pass leaves waits for a later flush.
+        let mut mirror_failed = std::mem::take(&mut self.session_log_mirror_failed);
+        if let Some(writer) = &self.mirror_writer {
+            for log_id in writer.take_failures() {
+                if !mirror_failed.contains(&log_id) {
+                    mirror_failed.push(log_id);
+                }
+            }
+        }
+        self.on_each_open_vault(|app| {
+            app.flush_vault_session_logs(final_flush, &mut mirror_failed);
+            None::<()>
+        });
+        // Kept only while a pane still records under that id.
+        mirror_failed.retain(|log_id| {
+            self.tabs
+                .iter()
+                .flat_map(|t| t.pane_grid.panes.values())
+                .any(|p| p.session_log_id == Some(*log_id) && !p.session_log_file_stopped)
+        });
+        self.session_log_mirror_failed = mirror_failed;
+    }
+
+    /// The acting vault's part of [`Self::flush_session_logs_inner`]:
+    /// its tabs only (a tab not claimed yet is its window's vault's).
+    fn flush_vault_session_logs(&mut self, final_flush: bool, mirror_failed_all: &mut Vec<uuid::Uuid>) {
+        let (here, window) = (self.vaults.current_id(), self.vaults.window_id());
+        let mine = move |tab: &crate::state::TerminalTab| tab.vault_or(window) == here;
         // Under a soft lock the master key is zeroized, so an append
         // would come back `Locked`, and the failure path below reads a
         // refused append as a full disk and stops EVERY recording. The
@@ -349,6 +388,11 @@ impl Oryxis {
         // the ones that reach this under a lock (a local shell exiting,
         // a pane moving) are not the ones anybody remembers.
         let locked = self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked;
+        // A locked vault with nothing recording has nothing to spool (and
+        // no reason to open a spool).
+        if locked && !self.vault_records(here) {
+            return;
+        }
         if locked && self.session_spool().is_none() {
             return;
         }
@@ -368,7 +412,7 @@ impl Oryxis {
             // Resolved BEFORE the pane loop borrows `self.tabs`: the
             // name needs the host's label, which lives on `self`.
             let mut resolved: Vec<(usize, usize, std::path::PathBuf)> = Vec::new();
-            for (ti, tab) in self.tabs.iter().enumerate() {
+            for (ti, tab) in self.tabs.iter().enumerate().filter(|(_, t)| mine(t)) {
                 for (pi, pane) in tab.pane_grid.panes.values().enumerate() {
                     if let Some(log_id) = pane.session_log_id
                         && pane.session_log_file.is_none()
@@ -390,14 +434,25 @@ impl Oryxis {
         // that went away is reported once, not once per flush. Not
         // under a lock, where nothing is queued and the toast would go
         // to a lock screen; the thread keeps them for the next flush.
-        let mirror_failed: Vec<uuid::Uuid> = match (&self.mirror_writer, locked) {
-            (Some(writer), false) => writer.take_failures(),
-            _ => Vec::new(),
+        let mirror_failed: Vec<uuid::Uuid> = if locked {
+            Vec::new()
+        } else {
+            let ours: Vec<uuid::Uuid> = self
+                .tabs
+                .iter()
+                .filter(|t| mine(t))
+                .flat_map(|t| t.pane_grid.panes.values())
+                .filter_map(|p| p.session_log_id)
+                .collect();
+            let (taken, kept): (Vec<_>, Vec<_>) =
+                std::mem::take(mirror_failed_all).into_iter().partition(|id| ours.contains(id));
+            *mirror_failed_all = kept;
+            taken
         };
         // Replay rows per pane, in stream order (chunks interleaved
         // with resizes; see `session_log_rows`).
         let mut pending: Vec<(uuid::Uuid, PendingSessionRow)> = Vec::new();
-        for tab in &mut self.tabs {
+        for tab in self.tabs.iter_mut().filter(|t| mine(t)) {
             for pane in tab.pane_grid.panes.values_mut() {
                 let Some(log_id) = pane.session_log_id else {
                     continue;
@@ -555,8 +610,9 @@ impl Oryxis {
                 // this batch are marked truncated at the drain so the
                 // vault row says so.
                 if !lost.is_empty() {
-                    self.session_spool_unavailable = true;
-                    self.session_spool_lost.extend(lost);
+                    let spool = &mut self.vaults.cur_mut().spool;
+                    spool.unavailable = true;
+                    spool.lost.extend(lost);
                 }
             }
             return;
@@ -567,7 +623,7 @@ impl Oryxis {
         // live panes hold now. Recordings that lost a batch to a spool
         // that could not write, and ends that found no spool to carry
         // them, are settled here too.
-        if let Some(spool) = self.session_spool.as_ref() {
+        if let Some(spool) = self.vaults.cur().spool.spool.as_ref() {
             let spooled = spool.drain_all();
             if !spooled.is_empty() {
                 let mut ahead: Vec<(uuid::Uuid, PendingSessionRow)> = Vec::new();
@@ -578,13 +634,14 @@ impl Oryxis {
                 pending = ahead;
             }
         }
-        if let Some(vault) = &self.vaults.cur().store {
-            for log_id in self.session_spool_lost.drain(..) {
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
+            for log_id in ov.spool.lost.drain(..) {
                 if let Err(e) = vault.mark_session_log_truncated(&log_id) {
                     tracing::warn!("marking session log {log_id} truncated failed: {e}");
                 }
             }
-            for log_id in self.session_log_end_pending.drain(..) {
+            for log_id in ov.spool.end_pending.drain(..) {
                 if let Err(e) = vault.end_session_log(&log_id) {
                     tracing::warn!("ending session log {log_id} failed: {e}");
                 }

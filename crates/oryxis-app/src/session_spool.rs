@@ -8,7 +8,10 @@
 //! idle lock grew the process by everything it printed.
 //!
 //! This is the bound. Under lock, the flush spools the rows it would
-//! have written to the vault into `~/.oryxis/runtime/spool/<log>.spool`,
+//! have written to the vault into
+//! `~/.oryxis/runtime/spool/<vault>/<log>.spool`, one folder and one key
+//! per open vault (a soft lock is a vault's own, and the drain after its
+//! unlock must replay that vault's recordings and nothing else),
 //! each row sealed under an [`oryxis_vault::EphemeralKey`] that lives in
 //! this process alone: the file is as readable at rest as the process's
 //! memory was, which is the posture the lock already accepts, and it is
@@ -40,18 +43,66 @@ pub(crate) struct SessionSpool {
     dir: PathBuf,
 }
 
+/// A vault's spool and what its flushes learned about it, kept on the
+/// vault (`OpenVault::spool`): the drain after its unlock reads this
+/// vault's spool alone.
+#[derive(Default)]
+pub(crate) struct VaultSpool {
+    /// Opened by the first flush under this vault's lock.
+    pub(crate) spool: Option<SessionSpool>,
+    /// The spool could not be opened, or could not take a batch; the
+    /// flush then keeps the rows on the panes as it always did, and does
+    /// not retry a folder it cannot write on every batch. What was
+    /// spooled before still drains.
+    pub(crate) unavailable: bool,
+    /// Recordings that lost a batch to a spool that could not write,
+    /// marked truncated at the drain so the vault row says so.
+    pub(crate) lost: Vec<Uuid>,
+    /// Recordings that ended under the lock with no spool to carry the
+    /// stamp; ended at the drain.
+    pub(crate) end_pending: Vec<Uuid>,
+}
+
+impl VaultSpool {
+    /// The spool, opened on first use for vault `vault`. `None` when it
+    /// could not be opened, in which case the rows stay on their panes.
+    pub(crate) fn get(&mut self, vault: Uuid) -> Option<&SessionSpool> {
+        if self.unavailable {
+            return None;
+        }
+        if self.spool.is_none() {
+            self.spool = SessionSpool::open(vault);
+            self.unavailable = self.spool.is_none();
+        }
+        self.spool.as_ref()
+    }
+}
+
 impl SessionSpool {
     /// The folder every spool lives in, `None` with no home to put it in.
-    fn dir() -> Option<PathBuf> {
+    fn root() -> Option<PathBuf> {
         Some(oryxis_core::paths::oryxis_dir()?.join("runtime").join("spool"))
     }
 
-    /// Open the spool for this process: the folder (owner-only on unix)
-    /// and a fresh key. `None` when either cannot be had, which the
-    /// caller reads as "keep the rows in memory", the old behaviour.
-    pub(crate) fn open() -> Option<Self> {
-        let dir = Self::dir()?;
-        Self::open_in(dir)
+    /// Open vault `vault`'s spool for this process: its folder
+    /// (owner-only on unix) and a fresh key. `None` when either cannot
+    /// be had, which the caller reads as "keep the rows in memory", the
+    /// old behaviour.
+    pub(crate) fn open(vault: Uuid) -> Option<Self> {
+        Self::open_in(Self::root()?.join(vault.simple().to_string()))
+    }
+
+    /// Delete vault `vault`'s spool folder (the vault is being deleted).
+    pub(crate) fn remove_for(vault: Uuid) {
+        let Some(root) = Self::root() else {
+            return;
+        };
+        let dir = root.join(vault.simple().to_string());
+        if dir.exists()
+            && let Err(e) = std::fs::remove_dir_all(&dir)
+        {
+            tracing::warn!("session spool {} not removed: {e}", dir.display());
+        }
     }
 
     fn open_in(dir: PathBuf) -> Option<Self> {
@@ -178,24 +229,36 @@ impl SessionSpool {
     /// Delete every spool a previous process left: sealed under a key
     /// that died with it, they can only be removed. Runs at boot.
     pub(crate) fn sweep_stale() {
-        let Some(dir) = Self::dir() else {
+        let Some(root) = Self::root() else {
             return;
         };
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            return;
+        let swept = Self::sweep_dir(&root);
+        if swept > 0 {
+            tracing::info!("swept {swept} session spool file(s) from a previous run");
+        }
+    }
+
+    /// Remove the spool files under `dir`: its own (a build from before
+    /// the per-vault folders put them there) and each vault folder's,
+    /// the folder going too once empty. Answers how many files went.
+    fn sweep_dir(dir: &std::path::Path) -> usize {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return 0;
         };
         let mut swept = 0usize;
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "spool")
+            if path.is_dir() {
+                swept += Self::sweep_dir(&path);
+                // Only removes an empty folder.
+                let _ = std::fs::remove_dir(&path);
+            } else if path.extension().is_some_and(|ext| ext == "spool")
                 && std::fs::remove_file(&path).is_ok()
             {
                 swept += 1;
             }
         }
-        if swept > 0 {
-            tracing::info!("swept {swept} session spool file(s) from a previous run");
-        }
+        swept
     }
 }
 
@@ -345,4 +408,34 @@ mod tests {
         assert!(b.drain_all().is_empty());
         assert!(!a.path_for(id).exists(), "the foreign file was kept");
     }
+
+    #[test]
+    fn each_vault_drains_its_own_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let work = SessionSpool::open_in(dir.path().join("work")).expect("spool");
+        let personal = SessionSpool::open_in(dir.path().join("personal")).expect("spool");
+        let (w, p) = (Uuid::new_v4(), Uuid::new_v4());
+        work.append(w, &[PendingSessionRow::End]).expect("append");
+        personal.append(p, &[PendingSessionRow::End]).expect("append");
+        let drained = work.drain_all();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(drained[0].0, w, "a vault drained another vault's recording");
+        // The other vault's file is where it was.
+        assert_eq!(personal.drain_all().len(), 1);
+    }
+
+    #[test]
+    fn the_boot_sweep_reaches_every_vault_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().join("spool");
+        // One file from a build before the per-vault folders, one per vault.
+        let old = SessionSpool::open_in(root.clone()).expect("spool");
+        let work = SessionSpool::open_in(root.join("work")).expect("spool");
+        old.append(Uuid::new_v4(), &[PendingSessionRow::End]).expect("append");
+        work.append(Uuid::new_v4(), &[PendingSessionRow::End]).expect("append");
+        assert_eq!(SessionSpool::sweep_dir(&root), 2);
+        assert!(!root.join("work").exists(), "an emptied vault folder stayed");
+        assert!(root.exists(), "the sweep removed the spool root itself");
+    }
+
 }

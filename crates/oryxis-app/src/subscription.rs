@@ -314,10 +314,11 @@ impl Oryxis {
         }
 
         // 30-second poll for silent auto-reconnect of disconnected SSH
-        // tabs. Unmounted while the vault is locked (soft auto-lock keeps
-        // sessions alive): a reconnect needs credentials from the sealed
-        // vault and would only burn retry attempts.
-        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked {
+        // tabs. Unmounted while every vault is locked (soft auto-lock
+        // keeps sessions alive): a reconnect needs credentials from the
+        // sealed vault and would only burn retry attempts; the handler
+        // skips each locked vault on its own.
+        if self.vaults.all().any(|v| v.vault_ui.state == crate::state::VaultState::Unlocked) {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(30))
                     .map(|_| Message::Settings(SettingsMessage::AutoReconnectTick)),
@@ -588,20 +589,18 @@ impl Oryxis {
             );
         }
 
-        // Session-log flush ticker. Only mounts while at least one pane
-        // is recording; drains the per-pane output buffers into the vault
-        // every 2 s so an idle-but-trickling session still persists
-        // promptly without a write per SSH chunk. Also unmounted while
-        // the vault is locked (the log key is zeroized, a drain would
-        // discard data): the capture path's own over-threshold flush
-        // then spools to disk (`session_spool`), and the first flush
-        // after unlock drains the spool ahead of the buffers.
-        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
-            && self
-                .tabs
-                .iter()
-                .any(|t| t.pane_grid.panes.values().any(|p| p.session_log_id.is_some()))
-        {
+        // Session-log flush ticker. Only mounts while some unlocked vault
+        // has a pane recording; drains the per-pane output buffers into
+        // their vault every 2 s so an idle-but-trickling session still
+        // persists promptly without a write per SSH chunk. Not for a
+        // locked vault alone (its log key is zeroized): the capture
+        // path's own over-threshold flush then spools to disk
+        // (`session_spool`, that vault's own), and the first flush after
+        // its unlock drains the spool ahead of the buffers. While another
+        // vault keeps the tick up, the pass over the locked one spools.
+        if self.vaults.all().any(|v| {
+            v.vault_ui.state == crate::state::VaultState::Unlocked && self.vault_records(v.id)
+        }) {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(2))
                     .map(|_| Message::Terminal(TerminalMessage::SessionLogFlushTick)),
@@ -689,19 +688,13 @@ impl Oryxis {
             );
         }
 
-        // Vault auto-lock idle check. Only mounts while unlocked with a
-        // non-zero threshold configured, so the common case (feature off)
-        // costs nothing. The 30 s cadence bounds the overshoot past the
-        // configured idle threshold; the handler does the actual
-        // elapsed-time comparison against `last_user_activity`.
-        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
-            && self
-                .vaults.cur().prefs.auto_lock_minutes
-                .parse::<u64>()
-                .ok()
-                .filter(|m| *m > 0)
-                .is_some()
-        {
+        // Vault auto-lock idle check. Only mounts while some open vault
+        // is unlocked with a non-zero threshold configured (each vault
+        // has its own), so the common case (feature off) costs nothing.
+        // The 30 s cadence bounds the overshoot past the configured idle
+        // threshold; the handler compares each vault against the input
+        // in its own windows (`OpenVault::auto_lock_due`).
+        if self.vaults.all().any(|v| v.auto_lock_armed()) {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(30))
                     .map(|_| Message::Settings(SettingsMessage::AutoLockTick)),

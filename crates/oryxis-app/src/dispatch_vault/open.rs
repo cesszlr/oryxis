@@ -153,6 +153,9 @@ impl Oryxis {
     /// of the strip it left. One place, so a vault opened from the
     /// switcher or the start picker gets what an unlock gives.
     pub(crate) fn finish_vault_open(&mut self) -> Task<Message> {
+        // Its idle clock starts at the open, not at whatever input its
+        // windows last saw before a lock.
+        self.vaults.cur_mut().last_user_activity = std::time::Instant::now();
         self.load_data_from_vault();
         // What the recordings spooled under a soft
         // lock goes into the vault now, ahead of the

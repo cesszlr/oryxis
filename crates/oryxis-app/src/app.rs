@@ -1172,29 +1172,6 @@ pub struct Oryxis {
     /// In-progress drawer resize drag: (cursor x at press, width at
     /// press). `None` when not dragging.
     pub(crate) panel_resize_drag: Option<(f32, f32)>,
-    /// Instant of the last user input event (keyboard / mouse / IME),
-    /// the idle anchor for `setting_auto_lock_minutes`. Not persisted.
-    pub(crate) last_user_activity: std::time::Instant,
-    /// Instant of the last free-space / size-cap check on the session
-    /// recordings. The flush runs every 2 s (and on a 64 KiB burst),
-    /// while a `statvfs` plus a `SUM(LENGTH(data))` are far too costly
-    /// at that cadence, so the check is throttled to
-    /// `SESSION_LOG_CAPACITY_INTERVAL`. Not persisted.
-    pub(crate) last_session_log_capacity_check: std::time::Instant,
-    /// Where recordings go while the vault is soft-locked
-    /// (`session_spool`), opened by the first flush under a lock.
-    pub(crate) session_spool: Option<crate::session_spool::SessionSpool>,
-    /// The spool could not be opened, or could not take a batch; the
-    /// flush then keeps the rows on the panes as it always did, and does
-    /// not retry a folder it cannot write on every batch. What was
-    /// spooled before still drains.
-    pub(crate) session_spool_unavailable: bool,
-    /// Recordings that lost a batch to a spool that could not write,
-    /// marked truncated at the drain so the vault row says so.
-    pub(crate) session_spool_lost: Vec<Uuid>,
-    /// Recordings that ended under a lock with no spool to carry the
-    /// stamp; ended at the drain.
-    pub(crate) session_log_end_pending: Vec<Uuid>,
     /// Instant of the last successful password unlock. The Enter that
     /// submits the unlock password reaches the global key subscription
     /// one message AFTER the widget's on_submit unlocked the vault, so
@@ -1222,6 +1199,10 @@ pub struct Oryxis {
     /// The plain-text mirror's writer thread (`session_file`), started
     /// by the first mirrored chunk. `None` until then.
     pub(crate) mirror_writer: Option<crate::dispatch_terminal::MirrorWriter>,
+    /// Recordings the mirror thread failed on whose vault was locked at
+    /// the flush that read the failure: switched off (and said) by the
+    /// first flush after that vault's unlock.
+    pub(crate) session_log_mirror_failed: Vec<Uuid>,
     /// Last manual-check outcome shown near the "Check now" button in
     /// settings. `None` hides the line; the enum picks i18n + color at
     /// render time (Checking / UpToDate / Failed(cause)).

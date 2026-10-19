@@ -549,12 +549,6 @@ impl Oryxis {
                 // Vault nav orientation: horizontal pill strip by default.
                 // Mirror `Connection::new` / `ConnectionForm::default`, which
                 // expose new hosts via MCP by default.
-                last_user_activity: std::time::Instant::now(),
-                last_session_log_capacity_check: std::time::Instant::now(),
-                session_spool: None,
-                session_spool_unavailable: false,
-                session_spool_lost: Vec::new(),
-                session_log_end_pending: Vec::new(),
                 last_unlock: None,
                 biometric_available,
                 pending_update: None,
@@ -563,6 +557,7 @@ impl Oryxis {
                 update_error: None,
                 update_ready: None,
                 mirror_writer: None,
+                session_log_mirror_failed: Vec::new(),
                 update_check_status: None,
                 reconnect_counters: std::collections::HashMap::new(),
                 toast: None,

@@ -90,7 +90,7 @@ impl Oryxis {
         if here && live_mouse != self.cur_mouse() {
             self.mouse_position = live_mouse;
             self.sftp.suppress_hover = false;
-            self.last_user_activity = std::time::Instant::now();
+            self.vaults.window_vault_mut().last_user_activity = std::time::Instant::now();
         }
         // An armed drag-out (issue #167) advances here, off the two
         // cursor moments it rides on. The armed flag keeps
@@ -120,7 +120,8 @@ impl Oryxis {
             self.drag_out_echo.swap_remove(i);
             return drag_out_started.unwrap_or_else(Task::none);
         }
-        // Any user input event resets the vault auto-lock idle clock.
+        // Any user input event resets the auto-lock idle clock of the
+        // window's vault.
         // These are the raw-event messages `subscription.rs` maps from
         // iced's global listener, so presence is detected app-wide
         // without touching individual handlers.
@@ -132,7 +133,7 @@ impl Oryxis {
                 | Message::Sftp(SftpMessage::SftpMouseLeftPressed)
                 | Message::Terminal(TerminalMessage::TerminalImeCommit(_))
         ) {
-            self.last_user_activity = std::time::Instant::now();
+            self.vaults.window_vault_mut().last_user_activity = std::time::Instant::now();
         }
         // Was the host editor on screen before this message? Compared
         // against the post-dispatch answer below, that is the "the
