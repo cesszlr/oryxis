@@ -56,20 +56,111 @@ pub(crate) fn mcp_wsl_command() -> String {
     s.into_owned()
 }
 
-/// JSON entry for the `oryxis` MCP server: the `command` path plus
-/// the optional `env` block carrying the auth token and, when the
-/// user confirmed their master password in the setup panel, the
-/// `ORYXIS_VAULT_PASSWORD` a password-protected vault needs (without
-/// it the server exits at startup and the client reports a failed
-/// connection). Shared between the copy-to-clipboard snippet and the
-/// on-disk merge so escaping stays consistent on Windows.
-fn oryxis_mcp_entry(cmd: &str, token: &str, vault_pw: Option<&str>) -> serde_json::Value {
-    let mut env = serde_json::Map::new();
-    if !token.is_empty() {
-        env.insert("ORYXIS_MCP_TOKEN".into(), serde_json::json!(token));
+/// One vault's MCP secrets as a client config carries them: the names
+/// of its variables (`oryxis_vault::device::mcp_env_names`: the first
+/// vault's are the plain `ORYXIS_MCP_TOKEN` / `ORYXIS_VAULT_PASSWORD`,
+/// another's carry its slug) and their values. One `oryxis` entry serves
+/// every vault, so a write for one vault replaces ITS variables and
+/// keeps the others' ([`merged_env`]).
+#[derive(Debug, Clone)]
+pub(crate) struct McpSecrets {
+    pub(crate) names: oryxis_vault::device::McpEnvNames,
+    /// Empty = the vault runs MCP without a token.
+    pub(crate) token: String,
+    /// The master password, when the user opted in to embedding it.
+    pub(crate) vault_pw: Option<String>,
+}
+
+impl McpSecrets {
+    /// The variables this vault puts in an entry.
+    fn pairs(&self) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        if !self.token.is_empty() {
+            out.push((self.names.token.clone(), self.token.clone()));
+        }
+        if let Some(pw) = &self.vault_pw {
+            out.push((self.names.password.clone(), pw.clone()));
+        }
+        out
     }
-    if let Some(pw) = vault_pw {
-        env.insert("ORYXIS_VAULT_PASSWORD".into(), serde_json::json!(pw));
+
+    /// The same vault with its values replaced for display.
+    fn shown(&self, token: String, vault_pw: Option<String>) -> Self {
+        Self { names: self.names.clone(), token, vault_pw }
+    }
+}
+
+/// The env an entry gets when `secrets`' vault writes it over `existing`
+/// (the variables the entry on disk carries): the other vaults' kept,
+/// this vault's replaced (dropped when it no longer has one).
+fn merged_env(existing: Vec<(String, String)>, secrets: &McpSecrets) -> Vec<(String, String)> {
+    let mine = [&secrets.names.token, &secrets.names.password];
+    let mut env: Vec<(String, String)> =
+        existing.into_iter().filter(|(name, _)| !mine.contains(&name)).collect();
+    env.extend(secrets.pairs());
+    env
+}
+
+/// The variables an `oryxis` entry already carries: its `env` block, or
+/// the `set VAR=value&&` chain of the WSL cmd.exe wrapper.
+pub(crate) fn entry_env(entry: &serde_json::Value) -> Vec<(String, String)> {
+    if let Some(env) = entry.get("env").and_then(|e| e.as_object()) {
+        return env
+            .iter()
+            .filter_map(|(k, v)| v.as_str().map(|v| (k.clone(), v.to_string())))
+            .collect();
+    }
+    match entry.get("args").and_then(|a| a.as_array()).map(|a| a.as_slice()) {
+        Some([flag, line]) if flag == "/c" => line.as_str().map(parse_cmd_sets).unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+/// The `set VAR=value&& ` segments at the head of a cmd.exe line, values
+/// un-escaped ([`cmd_escape`] reversed: a `^` takes the next character
+/// literally, so an escaped `&` never ends a value).
+fn parse_cmd_sets(line: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut rest = line;
+    while let Some(after) = rest.strip_prefix("set ") {
+        let Some((name, value_and_more)) = after.split_once('=') else {
+            break;
+        };
+        let mut value = String::new();
+        let mut chars = value_and_more.char_indices();
+        let mut end = None;
+        while let Some((i, c)) = chars.next() {
+            if c == '^' {
+                if let Some((_, next)) = chars.next() {
+                    value.push(next);
+                }
+            } else if value_and_more[i..].starts_with("&& ") {
+                end = Some(i + 3);
+                break;
+            } else {
+                value.push(c);
+            }
+        }
+        let Some(end) = end else {
+            break;
+        };
+        out.push((name.to_string(), value));
+        rest = &value_and_more[end..];
+    }
+    out
+}
+
+/// JSON entry for the `oryxis` MCP server: the `command` path plus
+/// the optional `env` block carrying each vault's auth token and, when
+/// the user confirmed a master password in the setup panel, the
+/// password a password-protected vault needs (without it the server
+/// skips that vault at startup). Shared between the copy-to-clipboard
+/// snippet and the on-disk merge so escaping stays consistent on
+/// Windows.
+fn oryxis_mcp_entry(cmd: &str, vars: &[(String, String)]) -> serde_json::Value {
+    let mut env = serde_json::Map::new();
+    for (name, value) in vars {
+        env.insert(name.clone(), serde_json::json!(value));
     }
     if env.is_empty() {
         serde_json::json!({ "command": cmd })
@@ -122,24 +213,16 @@ fn cmd_escape(value: &str) -> String {
 /// token (an `env` block would never cross the WSL boundary either),
 /// escaped for cmd; see [`cmd_escape`] for the two characters that
 /// can't be carried.
-fn oryxis_mcp_entry_wsl(
-    wsl_exe: &str,
-    win_exe: &str,
-    token: &str,
-    vault_pw: Option<&str>,
-) -> serde_json::Value {
-    if token.is_empty() && vault_pw.is_none() {
+fn oryxis_mcp_entry_wsl(wsl_exe: &str, win_exe: &str, vars: &[(String, String)]) -> serde_json::Value {
+    if vars.is_empty() {
         return serde_json::json!({ "command": wsl_exe });
     }
     // cmd.exe lives under the Windows root; the WSL mount is the only
     // path the Linux-side client can exec it through.
     const CMD: &str = "/mnt/c/Windows/System32/cmd.exe";
     let mut inner = String::new();
-    if !token.is_empty() {
-        inner.push_str(&format!("set ORYXIS_MCP_TOKEN={token}&& "));
-    }
-    if let Some(pw) = vault_pw {
-        inner.push_str(&format!("set ORYXIS_VAULT_PASSWORD={}&& ", cmd_escape(pw)));
+    for (name, value) in vars {
+        inner.push_str(&format!("set {name}={}&& ", cmd_escape(value)));
     }
     inner.push_str(win_exe);
     serde_json::json!({
@@ -151,15 +234,15 @@ fn oryxis_mcp_entry_wsl(
 /// The `oryxis` server entry for a client on this machine: the
 /// launcher path plus the env block the token and the opt-in vault
 /// password ride in.
-fn native_entry(token: &str, vault_pw: Option<&str>) -> serde_json::Value {
-    oryxis_mcp_entry(&mcp_binary_command(), token, vault_pw)
+fn native_entry(vars: &[(String, String)]) -> serde_json::Value {
+    oryxis_mcp_entry(&mcp_binary_command(), vars)
 }
 
 /// The entry for a client living inside a WSL distro: see
 /// [`oryxis_mcp_entry_wsl`] for the cmd.exe wrapper that carries the
 /// secrets across the boundary.
-fn wsl_entry(token: &str, vault_pw: Option<&str>) -> serde_json::Value {
-    oryxis_mcp_entry_wsl(&mcp_wsl_command(), &mcp_binary_command(), token, vault_pw)
+fn wsl_entry(vars: &[(String, String)]) -> serde_json::Value {
+    oryxis_mcp_entry_wsl(&mcp_wsl_command(), &mcp_binary_command(), vars)
 }
 
 /// The snippet users copy for `client`, in that client's own shape
@@ -169,19 +252,15 @@ fn wsl_entry(token: &str, vault_pw: Option<&str>) -> serde_json::Value {
 /// stored in the vault. Empty token keeps the legacy unauth path.
 /// `vault_pw` is the master password of a password-protected vault,
 /// embedded only after the user confirmed it in the setup panel.
-pub(crate) fn mcp_config_snippet(client: McpClient, token: &str, vault_pw: Option<&str>) -> String {
-    mcp_clients::render_snippet(client.format(), &native_entry(token, vault_pw))
+pub(crate) fn mcp_config_snippet(client: McpClient, secrets: &McpSecrets) -> String {
+    mcp_clients::render_snippet(client.format(), &native_entry(&secrets.pairs()))
 }
 
 /// Same as [`mcp_config_snippet`] but for a client running *inside* a
 /// WSL distro on a Windows host; the Windows app produces this so the
 /// user doesn't have to assemble the cmd.exe wrapper by hand.
-pub(crate) fn mcp_config_snippet_wsl(
-    client: McpClient,
-    token: &str,
-    vault_pw: Option<&str>,
-) -> String {
-    mcp_clients::render_snippet(client.format(), &wsl_entry(token, vault_pw))
+pub(crate) fn mcp_config_snippet_wsl(client: McpClient, secrets: &McpSecrets) -> String {
+    mcp_clients::render_snippet(client.format(), &wsl_entry(&secrets.pairs()))
 }
 
 /// Cap on the token's bullet run, mirroring the token row so both
@@ -219,11 +298,12 @@ pub(crate) fn token_mask(token: &str) -> String {
 /// finished text would silently miss it.
 pub(crate) fn mcp_config_snippet_display(
     client: McpClient,
-    token: &str,
-    vault_pw: Option<&str>,
+    secrets: &McpSecrets,
     wsl: bool,
     revealed: bool,
 ) -> String {
+    let token = secrets.token.as_str();
+    let vault_pw = secrets.vault_pw.as_deref();
     // An unset token stays unset: bullets would fabricate an `env` block
     // for a server the user is deliberately running without auth.
     let token_shown = if revealed || token.is_empty() {
@@ -238,10 +318,11 @@ pub(crate) fn mcp_config_snippet_display(
             secret_mask(VAULT_PW_MASK_WIDTH)
         }
     });
+    let shown = secrets.shown(token_shown, pw_shown);
     if wsl {
-        mcp_config_snippet_wsl(client, &token_shown, pw_shown.as_deref())
+        mcp_config_snippet_wsl(client, &shown)
     } else {
-        mcp_config_snippet(client, &token_shown, pw_shown.as_deref())
+        mcp_config_snippet(client, &shown)
     }
 }
 
@@ -467,7 +548,10 @@ fn wsl_client_has_entry(client: McpClient, markers: &[String]) -> bool {
 /// I/O; call from a background task. `Ok(())` means nothing failed; the
 /// caller surfaces any `Err` so a "revoked" claim never hides a
 /// plaintext credential still on disk.
-pub(crate) fn strip_vault_password_everywhere(token: &str) -> Result<(), String> {
+pub(crate) fn strip_vault_password_everywhere(secrets: &McpSecrets) -> Result<(), String> {
+    // This vault's password variable goes; its token and every other
+    // vault's variables stay.
+    let secrets = &secrets.shown(secrets.token.clone(), None);
     let mut errors: Vec<String> = Vec::new();
     // Every file an install may have written, not only the one each
     // client reads today: an install from before an environment override
@@ -478,7 +562,7 @@ pub(crate) fn strip_vault_password_everywhere(token: &str) -> Result<(), String>
                 for path in client.candidate_config_paths(&home) {
                     let has_entry = std::fs::read_to_string(&path)
                         .is_ok_and(|c| mcp_clients::has_entry(client.format(), &c));
-                    if has_entry && let Err(e) = rewrite_entry_at(client, &path, token, None) {
+                    if has_entry && let Err(e) = rewrite_entry_at(client, &path, secrets) {
                         errors.push(e);
                     }
                 }
@@ -492,7 +576,7 @@ pub(crate) fn strip_vault_password_everywhere(token: &str) -> Result<(), String>
         let markers = wsl_detect_markers().unwrap_or_default();
         for client in McpClient::available_in_wsl() {
             if wsl_client_has_entry(client, &markers)
-                && let Err(e) = install_mcp_config_to_wsl(client, token, None)
+                && let Err(e) = install_mcp_config_to_wsl(client, secrets)
             {
                 errors.push(e);
             }
@@ -511,10 +595,10 @@ pub(crate) fn strip_vault_password_everywhere(token: &str) -> Result<(), String>
 /// update's refresh: the launcher path is stable, but the entry's
 /// secrets must follow the settings. Errors are logged, not surfaced:
 /// nothing the user is looking at asked for this write.
-pub(crate) fn refresh_installed_clients(token: &str, vault_pw: Option<&str>) {
+pub(crate) fn refresh_installed_clients(secrets: &McpSecrets) {
     for client in McpClient::available() {
         if client_has_entry(client)
-            && let Err(e) = install_mcp_config_to_file(client, token, vault_pw)
+            && let Err(e) = install_mcp_config_to_file(client, secrets)
         {
             tracing::warn!(client = client.name(), error = %e, "failed to refresh MCP client config");
         }
@@ -524,7 +608,7 @@ pub(crate) fn refresh_installed_clients(token: &str, vault_pw: Option<&str>) {
         let markers = wsl_detect_markers().unwrap_or_default();
         for client in McpClient::available_in_wsl() {
             if wsl_client_has_entry(client, &markers)
-                && let Err(e) = install_mcp_config_to_wsl(client, token, vault_pw)
+                && let Err(e) = install_mcp_config_to_wsl(client, secrets)
             {
                 tracing::warn!(client = client.name(), error = %e, "failed to refresh MCP client config (WSL)");
             }
@@ -543,11 +627,7 @@ pub(crate) fn refresh_installed_clients(token: &str, vault_pw: Option<&str>) {
 /// is what says the client is installed, and a config file dropped
 /// into a folder nothing reads is litter at best and, with the vault
 /// password embedded, a credential nobody is guarding.
-pub(crate) fn install_mcp_config_to_file(
-    client: McpClient,
-    token: &str,
-    vault_pw: Option<&str>,
-) -> Result<String, String> {
+pub(crate) fn install_mcp_config_to_file(client: McpClient, secrets: &McpSecrets) -> Result<String, String> {
     let config_path = client_config_path(client)?;
     let parent = config_path
         .parent()
@@ -560,7 +640,7 @@ pub(crate) fn install_mcp_config_to_file(
         ));
     }
 
-    rewrite_entry_at(client, &config_path, token, vault_pw)?;
+    rewrite_entry_at(client, &config_path, secrets)?;
 
     if client == McpClient::ClaudeCode {
         sweep_legacy_mcp_config();
@@ -572,18 +652,14 @@ pub(crate) fn install_mcp_config_to_file(
 /// Merge the `oryxis` entry into the config at `path`, in `client`'s
 /// shape. A parse failure aborts rather than clobbering whatever the
 /// client has stored there.
-fn rewrite_entry_at(
-    client: McpClient,
-    path: &std::path::Path,
-    token: &str,
-    vault_pw: Option<&str>,
-) -> Result<(), String> {
+fn rewrite_entry_at(client: McpClient, path: &std::path::Path, secrets: &McpSecrets) -> Result<(), String> {
     let existing = if path.exists() {
         std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {e}", path.display()))?
     } else {
         String::new()
     };
-    let output = mcp_clients::merge_into(client.format(), &existing, native_entry(token, vault_pw))
+    let current = mcp_clients::existing_entry(client.format(), &existing).map(|e| entry_env(&e)).unwrap_or_default();
+    let output = mcp_clients::merge_into(client.format(), &existing, native_entry(&merged_env(current, secrets)))
         .map_err(|e| format!("{e} ({})", path.display()))?;
     write_config_private(path, &output)
 }
@@ -664,14 +740,10 @@ fn write_config_private(path: &std::path::Path, contents: &str) -> Result<(), St
 ///
 /// Only meaningful on Windows; returns an error elsewhere, where there
 /// is no `wsl.exe` to talk to.
-pub(crate) fn install_mcp_config_to_wsl(
-    client: McpClient,
-    token: &str,
-    vault_pw: Option<&str>,
-) -> Result<String, String> {
+pub(crate) fn install_mcp_config_to_wsl(client: McpClient, secrets: &McpSecrets) -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (client, token, vault_pw);
+        let _ = (client, secrets);
         Err("WSL install is only available on the Windows build".to_string())
     }
     #[cfg(target_os = "windows")]
@@ -684,7 +756,10 @@ pub(crate) fn install_mcp_config_to_wsl(
             .wsl_config_path(&markers)
             .ok_or_else(|| format!("{} cannot run inside WSL", client.name()))?;
         let existing = wsl_read_home_file(&path)?;
-        let output = mcp_clients::merge_into(client.format(), existing.trim(), wsl_entry(token, vault_pw))
+        let current = mcp_clients::existing_entry(client.format(), existing.trim())
+            .map(|e| entry_env(&e))
+            .unwrap_or_default();
+        let output = mcp_clients::merge_into(client.format(), existing.trim(), wsl_entry(&merged_env(current, secrets)))
             .map_err(|e| format!("{e} (WSL {path})"))?;
         wsl_write_home_file_private(&path, &output)?;
 
@@ -717,6 +792,19 @@ impl crate::app::Oryxis {
             .then(|| self.vaults.cur().master_password.clone())
             .flatten()
     }
+
+    /// The acting vault's MCP secrets, under its own variable names.
+    pub(crate) fn mcp_secrets(&self) -> McpSecrets {
+        let id = self.vaults.cur().id;
+        let names = oryxis_vault::device::installed()
+            .and_then(|d| d.entry(id))
+            .map(|e| oryxis_vault::device::mcp_env_names(&e))
+            .unwrap_or_else(|| oryxis_vault::device::McpEnvNames {
+                token: "ORYXIS_MCP_TOKEN".into(),
+                password: "ORYXIS_VAULT_PASSWORD".into(),
+            });
+        McpSecrets { names, token: self.vaults.cur().mcp.server_token.clone(), vault_pw: self.mcp_vault_pw() }
+    }
 }
 
 #[cfg(test)]
@@ -748,8 +836,25 @@ mod tests {
     }
 
     use super::{
-        cmd_escape, mcp_config_snippet_display, oryxis_mcp_entry, oryxis_mcp_entry_wsl, McpClient,
+        cmd_escape, entry_env, mcp_config_snippet_display, merged_env, oryxis_mcp_entry, oryxis_mcp_entry_wsl,
+        parse_cmd_sets, McpClient, McpSecrets,
     };
+
+    fn vars(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    /// The first vault's secrets (plain names).
+    fn first(token: &str, pw: Option<&str>) -> McpSecrets {
+        McpSecrets {
+            names: oryxis_vault::device::McpEnvNames {
+                token: "ORYXIS_MCP_TOKEN".into(),
+                password: "ORYXIS_VAULT_PASSWORD".into(),
+            },
+            token: token.into(),
+            vault_pw: pw.map(str::to_string),
+        }
+    }
 
     const WSL: &str = "/mnt/c/Users/wilso/.oryxis/bin/oryxis-mcp.exe";
     const WIN: &str = "C:\\Users\\wilso\\.oryxis\\bin\\oryxis-mcp.exe";
@@ -760,7 +865,7 @@ mod tests {
     // would see an empty token and reject every call.
     #[test]
     fn wsl_entry_with_token_wraps_through_cmd() {
-        let v = oryxis_mcp_entry_wsl(WSL, WIN, "deadbeef", None);
+        let v = oryxis_mcp_entry_wsl(WSL, WIN, &vars(&[("ORYXIS_MCP_TOKEN", "deadbeef")]));
         assert_eq!(v["command"], "/mnt/c/Windows/System32/cmd.exe");
         let args = v["args"].as_array().expect("args array");
         assert_eq!(args[0], "/c");
@@ -773,7 +878,7 @@ mod tests {
     // works, so no cmd.exe wrapper is emitted.
     #[test]
     fn wsl_entry_without_token_stays_direct() {
-        let v = oryxis_mcp_entry_wsl(WSL, WIN, "", None);
+        let v = oryxis_mcp_entry_wsl(WSL, WIN, &[]);
         assert_eq!(v["command"], WSL);
         assert!(v.get("args").is_none());
         assert!(v.get("env").is_none());
@@ -784,7 +889,11 @@ mod tests {
     // and cmd metacharacters in the password are ^-escaped.
     #[test]
     fn wsl_entry_with_vault_password_chains_sets() {
-        let v = oryxis_mcp_entry_wsl(WSL, WIN, "deadbeef", Some("p&ss|word"));
+        let v = oryxis_mcp_entry_wsl(
+            WSL,
+            WIN,
+            &vars(&[("ORYXIS_MCP_TOKEN", "deadbeef"), ("ORYXIS_VAULT_PASSWORD", "p&ss|word")]),
+        );
         let args = v["args"].as_array().expect("args array");
         assert_eq!(
             args[1],
@@ -798,7 +907,7 @@ mod tests {
     // launch has no way to carry the env var across the boundary.
     #[test]
     fn wsl_entry_with_only_vault_password_wraps_through_cmd() {
-        let v = oryxis_mcp_entry_wsl(WSL, WIN, "", Some("hunter2"));
+        let v = oryxis_mcp_entry_wsl(WSL, WIN, &vars(&[("ORYXIS_VAULT_PASSWORD", "hunter2")]));
         assert_eq!(v["command"], "/mnt/c/Windows/System32/cmd.exe");
         let args = v["args"].as_array().expect("args array");
         assert_eq!(args[1], format!("set ORYXIS_VAULT_PASSWORD=hunter2&& {WIN}"));
@@ -815,10 +924,10 @@ mod tests {
         const PW: &str = "correct horse battery staple";
         for client in McpClient::ALL {
             for wsl in [false, true] {
-                let masked = mcp_config_snippet_display(client, TOKEN, Some(PW), wsl, false);
+                let masked = mcp_config_snippet_display(client, &first(TOKEN, Some(PW)), wsl, false);
                 assert!(!masked.contains(TOKEN), "token leaked while masked (wsl={wsl})");
                 assert!(!masked.contains(PW), "vault password leaked while masked (wsl={wsl})");
-                let revealed = mcp_config_snippet_display(client, TOKEN, Some(PW), wsl, true);
+                let revealed = mcp_config_snippet_display(client, &first(TOKEN, Some(PW)), wsl, true);
                 assert!(revealed.contains(TOKEN), "token missing when revealed (wsl={wsl})");
                 assert!(revealed.contains(PW), "vault password missing when revealed (wsl={wsl})");
             }
@@ -830,7 +939,7 @@ mod tests {
     #[test]
     fn masked_snippet_keeps_an_unset_token_unset() {
         for client in McpClient::ALL {
-            let masked = mcp_config_snippet_display(client, "", None, false, false);
+            let masked = mcp_config_snippet_display(client, &first("", None), false, false);
             assert!(!masked.contains("ORYXIS_MCP_TOKEN"));
             assert!(!masked.contains('\u{2022}'));
         }
@@ -846,15 +955,71 @@ mod tests {
     // to the token; without either the env block is omitted entirely.
     #[test]
     fn native_entry_env_block_shapes() {
-        let v = oryxis_mcp_entry("oryxis-mcp", "tok", Some("pw"));
+        let v = oryxis_mcp_entry("oryxis-mcp", &first("tok", Some("pw")).pairs());
         assert_eq!(v["env"]["ORYXIS_MCP_TOKEN"], "tok");
         assert_eq!(v["env"]["ORYXIS_VAULT_PASSWORD"], "pw");
 
-        let v = oryxis_mcp_entry("oryxis-mcp", "", Some("pw"));
+        let v = oryxis_mcp_entry("oryxis-mcp", &first("", Some("pw")).pairs());
         assert!(v["env"].get("ORYXIS_MCP_TOKEN").is_none());
         assert_eq!(v["env"]["ORYXIS_VAULT_PASSWORD"], "pw");
 
-        let v = oryxis_mcp_entry("oryxis-mcp", "", None);
+        let v = oryxis_mcp_entry("oryxis-mcp", &first("", None).pairs());
         assert!(v.get("env").is_none());
+    }
+
+    /// One entry serves every vault: a write for Work replaces Work's
+    /// variables and keeps the first vault's, and revoking Work's
+    /// password takes only that variable.
+    #[test]
+    fn a_vaults_write_keeps_the_other_vaults_variables() {
+        let on_disk = vars(&[("ORYXIS_MCP_TOKEN", "t1"), ("ORYXIS_VAULT_PASSWORD", "p1"), ("ORYXIS_MCP_TOKEN_WORK", "old")]);
+        let work = McpSecrets {
+            names: oryxis_vault::device::McpEnvNames {
+                token: "ORYXIS_MCP_TOKEN_WORK".into(),
+                password: "ORYXIS_VAULT_PASSWORD_WORK".into(),
+            },
+            token: "t2".into(),
+            vault_pw: Some("p2".into()),
+        };
+        let merged = merged_env(on_disk, &work);
+        assert_eq!(
+            merged,
+            vars(&[
+                ("ORYXIS_MCP_TOKEN", "t1"),
+                ("ORYXIS_VAULT_PASSWORD", "p1"),
+                ("ORYXIS_MCP_TOKEN_WORK", "t2"),
+                ("ORYXIS_VAULT_PASSWORD_WORK", "p2"),
+            ])
+        );
+        let revoked = merged_env(merged, &McpSecrets { vault_pw: None, ..work });
+        assert!(revoked.iter().all(|(k, _)| k != "ORYXIS_VAULT_PASSWORD_WORK"));
+        assert!(revoked.iter().any(|(k, v)| k == "ORYXIS_VAULT_PASSWORD" && v == "p1"), "another vault's password stays");
+    }
+
+    /// What the WSL wrapper wrote is read back exactly, metacharacters
+    /// and a `&& ` inside a value included, so a second vault's write
+    /// keeps the first's password intact.
+    #[test]
+    fn the_wsl_wrapper_reads_back_what_it_wrote() {
+        let written = vars(&[("ORYXIS_MCP_TOKEN", "abc"), ("ORYXIS_VAULT_PASSWORD", "p&& x^y|(z)")]);
+        let entry = oryxis_mcp_entry_wsl(WSL, WIN, &written);
+        assert_eq!(entry_env(&entry), written);
+        assert!(parse_cmd_sets(WIN).is_empty(), "a bare launch has no variables");
+        let native = oryxis_mcp_entry("oryxis-mcp", &written);
+        assert_eq!(entry_env(&native), written);
+    }
+
+    /// Codex keeps the entry as TOML: it reads back as the JSON shape.
+    #[test]
+    fn a_toml_entry_reads_back() {
+        let written = vars(&[("ORYXIS_MCP_TOKEN", "abc"), ("ORYXIS_MCP_TOKEN_WORK", "def")]);
+        let text = crate::mcp_clients::render_snippet(
+            crate::mcp_clients::ConfigFormat::TomlMcpServers,
+            &oryxis_mcp_entry("oryxis-mcp", &written),
+        );
+        let entry = crate::mcp_clients::existing_entry(crate::mcp_clients::ConfigFormat::TomlMcpServers, &text).unwrap();
+        let mut read = entry_env(&entry);
+        read.sort();
+        assert_eq!(read, written);
     }
 }

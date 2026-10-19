@@ -97,7 +97,7 @@ pub(crate) fn sync_launcher_from_cache() -> Result<PathBuf, PluginError> {
 /// when the user opted in to embedding it, so the refresh doesn't
 /// strip it from the configs. Best-effort: failures are logged but
 /// don't roll back the install.
-pub(crate) fn post_install_refresh(token: &str, vault_pw: Option<&str>) {
+pub(crate) fn post_install_refresh(secrets: &crate::mcp::McpSecrets) {
     if let Err(e) = sync_launcher_from_cache() {
         tracing::warn!(
             target = "oryxis::mcp",
@@ -120,8 +120,7 @@ pub(crate) fn post_install_refresh(token: &str, vault_pw: Option<&str>) {
         && !crate::mcp::client_has_entry(crate::mcp_clients::McpClient::ClaudeCode)
         && let Err(msg) = crate::mcp::install_mcp_config_to_file(
             crate::mcp_clients::McpClient::ClaudeCode,
-            token,
-            vault_pw,
+            secrets,
         )
     {
         tracing::warn!(
@@ -130,7 +129,7 @@ pub(crate) fn post_install_refresh(token: &str, vault_pw: Option<&str>) {
             "failed to migrate the legacy MCP entry after install"
         );
     }
-    crate::mcp::refresh_installed_clients(token, vault_pw);
+    crate::mcp::refresh_installed_clients(secrets);
 }
 
 /// One-shot migration / first-install: fetch the manifest, pick the

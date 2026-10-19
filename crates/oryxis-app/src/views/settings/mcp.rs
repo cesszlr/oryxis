@@ -166,8 +166,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
     // revealing one and hiding the other would be a mask in name only.
     // Copy / Install rebuild the JSON from state and always carry the
     // real values.
-    let json_text =
-        mcp_config_snippet_display(client, token, vault_pw.as_deref(), target_wsl, token_visible);
+    let json_text = mcp_config_snippet_display(client, &app.mcp_secrets(), target_wsl, token_visible);
     let path_hint = client_path_hint(client, target_wsl, &app.vaults.cur().mcp.wsl_markers);
 
     // "Copy", not "Copy JSON": the snippet is TOML for Codex.
@@ -531,7 +530,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
     info_col = info_col.push(Space::new().height(8).boxed());
     if !app.vaults.cur().vault_ui.has_user_password {
         info_col = info_col.push(
-            text(crate::i18n::t("mcp_info_vault_password_note"))
+            text(crate::i18n::t("mcp_info_vault_password_note").replacen("{var}", &app.mcp_secrets().names.password, 1))
                 .size(11)
                 .color(OryxisColors::t().text_muted).boxed(),
         );
@@ -629,7 +628,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
     } else {
         info_col = info_col
             .push(
-                text(crate::i18n::t("mcp_vault_pw_note"))
+                text(crate::i18n::t("mcp_vault_pw_note").replacen("{var}", &app.mcp_secrets().names.password, 1))
                     .size(11)
                     .color(OryxisColors::t().warning).boxed(),
             )

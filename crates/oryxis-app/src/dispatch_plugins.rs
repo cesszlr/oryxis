@@ -551,10 +551,11 @@ impl Oryxis {
             }
 
             PluginMessage::PluginInstallDone(id, result) => {
-                let token = self.vaults.cur().mcp.server_token.clone();
                 // Carried into the config refresh so a plugin update
-                // doesn't strip an opted-in vault password from it.
-                let vault_pw = self.mcp_vault_pw();
+                // doesn't strip an opted-in vault password from it (the
+                // other vaults' variables in the entry are kept as they
+                // are).
+                let secrets = self.mcp_secrets();
                 let rebind_provider = self.plugin_providers.get(&id).cloned();
                 if let Some(entry) =
                     self.plugins.iter_mut().find(|p| p.provider_id == id)
@@ -571,10 +572,7 @@ impl Oryxis {
                                     // keep finding the right binary
                                     // across version bumps.
                                     if id == "mcp" {
-                                        crate::mcp_install::post_install_refresh(
-                                            &token,
-                                            vault_pw.as_deref(),
-                                        );
+                                        crate::mcp_install::post_install_refresh(&secrets);
                                     }
                                     PluginUiStatus::Installed(version)
                                 }

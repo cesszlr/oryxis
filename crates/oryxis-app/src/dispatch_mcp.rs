@@ -54,12 +54,12 @@ impl Oryxis {
             }
             McpMessage::CopyMcpConfig => {
                 self.vaults.cur_mut().mcp.config_copied = true;
-                let vault_pw = self.mcp_vault_pw();
+                let secrets = self.mcp_secrets();
                 let client = self.vaults.cur().mcp.client;
                 let snippet = if self.vaults.cur().mcp.target_wsl {
-                    mcp_config_snippet_wsl(client, &self.vaults.cur().mcp.server_token, vault_pw.as_deref())
+                    mcp_config_snippet_wsl(client, &secrets)
                 } else {
-                    mcp_config_snippet(client, &self.vaults.cur().mcp.server_token, vault_pw.as_deref())
+                    mcp_config_snippet(client, &secrets)
                 };
                 return iced::clipboard::write(snippet).discard();
             }
@@ -73,16 +73,15 @@ impl Oryxis {
                     return Task::none();
                 }
                 self.vaults.cur_mut().mcp.install_status = None;
-                let token = self.vaults.cur().mcp.server_token.clone();
-                let vault_pw = self.mcp_vault_pw();
+                let secrets = self.mcp_secrets();
                 let wsl = self.vaults.cur().mcp.target_wsl;
                 let client = self.vaults.cur().mcp.client;
                 return Task::perform(
                     async move {
                         if wsl {
-                            install_mcp_config_to_wsl(client, &token, vault_pw.as_deref())
+                            install_mcp_config_to_wsl(client, &secrets)
                         } else {
-                            install_mcp_config_to_file(client, &token, vault_pw.as_deref())
+                            install_mcp_config_to_file(client, &secrets)
                         }
                     },
                     |v| Message::Mcp(McpMessage::InstallMcpConfigResult(v)),
@@ -211,9 +210,9 @@ impl Oryxis {
                 // would miss a copy installed into the other one. The strip
                 // is presence-gated per target, so it never creates a
                 // config nor promotes the legacy dead-letter.
-                let token = self.vaults.cur().mcp.server_token.clone();
+                let secrets = self.mcp_secrets();
                 return Task::perform(
-                    async move { crate::mcp::strip_vault_password_everywhere(&token) },
+                    async move { crate::mcp::strip_vault_password_everywhere(&secrets) },
                     |v| Message::Mcp(McpMessage::McpVaultPwStripResult(v)),
                 );
             }

@@ -369,6 +369,40 @@ pub(crate) fn merge_into(
     }
 }
 
+/// The `oryxis` entry a config file's text carries, in the JSON shape
+/// the writers take (`command`, `args`, `env`), so a write can keep what
+/// it does not own (the other vaults' variables). `None` when there is
+/// none or the text does not parse.
+pub(crate) fn existing_entry(format: ConfigFormat, text: &str) -> Option<serde_json::Value> {
+    match format {
+        ConfigFormat::JsonMcpServers => serde_json::from_str::<serde_json::Value>(text.trim())
+            .ok()?
+            .get("mcpServers")?
+            .get("oryxis")
+            .cloned(),
+        ConfigFormat::TomlMcpServers => {
+            let doc: toml_edit::DocumentMut = text.parse().ok()?;
+            let entry = doc.get("mcp_servers")?.as_table_like()?.get("oryxis")?.as_table_like()?;
+            let mut out = serde_json::Map::new();
+            if let Some(cmd) = entry.get("command").and_then(|v| v.as_str()) {
+                out.insert("command".into(), serde_json::json!(cmd));
+            }
+            if let Some(args) = entry.get("args").and_then(|v| v.as_array()) {
+                let args: Vec<&str> = args.iter().filter_map(|a| a.as_str()).collect();
+                out.insert("args".into(), serde_json::json!(args));
+            }
+            if let Some(env) = entry.get("env").and_then(|v| v.as_table_like()) {
+                let env: serde_json::Map<String, serde_json::Value> = env
+                    .iter()
+                    .filter_map(|(k, v)| v.as_str().map(|v| (k.to_string(), serde_json::json!(v))))
+                    .collect();
+                out.insert("env".into(), serde_json::Value::Object(env));
+            }
+            Some(serde_json::Value::Object(out))
+        }
+    }
+}
+
 /// Whether a config file's text carries an `oryxis` entry.
 pub(crate) fn has_entry(format: ConfigFormat, text: &str) -> bool {
     match format {

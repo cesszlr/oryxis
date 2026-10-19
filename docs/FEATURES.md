@@ -567,6 +567,16 @@ panel turns it on, next to the other optional ones). Switching it back off close
   cancelled call stops where it stands, and every request and dial is
   logged to stderr for the client's own log.
 - **Disabled by default.** Enable in Settings > Security.
+- **Several vaults.** The server serves every vault it can open: one
+  without a master password, or one whose password comes in
+  `ORYXIS_VAULT_PASSWORD_<SLUG>` (and its token in
+  `ORYXIS_MCP_TOKEN_<SLUG>`, the slug upper-cased with `-` as `_`). The
+  first vault keeps the plain `ORYXIS_VAULT_PASSWORD` and
+  `ORYXIS_MCP_TOKEN`. `oryxis-mcp --vault <slug>` serves just one. Each
+  vault's own MCP switch is read per call, every answer names its
+  `vault`, every tool takes an optional `vault` parameter, and
+  `list_vaults` lists them. The setup panel writes each vault's variables
+  into the same `oryxis` entry, keeping the other vaults' variables.
 - **Distributed as a plugin.** Downloaded on demand, with a stable launcher
   path for external clients.
 - **One-click setup for your AI client.** Settings > MCP Server detects
