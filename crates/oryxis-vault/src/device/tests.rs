@@ -467,3 +467,19 @@ fn the_first_vault_keeps_the_plain_mcp_variables_and_the_others_carry_their_slug
     assert_eq!(mcp_env_names(&work).token, "ORYXIS_MCP_TOKEN_AREA_DE_TRABALHO");
 }
 
+
+#[test]
+fn a_locked_vaults_kubernetes_accounts_read_without_its_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("work.db");
+    let mut vault = VaultStore::open(&path).unwrap();
+    vault.set_master_password("pw").unwrap();
+    let mut k8s = oryxis_core::models::CloudProfile::new("cluster", "k8s");
+    k8s.config = r#"{"kubeconfig":"/home/u/.oryxis/kubeconfig/a.yaml"}"#.into();
+    vault.save_cloud_profile(&k8s, None).unwrap();
+    vault.save_cloud_profile(&oryxis_core::models::CloudProfile::new("aws", "aws"), None).unwrap();
+    vault.lock();
+    drop(vault);
+    assert_eq!(read_k8s_profile_configs(&path), Some(vec![k8s.config.clone()]), "only the Kubernetes ones");
+    assert_eq!(read_k8s_profile_configs(&dir.path().join("gone.db")), None, "unknown, never empty");
+}

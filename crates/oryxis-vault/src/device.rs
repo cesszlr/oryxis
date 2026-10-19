@@ -803,6 +803,27 @@ pub fn file_holds_sync_peer(path: &Path, peer_id: Uuid) -> bool {
     path.is_file() && probe().unwrap_or(false)
 }
 
+/// The `config` of every Kubernetes cloud account in the vault file at
+/// `path`, read-only and without its password (the column is plaintext;
+/// secrets sit in `secret`). `None` when the file is not there or cannot
+/// be read: the caller must then treat its references as unknown.
+pub fn read_k8s_profile_configs(path: &Path) -> Option<Vec<String>> {
+    let probe = || -> rusqlite::Result<Vec<String>> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        let mut stmt = db.prepare("SELECT config FROM cloud_profiles WHERE provider = 'k8s'")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        rows.collect()
+    };
+    if !path.is_file() {
+        return None;
+    }
+    probe().ok()
+}
+
 /// The device keys of a vault file's `settings` table, read-only.
 fn read_device_rows(path: &Path) -> rusqlite::Result<Vec<(String, String)>> {
     let db = rusqlite::Connection::open_with_flags(

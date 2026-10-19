@@ -76,11 +76,15 @@ pub(crate) fn referenced_paths(profiles: &[oryxis_core::models::CloudProfile]) -
     profiles
         .iter()
         .filter(|p| p.provider == "k8s")
-        .filter_map(|p| serde_json::from_str::<serde_json::Value>(&p.config).ok())
-        .filter_map(|v| v.get("kubeconfig")?.as_str().map(str::to_string))
-        .filter(|path| is_managed_path(path))
-        .map(PathBuf::from)
+        .filter_map(|p| referenced_path(&p.config))
         .collect()
+}
+
+/// The managed kubeconfig a Kubernetes account's `config` points at.
+pub(crate) fn referenced_path(config: &str) -> Option<PathBuf> {
+    let v = serde_json::from_str::<serde_json::Value>(config).ok()?;
+    let path = v.get("kubeconfig")?.as_str()?;
+    is_managed_path(path).then(|| PathBuf::from(path))
 }
 
 /// Remove every kubeconfig file of ours in `dir` that no account
