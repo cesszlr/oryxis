@@ -41,8 +41,19 @@ impl Oryxis {
         // with it (and to the log and stderr), since that screen is the
         // only surface left and a report used to come with the fixed
         // label alone (issue #250).
+        // The vault this start opens: the last used, or the one holding
+        // the host a launch names (`--connect`, a JumpList entry), so the
+        // dial after its unlock finds the host. Chosen once: the id, the
+        // file and the open below agree.
+        let (boot_vault_id, boot_vault_path) = match oryxis_vault::device::installed() {
+            Some(device) => {
+                let entry = device.boot_vault_for(pending_auto_connect);
+                (entry.id, Some(device.resolve(&entry)))
+            }
+            None => (oryxis_vault::device::FIRST_VAULT_ID, VaultStore::default_path()),
+        };
         let (mut vault, vault_open_error, vault_open_read_only, vault_open_corrupt) =
-            match VaultStore::open_boot() {
+            match VaultStore::open_boot_at(boot_vault_path.clone()) {
                 Ok(v) => (Some(v), None, false, false),
                 Err(e) => {
                     tracing::error!("vault open failed: {e}");
@@ -279,12 +290,7 @@ impl Oryxis {
         let (mut app, task) = (
             Self {
                 vaults: crate::vault_slots::VaultSlots::single({
-                    let mut first = crate::vault_slots::OpenVault::new(
-                        oryxis_vault::device::installed()
-                            .map(|d| d.boot_vault().id)
-                            .unwrap_or(oryxis_vault::device::FIRST_VAULT_ID),
-                        vault,
-                    );
+                    let mut first = crate::vault_slots::OpenVault::new(boot_vault_id, vault);
                     // Hydrated before the unlock (the lock screen runs
                     // while the vault can still be locked), so it comes
                     // from the read above rather than the factory default.
@@ -308,7 +314,7 @@ impl Oryxis {
                     } else {
                         None
                     };
-                    first.path = oryxis_vault::device::boot_vault_path();
+                    first.path = boot_vault_path;
                     first
                 }),
                 // Vector logo: rendered through iced's SVG (resvg) path so
@@ -665,12 +671,11 @@ impl Oryxis {
         // of them, the way it yields at the unlock site.
         let mut landed = false;
         if open_now
-            && let Some(connect_id) = app.pending_auto_connect.take()
-            && let Some(idx) = app
-                .vaults.cur().connections
-                .iter()
-                .position(|c| c.id == connect_id)
+            && let Some(idx) = app.pending_auto_connect.and_then(|connect_id| {
+                app.vaults.cur().connections.iter().position(|c| c.id == connect_id)
+            })
         {
+            app.pending_auto_connect = None;
             tasks.push(Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))));
             landed = true;
         }

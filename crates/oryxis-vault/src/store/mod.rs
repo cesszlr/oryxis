@@ -550,11 +550,17 @@ impl VaultStore {
     /// folder is created; a vault registered elsewhere is opened where it
     /// is, never a folder made for it.
     pub fn open_boot() -> Result<Self, VaultError> {
+        Self::open_boot_at(crate::device::boot_vault_path())
+    }
+
+    /// [`Self::open_boot`] of a boot vault the caller already chose
+    /// (`None`: no home to resolve one in, the default file): the app's
+    /// folder is made first, as a first start needs.
+    pub fn open_boot_at(path: Option<PathBuf>) -> Result<Self, VaultError> {
         let dir = oryxis_core::paths::oryxis_dir()
             .ok_or_else(|| VaultError::Io(std::io::Error::other("No home directory")))?;
         std::fs::create_dir_all(&dir)?;
-        let path = crate::device::boot_vault_path().unwrap_or_else(|| dir.join("vault.db"));
-        Self::open(path)
+        Self::open(path.unwrap_or_else(|| dir.join("vault.db")))
     }
 
     /// Open or create the vault database at a specific path.

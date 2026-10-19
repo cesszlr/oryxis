@@ -517,6 +517,40 @@ impl Oryxis {
         }
     }
 
+    /// Open saved host `id` from a door that belongs to the app, not to
+    /// a window (the tray's recent hosts): on the open vault that holds
+    /// it, in a window on that vault (the one the user works in first),
+    /// or a new window on it when none shows it. A vault that is locked
+    /// keeps the dial for its unlock, behind its lock screen.
+    pub(crate) fn open_host_anywhere(&mut self, id: Uuid) -> Task<Message> {
+        let Some(owner) = self
+            .vaults
+            .all()
+            .find(|v| v.connections.iter().any(|c| c.id == id))
+            .map(|v| v.id)
+        else {
+            return Task::none();
+        };
+        let (window, open) = if self.vault_of_window(self.input_window()) == owner {
+            (self.input_window(), Task::none())
+        } else if let Some(window) = self.window_on_vault(owner) {
+            (window, Task::none())
+        } else {
+            let (window, open) = self.open_window_for_vault(owner);
+            let shown = self.run_in_window(Some(window), Self::vault_shown);
+            (Some(window), Task::batch([open, shown]))
+        };
+        let dial = self.run_in_window(window, move |app| {
+            if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
+                app.update(Message::Ssh(crate::app::SshMessage::ConnectSavedHost(id)))
+            } else {
+                app.pending_auto_connect = Some(id);
+                Task::none()
+            }
+        });
+        Task::batch([open, dial])
+    }
+
     /// A new window working on vault `id`, on its hosts screen (or its
     /// lock screen).
     fn open_window_on_vault(&mut self, id: Uuid) -> Task<Message> {

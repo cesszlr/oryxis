@@ -1437,6 +1437,37 @@ impl Oryxis {
         recent
     }
 
+    /// [`Self::recent_connections`] over every OPEN vault, for the doors
+    /// that belong to the app rather than to a window (the tray's
+    /// "Recent hosts", the Windows JumpList): each host with the vault
+    /// holding it, newest first. A host two vaults hold (an import keeps
+    /// its id) is listed once, from the vault that used it last.
+    pub(crate) fn recent_connections_everywhere(
+        &self,
+        n: usize,
+    ) -> Vec<(Uuid, &oryxis_core::models::connection::Connection)> {
+        let mut recent: Vec<(Uuid, &oryxis_core::models::connection::Connection)> = self
+            .vaults
+            .all()
+            .flat_map(|v| v.connections.iter().filter(|c| c.last_used.is_some()).map(move |c| (v.id, c)))
+            .collect();
+        recent.sort_by_key(|(_, c)| std::cmp::Reverse(c.last_used));
+        let mut seen: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+        recent.retain(|(_, c)| seen.insert(c.id));
+        recent.truncate(n);
+        recent
+    }
+
+    /// A recent host's label on an app-wide door: with several vaults
+    /// open, the vault holding it follows the name.
+    pub(crate) fn recent_host_door_label(&self, vault: Uuid, label: &str) -> String {
+        if self.vaults.ids().count() > 1 {
+            format!("{label} \u{b7} {}", self.vault_name(vault))
+        } else {
+            label.to_string()
+        }
+    }
+
     pub(crate) fn snippet_injection_tab(&self) -> Option<usize> {
         let idx = self.cur_active_tab().or(self.last_terminal_tab)?;
         (idx < self.tabs.len()).then_some(idx)

@@ -394,3 +394,42 @@ fn a_vault_keeps_its_chord_and_loses_it_on_request() {
     let raw = std::fs::read_to_string(dir.path().join(FILE_NAME)).unwrap();
     assert!(!raw.contains("hotkey"), "an unset chord is not written");
 }
+
+#[test]
+fn a_launch_naming_a_host_opens_the_vault_that_holds_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    let host = oryxis_core::models::Connection::new("db", "db.example.com");
+    // The first vault (the last used) holds nothing; Work holds the host.
+    drop(VaultStore::open(dir.path().join(FIRST_VAULT_FILE)).unwrap());
+    let work = store.create_entry("Work").unwrap();
+    std::fs::create_dir_all(dir.path().join(VAULTS_DIR)).unwrap();
+    let mut work_db = VaultStore::open(store.resolve(&work)).unwrap();
+    work_db.set_master_password("pw").unwrap();
+    work_db.save_connection(&host, None).unwrap();
+    work_db.lock();
+    drop(work_db);
+    store.set_last_vault(FIRST_VAULT_ID).unwrap();
+    assert!(file_holds_connection(&store.resolve(&work), host.id), "read while locked");
+    assert_eq!(store.boot_vault_for(Some(host.id)).id, work.id);
+    // No host named, or one nobody holds: the usual start.
+    assert_eq!(store.boot_vault_for(None).id, FIRST_VAULT_ID);
+    assert_eq!(store.boot_vault_for(Some(uuid::Uuid::new_v4())).id, FIRST_VAULT_ID);
+    // Both hold it (an import keeps ids): the last used wins.
+    let first = VaultStore::open(dir.path().join(FIRST_VAULT_FILE)).unwrap();
+    first.save_connection(&host, None).unwrap();
+    drop(first);
+    assert_eq!(store.boot_vault_for(Some(host.id)).id, FIRST_VAULT_ID);
+}
+
+#[test]
+fn the_host_probe_writes_nothing_and_misses_a_missing_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing.db");
+    assert!(!file_holds_connection(&missing, uuid::Uuid::new_v4()));
+    assert!(!missing.exists(), "the probe never creates the file");
+    let junk = dir.path().join("junk.db");
+    std::fs::write(&junk, b"not a database at all").unwrap();
+    assert!(!file_holds_connection(&junk, uuid::Uuid::new_v4()));
+    assert_eq!(std::fs::read(&junk).unwrap(), b"not a database at all");
+}

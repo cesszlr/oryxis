@@ -231,13 +231,14 @@ impl Oryxis {
         // download folder setting is known.
         unlock_tasks.extend(self.zmodem_sweep_task());
         // After a manual unlock, fire any deferred
-        // `--connect <uuid>` from the launch CLI args.
-        if let Some(connect_id) = self.pending_auto_connect.take()
-            && let Some(idx) = self
-                .vaults.cur().connections
-                .iter()
-                .position(|c| c.id == connect_id)
-        {
+        // `--connect <uuid>` from the launch CLI args (or a
+        // tray recent opened into a locked vault). Taken
+        // only by the vault that holds the host: another
+        // vault unlocked first leaves it waiting.
+        if let Some(idx) = self.pending_auto_connect.and_then(|connect_id| {
+            self.vaults.cur().connections.iter().position(|c| c.id == connect_id)
+        }) {
+            self.pending_auto_connect = None;
             unlock_tasks.push(Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))));
         } else if let Some(link) = self.pending_deep_link.take() {
             // A deep link clicked at the lock screen

@@ -730,7 +730,7 @@ impl Oryxis {
 
     /// The window the user is working in (the focused one), when it is
     /// an extra window that still exists.
-    fn input_window(&self) -> Option<window::Id> {
+    pub(crate) fn input_window(&self) -> Option<window::Id> {
         self.input_window.filter(|w| {
             self.extra_windows.contains_key(w)
                 || self.window_ctx.as_ref().is_some_and(|c| c.id == *w)

@@ -404,6 +404,27 @@ impl DeviceStore {
         })
     }
 
+    /// The vault a start opens: when the launch names a saved host
+    /// (`--connect <id>`, a JumpList entry), the registered vault that
+    /// holds it, read while locked (`connections.id` is plaintext), the
+    /// [`Self::boot_vault`] first when it is one of them (an imported
+    /// host keeps its id, so two vaults can hold it); else
+    /// [`Self::boot_vault`].
+    pub fn boot_vault_for(&self, connect: Option<Uuid>) -> VaultEntry {
+        let usual = self.boot_vault();
+        let Some(id) = connect else {
+            return usual;
+        };
+        if file_holds_connection(&self.resolve(&usual), id) {
+            return usual;
+        }
+        let entries = self.with_current(|f| f.vaults.clone());
+        entries
+            .into_iter()
+            .find(|v| file_holds_connection(&self.resolve(v), id))
+            .unwrap_or(usual)
+    }
+
     /// Where `entry`'s file is: a relative path inside this store's
     /// folder, an absolute one as written.
     pub fn resolve(&self, entry: &VaultEntry) -> PathBuf {
@@ -689,6 +710,25 @@ pub fn is_vault_file(path: &Path) -> bool {
         db.query_row(
             "SELECT EXISTS(SELECT 1 FROM vault_meta WHERE key = 'password_check')",
             [],
+            |row| row.get(0),
+        )
+    };
+    path.is_file() && probe().unwrap_or(false)
+}
+
+/// Whether the vault file at `path` holds saved host `id`, read-only,
+/// without its password (the id column is plaintext). A missing or
+/// unreadable file holds nothing.
+pub fn file_holds_connection(path: &Path, id: Uuid) -> bool {
+    let probe = || -> rusqlite::Result<bool> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM connections WHERE id = ?1)",
+            [id.to_string()],
             |row| row.get(0),
         )
     };

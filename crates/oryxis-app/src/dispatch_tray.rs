@@ -5,7 +5,7 @@
 
 use iced::Task;
 
-use crate::app::{TabsMessage, SshMessage, TrayMessage, Message, Oryxis};
+use crate::app::{TabsMessage, TrayMessage, Message, Oryxis};
 
 impl Oryxis {
     pub(crate) fn handle_tray(
@@ -17,14 +17,18 @@ impl Oryxis {
             // claimed by this window's deep-link subscription. Not
             // tray-related beyond sharing the instance-IPC plumbing
             // (tray_ipc owns the inbox), hence its home here.
+            // It names no vault, so it lands where the user works: the
+            // window used last, on its vault.
             TrayMessage::DeepLink(url) => {
-                return self.handle_deep_link_url(&url);
+                return self.run_in_window(self.input_window(), move |app| app.handle_deep_link_url(&url));
             }
             // `oryxis user@host` run while this window was already up.
             // Dials, unlike the deep-link route: the target came from
-            // the user's own shell, not from a page they clicked.
+            // the user's own shell, not from a page they clicked. In the
+            // window used last, like a deep link.
             TrayMessage::ConnectTarget(target) => {
-                let route = self.handle_connect_target(&target);
+                let route =
+                    self.run_in_window(self.input_window(), move |app| app.handle_connect_target(&target));
                 #[cfg(target_os = "windows")]
                 {
                     return Task::batch([Task::done(Message::Tray(TrayMessage::Show)), route]);
@@ -106,12 +110,15 @@ impl Oryxis {
                         .collect();
                     // Recent hosts: top 10, through the one
                     // authority every recency surface reads.
+                    // Every open vault's, each row naming its vault
+                    // when there are several.
                     let recent: Vec<(String, String)> = self
-                        .recent_connections(10)
+                        .recent_connections_everywhere(10)
                         .iter()
-                        .map(|c| {
+                        .map(|(vault, c)| {
                             let shown =
                                 self.privacy_display_label(&c.label, &c.label, &privacy_terms);
+                            let shown = self.recent_host_door_label(*vault, &shown);
                             (shown.replace('&', "&&"), c.id.to_string())
                         })
                         .collect();
@@ -421,14 +428,8 @@ impl Oryxis {
                 }
             }
             TrayMessage::OpenHost(uuid) => {
-                if let Some(idx) =
-                    self.vaults.cur().connections.iter().position(|c| c.id == uuid)
-                {
-                    return Task::batch(vec![
-                        Task::done(Message::Tray(TrayMessage::Show)),
-                        Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))),
-                    ]);
-                }
+                let open = self.open_host_anywhere(uuid);
+                return Task::batch(vec![Task::done(Message::Tray(TrayMessage::Show)), open]);
             }
         }
         Task::none()
@@ -462,7 +463,9 @@ impl Oryxis {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        let recent = self.recent_connections(10);
+        // Every open vault's: the entry launches `--connect <id>`, and
+        // that start opens the vault holding the id.
+        let recent = self.recent_connections_everywhere(10);
         // JumpList titles are persisted by the shell, so they go
         // through the same Privacy Mode redactor as the tab strip
         // (issue #78); the entry still launches by uuid, so a
@@ -471,11 +474,9 @@ impl Oryxis {
         let privacy_terms = self.privacy_terms();
         let entries: Vec<(String, uuid::Uuid)> = recent
             .iter()
-            .map(|c| {
-                (
-                    self.privacy_display_label(&c.label, &c.label, &privacy_terms),
-                    c.id,
-                )
+            .map(|(vault, c)| {
+                let shown = self.privacy_display_label(&c.label, &c.label, &privacy_terms);
+                (self.recent_host_door_label(*vault, &shown), c.id)
             })
             .collect();
 
