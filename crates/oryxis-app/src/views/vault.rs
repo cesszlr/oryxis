@@ -224,7 +224,7 @@ impl Oryxis {
         with_chrome(body, self.cur_maximized())
     }
 
-    /// The screen a boot lands on when `VaultStore::open_default` failed
+    /// The screen a boot lands on when `VaultStore::open_boot` failed
     /// (`VaultState::Loading` after boot): the reason the engine gave,
     /// the file it was opening and where the debug log goes, every line
     /// selectable so a report can carry them verbatim. No control on
@@ -234,7 +234,7 @@ impl Oryxis {
         // The rows this screen records for the keyboard (the rebuild and
         // the restart), fresh every frame.
         self.modal_nav_reset();
-        let vault_path = oryxis_vault::VaultStore::default_path()
+        let vault_path = oryxis_vault::device::boot_vault_path()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "~/.oryxis/vault.db".to_string());
         let log_path = crate::logging::log_path()

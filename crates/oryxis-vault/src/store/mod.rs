@@ -459,6 +459,18 @@ pub(crate) fn decrypt_with_key(data: &[u8], key: &[u8]) -> Result<Vec<u8>, Vault
 // VaultStore
 // ---------------------------------------------------------------------------
 
+/// The settings rows sealed with the master key (base64 of the field
+/// ciphertext), re-sealed by key rotation. None of them may be a device
+/// key: the device store is plaintext and readable with every vault
+/// locked (`crate::device`, pinned by its tests).
+pub const ENCRYPTED_SETTING_KEYS: &[&str] = &[
+    "ai_api_key",
+    "files_recent_folders",
+    "sync_sftp_passphrase",
+    "sync_webdav_password",
+    "sync_device_identity",
+];
+
 /// Vault store, manages SQLite database with encrypted secrets.
 pub struct VaultStore {
     db: SqliteConn,
@@ -477,6 +489,11 @@ pub struct VaultStore {
     /// (`command_enc IS NULL` rows), re-checked on every open.
     command_history_migrated: std::sync::atomic::AtomicBool,
     db_path: PathBuf,
+    /// Where the device keys go (`crate::device`): the store installed
+    /// for the process when this one was opened, or one a test attached.
+    /// `None` = every setting is this vault's own row (the MCP server,
+    /// tests that attach nothing).
+    device: Option<std::sync::Arc<crate::device::DeviceStore>>,
 }
 
 
@@ -525,6 +542,19 @@ impl VaultStore {
             .ok_or_else(|| VaultError::Io(std::io::Error::other("No home directory")))?;
         std::fs::create_dir_all(&dir)?;
         Self::open(dir.join("vault.db"))
+    }
+
+    /// Open or create the vault a start opens: the device registry's
+    /// boot vault (`crate::device::boot_vault_path`), which is the
+    /// install's `vault.db` until there are more. Only the app's own
+    /// folder is created; a vault registered elsewhere is opened where it
+    /// is, never a folder made for it.
+    pub fn open_boot() -> Result<Self, VaultError> {
+        let dir = oryxis_core::paths::oryxis_dir()
+            .ok_or_else(|| VaultError::Io(std::io::Error::other("No home directory")))?;
+        std::fs::create_dir_all(&dir)?;
+        let path = crate::device::boot_vault_path().unwrap_or_else(|| dir.join("vault.db"));
+        Self::open(path)
     }
 
     /// Open or create the vault database at a specific path.
@@ -589,6 +619,7 @@ impl VaultStore {
             session_log_key: std::sync::Mutex::new(None),
             command_history_migrated: std::sync::atomic::AtomicBool::new(false),
             db_path: path,
+            device: crate::device::installed(),
         };
         store.create_tables().map_err(VaultError::at_open_step("schema"))?;
         Ok(store)
@@ -599,6 +630,19 @@ impl VaultStore {
     /// `oryxis-app::sync_runtime`).
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    /// Route this store's device keys to `device` (or, with `None`, keep
+    /// every setting in the vault's own table). `open` attaches the
+    /// store installed for the process; tests attach their own here
+    /// instead of installing one (`crate::device` module docs).
+    pub fn attach_device(&mut self, device: Option<std::sync::Arc<crate::device::DeviceStore>>) {
+        self.device = device;
+    }
+
+    /// The device store this vault routes device keys to, if any.
+    pub fn device(&self) -> Option<&std::sync::Arc<crate::device::DeviceStore>> {
+        self.device.as_ref()
     }
 
     #[cfg(unix)]
@@ -1119,11 +1163,9 @@ impl VaultStore {
         ] {
             self.convert_blob_column(table, id_col, col, dec, enc, lenient)?;
         }
-        self.convert_settings_b64("ai_api_key", dec, enc, lenient)?;
-        self.convert_settings_b64("files_recent_folders", dec, enc, lenient)?;
-        self.convert_settings_b64("sync_sftp_passphrase", dec, enc, lenient)?;
-        self.convert_settings_b64("sync_webdav_password", dec, enc, lenient)?;
-        self.convert_settings_b64("sync_device_identity", dec, enc, lenient)?;
+        for key in ENCRYPTED_SETTING_KEYS {
+            self.convert_settings_b64(key, dec, enc, lenient)?;
+        }
         // The session-recording content key only needs its wrapper
         // converted; the chunks themselves are sealed with the
         // (unchanged) content key.

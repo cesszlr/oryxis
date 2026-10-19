@@ -42,7 +42,7 @@ impl Oryxis {
         // only surface left and a report used to come with the fixed
         // label alone (issue #250).
         let (mut vault, vault_open_error, vault_open_read_only, vault_open_corrupt) =
-            match VaultStore::open_default() {
+            match VaultStore::open_boot() {
                 Ok(v) => (Some(v), None, false, false),
                 Err(e) => {
                     tracing::error!("vault open failed: {e}");

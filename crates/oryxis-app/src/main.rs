@@ -171,6 +171,8 @@ mod views;
 mod widgets;
 mod wol;
 mod zmodem_delivery;
+#[cfg(test)]
+mod settings_scope_tests;
 
 use iced::{window, Size};
 use tracing_subscriber::layer::SubscriberExt;
@@ -280,11 +282,25 @@ fn main() -> iced::Result {
     if force_debug_log && let Err(e) = logging::force_enable() {
         eprintln!("oryxis: failed to enable debug logging: {e}");
     }
+    // The device store (`~/.oryxis/device.json`: the vault registry and
+    // the settings that belong to this machine) is installed BEFORE the
+    // first vault open, so every `VaultStore` of the process routes the
+    // device keys to it, the reads just below included, and a vault that
+    // does not open still leaves the error screen its language. The
+    // first start of a build that has it copies those keys out of the
+    // vault once (`seed_from_first_vault`, read-only, retried on the next
+    // start when the vault cannot be read today).
+    if let Some(device) = oryxis_vault::device::for_app_dir() {
+        if let Err(e) = device.seed_from_first_vault() {
+            eprintln!("oryxis: device settings not copied from the vault: {e}");
+        }
+        oryxis_vault::device::install(std::sync::Arc::new(device));
+    }
     // The open's failure, kept for the subscriber below (it does not
     // exist yet); stderr gets it now for a terminal launch. `boot`
     // opens again and shows its own result on the error screen.
     let mut early_vault_error: Option<String> = None;
-    match oryxis_vault::VaultStore::open_default() {
+    match oryxis_vault::VaultStore::open_boot() {
         Err(e) => {
             eprintln!("oryxis: vault open failed: {e}");
             early_vault_error = Some(e.to_string());
@@ -987,8 +1003,10 @@ fn install_renderer_fallback_hook() {
 
         // Persist so future cold launches skip the crash, then relaunch with
         // the safer backend forced directly (works even if the write failed).
-        if let Ok(vault) = oryxis_vault::VaultStore::open_default() {
-            let _ = vault.set_setting("renderer_backend", setting);
+        // A device setting: written straight to the device store, no
+        // vault open inside a panic hook.
+        if let Some(device) = oryxis_vault::device::installed() {
+            let _ = device.set("renderer_backend", setting);
         }
         let _ = std::process::Command::new(&exe)
             .args(&args)

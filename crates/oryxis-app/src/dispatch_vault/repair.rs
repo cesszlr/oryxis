@@ -22,7 +22,7 @@ impl Oryxis {
                 if !allowed {
                     return Task::none();
                 }
-                let Some(path) = oryxis_vault::VaultStore::default_path() else {
+                let Some(path) = oryxis_vault::device::boot_vault_path() else {
                     self.vault_ui.rebuild = VaultRebuild::Failed("no home directory".into());
                     return Task::none();
                 };

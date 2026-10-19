@@ -5,8 +5,19 @@ impl VaultStore {
     // Settings (key/value in settings table)
     // -----------------------------------------------------------------------
 
-    /// Get a plain-text setting from the settings table.
+    /// The device store a key goes to: `Some` when `key` is a device
+    /// setting (`crate::device::is_device_key`) and this store has one
+    /// attached.
+    fn device_for(&self, key: &str) -> Option<&crate::device::DeviceStore> {
+        self.device.as_deref().filter(|_| crate::device::is_device_key(key))
+    }
+
+    /// Get a plain-text setting: a device key from the device store
+    /// (`crate::device`), any other from the vault's settings table.
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, VaultError> {
+        if let Some(device) = self.device_for(key) {
+            return Ok(device.get(key));
+        }
         let val: Option<String> = self
             .db
             .query_row(
@@ -18,8 +29,12 @@ impl VaultStore {
         Ok(val)
     }
 
-    /// Set a plain-text setting in the settings table.
+    /// Set a plain-text setting: a device key in the device store, any
+    /// other in the vault's settings table.
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), VaultError> {
+        if let Some(device) = self.device_for(key) {
+            return device.set(key, value).map_err(|e| VaultError::Io(std::io::Error::other(e)));
+        }
         self.db.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             params![key, value],
@@ -32,14 +47,24 @@ impl VaultStore {
     /// encrypted settings (`ai_api_key`, `sync_device_identity`) come
     /// back as their base64-encoded ciphertext, the caller is
     /// responsible for substituting decrypted material when needed.
+    ///
+    /// With a device store attached, the device keys come from it and the
+    /// vault's own rows for those keys (left behind by the migration,
+    /// `crate::device`) are not listed: an export carries what the app
+    /// actually uses.
     pub fn list_settings(&self) -> Result<Vec<(String, String)>, VaultError> {
         let mut stmt = self
             .db
             .prepare("SELECT key, value FROM settings ORDER BY key")?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
-        let mut out = Vec::new();
+        let mut out: Vec<(String, String)> = Vec::new();
         for r in rows {
             out.push(r?);
+        }
+        if let Some(device) = &self.device {
+            out.retain(|(key, _)| !crate::device::is_device_key(key));
+            out.extend(device.settings());
+            out.sort_by(|a, b| a.0.cmp(&b.0));
         }
         Ok(out)
     }
@@ -47,7 +72,13 @@ impl VaultStore {
     /// Delete every setting whose key starts with `prefix`. Backs the
     /// "Reset hints" action, which clears all `hint_*` one-time flags
     /// in one sweep so future hints don't each need their own reset.
+    /// Device keys under the prefix go from the device store too.
     pub fn delete_settings_with_prefix(&self, prefix: &str) -> Result<(), VaultError> {
+        if let Some(device) = &self.device {
+            device
+                .delete_with_prefix(prefix)
+                .map_err(|e| VaultError::Io(std::io::Error::other(e)))?;
+        }
         // ESCAPE so a literal `_`/`%` in the prefix can't wildcard-match.
         let pattern = format!(
             "{}%",

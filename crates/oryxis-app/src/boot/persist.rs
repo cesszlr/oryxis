@@ -82,10 +82,21 @@ impl Oryxis {
     /// instead of bubbling them up so a flaky disk doesn't take the
     /// whole settings panel down, the worst case is the user has to
     /// re-type on next boot.
+    ///
+    /// A device key (`oryxis_vault::device`) needs no vault: with none
+    /// open (the open-failed screen) it still reaches the device store,
+    /// so a language picked there is the one the next start shows.
     pub(crate) fn persist_setting(&self, key: &str, value: &str) {
-        if let Some(vault) = &self.vault
-            && let Err(e) = vault.set_setting(key, value)
-        {
+        let result = match &self.vault {
+            Some(vault) => vault.set_setting(key, value).map_err(|e| e.to_string()),
+            None => match oryxis_vault::device::installed() {
+                Some(device) if oryxis_vault::device::is_device_key(key) => {
+                    device.set(key, value).map_err(|e| e.to_string())
+                }
+                _ => Ok(()),
+            },
+        };
+        if let Err(e) = result {
             tracing::warn!("failed to persist setting {key}: {e}");
         }
     }

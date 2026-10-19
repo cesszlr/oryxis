@@ -1,0 +1,259 @@
+use super::*;
+use crate::VaultStore;
+
+fn store_in(dir: &Path) -> DeviceStore {
+    DeviceStore::at(dir)
+}
+
+/// A vault file at `dir/vault.db` with no device store attached, so its
+/// rows land in its own table (the shape every pre-registry install has).
+fn legacy_vault(dir: &Path, rows: &[(&str, &str)]) -> PathBuf {
+    let path = dir.join(FIRST_VAULT_FILE);
+    let mut vault = VaultStore::open(&path).unwrap();
+    vault.attach_device(None);
+    for (k, v) in rows {
+        vault.set_setting(k, v).unwrap();
+    }
+    path
+}
+
+#[test]
+fn a_device_with_no_file_names_its_first_vault_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    assert_eq!(store.vaults(), vec![VaultEntry::first()]);
+    assert_eq!(store.boot_vault().id, FIRST_VAULT_ID);
+    assert_eq!(store.resolve(&store.boot_vault()), dir.path().join("vault.db"));
+    assert_eq!(store.get("language"), None);
+    assert!(!store.is_seeded());
+    assert!(!store.path().exists(), "reads never create the file");
+}
+
+#[test]
+fn a_setting_survives_a_new_store_on_the_same_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    store_in(dir.path()).set("language", "pt-BR").unwrap();
+    assert_eq!(store_in(dir.path()).get("language").as_deref(), Some("pt-BR"));
+}
+
+#[test]
+fn a_read_sees_what_another_process_wrote_and_a_wipe_reads_as_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let mine = store_in(dir.path());
+    let theirs = store_in(dir.path());
+    mine.set("language", "de").unwrap();
+    assert_eq!(theirs.get("language").as_deref(), Some("de"));
+    // The other instance writes; the first one's cache must not answer.
+    theirs.set("language", "fr").unwrap();
+    assert_eq!(mine.get("language").as_deref(), Some("fr"));
+    // The harness wipes the sandbox while the process lives on.
+    std::fs::remove_file(mine.path()).unwrap();
+    assert_eq!(mine.get("language"), None);
+    assert_eq!(mine.vaults(), vec![VaultEntry::first()]);
+}
+
+#[test]
+fn two_writers_keep_each_others_keys() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = store_in(dir.path());
+    let b = store_in(dir.path());
+    // Both caches filled before either writes: a write that trusted its
+    // cache would drop the other's key.
+    assert_eq!(a.get("x"), None);
+    assert_eq!(b.get("x"), None);
+    a.set("language", "es").unwrap();
+    b.set("renderer_backend", "opengl").unwrap();
+    let fresh = store_in(dir.path());
+    assert_eq!(fresh.get("language").as_deref(), Some("es"));
+    assert_eq!(fresh.get("renderer_backend").as_deref(), Some("opengl"));
+}
+
+#[test]
+fn fields_a_newer_build_wrote_survive_a_rewrite() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(FILE_NAME);
+    std::fs::write(
+        &path,
+        r#"{"version": 9, "vaults": [{"id": "6f727978-6973-4000-8000-000000000001", "slug": "personal", "path": "vault.db", "color": "teal"}], "settings": {}, "future": [1, 2]}"#,
+    )
+    .unwrap();
+    let store = store_in(dir.path());
+    store.set("language", "ja").unwrap();
+    let written: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(written["future"], serde_json::json!([1, 2]));
+    assert_eq!(written["vaults"][0]["color"], "teal");
+    assert_eq!(written["version"], 9, "a newer format version is never lowered");
+    assert_eq!(written["settings"]["language"], "ja");
+}
+
+#[test]
+fn a_file_that_does_not_parse_reads_as_fresh_and_is_kept_aside() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(FILE_NAME);
+    std::fs::write(&path, b"{ not json").unwrap();
+    let store = store_in(dir.path());
+    assert_eq!(store.vaults(), vec![VaultEntry::first()]);
+    store.set("language", "it").unwrap();
+    assert_eq!(std::fs::read(dir.path().join("device.json.broken")).unwrap(), b"{ not json");
+    assert_eq!(store_in(dir.path()).get("language").as_deref(), Some("it"));
+}
+
+#[test]
+fn a_registry_emptied_by_hand_gets_its_first_vault_back() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(FILE_NAME), br#"{"vaults": []}"#).unwrap();
+    assert_eq!(store_in(dir.path()).boot_vault(), VaultEntry::first());
+}
+
+#[test]
+fn the_boot_vault_is_the_last_opened_while_it_is_registered() {
+    let dir = tempfile::tempdir().unwrap();
+    let other = Uuid::new_v4();
+    let json = serde_json::json!({
+        "vaults": [
+            {"id": FIRST_VAULT_ID, "slug": "personal", "path": "vault.db"},
+            {"id": other, "slug": "work", "label": "Work", "path": "/media/usb/work.db"},
+        ],
+        "last_vault": other,
+    });
+    std::fs::write(dir.path().join(FILE_NAME), serde_json::to_vec(&json).unwrap()).unwrap();
+    let store = store_in(dir.path());
+    let boot = store.boot_vault();
+    assert_eq!(boot.id, other);
+    assert_eq!(store.resolve(&boot), PathBuf::from("/media/usb/work.db"));
+    // A last vault that is no longer registered falls back to the first.
+    let json = serde_json::json!({
+        "vaults": [{"id": FIRST_VAULT_ID, "slug": "personal", "path": "vault.db"}],
+        "last_vault": other,
+    });
+    std::fs::write(dir.path().join(FILE_NAME), serde_json::to_vec(&json).unwrap()).unwrap();
+    assert_eq!(store_in(dir.path()).boot_vault().id, FIRST_VAULT_ID);
+}
+
+#[test]
+fn seeding_copies_only_the_device_keys_once() {
+    let dir = tempfile::tempdir().unwrap();
+    legacy_vault(
+        dir.path(),
+        &[("language", "pt-BR"), ("hotkey_new_tab", "ctrl+t"), ("app_theme", "Nord")],
+    );
+    let store = store_in(dir.path());
+    assert_eq!(store.seed_from_first_vault().unwrap(), 2);
+    assert!(store.is_seeded());
+    assert_eq!(store.get("language").as_deref(), Some("pt-BR"));
+    assert_eq!(store.get("hotkey_new_tab").as_deref(), Some("ctrl+t"));
+    assert_eq!(store.get("app_theme"), None, "a vault setting stays in the vault");
+    // Once: a later change in the vault's stale row is not copied again.
+    store.set("language", "en").unwrap();
+    assert_eq!(store.seed_from_first_vault().unwrap(), 0);
+    assert_eq!(store.get("language").as_deref(), Some("en"));
+}
+
+#[test]
+fn seeding_never_overwrites_a_key_set_before_it() {
+    let dir = tempfile::tempdir().unwrap();
+    legacy_vault(dir.path(), &[("language", "pt-BR"), ("debug_logging", "true")]);
+    let store = store_in(dir.path());
+    // Set on a start where the vault did not open (the error screen).
+    store.set("language", "fr").unwrap();
+    assert_eq!(store.seed_from_first_vault().unwrap(), 1);
+    assert_eq!(store.get("language").as_deref(), Some("fr"));
+    assert_eq!(store.get("debug_logging").as_deref(), Some("true"));
+}
+
+#[test]
+fn a_fresh_install_is_seeded_with_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    assert_eq!(store.seed_from_first_vault().unwrap(), 0);
+    assert!(store.is_seeded());
+}
+
+#[test]
+fn a_vault_that_cannot_be_read_leaves_the_store_unseeded() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(FIRST_VAULT_FILE), vec![0x5a_u8; 8192]).unwrap();
+    let store = store_in(dir.path());
+    assert_eq!(store.seed_from_first_vault().unwrap(), 0);
+    assert!(!store.is_seeded(), "the next start reads it again");
+}
+
+#[test]
+fn seeding_reads_a_vault_another_handle_holds_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = legacy_vault(dir.path(), &[("language", "ko")]);
+    let _held = VaultStore::open(&path).unwrap();
+    let store = store_in(dir.path());
+    assert_eq!(store.seed_from_first_vault().unwrap(), 1);
+    assert_eq!(store.get("language").as_deref(), Some("ko"));
+}
+
+#[test]
+fn a_vault_with_a_device_store_routes_device_keys_and_keeps_its_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let device = Arc::new(store_in(dir.path()));
+    let path = dir.path().join("v.db");
+    let mut vault = VaultStore::open(&path).unwrap();
+    vault.attach_device(Some(device.clone()));
+
+    vault.set_setting("language", "zh").unwrap();
+    vault.set_setting("plugins_aws_pinned_version", "0.3.1").unwrap();
+    vault.set_setting("app_theme", "Dracula").unwrap();
+    assert_eq!(device.get("language").as_deref(), Some("zh"));
+    assert_eq!(device.get("plugins_aws_pinned_version").as_deref(), Some("0.3.1"));
+    assert_eq!(device.get("app_theme"), None);
+    assert_eq!(vault.get_setting("language").unwrap().as_deref(), Some("zh"));
+    assert_eq!(vault.get_setting("app_theme").unwrap().as_deref(), Some("Dracula"));
+
+    // The vault's own table never saw the device keys.
+    vault.attach_device(None);
+    assert_eq!(vault.get_setting("language").unwrap(), None);
+    assert_eq!(vault.get_setting("app_theme").unwrap().as_deref(), Some("Dracula"));
+}
+
+#[test]
+fn listing_a_routed_vault_shows_the_device_values_not_its_stale_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = legacy_vault(dir.path(), &[("language", "pt-BR"), ("app_theme", "Nord")]);
+    let device = Arc::new(store_in(dir.path()));
+    device.set("language", "el").unwrap();
+    let mut vault = VaultStore::open(&path).unwrap();
+    vault.attach_device(Some(device));
+    let listed = vault.list_settings().unwrap();
+    let language: Vec<_> = listed.iter().filter(|(k, _)| k == "language").collect();
+    assert_eq!(language, vec![&("language".to_owned(), "el".to_owned())]);
+    assert!(listed.iter().any(|(k, v)| k == "app_theme" && v == "Nord"));
+    assert!(listed.windows(2).all(|w| w[0].0 <= w[1].0), "sorted by key");
+}
+
+#[test]
+fn deleting_by_prefix_reaches_the_device_store() {
+    let dir = tempfile::tempdir().unwrap();
+    let device = Arc::new(store_in(dir.path()));
+    let mut vault = VaultStore::open(dir.path().join("v.db")).unwrap();
+    vault.attach_device(Some(device.clone()));
+    vault.set_setting("hotkey_close_tab", "ctrl+w").unwrap();
+    vault.set_setting("hotkey_new_tab", "ctrl+t").unwrap();
+    vault.set_setting("language", "th").unwrap();
+    vault.delete_settings_with_prefix("hotkey_").unwrap();
+    assert_eq!(device.get("hotkey_close_tab"), None);
+    assert_eq!(device.get("hotkey_new_tab"), None);
+    assert_eq!(device.get("language").as_deref(), Some("th"));
+}
+
+#[test]
+fn no_device_key_is_a_sealed_setting() {
+    // The device store is plaintext and readable with every vault
+    // locked; a sealed row routed there would be ciphertext no vault key
+    // re-seals on rotation, or worse, a secret written in the clear.
+    for key in crate::store::ENCRYPTED_SETTING_KEYS {
+        assert!(!is_device_key(key), "{key} is sealed and must stay in its vault");
+    }
+}
+
+#[test]
+fn the_first_vault_id_is_stable() {
+    // Written into every device.json since the registry exists; a change
+    // would orphan the first vault of every install.
+    assert_eq!(FIRST_VAULT_ID.to_string(), "6f727978-6973-4000-8000-000000000001");
+}
