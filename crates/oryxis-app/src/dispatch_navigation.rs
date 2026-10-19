@@ -219,7 +219,7 @@ impl Oryxis {
                     // too; "install it and reopen this screen" must
                     // stay true for this door as well.
                     if self.settings_section == crate::state::SettingsSection::Sync
-                        && self.sync.transport == "git"
+                        && self.vaults.cur().sync.transport == "git"
                     {
                         tasks.push(crate::dispatch_git_sync::git_availability_task());
                     }

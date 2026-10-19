@@ -118,9 +118,9 @@ impl Oryxis {
                 // password input on screen, so Enter raises the OS
                 // presence prompt (the primary action). The fallback
                 // layout keeps Enter on the focused input's on_submit.
-                if self.vault_ui.state == crate::state::VaultState::Locked
+                if self.vaults.cur().vault_ui.state == crate::state::VaultState::Locked
                     && self.biometric_unlock_offered()
-                    && !self.vault_ui.password_fallback
+                    && !self.vaults.cur().vault_ui.password_fallback
                     && matches!(
                         &event,
                         keyboard::Event::KeyPressed {
@@ -143,7 +143,7 @@ impl Oryxis {
                 // exception: an app-level modal rendered over the lock
                 // screen (update / plugin install / KBI / host key) keeps
                 // its keyboard layer, so its Enter / Esc / arrows work.
-                if self.vault_ui.state != crate::state::VaultState::Unlocked {
+                if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
                     if self.any_modal_blocks_input()
                         && let Some(task) = self.handle_modal_nav_key(&event)
                     {
@@ -269,7 +269,7 @@ impl Oryxis {
                 // set-password and change-password forms.
                 if self.cur_view() == crate::state::View::Settings
                     && self.settings_section == crate::state::SettingsSection::Security
-                    && (self.vault_ui.show_password_form || self.vault_ui.change_password_open)
+                    && (self.vaults.cur().vault_ui.show_password_form || self.vaults.cur().vault_ui.change_password_open)
                     && let keyboard::Event::KeyPressed { key, modifiers, .. } = &event
                     && matches!(key, keyboard::Key::Named(keyboard::key::Named::Tab))
                 {

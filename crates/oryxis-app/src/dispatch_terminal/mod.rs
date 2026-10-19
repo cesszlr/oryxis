@@ -467,7 +467,7 @@ impl Oryxis {
                 // now would orphan the bytes still buffered on the pane.
                 // The recording stays open on the pane and is closed by
                 // whatever closes or restarts it after the unlock.
-                if self.vault_ui.state == crate::state::VaultState::Unlocked {
+                if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked {
                     self.flush_session_logs_final();
                     let log_id = self
                         .pane_tab_index(pane_id)

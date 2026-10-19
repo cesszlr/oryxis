@@ -93,7 +93,7 @@ impl Oryxis {
     pub(crate) fn biometric_unlock_offered(&self) -> bool {
         self.vaults.cur().prefs.biometric_unlock_enabled
             && self.biometric_available
-            && self.vault_ui.has_user_password
+            && self.vaults.cur().vault_ui.has_user_password
     }
 
     /// Best-effort refresh of the stored secret after a successful unlock
@@ -121,7 +121,7 @@ impl Oryxis {
         &mut self,
         master_password: &str,
     ) -> Option<iced::Task<crate::app::Message>> {
-        if !(self.vault_ui.setup_enable_biometric && self.biometric_available) {
+        if !(self.vaults.cur().vault_ui.setup_enable_biometric && self.biometric_available) {
             return None;
         }
         match self.biometric_vault().map(|bv| bv.enroll(master_password)) {

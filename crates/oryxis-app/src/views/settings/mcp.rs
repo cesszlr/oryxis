@@ -25,7 +25,7 @@ impl Oryxis {
             container(text(crate::i18n::t("mcp_setup_guide")).size(12).color(OryxisColors::t().accent))
                 .padding(Padding { top: 6.0, right: 16.0, bottom: 6.0, left: 16.0 }),
         )
-        .on_press(if self.mcp.show_info { Message::Mcp(McpMessage::HideMcpInfo) } else { Message::Mcp(McpMessage::ShowMcpInfo) })
+        .on_press(if self.vaults.cur().mcp.show_info { Message::Mcp(McpMessage::HideMcpInfo) } else { Message::Mcp(McpMessage::ShowMcpInfo) })
         .style(|_, status| {
             let bg = match status {
                 BtnStatus::Hovered => Color { a: 0.1, ..OryxisColors::t().accent },
@@ -40,7 +40,7 @@ impl Oryxis {
         let mut mcp_col = column![
             self.nav_toggle_row(
                 crate::i18n::t("mcp_server"),
-                self.mcp.server_enabled,
+                self.vaults.cur().mcp.server_enabled,
                 Message::Mcp(McpMessage::ToggleMcpServer),
             ),
             Space::new().height(12),
@@ -48,7 +48,7 @@ impl Oryxis {
             // flipping it needs no restart on either side.
             self.nav_toggle_row(
                 crate::i18n::t("mcp_allow_writes"),
-                self.mcp.allow_writes,
+                self.vaults.cur().mcp.allow_writes,
                 Message::Mcp(McpMessage::ToggleMcpAllowWrites),
             ),
             text(crate::i18n::t("mcp_allow_writes_desc")).size(11).color(OryxisColors::t().text_muted),
@@ -58,7 +58,7 @@ impl Oryxis {
                 Space::new().width(Length::Fill).boxed(),
                 self.settings_nav_slot_labeled(
                     crate::i18n::t("mcp_setup_guide"),
-                    crate::keynav::RowAction::activate(if self.mcp.show_info {
+                    crate::keynav::RowAction::activate(if self.vaults.cur().mcp.show_info {
                         Message::Mcp(McpMessage::HideMcpInfo)
                     } else {
                         Message::Mcp(McpMessage::ShowMcpInfo)
@@ -68,7 +68,7 @@ impl Oryxis {
                 ),
             ]).align_y(iced::Alignment::Center),
         ];
-        if self.mcp.show_info {
+        if self.vaults.cur().mcp.show_info {
             mcp_col = mcp_col
                 .push(Space::new().height(12).boxed())
                 .push(mcp_info_panel(self));
@@ -148,13 +148,13 @@ fn code_block<'a>(content: &str) -> Element<'a, Message> {
 /// keynav slot, which also means construction below strictly follows
 /// visual order.
 fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
-    let copied = app.mcp.config_copied;
-    let install_status = &app.mcp.install_status;
-    let token: &str = &app.mcp.server_token;
-    let token_visible = app.mcp.token_visible;
-    let target_wsl = app.mcp.target_wsl;
-    let client = app.mcp.client;
-    let client_detected = app.mcp.detected.contains(&client);
+    let copied = app.vaults.cur().mcp.config_copied;
+    let install_status = &app.vaults.cur().mcp.install_status;
+    let token: &str = &app.vaults.cur().mcp.server_token;
+    let token_visible = app.vaults.cur().mcp.token_visible;
+    let target_wsl = app.vaults.cur().mcp.target_wsl;
+    let client = app.vaults.cur().mcp.client;
+    let client_detected = app.vaults.cur().mcp.detected.contains(&client);
     let vault_pw = app.mcp_vault_pw();
 
     // `target_wsl` switches the snippet (and the Copy / Install button
@@ -168,7 +168,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
     // real values.
     let json_text =
         mcp_config_snippet_display(client, token, vault_pw.as_deref(), target_wsl, token_visible);
-    let path_hint = client_path_hint(client, target_wsl, &app.mcp.wsl_markers);
+    let path_hint = client_path_hint(client, target_wsl, &app.vaults.cur().mcp.wsl_markers);
 
     // "Copy", not "Copy JSON": the snippet is TOML for Codex.
     let copy_label = if copied {
@@ -353,7 +353,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
     ];
     for (i, c) in clients.iter().copied().enumerate() {
         let selected = c == client;
-        let detected = app.mcp.detected.contains(&c);
+        let detected = app.vaults.cur().mcp.detected.contains(&c);
         let msg = Message::Mcp(McpMessage::SetMcpClient(c));
         let mut label_items: Vec<Element<'_, Message>> = Vec::new();
         if detected {
@@ -393,7 +393,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
         .align_y(iced::Alignment::Center)
         .wrap();
     info_col = info_col.push(Space::new().height(12).boxed()).push(client_row.boxed());
-    if app.mcp.detecting {
+    if app.vaults.cur().mcp.detecting {
         info_col = info_col.push(Space::new().height(4).boxed()).push(
             text(crate::i18n::t("mcp_client_detecting"))
                 .size(10)
@@ -529,13 +529,13 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
     // without a master password the static note still explains the
     // variable for users who add one later.
     info_col = info_col.push(Space::new().height(8).boxed());
-    if !app.vault_ui.has_user_password {
+    if !app.vaults.cur().vault_ui.has_user_password {
         info_col = info_col.push(
             text(crate::i18n::t("mcp_info_vault_password_note"))
                 .size(11)
                 .color(OryxisColors::t().text_muted).boxed(),
         );
-    } else if app.mcp.include_vault_password {
+    } else if app.vaults.cur().mcp.include_vault_password {
         info_col = info_col
             .push(
                 crate::widgets::dir_row(vec![
@@ -562,7 +562,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
                     .size(10)
                     .color(OryxisColors::t().warning).boxed(),
             );
-    } else if let Some(typed) = &app.mcp.vault_pw_prompt {
+    } else if let Some(typed) = &app.vaults.cur().mcp.vault_pw_prompt {
         // Typed confirmation: embedding only happens after the user
         // proves they know the master password, so an unattended
         // unlocked app can't be used to exfiltrate it into a file.
@@ -614,7 +614,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
                 ])
                 .align_y(iced::Alignment::Center).boxed(),
             );
-        if app.mcp.vault_pw_error {
+        if app.vaults.cur().mcp.vault_pw_error {
             info_col = info_col.push(Space::new().height(4).boxed()).push(
                 text(crate::i18n::t("mcp_vault_pw_wrong"))
                     .size(11)
@@ -646,7 +646,7 @@ fn mcp_info_panel(app: &crate::app::Oryxis) -> Element<'_, Message> {
         // Outcome of the last Remove: confirm the scrub, or surface a
         // failure so the user is never told the credential is gone while
         // it lingers on disk.
-        match &app.mcp.vault_pw_strip_status {
+        match &app.vaults.cur().mcp.vault_pw_strip_status {
             Some(Ok(())) => {
                 info_col = info_col.push(Space::new().height(6).boxed()).push(
                     text(crate::i18n::t("mcp_vault_pw_removed"))

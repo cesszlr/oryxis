@@ -69,14 +69,14 @@ impl Oryxis {
             // predicate the render site uses, so the flag can never say
             // "open" over a screen that isn't showing it.
             Modal::HighlightRuleEditor => self.highlight_rule_editor_open(),
-            Modal::LockVaultConfirm => self.vault_ui.lock_confirm,
+            Modal::LockVaultConfirm => self.vaults.cur().vault_ui.lock_confirm,
             // The render site's own predicate, so the keyboard layer
             // and the overlay can never disagree about whether it is up.
             Modal::UpdateOffer => self.update_modal_shown(),
-            Modal::RelayDeployConfirm => self.sync.relay_deploy.confirm_open,
+            Modal::RelayDeployConfirm => self.vaults.cur().sync.relay_deploy.confirm_open,
             // Either picker: the same dialog, two owners, never both.
             Modal::SyncHostPicker => {
-                self.sync.sftp.picker_open || self.sync.relay_deploy.picker_open
+                self.vaults.cur().sync.sftp.picker_open || self.vaults.cur().sync.relay_deploy.picker_open
             }
         }
     }
@@ -229,7 +229,7 @@ impl Oryxis {
             // re-sent, so there is no window where Esc doubles a signal.
             Modal::MonitorKill => self.monitor.kill = None,
             // Esc mirrors CancelLockVaultConfirm: don't lock.
-            Modal::LockVaultConfirm => self.vault_ui.lock_confirm = false,
+            Modal::LockVaultConfirm => self.vaults.cur_mut().vault_ui.lock_confirm = false,
             // Esc is "Later": the offer goes down and a downloaded
             // artifact stays where it is. Not while the download runs:
             // with the modal down a completion under live sessions
@@ -242,13 +242,13 @@ impl Oryxis {
             }
             // Esc mirrors DeployConfirmCancel: the plan and the parked
             // session stay, so Review can reopen it; nothing has run.
-            Modal::RelayDeployConfirm => self.sync.relay_deploy.confirm_open = false,
+            Modal::RelayDeployConfirm => self.vaults.cur_mut().sync.relay_deploy.confirm_open = false,
             // Mirrors SftpHostPickerClose / DeployHostPickerClose.
             Modal::SyncHostPicker => {
-                self.sync.sftp.picker_open = false;
-                self.sync.sftp.picker_search.clear();
-                self.sync.relay_deploy.picker_open = false;
-                self.sync.relay_deploy.picker_search.clear();
+                self.vaults.cur_mut().sync.sftp.picker_open = false;
+                self.vaults.cur_mut().sync.sftp.picker_search.clear();
+                self.vaults.cur_mut().sync.relay_deploy.picker_open = false;
+                self.vaults.cur_mut().sync.relay_deploy.picker_search.clear();
             }
         }
     }

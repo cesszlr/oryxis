@@ -245,7 +245,7 @@ impl Oryxis {
         // arriving behind the lock screen would open a popup in state
         // that pops into view at unlock: the existence checks below
         // work on a SEALED vault by design.
-        if self.vault_ui.state != crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
             return None;
         }
         // Whether the terminal is ON SCREEN is asked of the same helper

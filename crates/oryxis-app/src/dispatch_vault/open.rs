@@ -15,37 +15,37 @@ impl Oryxis {
         match message {
             // -- Vault --
             VaultMessage::VaultPasswordChanged(pw) => {
-                self.vault_ui.password_input = pw.into_inner();
+                self.vaults.cur_mut().vault_ui.password_input = pw.into_inner();
             }
             VaultMessage::VaultTogglePasswordVisibility => {
-                self.vault_ui.password_visible = !self.vault_ui.password_visible;
+                self.vaults.cur_mut().vault_ui.password_visible = !self.vaults.cur_mut().vault_ui.password_visible;
             }
             VaultMessage::VaultSetup => {
-                if self.vault_ui.password_input.len() < 4 {
-                    self.vault_ui.error =
+                if self.vaults.cur().vault_ui.password_input.len() < 4 {
+                    self.vaults.cur_mut().vault_ui.error =
                         Some(crate::i18n::t("password_too_short").to_string());
                     return Task::none();
                 }
                 // Phase 1 (E1): calibrate Argon2id off the UI thread, then
                 // apply on `VaultKdfCalibrated`. A doubled click while the
                 // spinner is up is a no-op.
-                if self.vault_ui.calibrating {
+                if self.vaults.cur().vault_ui.calibrating {
                     return Task::none();
                 }
-                self.vault_ui.calibrating = true;
-                self.vault_ui.error = None;
+                self.vaults.cur_mut().vault_ui.calibrating = true;
+                self.vaults.cur_mut().vault_ui.error = None;
                 // Snapshot the confirmed password: the input stays live
                 // during the calibration and must not be re-read at apply
                 // time (see `pending_kdf_pw`).
-                self.vault_ui.pending_kdf_pw = Some(self.vault_ui.password_input.clone());
+                self.vaults.cur_mut().vault_ui.pending_kdf_pw = Some(self.vaults.cur_mut().vault_ui.password_input.clone());
                 return calibrate_kdf_task(crate::state::VaultPwOp::FirstSetup);
             }
             VaultMessage::VaultSkipPassword => {
                 if let Some(vault) = &mut self.vaults.cur_mut().store {
                     match vault.open_without_password() {
                         Ok(()) => {
-                            self.vault_ui.state = VaultState::Unlocked;
-                            self.vault_ui.error = None;
+                            self.vaults.cur_mut().vault_ui.state = VaultState::Unlocked;
+                            self.vaults.cur_mut().vault_ui.error = None;
                             self.load_data_from_vault();
                             // The app's own fetches, deferred from boot
                             // until the onboarding had its say on
@@ -68,31 +68,31 @@ impl Oryxis {
                             ]);
                         }
                         Err(VaultError::InvalidPassword) => {
-                            self.vault_ui.error = Some(
+                            self.vaults.cur_mut().vault_ui.error = Some(
                                 crate::i18n::t("vault_already_has_password").to_string(),
                             );
                         }
                         Err(e) => {
-                            self.vault_ui.error = Some(format!("Failed to create vault: {}", e));
+                            self.vaults.cur_mut().vault_ui.error = Some(format!("Failed to create vault: {}", e));
                         }
                     }
                 }
             }
             VaultMessage::VaultDestroyConfirm => {
-                self.vault_ui.destroy_confirm = !self.vault_ui.destroy_confirm;
+                self.vaults.cur_mut().vault_ui.destroy_confirm = !self.vaults.cur_mut().vault_ui.destroy_confirm;
             }
             VaultMessage::VaultDestroy => {
                 if let Some(vault) = &mut self.vaults.cur_mut().store {
                     match vault.destroy_and_recreate() {
                         Ok(()) => {
-                            self.vault_ui.state = VaultState::NeedSetup;
-                            self.vault_ui.error = None;
-                            self.vault_ui.destroy_confirm = false;
-                            self.vault_ui.password_input.clear();
-                            self.vault_ui.password_visible = false;
+                            self.vaults.cur_mut().vault_ui.state = VaultState::NeedSetup;
+                            self.vaults.cur_mut().vault_ui.error = None;
+                            self.vaults.cur_mut().vault_ui.destroy_confirm = false;
+                            self.vaults.cur_mut().vault_ui.password_input.clear();
+                            self.vaults.cur_mut().vault_ui.password_visible = false;
                         }
                         Err(e) => {
-                            self.vault_ui.error = Some(format!("Failed to reset vault: {}", e));
+                            self.vaults.cur_mut().vault_ui.error = Some(format!("Failed to reset vault: {}", e));
                         }
                     }
                 }
@@ -101,14 +101,15 @@ impl Oryxis {
                 // Ignore the submit when no password was typed (pressing
                 // Enter on an empty field or clicking Unlock with it blank
                 // shouldn't run a doomed unlock attempt or surface an error).
-                if self.vault_ui.password_input.is_empty() {
+                if self.vaults.cur().vault_ui.password_input.is_empty() {
                     return Task::none();
                 }
-                if let Some(vault) = &mut self.vaults.cur_mut().store {
-                    match vault.unlock(&self.vault_ui.password_input) {
+                let ov = self.vaults.cur_mut();
+                if let Some(vault) = &mut ov.store {
+                    match vault.unlock(&ov.vault_ui.password_input) {
                         Ok(()) => {
-                            self.vault_ui.state = VaultState::Unlocked;
-                            self.vault_ui.error = None;
+                            self.vaults.cur_mut().vault_ui.state = VaultState::Unlocked;
+                            self.vaults.cur_mut().vault_ui.error = None;
                             // Stamp the unlock so the key router can swallow
                             // the Enter that submitted the password (it
                             // arrives one message later, post-unlock; see
@@ -116,17 +117,17 @@ impl Oryxis {
                             self.last_unlock = Some(std::time::Instant::now());
                             // Retain the password in memory so we can spawn
                             // child windows with it via stdin pipe.
-                            self.master_password = Some(self.vault_ui.password_input.clone());
+                            self.vaults.cur_mut().master_password = Some(self.vaults.cur_mut().vault_ui.password_input.clone());
                             // Keep the OS-keystore copy current so biometric
                             // unlock reflects the live password (self-heals
                             // after a rotation). No-op unless opted in;
                             // enroll never prompts.
-                            self.biometric_reenroll(&self.vault_ui.password_input);
-                            self.vault_ui.password_input.clear();
-                            self.vault_ui.password_visible = false;
+                            self.biometric_reenroll(&self.vaults.cur().vault_ui.password_input);
+                            self.vaults.cur_mut().vault_ui.password_input.clear();
+                            self.vaults.cur_mut().vault_ui.password_visible = false;
                             // Next lock screen leads with biometrics again
                             // (a one-time fallback choice shouldn't stick).
-                            self.vault_ui.password_fallback = false;
+                            self.vaults.cur_mut().vault_ui.password_fallback = false;
                             self.load_data_from_vault();
                             // What the recordings spooled under a soft
                             // lock goes into the vault now, ahead of the
@@ -143,7 +144,7 @@ impl Oryxis {
                             // the P2P transport has a background engine;
                             // the snapshot transports reconcile on the
                             // cadence subscription.
-                            let sync_task = if self.sync.enabled && self.sync_uses_p2p() {
+                            let sync_task = if self.vaults.cur().sync.enabled && self.sync_uses_p2p() {
                                 self.start_sync_engine()
                             } else {
                                 Task::none()
@@ -156,7 +157,7 @@ impl Oryxis {
                             // subprocess, so it runs as a task (never in
                             // `view()`). Same probe the boot path and
                             // `TransportChanged` fire.
-                            if self.sync.transport == "git" {
+                            if self.vaults.cur().sync.transport == "git" {
                                 unlock_tasks
                                     .push(crate::dispatch_git_sync::git_availability_task());
                             }
@@ -241,10 +242,10 @@ impl Oryxis {
                             return Task::batch(unlock_tasks);
                         }
                         Err(VaultError::InvalidPassword) => {
-                            self.vault_ui.error = Some("Invalid password".into());
+                            self.vaults.cur_mut().vault_ui.error = Some("Invalid password".into());
                         }
                         Err(e) => {
-                            self.vault_ui.error = Some(e.to_string());
+                            self.vaults.cur_mut().vault_ui.error = Some(e.to_string());
                         }
                     }
                 }

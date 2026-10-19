@@ -1199,7 +1199,7 @@ impl Oryxis {
             RowAction::activate(Message::Vault(VaultMessage::LockVaultConfirmRememberToggled)),
             4.0,
             false,
-            iced::widget::checkbox(self.vault_ui.lock_confirm_remember)
+            iced::widget::checkbox(self.vaults.cur().vault_ui.lock_confirm_remember)
                 .label(crate::i18n::t("lock_vault_confirm_remember"))
                 .on_toggle(|_| Message::Vault(VaultMessage::LockVaultConfirmRememberToggled))
                 .size(16)

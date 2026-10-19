@@ -713,8 +713,8 @@ impl crate::app::Oryxis {
     /// at every use: the password is never copied into MCP state, so
     /// a vault lock naturally revokes access to it.
     pub(crate) fn mcp_vault_pw(&self) -> Option<String> {
-        (self.mcp.include_vault_password && self.vault_ui.has_user_password)
-            .then(|| self.master_password.clone())
+        (self.vaults.cur().mcp.include_vault_password && self.vaults.cur().vault_ui.has_user_password)
+            .then(|| self.vaults.cur().master_password.clone())
             .flatten()
     }
 }

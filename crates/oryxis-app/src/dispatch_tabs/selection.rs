@@ -200,7 +200,7 @@ impl Oryxis {
         // Credentials and known hosts are read from the vault at dial
         // time, so a soft lock pauses the queue rather than draining it
         // into failures.
-        if self.vault_ui.state != crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
             return None;
         }
         let mut tasks: Vec<Task<Message>> = Vec::new();

@@ -61,7 +61,11 @@ pub(crate) struct DevicePrefs {
     pub(crate) snippet_output_dir: Option<String>,
     pub(crate) auto_check_updates: bool,
     /// Release stream the updater follows (`stable` / `nightly`).
-    pub(crate) update_channel: crate::update::UpdateChannel,
+    pub(crate) update_channel: crate::update::UpdateChannel,    /// This device's display name in the sync peer lists (`sync_device_name`).
+    pub(crate) sync_device_name: String,
+    /// The sync listener's port as typed (`sync_listen_port`, `"0"` ==
+    /// ephemeral): one listener per device, whichever vault syncs.
+    pub(crate) sync_listen_port: String,
 }
 
 impl Default for DevicePrefs {
@@ -81,6 +85,8 @@ impl Default for DevicePrefs {
             session_log_file_dir: None,
             auto_check_updates: true,
             update_channel: crate::update::UpdateChannel::default(),
+            sync_device_name: String::new(),
+            sync_listen_port: "0".into(),
         }
     }
 }

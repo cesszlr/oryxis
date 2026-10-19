@@ -54,10 +54,10 @@ impl Oryxis {
                     .ok()
                     .filter(|m| *m > 0);
                 if let Some(minutes) = minutes
-                    && self.vault_ui.state == crate::state::VaultState::Unlocked
+                    && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
                     // Without a master password, locking reopens
                     // immediately; auto-locking would just churn.
-                    && self.vault_ui.has_user_password
+                    && self.vaults.cur().vault_ui.has_user_password
                     && self.last_user_activity.elapsed().as_secs() >= minutes * 60
                 {
                     tracing::info!("vault auto-lock after {minutes} min idle");

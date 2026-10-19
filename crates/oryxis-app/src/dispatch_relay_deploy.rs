@@ -154,7 +154,7 @@ impl Oryxis {
     ) -> Result<Task<Message>, SyncMessage> {
         let task = match message {
             SyncMessage::DeployToggle => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 d.open = !d.open;
                 if d.open {
                     if d.port.trim().is_empty() {
@@ -162,8 +162,8 @@ impl Oryxis {
                     }
                     // The deploy writes the wizard's token into the
                     // service; make sure there is one to write.
-                    if self.sync.relay_wizard.token.is_empty() {
-                        self.sync.relay_wizard.token = crate::dispatch_sync::fresh_relay_token();
+                    if self.vaults.cur().sync.relay_wizard.token.is_empty() {
+                        self.vaults.cur_mut().sync.relay_wizard.token = crate::dispatch_sync::fresh_relay_token();
                     }
                 } else {
                     // Closing the section drops the parked session and
@@ -178,23 +178,23 @@ impl Oryxis {
                 // The host is baked into the plan; while a probe or run
                 // is in flight it cannot change (the trigger is disabled
                 // too, this is the keyboard's door).
-                if !self.sync.relay_deploy.busy {
-                    self.sync.relay_deploy.picker_open = true;
-                    self.sync.relay_deploy.picker_search.clear();
+                if !self.vaults.cur().sync.relay_deploy.busy {
+                    self.vaults.cur_mut().sync.relay_deploy.picker_open = true;
+                    self.vaults.cur_mut().sync.relay_deploy.picker_search.clear();
                 }
                 Task::none()
             }
             SyncMessage::DeployHostPickerClose => {
-                self.sync.relay_deploy.picker_open = false;
-                self.sync.relay_deploy.picker_search.clear();
+                self.vaults.cur_mut().sync.relay_deploy.picker_open = false;
+                self.vaults.cur_mut().sync.relay_deploy.picker_search.clear();
                 Task::none()
             }
             SyncMessage::DeployHostPickerSearch(v) => {
-                self.sync.relay_deploy.picker_search = v;
+                self.vaults.cur_mut().sync.relay_deploy.picker_search = v;
                 Task::none()
             }
             SyncMessage::DeployHostChanged(id) => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 d.picker_open = false;
                 d.picker_search.clear();
                 if !d.busy && d.host_id != Some(id) {
@@ -209,7 +209,7 @@ impl Oryxis {
                 Task::none()
             }
             SyncMessage::DeployPortChanged(v) => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 // Disabled while busy; refused here as well, because an
                 // edit invalidates the plan a run is executing.
                 if !d.busy {
@@ -224,7 +224,7 @@ impl Oryxis {
                 Task::none()
             }
             SyncMessage::DeployCaddyToggled => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 if !d.busy {
                     d.use_caddy = !d.use_caddy;
                     d.reset_probe();
@@ -235,7 +235,7 @@ impl Oryxis {
             }
             SyncMessage::DeployProbe => self.start_relay_deploy_probe(),
             SyncMessage::DeployProbed(seq, outcome) => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 if seq != d.seq {
                     // A probe the user abandoned (host changed, section
                     // closed): its session drops with the payload.
@@ -287,7 +287,7 @@ impl Oryxis {
                 Task::none()
             }
             SyncMessage::DeployReview => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 // The modal only opens over a plan that can RUN: with
                 // neither root nor sudo the card offers the copy instead.
                 let runnable = d
@@ -303,12 +303,12 @@ impl Oryxis {
                 Task::none()
             }
             SyncMessage::DeployConfirmCancel => {
-                self.sync.relay_deploy.confirm_open = false;
+                self.vaults.cur_mut().sync.relay_deploy.confirm_open = false;
                 Task::none()
             }
             SyncMessage::DeployRun => self.start_relay_deploy_run(),
             SyncMessage::DeployProgress(seq, step, line) => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 if seq != d.seq {
                     return Ok(Task::none());
                 }
@@ -320,7 +320,7 @@ impl Oryxis {
                 Task::none()
             }
             SyncMessage::DeployFinished(seq, result) => {
-                let d = &mut self.sync.relay_deploy;
+                let d = &mut self.vaults.cur_mut().sync.relay_deploy;
                 if seq != d.seq {
                     return Ok(Task::none());
                 }
@@ -340,14 +340,14 @@ impl Oryxis {
                 if let Some((url, token)) = adopt {
                     // Adopt what RAN, never the live form: the plan's
                     // token and the plan's URL, the level-1 rule.
-                    self.sync.signaling_url = url.clone();
-                    self.sync.signaling_token = token.clone();
+                    self.vaults.cur_mut().sync.signaling_url = url.clone();
+                    self.vaults.cur_mut().sync.signaling_token = token.clone();
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("sync_signaling_url", &url);
                         let _ = vault.set_setting("sync_signaling_token", &token);
                     }
-                    self.sync.relay_wizard.result = Some(Ok(()));
-                    if self.sync.engine_running {
+                    self.vaults.cur_mut().sync.relay_wizard.result = Some(Ok(()));
+                    if self.vaults.cur().sync.engine_running {
                         self.stop_sync_engine();
                         return Ok(self.start_sync_engine());
                     }
@@ -363,46 +363,46 @@ impl Oryxis {
     /// plan. Precondition failures land in the card's result line and
     /// return `Task::none()`.
     fn start_relay_deploy_probe(&mut self) -> Task<Message> {
-        if self.sync.relay_deploy.busy {
+        if self.vaults.cur().sync.relay_deploy.busy {
             return Task::none();
         }
         // Credentials need the master key, same gate as a sync round.
         if !self.sync_round_allowed() {
             return Task::none();
         }
-        let Some(host_id) = self.sync.relay_deploy.host_id else {
-            self.sync.relay_deploy.result = Some(Err(t("relay_deploy_no_host").to_string()));
+        let Some(host_id) = self.vaults.cur().sync.relay_deploy.host_id else {
+            self.vaults.cur_mut().sync.relay_deploy.result = Some(Err(t("relay_deploy_no_host").to_string()));
             return Task::none();
         };
         let Some(mut conn) = self.vaults.cur().connections.iter().find(|c| c.id == host_id).cloned() else {
-            self.sync.relay_deploy.result = Some(Err(t("relay_deploy_no_host").to_string()));
+            self.vaults.cur_mut().sync.relay_deploy.result = Some(Err(t("relay_deploy_no_host").to_string()));
             return Task::none();
         };
-        let Some(port) = self.sync.relay_deploy.port() else {
-            self.sync.relay_deploy.result = Some(Err(t("relay_deploy_bad_port").to_string()));
+        let Some(port) = self.vaults.cur().sync.relay_deploy.port() else {
+            self.vaults.cur_mut().sync.relay_deploy.result = Some(Err(t("relay_deploy_bad_port").to_string()));
             return Task::none();
         };
-        let use_caddy = self.sync.relay_deploy.use_caddy;
+        let use_caddy = self.vaults.cur().sync.relay_deploy.use_caddy;
         // TLS needs the wizard's domain: that is the site Caddy serves
         // and the URL this device adopts. Both go into a root script, so
         // their SHAPE is checked here, before anything is dialled.
         let tls = if use_caddy {
-            let w = &self.sync.relay_wizard;
+            let w = &self.vaults.cur().sync.relay_wizard;
             match relay_deploy::tls_endpoint(&w.domain, &w.port) {
                 Ok(ep) => Some(ep),
                 Err(e) => {
-                    self.sync.relay_deploy.result = Some(Err(t(e.label_key()).to_string()));
-                    self.sync.relay_deploy.result_hint = None;
+                    self.vaults.cur_mut().sync.relay_deploy.result = Some(Err(t(e.label_key()).to_string()));
+                    self.vaults.cur_mut().sync.relay_deploy.result_hint = None;
                     return Task::none();
                 }
             }
         } else {
             None
         };
-        if self.sync.relay_wizard.token.is_empty() {
-            self.sync.relay_wizard.token = crate::dispatch_sync::fresh_relay_token();
+        if self.vaults.cur().sync.relay_wizard.token.is_empty() {
+            self.vaults.cur_mut().sync.relay_wizard.token = crate::dispatch_sync::fresh_relay_token();
         }
-        let token = self.sync.relay_wizard.token.clone();
+        let token = self.vaults.cur().sync.relay_wizard.token.clone();
 
         // Same working copy every connect path dials: group inheritance
         // (D4) and the effective proxy.
@@ -413,9 +413,9 @@ impl Oryxis {
             None => match relay_deploy::http_endpoint(&conn.hostname, port) {
                 Some(pair) => pair,
                 None => {
-                    self.sync.relay_deploy.result =
+                    self.vaults.cur_mut().sync.relay_deploy.result =
                         Some(Err(t("relay_deploy_bad_host_address").to_string()));
-                    self.sync.relay_deploy.result_hint = None;
+                    self.vaults.cur_mut().sync.relay_deploy.result_hint = None;
                     return Task::none();
                 }
             },
@@ -424,7 +424,7 @@ impl Oryxis {
         let host_key_on_file = self.route_host_keys_on_file(&conn);
         let dial = self.prepare_unattended_dial(conn);
 
-        let d = &mut self.sync.relay_deploy;
+        let d = &mut self.vaults.cur_mut().sync.relay_deploy;
         d.reset_probe();
         d.busy = true;
         d.result = None;
@@ -546,7 +546,7 @@ impl Oryxis {
             },
         );
         let (task, handle) = Task::stream(stream).abortable();
-        self.sync.relay_deploy.task = Some(handle.abort_on_drop());
+        self.vaults.cur_mut().sync.relay_deploy.task = Some(handle.abort_on_drop());
         task
     }
 
@@ -574,7 +574,7 @@ impl Oryxis {
     /// here and report. The plan and the session are the PROBE's: the
     /// form is not re-read.
     fn start_relay_deploy_run(&mut self) -> Task<Message> {
-        let d = &mut self.sync.relay_deploy;
+        let d = &mut self.vaults.cur_mut().sync.relay_deploy;
         if d.busy || !d.confirm_open {
             return Task::none();
         }
@@ -625,7 +625,7 @@ impl Oryxis {
         // the host where that step left it; every script is idempotent,
         // so the next run converges.
         let (task, handle) = Task::stream(stream).abortable();
-        self.sync.relay_deploy.task = Some(handle.abort_on_drop());
+        self.vaults.cur_mut().sync.relay_deploy.task = Some(handle.abort_on_drop());
         task
     }
 }

@@ -46,10 +46,10 @@ impl Oryxis {
         // password should be typeable without a click.
         container(crate::widgets::password_input_with_eye_id(
             placeholder,
-            &self.vault_ui.password_input,
+            &self.vaults.cur().vault_ui.password_input,
             |v| Message::Vault(VaultMessage::VaultPasswordChanged(v.into())),
             Some(on_submit),
-            self.vault_ui.password_visible,
+            self.vaults.cur().vault_ui.password_visible,
             Message::Vault(VaultMessage::VaultTogglePasswordVisibility),
             12.0,
             Some(iced::widget::Id::new("vault-unlock-password")),
@@ -70,7 +70,7 @@ impl Oryxis {
         // flips to the fallback automatically (see `BiometricUnlockResult`)
         // so the user is never stuck without an input.
         let bio_first =
-            self.biometric_unlock_offered() && !self.vault_ui.password_fallback;
+            self.biometric_unlock_offered() && !self.vaults.cur().vault_ui.password_fallback;
 
         let logo = svg(self.logo_handle.clone())
             .width(64)
@@ -155,13 +155,13 @@ impl Oryxis {
                 .boxed()
         };
 
-        let error = if let Some(err) = &self.vault_ui.error {
+        let error = if let Some(err) = &self.vaults.cur().vault_ui.error {
             text(err.clone()).size(13).color(OryxisColors::t().error).boxed()
         } else {
             Space::new().boxed()
         };
 
-        let destroy_section: Element<'_, Message> = if self.vault_ui.destroy_confirm {
+        let destroy_section: Element<'_, Message> = if self.vaults.cur().vault_ui.destroy_confirm {
             column![
                 text(crate::i18n::t("vault_destroy_confirm")).size(12).color(OryxisColors::t().error),
                 Space::new().height(6),
@@ -244,7 +244,7 @@ impl Oryxis {
             text(t("vault_open_failed")).size(18).color(c.error),
         ]
         .spacing(10);
-        if let Some(reason) = &self.vault_ui.open_error {
+        if let Some(reason) = &self.vaults.cur().vault_ui.open_error {
             col = col.push(
                 text(reason.clone()).size(13).selectable(true).color(c.text_primary).boxed(),
             );
@@ -258,11 +258,11 @@ impl Oryxis {
                     .boxed(),
             )
             .push(
-                text(t(if self.vault_ui.open_read_only {
+                text(t(if self.vaults.cur().vault_ui.open_read_only {
                     // Refused on purpose, with the reason: see
                     // `VaultUi::open_read_only`.
                     "vault_open_read_only_hint"
-                } else if self.vault_ui.open_corrupt {
+                } else if self.vaults.cur().vault_ui.open_corrupt {
                     "vault_open_corrupt_hint"
                 } else {
                     "vault_open_failed_hint"
@@ -278,7 +278,7 @@ impl Oryxis {
                     .color(c.text_secondary)
                     .boxed(),
             );
-        if self.vault_ui.open_corrupt {
+        if self.vaults.cur().vault_ui.open_corrupt {
             col = col.push(self.vault_rebuild_block());
         }
         let body: Element<'_, Message> = container(container(col).width(Length::Fixed(640.0)).padding(24))
@@ -308,7 +308,7 @@ impl Oryxis {
             }
         };
         let mut col = Column::<Element<'_, Message>>::new().spacing(10).padding(Padding::ZERO.top(8.0));
-        match &self.vault_ui.rebuild {
+        match &self.vaults.cur().vault_ui.rebuild {
             VaultRebuild::Idle => {
                 col = col
                     .push(text(t("vault_rebuild_explain")).size(13).color(c.text_secondary).boxed())

@@ -24,7 +24,7 @@ impl Oryxis {
                 // the confirm layers over a plain view, mirroring
                 // RequestClearHistory's overlay close.
                 self.panels.burger_menu = false;
-                if self.vault_ui.has_user_password {
+                if self.vaults.cur().vault_ui.has_user_password {
                     // A standing choice saved from the dialog's "always
                     // use the selected option" opt-in commits directly;
                     // Settings > Security exposes the same value so the
@@ -40,24 +40,24 @@ impl Oryxis {
                             // The opt-in never carries over from an
                             // earlier arming: a stale check would turn a
                             // one-off choice into a standing one.
-                            self.vault_ui.lock_confirm_remember = false;
-                            self.vault_ui.lock_confirm = true;
+                            self.vaults.cur_mut().vault_ui.lock_confirm_remember = false;
+                            self.vaults.cur_mut().vault_ui.lock_confirm = true;
                         }
                     }
                 }
             }
             VaultMessage::CancelLockVaultConfirm => {
-                self.vault_ui.lock_confirm = false;
+                self.vaults.cur_mut().vault_ui.lock_confirm = false;
             }
             VaultMessage::LockVaultConfirmRememberToggled => {
-                self.vault_ui.lock_confirm_remember = !self.vault_ui.lock_confirm_remember;
+                self.vaults.cur_mut().vault_ui.lock_confirm_remember = !self.vaults.cur_mut().vault_ui.lock_confirm_remember;
             }
             VaultMessage::LockVaultConfirmProceed { sleep } => {
                 // Persist the standing choice BEFORE committing: both lock
                 // paths sweep dialog state, and the soft lock zeroizes the
                 // key (settings survive; the vault stays readable for
                 // settings without the master key).
-                if self.vault_ui.lock_confirm_remember {
+                if self.vaults.cur().vault_ui.lock_confirm_remember {
                     let value = if sleep { "sleep" } else { "lock" };
                     self.vaults.cur_mut().prefs.manual_lock_action = value.into();
                     self.persist_setting("manual_lock_action", value);
@@ -91,22 +91,23 @@ impl Oryxis {
                 // What the recordings hold now reaches the vault while
                 // the key is still there; only what arrives after the
                 // lock goes to the spool.
-                if self.vaults.cur().store.is_some() && self.vault_ui.has_user_password {
+                if self.vaults.cur().store.is_some() && self.vaults.cur().vault_ui.has_user_password {
                     self.flush_session_logs();
                 }
-                if let Some(vault) = &mut self.vaults.cur_mut().store
-                    && self.vault_ui.has_user_password
+                let ov = self.vaults.cur_mut();
+                if let Some(vault) = &mut ov.store
+                    && ov.vault_ui.has_user_password
                 {
                     vault.lock();
-                    self.vault_ui.state = VaultState::Locked;
-                    self.master_password = None;
+                    self.vaults.cur_mut().vault_ui.state = VaultState::Locked;
+                    self.vaults.cur_mut().master_password = None;
                     // The lock screen leads with biometrics when enrolled;
                     // a fallback choice from a previous lock must not stick.
-                    self.vault_ui.password_fallback = false;
+                    self.vaults.cur_mut().vault_ui.password_fallback = false;
                     // The confirm dialog cannot survive either lock path: it
                     // is moot once the lock screen is up, and a stale latch
                     // would re-open over the unlocked app.
-                    self.vault_ui.lock_confirm = false;
+                    self.vaults.cur_mut().vault_ui.lock_confirm = false;
                     // Sweep UI that may hold typed or revealed secrets;
                     // everything else (tabs, terminals) stays.
                     self.revealed_secrets.clear();
@@ -198,18 +199,18 @@ impl Oryxis {
                     self.modal_nav_reset();
                     // A master-password candidate typed into the change /
                     // set-password form must not survive the soft lock.
-                    self.vault_ui.new_password.clear();
-                    self.vault_ui.confirm_password.clear();
+                    self.vaults.cur_mut().vault_ui.new_password.clear();
+                    self.vaults.cur_mut().vault_ui.confirm_password.clear();
                     // Abort an in-flight KDF calibration too: its snapshot is
                     // secret material and the apply must not land post-lock.
-                    self.vault_ui.pending_kdf_pw = None;
+                    self.vaults.cur_mut().vault_ui.pending_kdf_pw = None;
                     // Same for the MCP panel's master-password confirm.
-                    self.mcp.vault_pw_prompt = None;
-                    self.mcp.vault_pw_error = false;
+                    self.vaults.cur_mut().mcp.vault_pw_prompt = None;
+                    self.vaults.cur_mut().mcp.vault_pw_error = false;
                     // The one Show on the MCP panel governs the master
                     // password too (when the snippet embeds it); a reveal
                     // left on would spell it out the moment the vault opens.
-                    self.mcp.token_visible = false;
+                    self.vaults.cur_mut().mcp.token_visible = false;
                     // SFTP modals carry remote paths and live action buttons;
                     // root_view already stops rendering them while locked, but
                     // sweep the state so none reappears after unlock. A watch
@@ -288,29 +289,29 @@ impl Oryxis {
                 // auto-save while the key still exists, and on the same
                 // interrupted terms.
                 self.editor_flush_interrupted();
-                if let Some(vault) = &mut self.vaults.cur_mut().store {
+                if let Some(vault) = self.vaults.cur_mut().store.as_mut() {
                     vault.lock();
                     // The dialog that armed this is committed; clear the
                     // latch so it cannot re-open over the unlocked app.
-                    self.vault_ui.lock_confirm = false;
-                    if self.vault_ui.has_user_password {
-                        self.vault_ui.state = VaultState::Locked;
+                    self.vaults.cur_mut().vault_ui.lock_confirm = false;
+                    if self.vaults.cur().vault_ui.has_user_password {
+                        self.vaults.cur_mut().vault_ui.state = VaultState::Locked;
                         // The in-memory master password dies with the
                         // lock, like the soft lock already does (it
                         // feeds biometric enroll and the MCP config
                         // embed; neither may outlive the vault key).
-                        self.master_password = None;
+                        self.vaults.cur_mut().master_password = None;
                         // ssh-agent goes dark on lock (listener stays up).
                         self.agent_on_lock();
                         // And the MCP panel's typed confirm buffer.
-                        self.mcp.vault_pw_prompt = None;
-                        self.mcp.vault_pw_error = false;
+                        self.vaults.cur_mut().mcp.vault_pw_prompt = None;
+                        self.vaults.cur_mut().mcp.vault_pw_error = false;
                         // The one Show on the MCP panel governs the master
                         // password too (when the snippet embeds it); a reveal
                         // left on would spell it out the moment the vault opens.
-                        self.mcp.token_visible = false;
+                        self.vaults.cur_mut().mcp.token_visible = false;
                         // Same reset as the soft lock: lead with biometrics.
-                        self.vault_ui.password_fallback = false;
+                        self.vaults.cur_mut().vault_ui.password_fallback = false;
                         self.vaults.cur_mut().connections.clear();
                         self.quick_connects.clear();
                         self.vaults.cur_mut().keys.clear();
@@ -323,7 +324,7 @@ impl Oryxis {
                         // no longer loaded has nothing to run against.
                         // `reset_probe` also ABORTS a probe or run in
                         // flight, so "severs" is true of a deploy too.
-                        self.sync.relay_deploy.reset_probe();
+                        self.vaults.cur_mut().sync.relay_deploy.reset_probe();
                         // The same sweep the soft lock runs: the sync
                         // passphrase edit (including the decrypted
                         // stored value an open edit caches) must not
@@ -474,11 +475,11 @@ impl Oryxis {
                         // done"; the soft lock sweeps these too.
                         self.session_player = None;
                         self.viewing_session_log = None;
-                        self.vault_ui.new_password.clear();
-                        self.vault_ui.confirm_password.clear();
+                        self.vaults.cur_mut().vault_ui.new_password.clear();
+                        self.vaults.cur_mut().vault_ui.confirm_password.clear();
                         // Abort an in-flight KDF calibration (snapshot is
                         // secret material; the apply must not land post-lock).
-                        self.vault_ui.pending_kdf_pw = None;
+                        self.vaults.cur_mut().vault_ui.pending_kdf_pw = None;
                         self.sftp.picker_open = false;
                         self.sftp.new_entry = None;
                         self.sftp.delete_confirm.clear();
@@ -518,7 +519,9 @@ impl Oryxis {
                         ));
                     } else {
                         // No user password: re-open immediately
-                        let _ = vault.open_without_password();
+                        if let Some(vault) = self.vaults.cur_mut().store.as_mut() {
+                            let _ = vault.open_without_password();
+                        }
                     }
                 }
             }
@@ -538,11 +541,11 @@ impl Oryxis {
     /// the master key), so the round that comes back finds nothing to
     /// commit. The stored value itself rides the encrypted setting.
     fn sweep_sync_passphrase(&mut self) {
-        self.sync.passphrase_input.clear();
-        self.sync.passphrase_matches = None;
-        self.sync.passphrase_stored = None;
-        self.sync.passphrase_editing = false;
-        self.sync.passphrase_field_id = None;
-        self.sync.passphrase_sealed = None;
+        self.vaults.cur_mut().sync.passphrase_input.clear();
+        self.vaults.cur_mut().sync.passphrase_matches = None;
+        self.vaults.cur_mut().sync.passphrase_stored = None;
+        self.vaults.cur_mut().sync.passphrase_editing = false;
+        self.vaults.cur_mut().sync.passphrase_field_id = None;
+        self.vaults.cur_mut().sync.passphrase_sealed = None;
     }
 }

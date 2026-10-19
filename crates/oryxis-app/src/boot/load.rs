@@ -49,7 +49,7 @@ impl Oryxis {
     /// closing flush writes them over the external change, which is the
     /// user's own edit winning.
     pub(crate) fn reload_after_external_write(&mut self) {
-        if self.vault_ui.state != crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
             return;
         }
         let was_dirty = self.editor_autosave_dirty();
@@ -334,10 +334,10 @@ impl Oryxis {
             }
             ov.ai.api_key_set = vault.get_ai_api_key().ok().flatten().is_some();
             if let Ok(Some(v)) = vault.get_setting("mcp_server_enabled") {
-                self.mcp.server_enabled = v == "true";
+                ov.mcp.server_enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("mcp_server_allow_writes") {
-                self.mcp.allow_writes = v == "true";
+                ov.mcp.allow_writes = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("remote_desktop_enabled") {
                 ov.remote_desktop_enabled = v == "true";
@@ -345,23 +345,23 @@ impl Oryxis {
             // Token MCP clients must present; empty means auth is off
             // (server allows any caller as long as the global toggle is on).
             if let Ok(Some(v)) = vault.get_setting("mcp_server_token") {
-                self.mcp.server_token = v;
+                ov.mcp.server_token = v;
             }
             // Consent flag only; the password itself is read from
             // `master_password` at snippet/install time.
             if let Ok(Some(v)) = vault.get_setting("mcp_config_vault_pw") {
-                self.mcp.include_vault_password = v == "true";
+                ov.mcp.include_vault_password = v == "true";
             }
 
             // Sync settings
             if let Ok(Some(v)) = vault.get_setting("sync_enabled") {
-                self.sync.enabled = v == "true";
+                ov.sync.enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sync_mode") {
-                self.sync.mode = v;
+                ov.sync.mode = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_passwords") {
-                self.sync.passwords = v == "true";
+                ov.sync.passwords = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("flatten_hosts") {
                 ov.flatten_hosts = v == "true";
@@ -398,7 +398,7 @@ impl Oryxis {
                 self.local_terminal_default = uuid::Uuid::parse_str(&v).ok();
             }
             if let Ok(Some(v)) = vault.get_setting("sync_device_name") {
-                self.sync.device_name = v;
+                self.device_prefs.sync_device_name = v;
             }
             // One-time grandfather of the hosted relay (v0.9 -> v0.10):
             // release builds used to bake a hosted signaling URL in as an
@@ -488,34 +488,34 @@ impl Oryxis {
                 }
             }
             if let Ok(Some(v)) = vault.get_setting("sync_signaling_url") {
-                self.sync.signaling_url = v;
+                ov.sync.signaling_url = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_signaling_token") {
-                self.sync.signaling_token = v;
+                ov.sync.signaling_token = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_relay_url") {
-                self.sync.relay_url = v;
+                ov.sync.relay_url = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_listen_port") {
-                self.sync.listen_port = v;
+                self.device_prefs.sync_listen_port = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_transport") {
-                self.sync.transport = v;
+                ov.sync.transport = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_sftp_host_id") {
-                self.sync.sftp.host_id = uuid::Uuid::parse_str(&v).ok();
+                ov.sync.sftp.host_id = uuid::Uuid::parse_str(&v).ok();
             }
             if let Ok(Some(v)) = vault.get_setting("sync_sftp_remote_path") {
-                self.sync.sftp.remote_path = v;
+                ov.sync.sftp.remote_path = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_webdav_url") {
-                self.sync.webdav.url = v;
+                ov.sync.webdav.url = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_webdav_user") {
-                self.sync.webdav.user = v;
+                ov.sync.webdav.user = v;
             }
             if let Ok(Some(v)) = vault.get_sync_webdav_password() {
-                self.sync.webdav.password = v;
+                ov.sync.webdav.password = v;
             }
             // The shared group secret: only the KNOWLEDGE flag reaches
             // state. The field starts empty and the stored value never
@@ -526,12 +526,12 @@ impl Oryxis {
             // snapshot transport, so the SFTP / folder / Git / WebDAV
             // cards share the same placeholder.
             match vault.get_sync_sftp_passphrase() {
-                Ok(Some(_)) => self.sync.passphrase_known = true,
-                Ok(None) => self.sync.passphrase_known = false,
+                Ok(Some(_)) => ov.sync.passphrase_known = true,
+                Ok(None) => ov.sync.passphrase_known = false,
                 // Locked vault: leave the previous session's flag alone.
                 Err(_) => {}
             }
-            self.sync.peers = vault.list_sync_peers().unwrap_or_default();
+            ov.sync.peers = vault.list_sync_peers().unwrap_or_default();
             if let Ok(Some(v)) = vault.get_setting("ai_system_prompt") {
                 ov.ai.system_prompt = text_editor::Content::with_text(&v);
             }
@@ -1037,10 +1037,10 @@ impl Oryxis {
                 ov.prefs.ssh_connection_reuse = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sync_folder_path") {
-                self.sync.folder.path = v;
+                ov.sync.folder.path = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sync_git_remote") {
-                self.sync.git.remote = v;
+                ov.sync.git.remote = v;
             }
             if let Ok(Some(v)) = vault.get_setting("side_panel_width")
                 && let Ok(w) = v.parse::<f32>()

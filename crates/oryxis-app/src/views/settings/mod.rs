@@ -291,9 +291,9 @@ impl Oryxis {
         // Overlay the Sync host picker modal across the whole page when
         // one of its two owners has it open (same scrim + centered
         // dialog pattern as the SFTP file browser's picker).
-        let picker = if self.sync.sftp.picker_open {
+        let picker = if self.vaults.cur().sync.sftp.picker_open {
             Some(host_picker::HostPickerTarget::SftpSync)
-        } else if self.sync.relay_deploy.picker_open {
+        } else if self.vaults.cur().sync.relay_deploy.picker_open {
             Some(host_picker::HostPickerTarget::RelayDeploy)
         } else {
             None

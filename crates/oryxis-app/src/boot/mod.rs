@@ -352,19 +352,27 @@ impl Oryxis {
                     // while the vault can still be locked), so it comes
                     // from the read above rather than the factory default.
                     first.prefs.biometric_unlock_enabled = biometric_unlock_enabled;
+                    first.vault_ui = crate::state::VaultUi {
+                        state: vault_state,
+                        open_error: vault_open_error,
+                        open_read_only: vault_open_read_only,
+                        open_corrupt: vault_open_corrupt,
+                        has_user_password: vault_has_user_password,
+                        // Pre-check the onboarding form's biometric opt-in
+                        // whenever the platform can service it.
+                        setup_enable_biometric: biometric_available,
+                        ..Default::default()
+                    };
+                    // Keep the inherited password in memory only when the
+                    // unlock above actually succeeded, otherwise the user is
+                    // about to type their own at the lock screen.
+                    first.master_password = if vault_state == VaultState::Unlocked {
+                        inherited_password
+                    } else {
+                        None
+                    };
                     first
                 }),
-                vault_ui: crate::state::VaultUi {
-                    state: vault_state,
-                    open_error: vault_open_error,
-                    open_read_only: vault_open_read_only,
-                    open_corrupt: vault_open_corrupt,
-                    has_user_password: vault_has_user_password,
-                    // Pre-check the onboarding form's biometric opt-in
-                    // whenever the platform can service it.
-                    setup_enable_biometric: biometric_available,
-                    ..Default::default()
-                },
                 // Vector logo: rendered through iced's SVG (resvg) path so
                 // it stays crisp at any scale and avoids the wgpu image-atlas
                 // corruption seen on GNOME Wayland fractional scaling. Both
@@ -454,14 +462,6 @@ impl Oryxis {
                 pending_auto_connect,
                 pending_deep_link,
                 pending_connect_target,
-                // Keep the inherited password in memory only when the
-                // unlock above actually succeeded, otherwise the user is
-                // about to type their own at the lock screen.
-                master_password: if vault_state == VaultState::Unlocked {
-                    inherited_password
-                } else {
-                    None
-                },
                 sftp: crate::state::SftpState {
                     left: crate::state::PaneState {
                         is_remote: false,
@@ -697,8 +697,6 @@ impl Oryxis {
                 sidebar_search_open: false,
                 hosts_tree_expanded: std::collections::HashSet::new(),
                 hosts_tree_search: String::new(),
-                mcp: crate::state::McpState::default(),
-                sync: crate::state::SyncState::default(),
                 export_password: String::new(),
                 export_include_keys: true,
                 export_selection: oryxis_vault::ExportSelection::all(),
@@ -720,7 +718,7 @@ impl Oryxis {
         );
 
         // If auto-unlocked (no user password), load data immediately
-        if app.vault_ui.state == VaultState::Unlocked {
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
             app.load_data_from_vault();
         }
 
@@ -744,7 +742,7 @@ impl Oryxis {
         // by then would make the offer a lie for the first request.
         // The vault-creation arms fire the same helper once the answer
         // is known.
-        if app.vault_ui.state != VaultState::NeedSetup {
+        if app.vaults.cur().vault_ui.state != VaultState::NeedSetup {
             tasks.extend(app.boot_fetch_tasks());
         }
         // A Windows nightly self-replace that fails after the app has
@@ -786,7 +784,7 @@ impl Oryxis {
         // below: the restored-strip landing (issue #229) yields to all
         // of them, the way it yields at the unlock site.
         let mut landed = false;
-        if app.vault_ui.state == VaultState::Unlocked
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked
             && let Some(connect_id) = app.pending_auto_connect.take()
             && let Some(idx) = app
                 .vaults.cur().connections
@@ -821,7 +819,7 @@ impl Oryxis {
         // not park it for a later unlock. A launch argument outranks it
         // whole: no select, and no dial beside the argument's own
         // foreground one (the tab keeps its place in the queue).
-        if app.vault_ui.state == VaultState::Unlocked {
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
             let landing = app.take_launch_landing_task(landed);
             tasks.extend(landing.dial);
             tasks.extend(landing.select);
@@ -837,8 +835,8 @@ impl Oryxis {
         // Only the P2P transport runs a background engine; every
         // snapshot transport reconciles on the iced cadence
         // subscription instead.
-        if app.vault_ui.state == VaultState::Unlocked
-            && app.sync.enabled
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked
+            && app.vaults.cur().sync.enabled
             && app.sync_uses_p2p()
         {
             tasks.push(app.start_sync_engine());
@@ -847,13 +845,13 @@ impl Oryxis {
         // runs as a task rather than inside `view()`. Fire it whenever
         // the git transport can be on screen (also done on `VaultUnlock`
         // and on `TransportChanged`).
-        if app.vault_ui.state == VaultState::Unlocked && app.sync.transport == "git" {
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked && app.vaults.cur().sync.transport == "git" {
             tasks.push(crate::dispatch_git_sync::git_availability_task());
         }
 
         // Auto-start port forward rules marked `auto_start`. Deferred to
         // `VaultUnlock` when the vault is locked, same as sync / --connect.
-        if app.vault_ui.state == VaultState::Unlocked {
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
             tasks.extend(app.auto_start_port_forwards());
         }
 
@@ -874,7 +872,7 @@ impl Oryxis {
         // the `VaultUnlock` handler, which calls the same method once
         // the user's password opens it (the boot constructor can't
         // re-run). See `spawn_plugin_unlock_tasks`.
-        if app.vault_ui.state == VaultState::Unlocked {
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
             tasks.extend(app.spawn_plugin_unlock_tasks());
         }
         // One-time performance-mode auto-enable notice, for the
@@ -886,7 +884,7 @@ impl Oryxis {
         // family and weight are vault settings, so for a password vault
         // the heal used to run against the constructor's default font
         // and never against the configured one.
-        if app.vault_ui.state == VaultState::Unlocked {
+        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
             tasks.extend(app.unlock_fetch_tasks());
         }
 
@@ -948,7 +946,7 @@ impl Oryxis {
         // Booting straight onto the lock screen: put the keyboard in
         // the master-password field (same auto-focus as LockVault /
         // SoftLockVault, so the password is typeable without a click).
-        if app.vault_ui.state == crate::state::VaultState::Locked {
+        if app.vaults.cur().vault_ui.state == crate::state::VaultState::Locked {
             tasks.push(crate::widgets::focus_input(iced::widget::Id::new(
                 "vault-unlock-password",
             )));

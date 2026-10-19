@@ -92,7 +92,7 @@ impl Oryxis {
     /// Validates config while holding `&self`, then does the network and
     /// vault work off-thread, so the caller can fire it blindly.
     pub(crate) fn run_webdav_sync_round(&mut self, trigger: SyncRoundTrigger) -> Task<Message> {
-        if self.sync.webdav.in_progress {
+        if self.vaults.cur().sync.webdav.in_progress {
             return Task::none();
         }
         // A locked vault has no master key to decrypt with; the
@@ -100,9 +100,9 @@ impl Oryxis {
         if !self.sync_round_allowed() {
             return Task::none();
         }
-        let url = self.sync.webdav.url.trim().to_string();
+        let url = self.vaults.cur().sync.webdav.url.trim().to_string();
         if url.is_empty() {
-            self.sync.webdav.status = Some(Err(t("webdav_sync_no_url").to_string()));
+            self.vaults.cur_mut().sync.webdav.status = Some(Err(t("webdav_sync_no_url").to_string()));
             return Task::none();
         }
         let Some(vault) = &self.vaults.cur().store else {
@@ -111,20 +111,20 @@ impl Oryxis {
         // Group key: the typed buffer for a manual round, else the
         // stored value.
         let Some(key) = self.sync_round_passphrase(trigger) else {
-            self.sync.webdav.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
+            self.vaults.cur_mut().sync.webdav.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
             return Task::none();
         };
         // Argon2id derivation (~0.4 s) runs on a worker thread, not on
         // the UI thread (same reason as the Git transport).
         let db_path = vault.db_path().to_path_buf();
-        let master_password = self.master_password.clone();
+        let master_password = self.vaults.cur().master_password.clone();
         let auth = Auth {
-            user: self.sync.webdav.user.clone(),
-            password: self.sync.webdav.password.clone(),
+            user: self.vaults.cur().sync.webdav.user.clone(),
+            password: self.vaults.cur().sync.webdav.password.clone(),
         };
 
-        self.sync.webdav.in_progress = true;
-        self.sync.webdav.status = None;
+        self.vaults.cur_mut().sync.webdav.in_progress = true;
+        self.vaults.cur_mut().sync.webdav.status = None;
         // Remember what seals this snapshot, so the commit at the end
         // writes that key and not whatever the field holds by then.
         let passphrase = self.arm_round_passphrase(key);

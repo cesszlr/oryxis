@@ -22,7 +22,7 @@ impl Oryxis {
     /// The deploy section of the relay wizard card. Rows record on the
     /// Settings ring in visual order, like the wizard rows above them.
     pub(super) fn sync_relay_deploy_block(&self) -> iced::widget::Column<iced::Element<'_, Message>> {
-        let d = &self.sync.relay_deploy;
+        let d = &self.vaults.cur().sync.relay_deploy;
         let c = OryxisColors::t();
         let mut col: iced::widget::Column<iced::Element<'_, Message>> =
             column![self.settings_nav_slot_labeled(
@@ -273,7 +273,7 @@ impl Oryxis {
         use crate::keynav::RowAction;
         let c = OryxisColors::t();
         self.modal_nav_reset();
-        let d = &self.sync.relay_deploy;
+        let d = &self.vaults.cur().sync.relay_deploy;
         let Some(plan) = &d.plan else {
             // The flag is up with no plan: a state no handler produces.
             // Render the cancel-only shell rather than a blank overlay.

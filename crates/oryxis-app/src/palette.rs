@@ -204,7 +204,7 @@ impl Oryxis {
         if self.vaults.cur().prefs.host_monitoring {
             items.push((t("settings_section_monitoring"), S::Monitoring));
         }
-        if self.sync.enabled {
+        if self.vaults.cur().sync.enabled {
             items.push((t("sync"), S::Sync));
         }
         // Same gate as the Features toggle: no listener on this
@@ -253,7 +253,7 @@ impl Oryxis {
             let enabled = (!action.terminal_only() || in_terminal)
                 && (!action.vault_only() || self.in_vault_area())
                 && (!action.tab_only() || self.focused_strip_tab().is_some())
-                && (action != HotkeyAction::LockVault || self.vault_ui.has_user_password);
+                && (action != HotkeyAction::LockVault || self.vaults.cur().vault_ui.has_user_password);
             candidates.push(Candidate {
                 label: t(action.label_key()).to_string(),
                 keywords: action.id(),

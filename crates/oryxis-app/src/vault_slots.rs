@@ -111,6 +111,15 @@ pub(crate) struct OpenVault {
     /// What the user configured in this vault (every preference that is
     /// not the device's, see `state::DevicePrefs`).
     pub(crate) prefs: crate::state::AppPrefs,
+    pub(crate) mcp: crate::state::McpState,
+    pub(crate) sync: crate::state::SyncState,
+    /// Its lock state and the screens around opening it.
+    pub(crate) vault_ui: crate::state::VaultUi,
+    /// Master password retained in memory for the in-place relaunch
+    /// (`relaunch_self`), which hands it to the replacement process.
+    /// Populated after a successful unlock / setup, cleared if the user
+    /// explicitly re-locks.
+    pub(crate) master_password: Option<String>,
     /// See [`crate::state::ChatUi`].
     pub(crate) chat_ui: crate::state::ChatUi,
     pub(crate) hosts_sort: crate::state::ListSort,
@@ -228,6 +237,10 @@ impl OpenVault {
             custom_ui_themes: Vec::new(),
             files_recent_folders: std::collections::HashMap::new(),
             prefs: crate::state::AppPrefs::default(),
+            sync: crate::state::SyncState::default(),
+            mcp: crate::state::McpState::default(),
+            vault_ui: crate::state::VaultUi::default(),
+            master_password: None,
             privacy: crate::state::PrivacyState::default(),
             ai: crate::state::AiState::default(),
             chat_ui: crate::state::ChatUi::default(),

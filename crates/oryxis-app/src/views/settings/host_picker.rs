@@ -41,8 +41,8 @@ pub(super) enum HostPickerTarget {
 impl HostPickerTarget {
     fn search(self, app: &Oryxis) -> &str {
         match self {
-            Self::SftpSync => &app.sync.sftp.picker_search,
-            Self::RelayDeploy => &app.sync.relay_deploy.picker_search,
+            Self::SftpSync => &app.vaults.cur().sync.sftp.picker_search,
+            Self::RelayDeploy => &app.vaults.cur().sync.relay_deploy.picker_search,
         }
     }
     fn pick(self, id: uuid::Uuid) -> Message {

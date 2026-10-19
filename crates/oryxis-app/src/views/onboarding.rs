@@ -211,7 +211,7 @@ impl Oryxis {
             (
                 t("sync"),
                 t("feature_sync_desc"),
-                self.sync.enabled,
+                self.vaults.cur().sync.enabled,
                 Message::Sync(SyncMessage::ToggleEnabled),
             ),
             (
@@ -357,16 +357,16 @@ impl Oryxis {
 
         let fields = container(password_input_with_eye(
             t("master_password_optional"),
-            &self.vault_ui.password_input,
+            &self.vaults.cur().vault_ui.password_input,
             |v| Message::Vault(VaultMessage::VaultPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::VaultSetup)),
-            self.vault_ui.password_visible,
+            self.vaults.cur().vault_ui.password_visible,
             Message::Vault(VaultMessage::VaultTogglePasswordVisibility),
             12.0,
         ))
         .width(300);
 
-        let error: Element<'_, Message> = if let Some(e) = &self.vault_ui.error {
+        let error: Element<'_, Message> = if let Some(e) = &self.vaults.cur().vault_ui.error {
             column![
                 Space::new().height(8),
                 text(e.clone()).size(12).color(OryxisColors::t().error),
@@ -383,7 +383,7 @@ impl Oryxis {
                 Space::new().height(10),
                 container(crate::widgets::toggle_row(
                     crate::biometric::bio_setup_label(),
-                    self.vault_ui.setup_enable_biometric,
+                    self.vaults.cur().vault_ui.setup_enable_biometric,
                     Message::Vault(VaultMessage::ToggleSetupBiometric),
                 ))
                 .width(300),
@@ -406,7 +406,7 @@ impl Oryxis {
             // While the KDF calibrates (E1), disable the button and show
             // the "calibrating" label so the ~1s wait reads as progress,
             // not a frozen click.
-            if self.vault_ui.calibrating {
+            if self.vaults.cur().vault_ui.calibrating {
                 crate::widgets::styled_button_opt(t("kdf_calibrating"), None, accent)
             } else {
                 styled_button(t("create_vault"), Message::Vault(VaultMessage::VaultSetup), accent)

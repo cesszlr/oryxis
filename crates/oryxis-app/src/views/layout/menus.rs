@@ -804,7 +804,7 @@ impl Oryxis {
             // Lock Vault only when a master password is set; without one,
             // locking has nothing to protect and the unlock screen has no
             // way to re-enter (mirrors the Settings -> Security gating).
-            if self.vault_ui.has_user_password {
+            if self.vaults.cur().vault_ui.has_user_password {
                 // Asks first: Lock Vault tears every live session down, so
                 // the item opens the confirm dialog (`LockVaultConfirm`)
                 // rather than committing directly.

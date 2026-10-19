@@ -116,7 +116,7 @@ impl Oryxis {
             return Task::none();
         };
         let db_path = vault.db_path().to_path_buf();
-        let master_password = self.master_password.clone();
+        let master_password = self.vaults.cur().master_password.clone();
         match crate::agent_server::AgentRuntime::spawn(
             &db_path,
             master_password.as_deref(),
@@ -200,7 +200,7 @@ impl Oryxis {
     /// Re-unlock the agent's dedicated handle after the vault unlocks.
     pub(crate) fn agent_on_unlock(&mut self) {
         if let Some(runtime) = &self.agent.runtime {
-            runtime.unlock(self.master_password.as_deref());
+            runtime.unlock(self.vaults.cur().master_password.as_deref());
         }
     }
 

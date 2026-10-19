@@ -91,7 +91,7 @@ impl Oryxis {
                 // any section change: the reveal is for the moment of
                 // copying it, not a state the panel keeps while the user
                 // is elsewhere.
-                self.mcp.token_visible = false;
+                self.vaults.cur_mut().mcp.token_visible = false;
                 // Leaving the Shortcuts editor cancels any pending
                 // capture; otherwise the next keystroke on the new
                 // section would silently rebind the action.
@@ -123,7 +123,7 @@ impl Oryxis {
                 // (a task, never in `view()`): the git card's "install
                 // it and reopen this screen" instruction relies on a
                 // reopen actually re-checking.
-                if section == crate::state::SettingsSection::Sync && self.sync.transport == "git" {
+                if section == crate::state::SettingsSection::Sync && self.vaults.cur().sync.transport == "git" {
                     tasks.push(crate::dispatch_git_sync::git_availability_task());
                 }
                 // Clicking another matching section while a search is

@@ -26,16 +26,12 @@ pub(crate) struct SyncState {
     /// with their decrypted passwords so peers can mirror them. Off by
     /// default; passwords stay device-local until the user opts in.
     pub(crate) passwords: bool,
-    /// This device's display name in the peer list.
-    pub(crate) device_name: String,
     /// Signaling endpoint URL (empty == not set).
     pub(crate) signaling_url: String,
     /// Bearer token for the signaling endpoint. Empty == not configured.
     pub(crate) signaling_token: String,
     /// Relay endpoint URL (empty == not set).
     pub(crate) relay_url: String,
-    /// Listen port as a string (`"0"` == ephemeral).
-    pub(crate) listen_port: String,
     /// Paired peers loaded from the vault.
     pub(crate) peers: Vec<SyncPeerRow>,
     /// Last status line shown in the Sync panel.
@@ -352,7 +348,6 @@ impl Default for SyncState {
             enabled: false,
             mode: "manual".into(),
             passwords: false,
-            device_name: String::new(),
             // The engine config exposes `signaling_url` / `signaling_token`
             // as `Option<String>`; the app state uses a plain `String`
             // (empty == not set) so a Settings text input can drive it.
@@ -363,7 +358,6 @@ impl Default for SyncState {
             signaling_url: String::new(),
             signaling_token: String::new(),
             relay_url: String::new(),
-            listen_port: "0".into(),
             peers: Vec::new(),
             status: None,
             runtime: None,

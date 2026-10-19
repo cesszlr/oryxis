@@ -17,17 +17,17 @@ impl Oryxis {
                 // file is in place: a rebuild of the REBUILT file would
                 // rename a healthy vault to `.damaged-*`.
                 let allowed = self.vaults.cur().store.is_none()
-                    && self.vault_ui.open_corrupt
-                    && matches!(self.vault_ui.rebuild, VaultRebuild::Idle | VaultRebuild::Failed(_));
+                    && self.vaults.cur().vault_ui.open_corrupt
+                    && matches!(self.vaults.cur().vault_ui.rebuild, VaultRebuild::Idle | VaultRebuild::Failed(_));
                 if !allowed {
                     return Task::none();
                 }
                 let Some(path) = oryxis_vault::device::boot_vault_path() else {
-                    self.vault_ui.rebuild = VaultRebuild::Failed("no home directory".into());
+                    self.vaults.cur_mut().vault_ui.rebuild = VaultRebuild::Failed("no home directory".into());
                     return Task::none();
                 };
                 tracing::warn!(path = %path.display(), "rebuilding the damaged vault");
-                self.vault_ui.rebuild = VaultRebuild::Running;
+                self.vaults.cur_mut().vault_ui.rebuild = VaultRebuild::Running;
                 Task::perform(
                     async move {
                         tokio::task::spawn_blocking(move || oryxis_vault::rebuild_vault(&path))
@@ -55,24 +55,24 @@ impl Oryxis {
                             ms = report.elapsed_ms,
                             "vault rebuilt"
                         );
-                        self.vault_ui.rebuild = VaultRebuild::Done { report, restart_failed: false };
+                        self.vaults.cur_mut().vault_ui.rebuild = VaultRebuild::Done { report, restart_failed: false };
                     }
                     Err(e) => {
                         tracing::error!("vault rebuild failed: {e}");
-                        self.vault_ui.rebuild = VaultRebuild::Failed(e);
+                        self.vaults.cur_mut().vault_ui.rebuild = VaultRebuild::Failed(e);
                     }
                 }
                 Task::none()
             }
             VaultMessage::RestartAfterVaultRebuild => {
-                if !matches!(self.vault_ui.rebuild, VaultRebuild::Done { .. }) {
+                if !matches!(self.vaults.cur().vault_ui.rebuild, VaultRebuild::Done { .. }) {
                     return Task::none();
                 }
                 // Never returns on success; on a failed spawn the screen
                 // says so instead of offering anything that would touch
                 // the rebuilt file.
                 self.relaunch_self();
-                if let VaultRebuild::Done { restart_failed, .. } = &mut self.vault_ui.rebuild {
+                if let VaultRebuild::Done { restart_failed, .. } = &mut self.vaults.cur_mut().vault_ui.rebuild {
                     *restart_failed = true;
                 }
                 Task::none()

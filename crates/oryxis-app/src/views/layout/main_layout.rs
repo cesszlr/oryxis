@@ -622,7 +622,7 @@ impl Oryxis {
         // session and tab, so the button asks first. Backdrop / Esc /
         // Cancel all decline (the safe default); only the Lock button
         // commits.
-        if self.vault_ui.lock_confirm {
+        if self.vaults.cur().vault_ui.lock_confirm {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -638,7 +638,7 @@ impl Oryxis {
         // script that runs as root on a remote machine, so it blocks
         // input and nothing runs until the Run button. Backdrop / Esc /
         // Cancel all decline.
-        if self.sync.relay_deploy.confirm_open {
+        if self.vaults.cur().sync.relay_deploy.confirm_open {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,

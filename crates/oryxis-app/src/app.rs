@@ -309,7 +309,6 @@ pub(crate) fn terminal_font_serves_weight(family: &str, weight: u16) -> bool {
 pub struct Oryxis {
     // Vault
     pub(crate) vaults: crate::vault_slots::VaultSlots,
-    pub(crate) vault_ui: crate::state::VaultUi,
     // Vector logo handles (see boot.rs). SVG goes through iced's
     // resvg/tiny-skia path instead of the wgpu image atlas, which on
     // GNOME Wayland fractional scaling corrupted the raster PNG into
@@ -708,11 +707,6 @@ pub struct Oryxis {
     /// (this one dials, a `ssh://` link only prefills), and merging them
     /// would make provenance a guess at drain time.
     pub(crate) pending_connect_target: Option<String>,
-    /// Master password retained in memory for the in-place relaunch
-    /// (`relaunch_self`), which hands it to the replacement process.
-    /// Populated after a successful unlock / setup, cleared if the user
-    /// explicitly re-locks.
-    pub(crate) master_password: Option<String>,
     /// SFTP browser state of the **active** SFTP tab. A working buffer:
     /// the focused SFTP tab's live state lives here, the others park their
     /// state in `SftpTab::state` (swap-on-focus). With no SFTP tab focused
@@ -1495,10 +1489,8 @@ pub struct Oryxis {
     pub(crate) hosts_tree_search: String,
 
     // MCP Server
-    pub(crate) mcp: crate::state::McpState,
 
     // Sync (settings + runtime engine handles + pairing/SFTP forms)
-    pub(crate) sync: crate::state::SyncState,
 
     // ── SSH-agent server (B1): expose vault keys over the standard
     // ssh-agent socket. Feature-gated (off by default), in-core (the

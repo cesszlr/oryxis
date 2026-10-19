@@ -91,7 +91,7 @@ impl Oryxis {
         if in_settings
             && (self.editing_hotkey.is_some()
                 || (self.settings_section == crate::state::SettingsSection::Security
-                    && (self.vault_ui.show_password_form || self.vault_ui.change_password_open)))
+                    && (self.vaults.cur().vault_ui.show_password_form || self.vaults.cur().vault_ui.change_password_open)))
         {
             return None;
         }
@@ -147,7 +147,7 @@ impl Oryxis {
                 // field enters Content at its first row).
                 // Leaving the sync passphrase field by Tab is a deliberate
                 // walk-away: an open edit is abandoned, empty or not.
-                if self.sync.passphrase_editing {
+                if self.vaults.cur().sync.passphrase_editing {
                     self.exit_passphrase_edit();
                 }
                 if let Some(task) = self.settings_ring_idle_resolve(*named, modifiers.shift()) {
@@ -173,7 +173,7 @@ impl Oryxis {
             Named::Escape => {
                 // An open sync passphrase edit is cancelled by Esc like
                 // any other cancel: back to the read-only mask.
-                if self.sync.passphrase_editing {
+                if self.vaults.cur().sync.passphrase_editing {
                     self.exit_passphrase_edit();
                 }
                 self.keynav_escape()

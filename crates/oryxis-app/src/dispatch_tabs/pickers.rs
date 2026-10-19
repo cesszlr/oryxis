@@ -118,7 +118,7 @@ impl Oryxis {
                 // The palette assumes an unlocked vault (its actions do).
                 // The hotkey path already gates on this; guard here too so
                 // no other producer can open it over the lock screen.
-                if self.vault_ui.state != crate::state::VaultState::Unlocked {
+                if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
                     return Task::none();
                 }
                 self.palette.open = true;

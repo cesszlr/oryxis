@@ -15,7 +15,7 @@ impl Oryxis {
         // update heartbeat with this one dead means the freeze sits in
         // presentation, not in our handlers.
         crate::stall_watchdog::beat_view();
-        let base = match self.vault_ui.state {
+        let base = match self.vaults.cur().vault_ui.state {
             VaultState::Loading => self.view_vault_open_failed(),
             // First-run welcome / onboarding carousel, full page.
             VaultState::NeedSetup => crate::views::vault::with_chrome(
@@ -88,7 +88,7 @@ impl Oryxis {
                 // port forward). No outside-click dismiss for the same reason.
                 Some((self.view_host_key_modal(), None, 40.0))
             } else if let Some(dialog) = self.error_dialog.clone()
-                && !matches!(self.vault_ui.state, VaultState::Unlocked)
+                && !matches!(self.vaults.cur().vault_ui.state, VaultState::Unlocked)
             {
                 // The error dialog renders inside `view_main`, which the
                 // lock screen replaces. A dialog raised WHILE locked (the
@@ -104,7 +104,7 @@ impl Oryxis {
                     40.0,
                 ))
             } else if self.cert_viewer.is_some()
-                && matches!(self.vault_ui.state, VaultState::Unlocked)
+                && matches!(self.vaults.cur().vault_ui.state, VaultState::Unlocked)
             {
                 // Read-only certificate viewer (B2). Vault-area modal: gated on
                 // Unlocked, and swept by the soft-lock so it can't linger over
@@ -130,7 +130,7 @@ impl Oryxis {
         // (Save & Upload / Delete) and must never render or accept input
         // over a soft-locked vault. `SoftLockVault` also sweeps these
         // fields so nothing stale reappears after unlock.
-        let composed = if matches!(self.vault_ui.state, VaultState::Unlocked) {
+        let composed = if matches!(self.vaults.cur().vault_ui.state, VaultState::Unlocked) {
             self.layer_sftp_modals(composed)
         } else {
             composed
@@ -157,7 +157,7 @@ impl Oryxis {
         // survive the view rebuild. The placeholder stays Shrink-sized
         // (the repo's void-Space discipline): a Fixed(0.0) child is
         // exactly the shape that once made child counts vary.
-        let composed = if matches!(self.vault_ui.state, VaultState::Unlocked) {
+        let composed = if matches!(self.vaults.cur().vault_ui.state, VaultState::Unlocked) {
             let overlay = self
                 .toast_overlay()
                 .unwrap_or_else(|| iced::widget::Space::new().boxed());

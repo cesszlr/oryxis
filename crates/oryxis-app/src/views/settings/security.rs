@@ -67,7 +67,7 @@ impl Oryxis {
         use crate::state::SecretField;
         let current = container(crate::widgets::password_input_with_eye(
             t("current_master_password_placeholder"),
-            &self.vault_ui.current_password,
+            &self.vaults.cur().vault_ui.current_password,
             |v| Message::Vault(VaultMessage::VaultCurrentPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::ConfirmChangeVaultPassword)),
             self.revealed_secrets.contains(&SecretField::VaultCurrentPassword),
@@ -77,7 +77,7 @@ impl Oryxis {
         .width(300);
         let new = container(crate::widgets::password_input_with_eye(
             t("new_master_password_placeholder"),
-            &self.vault_ui.new_password,
+            &self.vaults.cur().vault_ui.new_password,
             |v| Message::Vault(VaultMessage::VaultNewPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::ConfirmChangeVaultPassword)),
             self.revealed_secrets.contains(&SecretField::VaultNewPassword),
@@ -87,7 +87,7 @@ impl Oryxis {
         .width(300);
         let confirm = container(crate::widgets::password_input_with_eye(
             t("confirm_master_password_placeholder"),
-            &self.vault_ui.confirm_password,
+            &self.vaults.cur().vault_ui.confirm_password,
             |v| Message::Vault(VaultMessage::VaultConfirmPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::ConfirmChangeVaultPassword)),
             self.revealed_secrets.contains(&SecretField::VaultConfirmPassword),
@@ -95,12 +95,12 @@ impl Oryxis {
             10.0,
         ))
         .width(300);
-        let error: Element<'_, Message> = if let Some(err) = &self.vault_ui.password_error {
+        let error: Element<'_, Message> = if let Some(err) = &self.vaults.cur().vault_ui.password_error {
             text(err.clone()).size(12).color(OryxisColors::t().error).boxed()
         } else {
             Space::new().boxed()
         };
-        let update_btn = if self.vault_ui.calibrating {
+        let update_btn = if self.vaults.cur().vault_ui.calibrating {
             // E1: KDF calibration in flight; disable + show progress.
             crate::widgets::styled_button_opt(
                 crate::i18n::t("kdf_calibrating"),
@@ -144,11 +144,11 @@ impl Oryxis {
         // visibly moves the control (and reveals / hides the form).
         let password_toggle = self.nav_toggle_row(
             crate::i18n::t("vault_password"),
-            self.vault_ui.has_user_password || self.vault_ui.show_password_form,
+            self.vaults.cur().vault_ui.has_user_password || self.vaults.cur().vault_ui.show_password_form,
             Message::Vault(VaultMessage::ToggleVaultPassword),
         );
 
-        let password_section: Element<'_, Message> = if !self.vault_ui.has_user_password {
+        let password_section: Element<'_, Message> = if !self.vaults.cur().vault_ui.has_user_password {
             // No master password yet. Always lead with a highlighted
             // callout explaining why one matters; reveal the actual
             // input form only once the user flips the switch on.
@@ -162,14 +162,14 @@ impl Oryxis {
                 OryxisColors::t().accent,
             );
 
-            if !self.vault_ui.show_password_form {
+            if !self.vaults.cur().vault_ui.show_password_form {
                 // Switch is off: callout only, no input fields.
                 column![Space::new().height(8), importance].boxed()
             } else {
             // Show password input to enable
             let input = container(crate::widgets::password_input_with_eye(
                 t("new_master_password_placeholder"),
-                &self.vault_ui.new_password,
+                &self.vaults.cur().vault_ui.new_password,
                 |v| Message::Vault(VaultMessage::VaultNewPasswordChanged(v.into())),
                 Some(Message::Vault(VaultMessage::SetVaultPassword)),
                 self.revealed_secrets
@@ -186,7 +186,7 @@ impl Oryxis {
             // vault. Require them to match before accepting.
             let confirm = container(crate::widgets::password_input_with_eye(
                 t("confirm_master_password_placeholder"),
-                &self.vault_ui.confirm_password,
+                &self.vaults.cur().vault_ui.confirm_password,
                 |v| Message::Vault(VaultMessage::VaultConfirmPasswordChanged(v.into())),
                 Some(Message::Vault(VaultMessage::SetVaultPassword)),
                 self.revealed_secrets
@@ -197,7 +197,7 @@ impl Oryxis {
                 10.0,
             ))
             .width(300);
-            let btn = if self.vault_ui.calibrating {
+            let btn = if self.vaults.cur().vault_ui.calibrating {
                 crate::widgets::styled_button_opt(crate::i18n::t("kdf_calibrating"), None, OryxisColors::t().accent)
             } else {
                 styled_button(crate::i18n::t("set_password"), Message::Vault(VaultMessage::SetVaultPassword), OryxisColors::t().accent)
@@ -211,7 +211,7 @@ impl Oryxis {
                     Space::new().height(8),
                     container(crate::widgets::toggle_row(
                         crate::biometric::bio_setup_label(),
-                        self.vault_ui.setup_enable_biometric,
+                        self.vaults.cur().vault_ui.setup_enable_biometric,
                         Message::Vault(VaultMessage::ToggleSetupBiometric),
                     ))
                     .width(300),
@@ -219,7 +219,7 @@ impl Oryxis {
             } else {
                 Space::new().boxed()
             };
-            let error: Element<'_, Message> = if let Some(err) = &self.vault_ui.password_error {
+            let error: Element<'_, Message> = if let Some(err) = &self.vaults.cur().vault_ui.password_error {
                 text(err.clone()).size(12).color(OryxisColors::t().error).boxed()
             } else {
                 Space::new().boxed()
@@ -241,12 +241,12 @@ impl Oryxis {
             ].boxed()
             }
         } else {
-            let error: Element<'_, Message> = if let Some(err) = &self.vault_ui.password_error {
+            let error: Element<'_, Message> = if let Some(err) = &self.vaults.cur().vault_ui.password_error {
                 text(err.clone()).size(12).color(OryxisColors::t().error).boxed()
             } else {
                 Space::new().boxed()
             };
-            if self.vault_ui.confirm_remove_password {
+            if self.vaults.cur().vault_ui.confirm_remove_password {
                 // Confirm prompt armed by the header switch. The header
                 // toggle is the single removal path now (the old
                 // standalone Remove button was redundant); this two-step
@@ -318,7 +318,7 @@ impl Oryxis {
     /// buttons, so the keynav recording order matches the on-screen
     /// order.
     fn security_biometric_card(&self) -> Element<'_, Message> {
-        if self.biometric_available && self.vault_ui.has_user_password {
+        if self.biometric_available && self.vaults.cur().vault_ui.has_user_password {
             let tint = OryxisColors::t().accent;
             let card = container(
                 dir_row(vec![
@@ -369,7 +369,7 @@ impl Oryxis {
         // vault re-opens itself with an empty key). Show the
         // button when a password exists; otherwise replace with
         // a muted note telling the user how to enable locking.
-        let lock_btn: Element<'_, Message> = if self.vault_ui.has_user_password {
+        let lock_btn: Element<'_, Message> = if self.vaults.cur().vault_ui.has_user_password {
             // Asks first: Lock Vault tears every live session down, so
             // the button opens the confirm dialog (`LockVaultConfirm`)
             // rather than committing directly.
@@ -412,7 +412,7 @@ impl Oryxis {
         // password (current -> new) without removing encryption. Both
         // controls only apply once a password exists; when it does, the
         // change form drops in below the button row when opened.
-        let lock_row: Element<'_, Message> = if self.vault_ui.has_user_password {
+        let lock_row: Element<'_, Message> = if self.vaults.cur().vault_ui.has_user_password {
             let update_btn = self.settings_nav_slot_labeled(
                 t("update_password"),
                 crate::keynav::RowAction::activate(Message::Vault(VaultMessage::OpenChangeVaultPassword)),
@@ -442,7 +442,7 @@ impl Oryxis {
                 .boxed(),
             );
             let buttons = dir_row(vec![lock_btn, Space::new().width(10).boxed(), update_btn]);
-            if self.vault_ui.change_password_open {
+            if self.vaults.cur().vault_ui.change_password_open {
                 column![buttons, Space::new().height(12), self.change_password_form()].boxed()
             } else {
                 buttons.boxed()
@@ -458,7 +458,7 @@ impl Oryxis {
         // same setting; this row is the way back to "ask". Recorded
         // after the button pair, matching the on-screen order, and
         // hidden with the buttons while no master password exists.
-        let manual_action: Element<'_, Message> = if self.vault_ui.has_user_password {
+        let manual_action: Element<'_, Message> = if self.vaults.cur().vault_ui.has_user_password {
             column![
                 self.nav_pick_row(
                     t("manual_lock_action"),
@@ -492,7 +492,7 @@ impl Oryxis {
         // field is replaced by the same muted note as the Lock button.
         // Built here, before the export/import card, so the keyboard
         // recording order matches the on-screen order.
-        let auto_lock_field: Element<'_, Message> = if self.vault_ui.has_user_password {
+        let auto_lock_field: Element<'_, Message> = if self.vaults.cur().vault_ui.has_user_password {
             self.settings_nav_slot_labeled(
                 t("auto_lock_minutes"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-security-auto-lock")),
@@ -526,7 +526,7 @@ impl Oryxis {
         // The picker only renders once a password exists; without one
         // the button row already collapsed to the muted note, so the
         // block stays a single element either way.
-        let lock_block: Element<'_, Message> = if self.vault_ui.has_user_password {
+        let lock_block: Element<'_, Message> = if self.vaults.cur().vault_ui.has_user_password {
             column![lock_row, Space::new().height(14), manual_action].boxed()
         } else {
             lock_row

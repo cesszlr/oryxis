@@ -68,7 +68,7 @@ impl Oryxis {
     /// off-thread. Returns `Task::none()` with an inline status on any
     /// precondition failure, so the caller can fire it blindly.
     pub(crate) fn run_folder_sync_round(&mut self, trigger: SyncRoundTrigger) -> Task<Message> {
-        if self.sync.folder.in_progress {
+        if self.vaults.cur().sync.folder.in_progress {
             return Task::none();
         }
         // A locked vault has no master key to decrypt with; the
@@ -76,9 +76,9 @@ impl Oryxis {
         if !self.sync_round_allowed() {
             return Task::none();
         }
-        let input = self.sync.folder.path.trim().to_string();
+        let input = self.vaults.cur().sync.folder.path.trim().to_string();
         if input.is_empty() {
-            self.sync.folder.status = Some(Err(t("folder_sync_no_path").to_string()));
+            self.vaults.cur_mut().sync.folder.status = Some(Err(t("folder_sync_no_path").to_string()));
             return Task::none();
         }
         let Some(vault) = &self.vaults.cur().store else {
@@ -87,13 +87,13 @@ impl Oryxis {
         // Group key: the typed buffer for a manual round, else the
         // stored value. Resolved once, here, and carried by value.
         let Some(key) = self.sync_round_passphrase(trigger) else {
-            self.sync.folder.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
+            self.vaults.cur_mut().sync.folder.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
             return Task::none();
         };
         // Argon2id derivation (~0.4 s) runs inside the blocking task,
         // not on the UI thread (same reason as the Git transport).
         let db_path = vault.db_path().to_path_buf();
-        let master_password = self.master_password.clone();
+        let master_password = self.vaults.cur().master_password.clone();
 
         // Per-device temp-file tag, the same guard the SFTP transport
         // documents: two devices sharing one temp name would interleave
@@ -117,8 +117,8 @@ impl Oryxis {
             }
         };
 
-        self.sync.folder.in_progress = true;
-        self.sync.folder.status = None;
+        self.vaults.cur_mut().sync.folder.in_progress = true;
+        self.vaults.cur_mut().sync.folder.status = None;
         // Remember what seals this snapshot, so the commit at the end
         // writes that key and not whatever the field holds by then.
         let passphrase = self.arm_round_passphrase(key);

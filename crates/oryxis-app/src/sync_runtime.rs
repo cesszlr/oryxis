@@ -117,17 +117,17 @@ impl Oryxis {
     fn build_sync_config(&self) -> SyncConfig {
         let mut config = SyncConfig {
             enabled: true,
-            mode: if self.sync.mode == "auto" {
+            mode: if self.vaults.cur().sync.mode == "auto" {
                 SyncMode::Auto
             } else {
                 SyncMode::Manual
             },
-            relay_url: if self.sync.relay_url.trim().is_empty() {
+            relay_url: if self.vaults.cur().sync.relay_url.trim().is_empty() {
                 None
             } else {
-                Some(self.sync.relay_url.clone())
+                Some(self.vaults.cur().sync.relay_url.clone())
             },
-            listen_port: self.sync.listen_port.trim().parse().unwrap_or(0),
+            listen_port: self.device_prefs.sync_listen_port.trim().parse().unwrap_or(0),
             auto_interval_secs: 300,
             ..SyncConfig::default()
         };
@@ -136,13 +136,13 @@ impl Oryxis {
         // to LAN-only (`None`). The token follows the same rule and
         // is `None` (so the signaling client sends no `Authorization`)
         // when the field is empty.
-        let url = self.sync.signaling_url.trim();
+        let url = self.vaults.cur().sync.signaling_url.trim();
         config.signaling_url = if url.is_empty() {
             None
         } else {
             Some(url.to_string())
         };
-        let token = self.sync.signaling_token.trim();
+        let token = self.vaults.cur().sync.signaling_token.trim();
         config.signaling_token = if token.is_empty() {
             None
         } else {
@@ -165,7 +165,7 @@ impl Oryxis {
     /// safe answer, including for a settings row written by a newer
     /// build.
     pub(crate) fn sync_uses_p2p(&self) -> bool {
-        self.sync.transport == "p2p"
+        self.vaults.cur().sync.transport == "p2p"
     }
 
     /// Whether a snapshot round may run right now: only with the vault
@@ -178,7 +178,7 @@ impl Oryxis {
     /// set (established sessions survive it), so the `let Some(vault)`
     /// check inside those functions is NOT the gate.
     pub(crate) fn sync_round_allowed(&self) -> bool {
-        self.vault_ui.state == crate::state::VaultState::Unlocked
+        self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
     }
 
     /// Spawn the sync engine from current settings, off the UI thread.
@@ -188,7 +188,7 @@ impl Oryxis {
     /// (`Task::none`) if the engine is already running (or a spawn is
     /// in flight) or the vault isn't available.
     pub(crate) fn start_sync_engine(&mut self) -> Task<Message> {
-        if self.sync.runtime.is_some() || self.sync.pending_engine.is_some() {
+        if self.vaults.cur().sync.runtime.is_some() || self.vaults.cur().sync.pending_engine.is_some() {
             return Task::none();
         }
         let Some(vault) = &self.vaults.cur().store else {
@@ -196,12 +196,12 @@ impl Oryxis {
         };
         let db_path = vault.db_path().to_path_buf();
         let config = self.build_sync_config();
-        let device_name = if self.sync.device_name.trim().is_empty() {
+        let device_name = if self.device_prefs.sync_device_name.trim().is_empty() {
             "oryxis-device".to_string()
         } else {
-            self.sync.device_name.clone()
+            self.device_prefs.sync_device_name.clone()
         };
-        let master_password = self.master_password.clone();
+        let master_password = self.vaults.cur().master_password.clone();
 
         // The spawn unlocks the vault (Argon2id, ~1s) and binds QUIC /
         // mDNS; it must not run on the UI thread (it used to, and
@@ -210,7 +210,7 @@ impl Oryxis {
         // back through a oneshot and a signal message; the handler
         // stores the runtime and pumps the event stream.
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.sync.pending_engine = Some(rx);
+        self.vaults.cur_mut().sync.pending_engine = Some(rx);
         Task::perform(
             async move {
                 let result =
@@ -227,10 +227,10 @@ impl Oryxis {
     /// `send` fails, and the just-built runtime drops, which stops the
     /// engine's background tasks.
     pub(crate) fn stop_sync_engine(&mut self) {
-        if let Some(mut runtime) = self.sync.runtime.take() {
+        if let Some(mut runtime) = self.vaults.cur_mut().sync.runtime.take() {
             runtime.stop();
         }
-        self.sync.pending_engine = None;
-        self.sync.engine_running = false;
+        self.vaults.cur_mut().sync.pending_engine = None;
+        self.vaults.cur_mut().sync.engine_running = false;
     }
 }

@@ -38,7 +38,7 @@ impl Oryxis {
                             crate::i18n::t("biometric_enroll_failed").to_string(),
                         );
                     }
-                    let Some(pw) = self.master_password.clone() else {
+                    let Some(pw) = self.vaults.cur().master_password.clone() else {
                         tracing::warn!("biometric opt-in refused: master password not in memory");
                         return self.show_toast(
                             crate::i18n::t("biometric_enroll_failed").to_string(),
@@ -88,17 +88,17 @@ impl Oryxis {
                 Ok(password) => {
                     // Feed the released password into the ordinary unlock
                     // path (which sets `master_password`, boots sync, etc).
-                    self.vault_ui.password_input = password;
+                    self.vaults.cur_mut().vault_ui.password_input = password;
                     return Task::done(Message::Vault(VaultMessage::VaultUnlock));
                 }
                 Err(e) => {
                     tracing::warn!("biometric unlock failed: {e}");
-                    self.vault_ui.error =
+                    self.vaults.cur_mut().vault_ui.error =
                         Some(crate::i18n::t("biometric_unlock_failed").to_string());
                     // Drop to the typed-password layout so the user is
                     // never stuck on a prompt the OS keeps rejecting, and
                     // focus the input the error just told them to use.
-                    self.vault_ui.password_fallback = true;
+                    self.vaults.cur_mut().vault_ui.password_fallback = true;
                     return crate::widgets::focus_input(iced::widget::Id::new(
                         "vault-unlock-password",
                     ));
@@ -108,14 +108,14 @@ impl Oryxis {
                 // Biometric-first lock screen: reveal the typed-password
                 // form. The biometric button stays available below it, so
                 // this is a per-lock choice, not a mode switch.
-                self.vault_ui.password_fallback = true;
-                self.vault_ui.error = None;
+                self.vaults.cur_mut().vault_ui.password_fallback = true;
+                self.vaults.cur_mut().vault_ui.error = None;
                 return crate::widgets::focus_input(iced::widget::Id::new(
                     "vault-unlock-password",
                 ));
             }
             VaultMessage::ToggleSetupBiometric => {
-                self.vault_ui.setup_enable_biometric = !self.vault_ui.setup_enable_biometric;
+                self.vaults.cur_mut().vault_ui.setup_enable_biometric = !self.vaults.cur_mut().vault_ui.setup_enable_biometric;
             }
             // The parent routed us here, so anything else is a
             // grouping mistake, not a runtime case.

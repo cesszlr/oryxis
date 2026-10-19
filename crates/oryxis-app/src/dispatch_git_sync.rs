@@ -213,7 +213,7 @@ pub(crate) fn git_availability_task() -> Task<Message> {
 impl Oryxis {
     /// Run one Git-sync round.
     pub(crate) fn run_git_sync_round(&mut self, trigger: SyncRoundTrigger) -> Task<Message> {
-        if self.sync.git.in_progress {
+        if self.vaults.cur().sync.git.in_progress {
             return Task::none();
         }
         // A locked vault has no master key to decrypt with; the
@@ -221,9 +221,9 @@ impl Oryxis {
         if !self.sync_round_allowed() {
             return Task::none();
         }
-        let remote = self.sync.git.remote.trim().to_string();
+        let remote = self.vaults.cur().sync.git.remote.trim().to_string();
         if remote.is_empty() {
-            self.sync.git.status = Some(Err(t("git_sync_no_remote").to_string()));
+            self.vaults.cur_mut().sync.git.status = Some(Err(t("git_sync_no_remote").to_string()));
             return Task::none();
         }
         let Some(vault) = &self.vaults.cur().store else {
@@ -236,7 +236,7 @@ impl Oryxis {
         // reads the buffer) and IN FLIGHT (the key is armed below and
         // committed by value, never re-read from the field).
         let Some(key) = self.sync_round_passphrase(trigger) else {
-            self.sync.git.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
+            self.vaults.cur_mut().sync.git.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
             return Task::none();
         };
         // The Argon2id derivation (~0.4 s) runs inside the blocking
@@ -244,17 +244,17 @@ impl Oryxis {
         // every "Sync now" click (the stall watchdog logged GitSyncNow
         // at ~370 ms per round).
         let db_path = vault.db_path().to_path_buf();
-        let master_password = self.master_password.clone();
+        let master_password = self.vaults.cur().master_password.clone();
         // Same fallback as `start_sync_engine`: an unset device name
         // would otherwise render as a bare "oryxis: sync from" commit.
-        let device = if self.sync.device_name.trim().is_empty() {
+        let device = if self.device_prefs.sync_device_name.trim().is_empty() {
             "oryxis-device".to_string()
         } else {
-            self.sync.device_name.clone()
+            self.device_prefs.sync_device_name.clone()
         };
 
-        self.sync.git.in_progress = true;
-        self.sync.git.status = None;
+        self.vaults.cur_mut().sync.git.in_progress = true;
+        self.vaults.cur_mut().sync.git.status = None;
         // Remember what seals this snapshot, so the commit at the end
         // writes that key and not whatever the field holds by then.
         let passphrase = self.arm_round_passphrase(key);

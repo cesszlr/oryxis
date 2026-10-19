@@ -86,7 +86,7 @@ impl Oryxis {
                         // ran; a locked vault cannot encrypt the private
                         // material, so the generated key is dropped (the
                         // panel was already swept by the lock sweep).
-                        if self.vault_ui.state != crate::state::VaultState::Unlocked {
+                        if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
                             return Ok(Task::none());
                         }
                         let Some(vault) = &self.vaults.cur().store else {

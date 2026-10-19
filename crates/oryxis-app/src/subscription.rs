@@ -291,7 +291,7 @@ impl Oryxis {
         // field's last drawn bounds, and fall back to a focus query when
         // the geometry is inconclusive or the buffer is stale (a
         // select-all delete clears the display without firing on_input).
-        if self.sync.passphrase_editing {
+        if self.vaults.cur().sync.passphrase_editing {
             subs.push(iced::event::listen_with(|event, _status, _window| {
                 match event {
                     iced::event::Event::Mouse(iced::mouse::Event::ButtonPressed(
@@ -317,7 +317,7 @@ impl Oryxis {
         // tabs. Unmounted while the vault is locked (soft auto-lock keeps
         // sessions alive): a reconnect needs credentials from the sealed
         // vault and would only burn retry attempts.
-        if self.vault_ui.state == crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(30))
                     .map(|_| Message::Settings(SettingsMessage::AutoReconnectTick)),
@@ -389,7 +389,7 @@ impl Oryxis {
         // the locked screen would still be gathering (and discarding)
         // telemetry behind the lock screen.
         if self.vaults.cur().prefs.host_monitoring
-            && self.vault_ui.state == crate::state::VaultState::Unlocked
+            && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && (self.monitor_tab_visible()
                 || (self.vaults.cur().prefs.monitor_status_bar && self.vaults.cur().prefs.show_status_bar))
             && self.monitor_target().is_some()
@@ -407,7 +407,7 @@ impl Oryxis {
         // actually up. Same Unlocked gate as the sidebar monitor: a
         // soft lock must stop reading the fleet behind the lock screen.
         if self.vaults.cur().prefs.host_monitoring
-            && self.vault_ui.state == crate::state::VaultState::Unlocked
+            && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && self.cur_view() == crate::state::View::Monitoring
             && self.cur_active_tab().is_none()
         {
@@ -423,7 +423,7 @@ impl Oryxis {
         // matching the probe cadence re-renders it while visible.
         if self.vaults.cur().prefs.show_status_bar
             && self.vaults.cur().prefs.status_show_latency
-            && self.vault_ui.state == crate::state::VaultState::Unlocked
+            && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && self
                 .active_tab
                 .and_then(|i| self.tabs.get(i))
@@ -449,7 +449,7 @@ impl Oryxis {
         // the bar hidden. Gating it there would leave the dot amber for
         // an outage that ended. Unmounted the moment the focused pane is
         // not on mosh, like every other periodic subscription here.
-        if self.vault_ui.state == crate::state::VaultState::Unlocked
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && self
                 .active_tab
                 .and_then(|i| self.tabs.get(i))
@@ -465,7 +465,7 @@ impl Oryxis {
         // clears every watch, but the gate makes the invariant structural
         // (no save can upload behind the lock screen even if a watch
         // slipped past a future sweep edit).
-        if self.vault_ui.state == crate::state::VaultState::Unlocked
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && (!self.cur_sftp().edit_watches.is_empty()
                 || self
                     .sftp_tabs
@@ -579,7 +579,7 @@ impl Oryxis {
         // backoff, so a permanently-down forward keeps this at a gentle
         // 4 wakes/min rather than churning the view faster than any rule
         // could possibly be due.
-        if self.vault_ui.state == crate::state::VaultState::Unlocked
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && !self.port_forward_retry.is_empty()
         {
             subs.push(
@@ -596,7 +596,7 @@ impl Oryxis {
         // discard data): the capture path's own over-threshold flush
         // then spools to disk (`session_spool`), and the first flush
         // after unlock drains the spool ahead of the buffers.
-        if self.vault_ui.state == crate::state::VaultState::Unlocked
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && self
                 .tabs
                 .iter()
@@ -655,10 +655,10 @@ impl Oryxis {
         // would then reach a server with stored credentials on behalf
         // of a vault the user believes is closed (and fail, since it
         // cannot decrypt anything).
-        if self.sync.enabled
+        if self.vaults.cur().sync.enabled
             && !self.sync_uses_p2p()
-            && self.sync.mode == "auto"
-            && self.vault_ui.state == crate::state::VaultState::Unlocked
+            && self.vaults.cur().sync.mode == "auto"
+            && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
         {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(300))
@@ -680,7 +680,7 @@ impl Oryxis {
         // lost on return, and the documented "subscriptions unmount
         // while locked" contract broken.
         if self.cur_view() == crate::state::View::History
-            && self.vault_ui.state == crate::state::VaultState::Unlocked
+            && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && self.session_player.as_ref().is_some_and(|p| p.playing)
         {
             subs.push(
@@ -694,7 +694,7 @@ impl Oryxis {
         // costs nothing. The 30 s cadence bounds the overshoot past the
         // configured idle threshold; the handler does the actual
         // elapsed-time comparison against `last_user_activity`.
-        if self.vault_ui.state == crate::state::VaultState::Unlocked
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
             && self
                 .vaults.cur().prefs.auto_lock_minutes
                 .parse::<u64>()

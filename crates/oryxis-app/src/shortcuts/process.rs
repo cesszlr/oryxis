@@ -49,7 +49,7 @@ impl Oryxis {
         if crate::logging::is_forced() {
             cmd.arg("--debug-log");
         }
-        let inherit = self.master_password.is_some();
+        let inherit = self.vaults.cur().master_password.is_some();
         if inherit {
             cmd.arg("--inherit-vault");
             cmd.stdin(std::process::Stdio::piped());
@@ -58,7 +58,7 @@ impl Oryxis {
             Ok(mut child) => {
                 if inherit
                     && let Some(mut stdin) = child.stdin.take()
-                    && let Some(pw) = self.master_password.as_ref()
+                    && let Some(pw) = self.vaults.cur().master_password.as_ref()
                 {
                     use std::io::Write as _;
                     let _ = writeln!(stdin, "{}", pw);

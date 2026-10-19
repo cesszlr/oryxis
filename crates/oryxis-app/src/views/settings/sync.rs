@@ -10,7 +10,7 @@ impl Oryxis {
     /// box, so they know a passphrase exists) asks for the replacement
     /// ("enter new passphrase"), the standard change-password wording.
     fn sync_passphrase_placeholder(&self) -> &'static str {
-        if self.sync.passphrase_known {
+        if self.vaults.cur().sync.passphrase_known {
             crate::i18n::t("sync_passphrase_new_placeholder")
         } else {
             crate::i18n::t("sftp_sync_passphrase_placeholder")
@@ -24,7 +24,7 @@ impl Oryxis {
     /// comparison itself lives in `set_sync_passphrase`; this only
     /// renders its outcome.
     fn sync_passphrase_hint(&self) -> Option<Element<'_, Message>> {
-        match self.sync.passphrase_matches {
+        match self.vaults.cur().sync.passphrase_matches {
             Some(true) => Some(
                 text(crate::i18n::t("sync_passphrase_match_hint"))
                     .size(11)
@@ -85,7 +85,7 @@ impl Oryxis {
         id: &'static str,
         width: Length,
     ) -> Element<'_, Message> {
-        if self.sync.passphrase_known && !self.sync.passphrase_editing {
+        if self.vaults.cur().sync.passphrase_known && !self.vaults.cur().sync.passphrase_editing {
             let change = Message::Sync(SyncMessage::PassphraseChangeRequested(id));
             // The display IS the button: no pencil, no tooltip, so it
             // reads exactly like the other fields on the card: a masked
@@ -161,7 +161,7 @@ impl Oryxis {
                 crate::widgets::bounds_reporter(
                     container(crate::widgets::password_input_with_eye_nav(
                         self.sync_passphrase_placeholder(),
-                        self.sync.passphrase_input.as_str(),
+                        self.vaults.cur().sync.passphrase_input.as_str(),
                         |v| Message::Sync(SyncMessage::PassphraseChanged(v.into())),
                         None,
                         self.revealed_secrets
@@ -184,7 +184,7 @@ impl Oryxis {
                         },
                     ))
                     .width(width).boxed(),
-                    self.sync.passphrase_field_bounds.clone(),
+                    self.vaults.cur().sync.passphrase_field_bounds.clone(),
                 ),
             );
             let mut col = column![field];
@@ -207,9 +207,9 @@ impl Oryxis {
         // "Engine stopped" there would read as broken; show a
         // transport-appropriate label instead.
         let engine_state = if !is_p2p {
-            let (label, color) = if self.sync.enabled {
+            let (label, color) = if self.vaults.cur().sync.enabled {
                 (
-                    crate::i18n::t(if self.sync.transport == "sftp" {
+                    crate::i18n::t(if self.vaults.cur().sync.transport == "sftp" {
                         "sftp_sync_active_label"
                     } else {
                         "snapshot_sync_active_label"
@@ -223,7 +223,7 @@ impl Oryxis {
                 )
             };
             text(label).size(11).color(color)
-        } else if self.sync.engine_running {
+        } else if self.vaults.cur().sync.engine_running {
             text(crate::i18n::t("sync_engine_running_label"))
                 .size(11)
                 .color(OryxisColors::t().success)
@@ -255,7 +255,7 @@ impl Oryxis {
         // search), not a flat dropdown. The trigger shows the
         // current selection or a placeholder.
         let selected_conn = self
-            .sync.sftp.host_id
+            .vaults.cur().sync.sftp.host_id
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id));
         let host_trigger_inner: Element<'_, Message> = if let Some(c) = selected_conn {
             dir_row(vec![
@@ -315,7 +315,7 @@ impl Oryxis {
             10.0,
             text_input(
                 "/home/user/oryxis-sync/",
-                &self.sync.sftp.remote_path,
+                &self.vaults.cur().sync.sftp.remote_path,
             )
             .id(iced::widget::Id::new("set-sync-sftp-path"))
             .on_input(|v| Message::Sync(SyncMessage::SftpPathChanged(v)))
@@ -391,7 +391,7 @@ impl Oryxis {
             .collect();
         let selected = Self::TRANSPORTS
             .iter()
-            .position(|(token, _)| *token == self.sync.transport)
+            .position(|(token, _)| *token == self.vaults.cur().sync.transport)
             // An unknown token (a settings row from a newer build)
             // shows as P2P rather than an empty picker.
             .unwrap_or(0);
@@ -443,7 +443,7 @@ impl Oryxis {
         // The selected transport's config joins the Transport card so
         // the picker and its settings read as one theme; built here so
         // the keyboard rows record before Options renders.
-        let config: Option<Element<'_, Message>> = match self.sync.transport.as_str() {
+        let config: Option<Element<'_, Message>> = match self.vaults.cur().sync.transport.as_str() {
             _ if is_sftp => Some(self.sync_snapshot_card().boxed()),
             "folder" => Some(self.sync_folder_card()),
             "git" => Some(self.sync_git_card()),
@@ -497,7 +497,7 @@ impl Oryxis {
     /// say so because conflating the two silently puts a device in its
     /// own sync group.
     fn sync_webdav_card(&self) -> Element<'_, Message> {
-        let busy = self.sync.webdav.in_progress;
+        let busy = self.vaults.cur().sync.webdav.in_progress;
         let mut col = column![
             text(t("webdav_sync_desc"))
                 .size(11)
@@ -509,7 +509,7 @@ impl Oryxis {
             (
                 "webdav_sync_url",
                 "sync-webdav-url",
-                self.sync.webdav.url.as_str(),
+                self.vaults.cur().sync.webdav.url.as_str(),
                 false,
                 (|v| Message::Sync(SyncMessage::WebdavUrlChanged(v))) as fn(String) -> Message,
                 Some("https://cloud.example.com/remote.php/dav/files/me/oryxis/"),
@@ -517,7 +517,7 @@ impl Oryxis {
             (
                 "webdav_sync_user",
                 "sync-webdav-user",
-                self.sync.webdav.user.as_str(),
+                self.vaults.cur().sync.webdav.user.as_str(),
                 false,
                 |v| Message::Sync(SyncMessage::WebdavUserChanged(v)),
                 None,
@@ -525,7 +525,7 @@ impl Oryxis {
             (
                 "webdav_sync_password",
                 "sync-webdav-pass",
-                self.sync.webdav.password.as_str(),
+                self.vaults.cur().sync.webdav.password.as_str(),
                 true,
                 |v| Message::Sync(SyncMessage::WebdavPasswordChanged(v.into())),
                 None,
@@ -581,7 +581,7 @@ impl Oryxis {
         // anything on the path, so the card says so where the URL is
         // typed instead of leaving it to the manual. Loopback is
         // exempt because there is no path.
-        if webdav_is_cleartext(&self.sync.webdav.url) {
+        if webdav_is_cleartext(&self.vaults.cur().sync.webdav.url) {
             col = col.push(Space::new().height(2).boxed()).push(
                 text(t("webdav_sync_cleartext"))
                     .size(11)
@@ -589,7 +589,7 @@ impl Oryxis {
             );
         }
 
-        if let Some(status) = &self.sync.webdav.status {
+        if let Some(status) = &self.vaults.cur().sync.webdav.status {
             let (msg, color) = match status {
                 Ok(s) => (s.clone(), OryxisColors::t().success),
                 Err(e) => (e.clone(), OryxisColors::t().error),
@@ -621,11 +621,11 @@ impl Oryxis {
     /// opening the Sync section and after each round; this card only
     /// reads the cached result.
     fn sync_git_card(&self) -> Element<'_, Message> {
-        let busy = self.sync.git.in_progress;
+        let busy = self.vaults.cur().sync.git.in_progress;
         // `None` = probe in flight: the button waits a moment rather
         // than guessing, and no warning is shown until the probe
         // answers.
-        let has_git = self.sync.git.git_available.unwrap_or(false);
+        let has_git = self.vaults.cur().sync.git.git_available.unwrap_or(false);
         let mut col = column![
             text(t("git_sync_desc"))
                 .size(11)
@@ -637,7 +637,7 @@ impl Oryxis {
         // answers on its own, and a line inserted above the inputs below
         // dropped the focus of whichever one was being typed into.
         let mut no_git_slot = iced::widget::Column::<iced::Element<'_, _>>::new();
-        if self.sync.git.git_available == Some(false) {
+        if self.vaults.cur().sync.git.git_available == Some(false) {
             no_git_slot = no_git_slot
                 .push(
                     text(t("git_sync_no_git"))
@@ -659,7 +659,7 @@ impl Oryxis {
                 t("git_sync_remote"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("sync-git-remote")),
                 crate::widgets::INPUT_RADIUS,
-                text_input("git@github.com:me/oryxis-vault.git", &self.sync.git.remote)
+                text_input("git@github.com:me/oryxis-vault.git", &self.vaults.cur().sync.git.remote)
                     .id(iced::widget::Id::new("sync-git-remote"))
                     .on_input(|v| Message::Sync(SyncMessage::GitRemoteChanged(v)))
                     .padding(10)
@@ -689,7 +689,7 @@ impl Oryxis {
             ),
         ));
 
-        if let Some(status) = &self.sync.git.status {
+        if let Some(status) = &self.vaults.cur().sync.git.status {
             let (msg, color) = match status {
                 Ok(s) => (s.clone(), OryxisColors::t().success),
                 Err(e) => (e.clone(), OryxisColors::t().error),
@@ -719,7 +719,7 @@ impl Oryxis {
     /// here would suggest Oryxis talks to them, when in fact it never
     /// leaves the filesystem.
     fn sync_folder_card(&self) -> Element<'_, Message> {
-        let busy = self.sync.folder.in_progress;
+        let busy = self.vaults.cur().sync.folder.in_progress;
         let mut col = column![
             text(t("folder_sync_desc"))
                 .size(11)
@@ -732,7 +732,7 @@ impl Oryxis {
                 t("folder_sync_path"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("sync-folder-path")),
                 crate::widgets::INPUT_RADIUS,
-                text_input(t("folder_sync_path"), &self.sync.folder.path)
+                text_input(t("folder_sync_path"), &self.vaults.cur().sync.folder.path)
                     .id(iced::widget::Id::new("sync-folder-path"))
                     .on_input(|v| Message::Sync(SyncMessage::FolderPathChanged(v)))
                     .padding(10)
@@ -782,7 +782,7 @@ impl Oryxis {
             ),
         ));
 
-        if let Some(status) = &self.sync.folder.status {
+        if let Some(status) = &self.vaults.cur().sync.folder.status {
             let (msg, color) = match status {
                 Ok(s) => (s.clone(), OryxisColors::t().success),
                 Err(e) => (e.clone(), OryxisColors::t().error),
@@ -810,7 +810,7 @@ impl Oryxis {
     /// toggle, the Sync Now / Cancel action and the status + health
     /// lines under it.
     fn sync_options_card(&self, is_sftp: bool, is_p2p: bool) -> Element<'_, Message> {
-        let mode_label = if self.sync.mode == "auto" { t("sync_mode_auto") } else { t("sync_mode_manual") };
+        let mode_label = if self.vaults.cur().sync.mode == "auto" { t("sync_mode_auto") } else { t("sync_mode_manual") };
         let auto_label = t("sync_mode_auto").to_string();
         let manual_label = t("sync_mode_manual").to_string();
         let mode_options = vec![auto_label.clone(), manual_label.clone()];
@@ -866,7 +866,7 @@ impl Oryxis {
 
         let passwords_toggle = self.nav_toggle_row(
             crate::i18n::t("sync_passwords"),
-            self.sync.passwords,
+            self.vaults.cur().sync.passwords,
             Message::Sync(SyncMessage::TogglePasswords),
         );
 
@@ -885,7 +885,7 @@ impl Oryxis {
         // to the config it acts on, so a second one here would be a
         // duplicate (and, before the transport gates were fixed, a
         // button that fired the P2P path and did nothing at all).
-        if self.sync.mode == "manual" && (is_sftp || is_p2p) {
+        if self.vaults.cur().sync.mode == "manual" && (is_sftp || is_p2p) {
             if is_sftp {
                 // SFTP round: relabel + disable the button while a
                 // round is in flight so the click has immediate
@@ -893,7 +893,7 @@ impl Oryxis {
                 // transfer can't be safely aborted mid-write).
                 // Recorded only while enabled, so Enter can't
                 // re-fire a round already in flight.
-                let (label, msg) = if self.sync.sftp.in_progress {
+                let (label, msg) = if self.vaults.cur().sync.sftp.in_progress {
                     (crate::i18n::t("sftp_sync_running"), None)
                 } else {
                     (crate::i18n::t("sync_now"), Some(Message::Sync(SyncMessage::Now)))
@@ -917,7 +917,7 @@ impl Oryxis {
                 // flight. Cancel races a oneshot against the sync
                 // future in dispatch; the click drops the QUIC
                 // connection immediately.
-                let action_btn = if self.sync.in_progress {
+                let action_btn = if self.vaults.cur().sync.in_progress {
                     self.settings_nav_slot_labeled(
                         t("sync_now"),
                         crate::keynav::RowAction::activate(Message::Sync(SyncMessage::CancelInProgress)),
@@ -951,7 +951,7 @@ impl Oryxis {
         // keeps the engine status string. The other snapshot
         // transports report inside their own card.
         if is_sftp {
-            if let Some(status) = &self.sync.sftp.status {
+            if let Some(status) = &self.vaults.cur().sync.sftp.status {
                 let (txt, color) = match status {
                     Ok(s) => (s.clone(), OryxisColors::t().text_muted),
                     Err(e) => (e.clone(), OryxisColors::t().error),
@@ -966,7 +966,7 @@ impl Oryxis {
                 }
             }
         } else if is_p2p
-            && let Some(status) = &self.sync.status
+            && let Some(status) = &self.vaults.cur().sync.status
         {
             options_section = options_section
                 .push(Space::new().height(8).boxed())
@@ -981,13 +981,13 @@ impl Oryxis {
             options_section = options_section.push(Space::new().height(8).boxed()).push(
                 text(format!(
                     "{} {}",
-                    self.sync.discovered.len(),
+                    self.vaults.cur().sync.discovered.len(),
                     crate::i18n::t("sync_health_lan"),
                 ))
                 .size(11)
                 .color(OryxisColors::t().text_muted).boxed(),
             );
-            if let Some(sig) = &self.sync.signaling_last {
+            if let Some(sig) = &self.vaults.cur().sync.signaling_last {
                 let (txt, color) = match sig {
                     Ok(addr) => (
                         format!(
@@ -1026,7 +1026,7 @@ impl Oryxis {
             10.0,
             text_input(
                 crate::i18n::t("sync_device_name_hint"),
-                &self.sync.device_name,
+                &self.device_prefs.sync_device_name,
             )
             .id(iced::widget::Id::new("set-sync-device-name"))
             .on_input(|v| Message::Sync(SyncMessage::DeviceNameChanged(v)))
@@ -1050,7 +1050,7 @@ impl Oryxis {
             Space::new().height(8),
         ];
 
-        match self.sync.pairing.state {
+        match self.vaults.cur().sync.pairing.state {
             crate::state::SyncPairingState::Idle => {
                 pairing_section = pairing_section.push(dir_row(vec![
                     self.settings_nav_slot_labeled(
@@ -1081,14 +1081,14 @@ impl Oryxis {
                 // One-click "Pair" switches to the join form
                 // with the address pre-filled, so the user
                 // only has to enter the 6-digit code.
-                if !self.sync.discovered.is_empty() {
+                if !self.vaults.cur().sync.discovered.is_empty() {
                     pairing_section = pairing_section
                         .push(Space::new().height(14).boxed())
                         .push(text(crate::i18n::t("sync_discovered_devices"))
                             .size(12)
                             .color(OryxisColors::t().text_secondary).boxed())
                         .push(Space::new().height(6).boxed());
-                    for peer in &self.sync.discovered {
+                    for peer in &self.vaults.cur().sync.discovered {
                         let label = if peer.device_name.is_empty() {
                             crate::i18n::t("sync_discovered_unnamed").to_string()
                         } else {
@@ -1130,7 +1130,7 @@ impl Oryxis {
                         .size(12)
                         .color(OryxisColors::t().text_secondary).boxed())
                     .push(Space::new().height(6).boxed());
-                if let Some(code) = &self.sync.pairing.code {
+                if let Some(code) = &self.vaults.cur().sync.pairing.code {
                     pairing_section = pairing_section
                         .push(text(code.as_str())
                             .size(30)
@@ -1140,7 +1140,7 @@ impl Oryxis {
                 // Copy button + the QR. The link works only
                 // when both ends have a signaling URL set
                 // (Settings > Sync > Advanced).
-                if let Some(link) = &self.sync.pairing.link {
+                if let Some(link) = &self.vaults.cur().sync.pairing.link {
                     pairing_section = pairing_section
                         .push(Space::new().height(12).boxed())
                         .push(text(crate::i18n::t("sync_pairing_link_label"))
@@ -1185,7 +1185,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         crate::i18n::t("sync_pairing_code_placeholder"),
-                        &self.sync.pairing.join_code_input,
+                        &self.vaults.cur().sync.pairing.join_code_input,
                     )
                     .id(iced::widget::Id::new("set-sync-pair-code"))
                     .on_input(|v| Message::Sync(SyncMessage::JoinCodeChanged(v)))
@@ -1202,7 +1202,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         crate::i18n::t("sync_pairing_target_placeholder"),
-                        &self.sync.pairing.join_target_input,
+                        &self.vaults.cur().sync.pairing.join_target_input,
                     )
                     .id(iced::widget::Id::new("set-sync-pair-target"))
                     .on_input(|v| Message::Sync(SyncMessage::JoinTargetChanged(v)))
@@ -1240,7 +1240,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         crate::i18n::t("sync_pairing_link_placeholder"),
-                        &self.sync.pairing.join_link_input,
+                        &self.vaults.cur().sync.pairing.join_link_input,
                     )
                     .id(iced::widget::Id::new("set-sync-pair-link"))
                     .on_input(|v| Message::Sync(SyncMessage::JoinLinkChanged(v)))
@@ -1285,8 +1285,8 @@ impl Oryxis {
         // in the Options card, but when the user is actively
         // pairing they're looking here, so we mirror it
         // adjacent to the form they're filling in.
-        if !matches!(self.sync.pairing.state, crate::state::SyncPairingState::Idle)
-            && let Some(status) = &self.sync.status
+        if !matches!(self.vaults.cur().sync.pairing.state, crate::state::SyncPairingState::Idle)
+            && let Some(status) = &self.vaults.cur().sync.status
         {
             pairing_section = pairing_section
                 .push(Space::new().height(8).boxed())
@@ -1298,14 +1298,14 @@ impl Oryxis {
         // Paired devices list. Empty until the first successful
         // pairing on either side; pre-Phase B builds never
         // populated this because the engine wasn't wired.
-        if !self.sync.peers.is_empty() {
+        if !self.vaults.cur().sync.peers.is_empty() {
             pairing_section = pairing_section
                 .push(Space::new().height(14).boxed())
                 .push(text(crate::i18n::t("sync_paired_devices"))
                     .size(12)
                     .color(OryxisColors::t().text_secondary).boxed())
                 .push(Space::new().height(6).boxed());
-            for peer in &self.sync.peers {
+            for peer in &self.vaults.cur().sync.peers {
                 let last_sync = peer.last_synced_at
                     // Stored UTC; show in the user's local timezone.
                     .map(|d| {
@@ -1358,7 +1358,7 @@ impl Oryxis {
         // Frozen while a deploy is in flight, but still a stop of the
         // walk (inert): an omitted slot would renumber every row below
         // it under a ring that kept its index.
-        let action = if self.sync.relay_deploy.busy {
+        let action = if self.vaults.cur().sync.relay_deploy.busy {
             crate::keynav::RowAction::default()
         } else {
             crate::keynav::RowAction::input(iced::widget::Id::new(id))
@@ -1372,10 +1372,10 @@ impl Oryxis {
     /// reachability test passes. The in-app fast path for what
     /// SELF_HOSTING.md documents long-form.
     fn sync_relay_wizard_card(&self) -> iced::widget::Column<iced::Element<'_, Message>> {
-        let w = &self.sync.relay_wizard;
+        let w = &self.vaults.cur().sync.relay_wizard;
         // A deploy probe or run bakes the domain, public port and token
         // into its plan: they are frozen while one is in flight.
-        let deploy_busy = self.sync.relay_deploy.busy;
+        let deploy_busy = self.vaults.cur().sync.relay_deploy.busy;
         let mut wizard_col: iced::widget::Column<iced::Element<'_, Message>> =
             column![self.settings_nav_slot_labeled(
                 t("sync_wizard_button"),
@@ -1616,7 +1616,7 @@ impl Oryxis {
                 "set-sync-signaling-url",
             )),
             10.0,
-            text_input("https://...", &self.sync.signaling_url)
+            text_input("https://...", &self.vaults.cur().sync.signaling_url)
                 .id(iced::widget::Id::new("set-sync-signaling-url"))
                 .on_input(|v| Message::Sync(SyncMessage::SignalingUrlChanged(v)))
                 .padding(8)
@@ -1639,7 +1639,7 @@ impl Oryxis {
             container(
                 crate::widgets::password_input_with_eye_nav(
                     crate::i18n::t("sync_signaling_token_placeholder"),
-                    &self.sync.signaling_token,
+                    &self.vaults.cur().sync.signaling_token,
                     |v| Message::Sync(SyncMessage::SignalingTokenChanged(v.into())),
                     None,
                     self.revealed_secrets
@@ -1667,7 +1667,7 @@ impl Oryxis {
             t("sync_relay_url"),
             crate::keynav::RowAction::input(iced::widget::Id::new("set-sync-relay-url")),
             10.0,
-            text_input(crate::i18n::t("sync_relay_optional"), &self.sync.relay_url)
+            text_input(crate::i18n::t("sync_relay_optional"), &self.vaults.cur().sync.relay_url)
                 .id(iced::widget::Id::new("set-sync-relay-url"))
                 .on_input(|v| Message::Sync(SyncMessage::RelayUrlChanged(v)))
                 .padding(8)
@@ -1681,7 +1681,7 @@ impl Oryxis {
                 "set-sync-listen-port",
             )),
             10.0,
-            text_input("0", &self.sync.listen_port)
+            text_input("0", &self.device_prefs.sync_listen_port)
                 .id(iced::widget::Id::new("set-sync-listen-port"))
                 .on_input(|v| Message::Sync(SyncMessage::ListenPortChanged(v)))
                 .padding(8)
@@ -1725,7 +1725,7 @@ impl Oryxis {
         // calls.
         self.keynav_settings_reset();
 
-        let is_sftp = self.sync.transport == "sftp";
+        let is_sftp = self.vaults.cur().sync.transport == "sftp";
         // Pairing, LAN discovery and the signaling / relay / port
         // fields are the P2P engine's own surface. Asking `!is_sftp`
         // put all of it in front of folder and Git users, who have no
@@ -1756,7 +1756,7 @@ impl Oryxis {
             .push(Space::new().height(8).boxed())
             .push(how_section);
 
-        if self.sync.enabled {
+        if self.vaults.cur().sync.enabled {
             let transport_section = self.sync_transport_card(is_sftp);
             let options_section = self.sync_options_card(is_sftp, is_p2p);
 

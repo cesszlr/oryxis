@@ -314,7 +314,7 @@ impl Oryxis {
     /// recording goes through here, so none can be the one that leaves
     /// a log open because it happened to end under a lock.
     pub(crate) fn end_session_log_now(&mut self, log_id: uuid::Uuid) {
-        if self.vault_ui.state == crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked {
             if let Some(vault) = &self.vaults.cur().store
                 && let Err(e) = vault.end_session_log(&log_id)
             {
@@ -348,7 +348,7 @@ impl Oryxis {
         // behaviour. Decided here rather than at the callers because
         // the ones that reach this under a lock (a local shell exiting,
         // a pane moving) are not the ones anybody remembers.
-        let locked = self.vault_ui.state != crate::state::VaultState::Unlocked;
+        let locked = self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked;
         if locked && self.session_spool().is_none() {
             return;
         }

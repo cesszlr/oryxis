@@ -41,7 +41,7 @@ impl Oryxis {
     /// merge off-thread. Returns `Task::none()` (with an inline status) on
     /// any precondition failure, so the caller can fire it blindly.
     pub(crate) fn run_sftp_sync_round(&mut self, trigger: SyncRoundTrigger) -> Task<Message> {
-        if self.sync.sftp.in_progress {
+        if self.vaults.cur().sync.sftp.in_progress {
             return Task::none();
         }
         // A locked vault has no master key to decrypt with; the
@@ -50,21 +50,21 @@ impl Oryxis {
             return Task::none();
         }
 
-        let Some(host_id) = self.sync.sftp.host_id else {
-            self.sync.sftp.status = Some(Err(t("sftp_sync_no_host").to_string()));
+        let Some(host_id) = self.vaults.cur().sync.sftp.host_id else {
+            self.vaults.cur_mut().sync.sftp.status = Some(Err(t("sftp_sync_no_host").to_string()));
             return Task::none();
         };
         let Some(mut conn) = self.vaults.cur().connections.iter().find(|c| c.id == host_id).cloned() else {
-            self.sync.sftp.status = Some(Err(t("sftp_sync_no_host").to_string()));
+            self.vaults.cur_mut().sync.sftp.status = Some(Err(t("sftp_sync_no_host").to_string()));
             return Task::none();
         };
         // Same working copy every connect path dials: group inheritance
         // (D4) and the effective proxy, so the sync host authenticates
         // exactly like a terminal tab to it would.
         self.apply_group_inheritance(&mut conn);
-        let remote_input = self.sync.sftp.remote_path.trim();
+        let remote_input = self.vaults.cur().sync.sftp.remote_path.trim();
         if remote_input.is_empty() {
-            self.sync.sftp.status = Some(Err(t("sftp_sync_no_path").to_string()));
+            self.vaults.cur_mut().sync.sftp.status = Some(Err(t("sftp_sync_no_path").to_string()));
             return Task::none();
         }
         // Resolve the snapshot FILE path. The user may give just a
@@ -82,7 +82,7 @@ impl Oryxis {
         // Group key: the typed buffer for a manual round, else the
         // stored value.
         let Some(key) = self.sync_round_passphrase(trigger) else {
-            self.sync.sftp.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
+            self.vaults.cur_mut().sync.sftp.status = Some(Err(t("sftp_sync_no_passphrase").to_string()));
             return Task::none();
         };
 
@@ -91,7 +91,7 @@ impl Oryxis {
         // pattern as `sync_runtime`; opened inside the task on the same
         // SQLite file (WAL makes concurrent handles safe).
         let db_path = vault.db_path().to_path_buf();
-        let master_password = self.master_password.clone();
+        let master_password = self.vaults.cur().master_password.clone();
 
         // Per-device temp-file tag. The upload writes a temp then renames
         // it over the shared snapshot; if two devices used the SAME temp
@@ -136,8 +136,8 @@ impl Oryxis {
             }
         });
 
-        self.sync.sftp.in_progress = true;
-        self.sync.sftp.status = Some(Ok(t("sftp_sync_running").to_string()));
+        self.vaults.cur_mut().sync.sftp.in_progress = true;
+        self.vaults.cur_mut().sync.sftp.status = Some(Ok(t("sftp_sync_running").to_string()));
         // Remember what seals this snapshot, so the commit at the end
         // writes that key and not whatever the field holds by then.
         let passphrase = self.arm_round_passphrase(key);

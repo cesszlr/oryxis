@@ -136,7 +136,7 @@ impl crate::app::Oryxis {
     /// screen lands right after the master password.
     pub(crate) fn handle_deep_link(&mut self, link: DeepLink) -> Task<Message> {
         use crate::messages::TabsMessage;
-        if self.vault_ui.state != crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
             self.pending_deep_link = Some(link);
             return Task::none();
         }
@@ -145,7 +145,7 @@ impl crate::app::Oryxis {
                 // Prefill the join field and land on Settings > Sync;
                 // the user presses Join (and confirms the code) as if
                 // they had pasted the link themselves.
-                self.sync.pairing.join_link_input = url;
+                self.vaults.cur_mut().sync.pairing.join_link_input = url;
                 Task::done(Message::Tabs(TabsMessage::OpenSettingsSection(
                     crate::state::SettingsSection::Sync,
                 )))
@@ -201,7 +201,7 @@ impl crate::app::Oryxis {
     /// way `ssh user@host` would; the two paths deliberately never
     /// share a transport (see `tray_ipc`'s separate inboxes).
     pub(crate) fn handle_connect_target(&mut self, target: &str) -> Task<Message> {
-        if self.vault_ui.state != crate::state::VaultState::Unlocked {
+        if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
             self.pending_connect_target = Some(target.to_string());
             return Task::none();
         }

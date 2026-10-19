@@ -452,7 +452,7 @@ impl Oryxis {
             // the vault isn't unlocked, decline to open. Otherwise route
             // through the message so the query is reset + input focused.
             ShowCommandPalette => {
-                if self.vault_ui.state == crate::state::VaultState::Unlocked {
+                if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked {
                     Task::done(Message::Tabs(TabsMessage::ShowCommandPalette))
                 } else {
                     Task::none()
