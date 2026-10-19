@@ -42,6 +42,9 @@ pub(crate) fn copies_to_new_vault(key: &str) -> bool {
         "pinned_tabs",
         "mcp_server_token",
         "mcp_config_vault_pw",
+        // Exposing a vault to AI clients is that vault's own choice.
+        "mcp_server_enabled",
+        "mcp_server_allow_writes",
         "shell_integration_nonce",
         "default_key_id",
         "default_identity_id",
@@ -906,6 +909,8 @@ mod tests {
             "sync_device_identity",
             "ai_api_key",
             "mcp_server_token",
+            "mcp_server_enabled",
+            "mcp_server_allow_writes",
             "default_key_id",
             "hint_privacy_mask",
             "port_forwards_migrated",

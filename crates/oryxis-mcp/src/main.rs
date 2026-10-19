@@ -149,8 +149,16 @@ fn open_one(
     }
     // Token gate: a vault storing a non-empty `mcp_server_token` needs
     // the caller to present it. An empty stored token keeps the legacy
-    // unauthenticated path so existing setups don't break on upgrade.
+    // unauthenticated path, for the FIRST vault only (existing setups
+    // don't break on upgrade): any other vault without a token would be
+    // open to a client configured for the first one, so it is not served
+    // (the app gives it a token when its MCP is turned on).
     let stored = vault.get_setting("mcp_server_token").ok().flatten().unwrap_or_default();
+    if stored.is_empty() && entry.id != oryxis_vault::device::FIRST_VAULT_ID {
+        return Err("it has no MCP token; turn its MCP Server on in Oryxis, which sets one, and install the \
+                    config again."
+            .to_string());
+    }
     if !stored.is_empty() && env(&names.token).unwrap_or_default() != stored {
         return Err(format!(
             "MCP token mismatch. Set {} to the value shown in Oryxis Settings > Security > MCP. \

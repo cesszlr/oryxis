@@ -222,12 +222,13 @@ impl Server {
         Ok(Value::Array(out))
     }
 
-    /// `list_vaults`: what each served vault is called and whether its
-    /// MCP and its host writes are on.
+    /// `list_vaults`: the served vaults with MCP on (one switched off is
+    /// not exposed, its name included), and whether host writes are on.
     fn list_vaults(&self) -> Value {
         Value::Array(
             self.vaults
                 .iter()
+                .filter(|v| v.enabled())
                 .map(|v| {
                     let writes = v
                         .vault()
@@ -239,7 +240,6 @@ impl Server {
                         "vault": v.slug,
                         "id": v.id.to_string(),
                         "label": v.label,
-                        "mcp_enabled": v.enabled(),
                         "writes_enabled": writes,
                     })
                 })

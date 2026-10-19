@@ -12,7 +12,7 @@ pub fn tool_definitions() -> Vec<Value> {
 fn list_vaults() -> Value {
     json!({
         "name": "list_vaults",
-        "description": "List the Oryxis vaults this server serves: `vault` (the slug every other answer carries and the `vault` parameter takes), `label`, and whether MCP and host writes are on in each.",
+        "description": "List the Oryxis vaults this server serves: `vault` (the slug every other answer carries and the `vault` parameter takes), `label`, and whether host writes are on in each. A vault whose MCP is off is not listed.",
         "inputSchema": { "type": "object", "properties": {} }
     })
 }

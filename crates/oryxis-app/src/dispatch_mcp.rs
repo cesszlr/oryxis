@@ -23,6 +23,15 @@ impl Oryxis {
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("mcp_server_enabled", if self.vaults.cur().mcp.server_enabled { "true" } else { "false" });
                 }
+                // A vault other than the first gets a token when its MCP
+                // goes on: `oryxis-mcp` serves no such vault without one
+                // (a client configured for the first vault would reach it).
+                if self.vaults.cur().mcp.server_enabled
+                    && self.vaults.cur().mcp.server_token.is_empty()
+                    && self.vaults.cur().id != oryxis_vault::device::FIRST_VAULT_ID
+                {
+                    let _ = self.handle_mcp(McpMessage::RegenerateMcpToken);
+                }
                 // MCP ships as a plugin (~5 MB binary external clients
                 // like Claude Desktop spawn). First-time enable triggers
                 // the install modal; an already-installed plugin or a

@@ -1339,6 +1339,8 @@ mod tests {
         assert!(err);
         let (err, text) = call(&server, "list_hosts", json!({"vault": "home"})).await;
         assert!(err && text.contains("served: work"), "{text}");
+        let (_, text) = call(&server, "list_vaults", json!({})).await;
+        assert!(text.contains("\"work\"") && !text.contains("home"), "a vault with MCP off is not exposed: {text}");
         // Both off: the server answers as a disabled one always did.
         work.vault().set_setting("mcp_server_enabled", "false").unwrap();
         let (err, text) = call(&server, "list_hosts", json!({})).await;
@@ -1396,6 +1398,7 @@ mod tests {
         std::fs::create_dir_all(device.resolve(&work).parent().unwrap()).unwrap();
         let mut w = VaultStore::open(device.resolve(&work)).unwrap();
         w.set_master_password("pw-work").unwrap();
+        w.set_setting("mcp_server_token", "tok-w").unwrap();
         drop(w);
         let work_names = mcp_env_names(&work);
         let slugs = |served: Vec<crate::server::Served>| served.into_iter().map(|s| s.slug).collect::<Vec<_>>();
@@ -1409,6 +1412,7 @@ mod tests {
         let both = |n: &str| match n {
             "ORYXIS_MCP_TOKEN" => Some("tok-1".to_string()),
             n if n == work_names.password => Some("pw-work".to_string()),
+            n if n == work_names.token => Some("tok-w".to_string()),
             _ => None,
         };
         assert_eq!(slugs(crate::open_vaults(&device, vec![], both).unwrap()), vec![first_slug.clone(), "work".into()]);
@@ -1422,6 +1426,14 @@ mod tests {
         let err = crate::open_vaults(&device, vec![], wrong).err().unwrap();
         assert!(err.contains("token mismatch") && err.contains(&work_names.password), "{err}");
         assert!(crate::open_vaults(&device, vec!["--vault".into(), "ghost".into()], both).is_err());
+
+        // A vault other than the first with no token is never served: a
+        // client set up for the first vault would reach it.
+        let mut w = VaultStore::open(device.resolve(&work)).unwrap();
+        w.unlock("pw-work").unwrap();
+        w.set_setting("mcp_server_token", "").unwrap();
+        drop(w);
+        assert_eq!(slugs(crate::open_vaults(&device, vec![], both).unwrap()), vec![first_slug.clone()]);
     }
 
 }
