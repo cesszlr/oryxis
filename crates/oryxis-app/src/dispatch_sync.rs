@@ -221,8 +221,11 @@ impl Oryxis {
                 if !self.vaults.cur().sync.enabled
                     && let Some(other) = self.sync_target_taken_by()
                 {
-                    self.vaults.cur_mut().sync.status = Some(Self::sync_target_taken_text(&other));
-                    return Task::none();
+                    // Said where the toggle is (Features & Plugins, the
+                    // onboarding) as well as in the Sync section.
+                    let text = Self::sync_target_taken_text(&other);
+                    self.vaults.cur_mut().sync.status = Some(text.clone());
+                    return self.show_toast(text);
                 }
                 self.vaults.cur_mut().sync.enabled = !self.vaults.cur_mut().sync.enabled;
                 if let Some(vault) = &self.vaults.cur().store {

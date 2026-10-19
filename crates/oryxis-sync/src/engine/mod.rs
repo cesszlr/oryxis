@@ -1029,6 +1029,16 @@ impl SyncHandle {
                 return Err(SyncError::PairingFailed(reason));
             }
         };
+        // The link names the host: refused here, before the host stores
+        // a pairing this side would refuse after (`PeerGuard`), when it
+        // is another local vault's peer already.
+        if self.guard.paired_elsewhere(&device_id) {
+            let reason = pairing::PAIRED_ELSEWHERE.to_string();
+            let _ = self
+                .event_tx
+                .send(SyncEvent::PairingFailed { reason: reason.clone() });
+            return Err(SyncError::PairingFailed(reason));
+        }
         let Some(signaling_url) = self.config.signaling_url.clone() else {
             let reason =
                 "Signaling URL is not configured; set one in Settings > Sync > Advanced"
