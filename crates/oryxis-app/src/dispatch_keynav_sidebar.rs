@@ -104,13 +104,13 @@ impl Oryxis {
         let x = self.cur_mouse().x;
         if self.sidebar_region_shown(tab, SidebarSide::Left)
             && x > strip_left
-            && x < strip_left + self.chat_ui.sidebar_width[SidebarSide::Left.idx()]
+            && x < strip_left + self.vaults.cur().chat_ui.sidebar_width[SidebarSide::Left.idx()]
         {
             return Some(SidebarSide::Left);
         }
         if self.sidebar_region_shown(tab, SidebarSide::Right) {
             let right_edge = self.cur_window_size().width - strip_right;
-            if x > right_edge - self.chat_ui.sidebar_width[SidebarSide::Right.idx()]
+            if x > right_edge - self.vaults.cur().chat_ui.sidebar_width[SidebarSide::Right.idx()]
                 && x < right_edge
             {
                 return Some(SidebarSide::Right);

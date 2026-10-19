@@ -108,7 +108,7 @@ impl Oryxis {
                 g.parent_id.is_none() || !Group::is_reachable_from_root(&self.vaults.cur().groups, g.id)
             })
             .collect();
-        self.hosts_sort.sort_items(&mut roots, |g| g.label.clone(), |g| g.created_at);
+        self.vaults.cur().hosts_sort.sort_items(&mut roots, |g| g.label.clone(), |g| g.created_at);
         for group in roots {
             self.tree_group_rows(
                 &mut rows,
@@ -136,7 +136,7 @@ impl Oryxis {
             .enumerate()
             .filter(|(_, c)| c.group_id.filter(|gid| group_exists(*gid)).is_none())
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut root_hosts,
             |(_, c)| c.label.clone(),
             |(_, c)| c.created_at,
@@ -208,7 +208,7 @@ impl Oryxis {
             .iter()
             .filter(|g| g.parent_id == Some(group.id))
             .collect();
-        self.hosts_sort.sort_items(&mut children, |g| g.label.clone(), |g| g.created_at);
+        self.vaults.cur().hosts_sort.sort_items(&mut children, |g| g.label.clone(), |g| g.created_at);
         for child in children {
             self.tree_group_rows(
                 rows,
@@ -233,7 +233,7 @@ impl Oryxis {
             .enumerate()
             .filter(|(_, c)| c.group_id == Some(group.id))
             .collect();
-        self.hosts_sort.sort_items(&mut hosts, |(_, c)| c.label.clone(), |(_, c)| c.created_at);
+        self.vaults.cur().hosts_sort.sort_items(&mut hosts, |(_, c)| c.label.clone(), |(_, c)| c.created_at);
         for (idx, conn) in hosts {
             // A matching group shows its whole host list; otherwise
             // only the hosts that match themselves.
@@ -593,7 +593,7 @@ impl Oryxis {
                 None => sg.group_id.filter(|gid| group_exists(*gid)).is_none(),
             })
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut sessions,
             |(_, sg)| sg.label.clone(),
             |(_, sg)| sg.created_at,

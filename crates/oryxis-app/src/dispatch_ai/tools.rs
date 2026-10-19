@@ -88,16 +88,16 @@ impl Oryxis {
                             .and_then(|v| v.get_ai_api_key().ok().flatten())
                             .unwrap_or_default();
                         let config = crate::ai::AiConfig {
-                            provider: self.ai.provider.clone(),
-                            model: self.ai.model.clone(),
+                            provider: self.vaults.cur().ai.provider.clone(),
+                            model: self.vaults.cur().ai.model.clone(),
                             api_key,
-                            api_url: if self.ai.api_url.is_empty() {
+                            api_url: if self.vaults.cur().ai.api_url.is_empty() {
                                 None
                             } else {
-                                Some(self.ai.api_url.clone())
+                                Some(self.vaults.cur().ai.api_url.clone())
                             },
                             system_prompt: None,
-                            reasoning: self.ai.reasoning,
+                            reasoning: self.vaults.cur().ai.reasoning,
                         };
                         self.tabs[idx].chat_loading = true;
                         let cmd_for_judge = command.clone();
@@ -143,7 +143,7 @@ impl Oryxis {
                     .chat_history
                     .push(pending_tool_bubble(command, thought_signature));
                 self.tabs[idx].chat_loading = false;
-                if Some(idx) == self.cur_active_tab() && self.chat_ui.scroll_at_bottom {
+                if Some(idx) == self.cur_active_tab() && self.vaults.cur().chat_ui.scroll_at_bottom {
                     return chat_scroll_to_end();
                 }
             }
@@ -164,7 +164,7 @@ impl Oryxis {
                     .chat_history
                     .push(pending_tool_bubble(command, thought_signature));
                 self.tabs[idx].chat_loading = false;
-                if Some(idx) == self.cur_active_tab() && self.chat_ui.scroll_at_bottom {
+                if Some(idx) == self.cur_active_tab() && self.vaults.cur().chat_ui.scroll_at_bottom {
                     return chat_scroll_to_end();
                 }
             }
@@ -351,7 +351,7 @@ impl Oryxis {
                         "[terminal session is not connected; command not sent]",
                     ));
                     tab.chat_loading = false;
-                    if Some(idx) == self.cur_active_tab() && self.chat_ui.scroll_at_bottom {
+                    if Some(idx) == self.cur_active_tab() && self.vaults.cur().chat_ui.scroll_at_bottom {
                         return chat_scroll_to_end();
                     }
                     return Task::none();

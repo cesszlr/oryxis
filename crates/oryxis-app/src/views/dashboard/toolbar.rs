@@ -323,7 +323,7 @@ impl Oryxis {
             crate::widgets::bounds_reporter(
                 crate::widgets::sort_toolbar_button(
                     crate::state::SortMenuKind::Hosts,
-                    self.hosts_sort,
+                    self.vaults.cur().hosts_sort,
                 ),
                 self.toolbar_sort_btn_bounds.clone(),
             ),
@@ -360,7 +360,7 @@ impl Oryxis {
         // grid already renders as a single column (list == grid there).
         let nav_width = self.vault_rail_width();
         let panel_open = self.cloud_discover.visible || self.panels.host_panel;
-        let panel_width = if panel_open { self.panel_width } else { 0.0 };
+        let panel_width = if panel_open { self.vaults.cur().panel_width } else { 0.0 };
         let available = (self.cur_window_size().width
             - nav_width
             - self.side_strip_reserve()

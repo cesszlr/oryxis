@@ -154,7 +154,7 @@ impl Oryxis {
         let dashboard_section = panel_section(column![
             self.nav_toggle_row(
                 crate::i18n::t("flatten_hosts_label"),
-                self.flatten_hosts,
+                self.vaults.cur().flatten_hosts,
                 Message::Settings(SettingsMessage::FlattenHostsToggle),
             ),
             Space::new().height(4),
@@ -768,7 +768,7 @@ impl Oryxis {
         // Each card is a keyboard row (Enter applies / opens it);
         // recorded here so the Theme group follows the Tabs group in
         // the keyboard order, exactly as rendered.
-        let active_name = self.active_app_theme_name.as_str();
+        let active_name = self.vaults.cur().active_app_theme_name.as_str();
         // Filter and chips, the terminal gallery's rule
         // (`theme_tags::theme_matches`) over the chrome themes' measured
         // traits. Recorded before the cards, in draw order.
@@ -945,7 +945,7 @@ impl Oryxis {
     fn active_app_theme_row(&self) -> Element<'_, Message> {
         // Borrowed from state, not cloned: `app_theme_card` ties the
         // returned element's lifetime to the label.
-        let name = self.active_app_theme_name.as_str();
+        let name = self.vaults.cur().active_app_theme_name.as_str();
         let colors = self
             .vaults.cur().custom_ui_themes
             .iter()

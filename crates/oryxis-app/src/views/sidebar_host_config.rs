@@ -100,7 +100,7 @@ impl Oryxis {
                 Space::new().width(Length::Fill).boxed(),
                 step_btn("\u{2212}", Message::Settings(SettingsMessage::TerminalFontSizeDecrease)),
                 Space::new().width(8).boxed(),
-                text(format!("{:.0}", self.terminal_font_size)).size(13).color(c.text_primary).boxed(),
+                text(format!("{:.0}", self.vaults.cur().terminal_font_size)).size(13).color(c.text_primary).boxed(),
                 Space::new().width(8).boxed(),
                 step_btn("+", Message::Settings(SettingsMessage::TerminalFontSizeIncrease)),
             ])
@@ -114,7 +114,7 @@ impl Oryxis {
             stab,
             crate::widgets::INPUT_RADIUS,
             iced::widget::pick_list(
-                Some(self.terminal_font_name.clone()),
+                Some(self.vaults.cur().terminal_font_name.clone()),
                 fonts,
                 |s: &String| s.clone(),
             )
@@ -133,7 +133,7 @@ impl Oryxis {
         let weights = crate::fonts::TerminalFontWeight::ALL;
         let (weight_prev, weight_next) = crate::keynav::slots::cycle_pair(
             &weights,
-            &self.terminal_font_weight,
+            &self.vaults.cur().terminal_font_weight,
             |w| Message::Settings(SettingsMessage::TerminalFontWeightChanged(w)),
         );
         let weight_pick = self.sidebar_nav_slot(
@@ -141,7 +141,7 @@ impl Oryxis {
             stab,
             crate::widgets::INPUT_RADIUS,
             iced::widget::pick_list(
-                Some(self.terminal_font_weight),
+                Some(self.vaults.cur().terminal_font_weight),
                 weights.to_vec(),
                 |w: &crate::fonts::TerminalFontWeight| w.to_string(),
             )
@@ -157,7 +157,7 @@ impl Oryxis {
         let thicknesses = crate::fonts::TextThickness::ALL;
         let (thick_prev, thick_next) = crate::keynav::slots::cycle_pair(
             &thicknesses,
-            &self.terminal_text_thickness,
+            &self.vaults.cur().terminal_text_thickness,
             |v| Message::Settings(SettingsMessage::TerminalTextThicknessChanged(v)),
         );
         let thickness_pick = self.sidebar_nav_slot(
@@ -165,7 +165,7 @@ impl Oryxis {
             stab,
             crate::widgets::INPUT_RADIUS,
             iced::widget::pick_list(
-                Some(self.terminal_text_thickness),
+                Some(self.vaults.cur().terminal_text_thickness),
                 thicknesses.to_vec(),
                 |v: &crate::fonts::TextThickness| v.to_string(),
             )

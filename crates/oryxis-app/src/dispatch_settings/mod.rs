@@ -53,7 +53,7 @@ mod login_scripts;
 pub(crate) use local_terminals::spawn_local_shell_in;
 mod privacy;
 mod terminal_prefs;
-mod themes;
+pub(crate) mod themes;
 
 impl Oryxis {
     /// Effective SSH keepalive duration for a connection. Per-host

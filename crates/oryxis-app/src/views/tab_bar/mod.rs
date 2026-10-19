@@ -471,7 +471,7 @@ impl Oryxis {
         // Workspace mode prepends area tabs (Hosts, SFTP) that consume
         // strip width before the connection tabs even start. Each is
         // roughly icon(16) + gap(6) + label(~50) + padding(20) ~= 90 px.
-        let area_tab_count = 1 + (self.sftp_enabled as u32);
+        let area_tab_count = 1 + (self.vaults.cur().sftp_enabled as u32);
         const AREA_TAB_APPROX_WIDTH: f32 = 100.0;
         let area_tabs_total =
             area_tab_count as f32 * (AREA_TAB_APPROX_WIDTH + TAB_SPACING);
@@ -920,7 +920,7 @@ impl Oryxis {
                     self.tabs.iter().position(|t| t._id == *id).map(StripEntry::Terminal)
                 }
                 crate::state::TabRef::Sftp(id) => {
-                    if !self.sftp_enabled {
+                    if !self.vaults.cur().sftp_enabled {
                         return None;
                     }
                     self.sftp_tabs.iter().position(|t| t.id == *id).map(StripEntry::Sftp)

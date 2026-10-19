@@ -210,7 +210,7 @@ impl Oryxis {
             }
             // Which install scripts already ran where, for the
             // "installed here" hint on the snippet surfaces.
-            self.install_runs = vault
+            ov.install_runs = vault
                 .list_install_runs()
                 .unwrap_or_default()
                 .into_iter()
@@ -243,14 +243,18 @@ impl Oryxis {
             // Saved AI conversations share the History timeline. The list is
             // metadata only (turn bodies load when one is opened), so it is
             // cheap to hold whole rather than paginate.
-            self.chat_ui.conversations = vault.list_chat_conversations().unwrap_or_default();
+            ov.chat_ui.conversations = vault.list_chat_conversations().unwrap_or_default();
         }
     }
 
     /// Language / layout / theme, the derived terminal palette, plus the
     /// AI, MCP, sync and local-terminal settings.
     fn load_vault_locale_ai_sync(&mut self) {
-        if let Some(vault) = &self.vaults.cur().store {
+        // Legacy local-terminal ids stamped below are written back once the
+        // vault borrow ends (the write goes through `persist_setting`).
+        let mut repersist_local_terminals = false;
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
 
             // Language: "auto" (the default, also what a missing row
             // means) follows the OS locale; a concrete code is an
@@ -286,38 +290,38 @@ impl Oryxis {
             // values leave the early-boot default in place, so a renamed /
             // deleted theme can never wedge the app on boot.
             if let Ok(Some(v)) = vault.get_setting("app_theme")
-                && self.apply_app_theme_name(&v)
+                && crate::dispatch_settings::themes::apply_app_theme_in(&ov.custom_ui_themes, &v)
             {
-                self.active_app_theme_name = v;
+                ov.active_app_theme_name = v;
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_theme_override")
                 && !v.is_empty()
             {
-                self.terminal_theme_override = Some(v);
+                ov.terminal_theme_override = Some(v);
             }
             // Refresh the global derived palette to pick up the
             // theme + override loaded above. Per-host overrides are
             // applied lazily when each tab paints.
-            self.terminal_palette = self.resolve_global_terminal_palette();
+            ov.terminal_palette = crate::dispatch_settings::themes::global_terminal_palette(ov);
 
             // AI settings
             if let Ok(Some(v)) = vault.get_setting("ai_enabled") {
-                self.ai.enabled = v == "true";
+                ov.ai.enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("ai_reasoning") {
-                self.ai.reasoning = v == "true";
+                ov.ai.reasoning = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("ai_save_history") {
-                self.ai.save_history = v == "true";
+                ov.ai.save_history = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("ai_provider") {
-                self.ai.provider = v;
+                ov.ai.provider = v;
             }
             if let Ok(Some(v)) = vault.get_setting("ai_model") {
-                self.ai.model = v;
+                ov.ai.model = v;
             }
             if let Ok(Some(v)) = vault.get_setting("ai_api_url") {
-                self.ai.api_url = v;
+                ov.ai.api_url = v;
             }
             if let Ok(Some(v)) = vault.get_setting("ai_default_mode") {
                 let mode = crate::state::ChatMode::from_setting(&v);
@@ -328,7 +332,7 @@ impl Oryxis {
                     tab.chat_mode = mode;
                 }
             }
-            self.ai.api_key_set = vault.get_ai_api_key().ok().flatten().is_some();
+            ov.ai.api_key_set = vault.get_ai_api_key().ok().flatten().is_some();
             if let Ok(Some(v)) = vault.get_setting("mcp_server_enabled") {
                 self.mcp.server_enabled = v == "true";
             }
@@ -336,7 +340,7 @@ impl Oryxis {
                 self.mcp.allow_writes = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("remote_desktop_enabled") {
-                self.remote_desktop_enabled = v == "true";
+                ov.remote_desktop_enabled = v == "true";
             }
             // Token MCP clients must present; empty means auth is off
             // (server allows any caller as long as the global toggle is on).
@@ -360,16 +364,16 @@ impl Oryxis {
                 self.sync.passwords = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("flatten_hosts") {
-                self.flatten_hosts = v == "true";
+                ov.flatten_hosts = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("hosts_sort") {
-                self.hosts_sort = crate::state::ListSort::from_storage_str(&v);
+                ov.hosts_sort = crate::state::ListSort::from_storage_str(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("keys_sort") {
-                self.keys_sort = crate::state::ListSort::from_storage_str(&v);
+                ov.keys_sort = crate::state::ListSort::from_storage_str(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("snippets_sort") {
-                self.snippets_sort = crate::state::ListSort::from_storage_str(&v);
+                ov.snippets_sort = crate::state::ListSort::from_storage_str(&v);
             }
             // Local terminals: curated, machine-local list persisted as JSON.
             // Presence of the key means the one-time scan already ran; a
@@ -385,7 +389,7 @@ impl Oryxis {
                     for e in list.iter_mut().filter(|e| e.id.is_nil()) {
                         e.id = uuid::Uuid::new_v4();
                     }
-                    self.persist_local_terminals();
+                    repersist_local_terminals = true;
                 }
             }
             if let Ok(Some(v)) = vault.get_setting("local_terminal_default") {
@@ -529,8 +533,11 @@ impl Oryxis {
             }
             self.sync.peers = vault.list_sync_peers().unwrap_or_default();
             if let Ok(Some(v)) = vault.get_setting("ai_system_prompt") {
-                self.ai.system_prompt = text_editor::Content::with_text(&v);
+                ov.ai.system_prompt = text_editor::Content::with_text(&v);
             }
+        }
+        if repersist_local_terminals {
+            self.persist_local_terminals();
         }
     }
 
@@ -665,7 +672,7 @@ impl Oryxis {
                 }
             };
             oryxis_terminal::osc::set_global_command_nonce(Some(nonce.clone()));
-            self.shell_integration_nonce = nonce;
+            ov.shell_integration_nonce = nonce;
             if let Ok(Some(v)) = vault.get_setting("command_history_file") {
                 ov.prefs.command_history_file = v == "true";
             }
@@ -808,37 +815,37 @@ impl Oryxis {
                 ov.prefs.show_tab_host_address = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("privacy_mode") {
-                self.privacy.mode = v == "true";
+                ov.privacy.mode = v == "true";
             }
             // Privacy mask lists (issue #78). The never list is seeded
             // with the generic-username defaults at struct init; a
             // stored value (even an empty string, the user clearing
             // the field is a choice) replaces it wholesale.
             if let Ok(Some(v)) = vault.get_setting("privacy_always_mask") {
-                self.privacy.always_mask_editor =
+                ov.privacy.always_mask_editor =
                     iced::widget::text_editor::Content::with_text(&v);
-                self.privacy.always_mask = v;
+                ov.privacy.always_mask = v;
             }
             if let Ok(Some(v)) = vault.get_setting("privacy_never_mask") {
-                self.privacy.never_mask_editor =
+                ov.privacy.never_mask_editor =
                     iced::widget::text_editor::Content::with_text(&v);
-                self.privacy.never_mask = v;
+                ov.privacy.never_mask = v;
             }
             if let Ok(Some(v)) = vault.get_setting("hint_privacy_mask") {
-                self.privacy.hint_shown = v == "true";
+                ov.privacy.hint_shown = v == "true";
             }
             // Per-class mask gates (issue #78 block 1): absent = on.
             if let Ok(Some(v)) = vault.get_setting("privacy_mask_public_ips") {
-                self.privacy.mask_public_ips = v != "false";
+                ov.privacy.mask_public_ips = v != "false";
             }
             if let Ok(Some(v)) = vault.get_setting("privacy_mask_private_ips") {
-                self.privacy.mask_private_ips = v != "false";
+                ov.privacy.mask_private_ips = v != "false";
             }
             if let Ok(Some(v)) = vault.get_setting("privacy_mask_usernames") {
-                self.privacy.mask_usernames = v != "false";
+                ov.privacy.mask_usernames = v != "false";
             }
             if let Ok(Some(v)) = vault.get_setting("privacy_mask_hostnames") {
-                self.privacy.mask_hostnames = v != "false";
+                ov.privacy.mask_hostnames = v != "false";
             }
             // One-shot reset: Privacy Mode was never meant to be on by
             // default, yet some vaults carry a persisted
@@ -846,8 +853,8 @@ impl Oryxis {
             // sentinel keeps a user who deliberately re-enables it from
             // being reset again on the next boot.
             if let Ok(None) = vault.get_setting("privacy_default_off_applied") {
-                if self.privacy.mode {
-                    self.privacy.mode = false;
+                if ov.privacy.mode {
+                    ov.privacy.mode = false;
                     let _ = vault.set_setting("privacy_mode", "false");
                 }
                 let _ = vault.set_setting("privacy_default_off_applied", "true");
@@ -1009,7 +1016,7 @@ impl Oryxis {
                 ov.prefs.side_full_height = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_enabled") {
-                self.sftp_enabled = v == "true";
+                ov.sftp_enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("host_monitoring_enabled") {
                 ov.prefs.host_monitoring = v == "true";
@@ -1038,7 +1045,7 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("side_panel_width")
                 && let Ok(w) = v.parse::<f32>()
             {
-                self.panel_width =
+                ov.panel_width =
                     w.clamp(crate::app::PANEL_WIDTH_MIN, crate::app::PANEL_WIDTH_MAX);
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_split_ratio")
@@ -1266,7 +1273,7 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("terminal_font_size")
                 && let Ok(parsed) = v.parse::<f32>()
             {
-                self.terminal_font_size = parsed.clamp(10.0, 24.0);
+                ov.terminal_font_size = parsed.clamp(10.0, 24.0);
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_font_name")
                 && !v.is_empty()
@@ -1278,21 +1285,21 @@ impl Oryxis {
                 // the literal "Source Code Pro" persisted, hop them onto
                 // the new bundled family so glyphs render and the picker
                 // reflects what's actually loaded.
-                self.terminal_font_name = if v == "Source Code Pro" {
+                ov.terminal_font_name = if v == "Source Code Pro" {
                     "SauceCodePro Nerd Font".to_string()
                 } else {
                     v
                 };
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_text_thickness") {
-                self.terminal_text_thickness =
+                ov.terminal_text_thickness =
                     crate::fonts::TextThickness::from_setting(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_font_weight") {
                 // Unknown values read as Regular, so a row written by a
                 // newer build (or a hand edit) can only cost the weight,
                 // never the boot.
-                self.terminal_font_weight =
+                ov.terminal_font_weight =
                     crate::fonts::TerminalFontWeight::from_setting(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("keepalive_interval") {

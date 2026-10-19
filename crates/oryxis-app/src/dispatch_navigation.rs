@@ -86,7 +86,7 @@ impl Oryxis {
                 self.keynav.pick_open = false;
                 // Leaving the Logs view re-arms Privacy Mode masking so a
                 // revealed timeline doesn't stay exposed on the next visit.
-                self.privacy.revealed = false;
+                self.vaults.cur_mut().privacy.revealed = false;
                 // The Settings sidebar search is scoped to the visit:
                 // coming back later starts from the plain section list,
                 // not a stale filtered rail.
@@ -448,20 +448,20 @@ impl Oryxis {
                     // content's right edge.
                     let panel_width = match kind {
                         SortMenuKind::Hosts => {
-                            if self.panels.host_panel { self.panel_width } else { 0.0 }
+                            if self.panels.host_panel { self.vaults.cur().panel_width } else { 0.0 }
                         }
                         SortMenuKind::Keys => {
                             if self.panels.key_panel
                                 || self.panels.identity_panel
                                 || self.panels.key_generate_panel
                             {
-                                self.panel_width
+                                self.vaults.cur().panel_width
                             } else {
                                 0.0
                             }
                         }
                         SortMenuKind::Snippets => {
-                            if self.panels.snippet_panel { self.panel_width } else { 0.0 }
+                            if self.panels.snippet_panel { self.vaults.cur().panel_width } else { 0.0 }
                         }
                     };
                     // Must match the `OverlayContent::SortMenu` width in
@@ -488,15 +488,15 @@ impl Oryxis {
                 self.sidebar_sort_open = false;
                 let key = match kind {
                     SortMenuKind::Hosts => {
-                        self.hosts_sort = sort;
+                        self.vaults.cur_mut().hosts_sort = sort;
                         "hosts_sort"
                     }
                     SortMenuKind::Keys => {
-                        self.keys_sort = sort;
+                        self.vaults.cur_mut().keys_sort = sort;
                         "keys_sort"
                     }
                     SortMenuKind::Snippets => {
-                        self.snippets_sort = sort;
+                        self.vaults.cur_mut().snippets_sort = sort;
                         "snippets_sort"
                     }
                 };
@@ -522,7 +522,7 @@ impl Oryxis {
                     let menu_w = self.toolbar_search_width();
                     let pad = 24.0_f32;
                     let panel = if self.vault_panel_open() {
-                        self.panel_width
+                        self.vaults.cur().panel_width
                     } else {
                         0.0
                     };
@@ -568,7 +568,7 @@ impl Oryxis {
                         y: 0.0,
                     });
                     let panel = if self.vault_panel_open() {
-                        self.panel_width
+                        self.vaults.cur().panel_width
                     } else {
                         0.0
                     };

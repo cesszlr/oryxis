@@ -531,13 +531,9 @@ impl Oryxis {
                 history_content: crate::state::HistoryContentSearch::default(),
                 identity_form: crate::state::IdentityForm::default(),
                 identity_context_menu: None,
-                hosts_sort: crate::state::ListSort::default(),
-                keys_sort: crate::state::ListSort::default(),
-                snippets_sort: crate::state::ListSort::default(),
                 proxy_identity_form: crate::state::ProxyIdentityForm::default(),
                 login_script_generation: 0,
                 login_script_form: crate::state::LoginScriptForm::default(),
-                highlight_rules_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
                 highlight_rule_form: crate::state::HighlightRuleForm::default(),
                 trigger_confirm: None,
                 cloud_form: crate::state::CloudForm::default(),
@@ -573,7 +569,6 @@ impl Oryxis {
                 plugins_auto_update_global: true,
                 plugins: Vec::new(),
                 plugin_install_modal: None,
-                install_runs: std::collections::HashMap::new(),
                 theme_ui: crate::state::ThemeEditorUi::default(),
                 monitor: Default::default(),
                 tmux: Default::default(),
@@ -603,9 +598,7 @@ impl Oryxis {
                 ui_theme_import_error: None,
                 ui_theme_editor: None,
                 ui_color_popover: None,
-                active_app_theme_name: "Oryxis Dark".to_string(),
                 clear_history_confirm: false,
-                chat_ui: crate::state::ChatUi::default(),
                 viewing_session_log: None,
                 session_player: None,
                 gif_export: crate::state::GifExportState::default(),
@@ -621,20 +614,13 @@ impl Oryxis {
                 link_confirm: None,
                 save_output: None,
                 remote_desktop_seq: 0,
-                remote_desktop_enabled: false,
                 port_forward_starting: std::collections::HashSet::new(),
                 port_forward_retry: std::collections::HashMap::new(),
                 port_forward_agent_watch: None,
                 port_forward_form: crate::state::PortForwardRuleForm::default(),
                 port_forward_context_menu: None,
-                terminal_palette: oryxis_terminal::TerminalPalette::default(),
-                terminal_theme_override: None,
                 local_terminal_theme: None,
-                terminal_font_size: 14.0,
                 terminal_font_zoom: 0.0,
-                terminal_font_name: "SauceCodePro Nerd Font".to_string(),
-                terminal_font_weight: crate::fonts::TerminalFontWeight::default(),
-                terminal_text_thickness: crate::fonts::TextThickness::default(),
                 settings_section: SettingsSection::Interface,
                 open_panel_tabs: std::collections::BTreeSet::new(),
                 net_tools: crate::state::NetToolsState::default(),
@@ -646,10 +632,8 @@ impl Oryxis {
                 // `load_data_from_vault`; empty until then, which is also
                 // what a locked vault shows, and an empty key is never
                 // installed, so nothing is captured before it is known.
-                shell_integration_nonce: String::new(),
                 sidebar_snippet_group: None,
                 pending_perf_mode_toast: false,
-                privacy: crate::state::PrivacyState::default(),
                 download_mirror,
                 agent: crate::state::AgentState::default(),
                 tray_menu_signature: 0,
@@ -661,10 +645,8 @@ impl Oryxis {
                 pending_ecs_autoconnect: None,
                 tab_drag: None,
                 pane_drag_from: None,
-                panel_width: crate::app::PANEL_WIDTH,
                 panel_resize_drag: None,
                 editor_saved_snapshot: None,
-                sftp_enabled: true,
                 // Workspace is the v0.7 default. Existing users who
                 // never persisted `layout_mode` also fall through to
                 // this default on next launch (no migration row
@@ -688,7 +670,6 @@ impl Oryxis {
                 mirror_writer: None,
                 update_check_status: None,
                 reconnect_counters: std::collections::HashMap::new(),
-                ai: crate::state::AiState::default(),
                 toast: None,
                 toast_deadline: None,
                 os_notices: Vec::new(),
@@ -718,7 +699,6 @@ impl Oryxis {
                 hosts_tree_search: String::new(),
                 mcp: crate::state::McpState::default(),
                 sync: crate::state::SyncState::default(),
-                flatten_hosts: true,
                 export_password: String::new(),
                 export_include_keys: true,
                 export_selection: oryxis_vault::ExportSelection::all(),
@@ -1049,8 +1029,8 @@ impl Oryxis {
     pub(crate) fn unlock_fetch_tasks(&mut self) -> Vec<Task<Message>> {
         let mut tasks = Vec::new();
         for (key, task) in crate::fonts::boot_pack_tasks(
-            &self.terminal_font_name,
-            self.terminal_font_weight,
+            &self.vaults.cur().terminal_font_name,
+            self.vaults.cur().terminal_font_weight,
         ) {
             if self.loaded_pack_fonts.insert(key.to_string()) {
                 tasks.push(task);

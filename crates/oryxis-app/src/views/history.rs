@@ -63,7 +63,7 @@ impl Oryxis {
         // entries".) Show just the empty state, no toolbar / pagination /
         // Clear all, matching the other empty vault views.
         let has_timeline = !self.vaults.cur().session_logs.is_empty()
-            || !self.chat_ui.conversations.is_empty()
+            || !self.vaults.cur().chat_ui.conversations.is_empty()
             || self
                 .vaults.cur().logs
                 .iter()
@@ -141,7 +141,7 @@ impl Oryxis {
                 kind: TimelineKind::Session { idx, entry },
             });
         }
-        for (idx, entry) in self.chat_ui.conversations.iter().enumerate() {
+        for (idx, entry) in self.vaults.cur().chat_ui.conversations.iter().enumerate() {
             // A conversation on a local shell has no host to resolve.
             let hostname = entry
                 .connection_id
@@ -243,7 +243,7 @@ impl Oryxis {
         // Nothing to clear → the button is disabled (muted, no action).
         let has_entries = !self.vaults.cur().logs.is_empty()
             || !self.vaults.cur().session_logs.is_empty()
-            || !self.chat_ui.conversations.is_empty();
+            || !self.vaults.cur().chat_ui.conversations.is_empty();
         let mut clear_btn = button(
             container(
                 text(crate::i18n::t("clear_all").to_uppercase())
@@ -357,7 +357,7 @@ impl Oryxis {
         if privacy_applies {
             row_items.push(self.keynav_toolbar_slot(
                 crate::keynav::ToolbarItem::PrivacyReveal,
-                crate::widgets::privacy_reveal_btn(self.privacy.revealed),
+                crate::widgets::privacy_reveal_btn(self.vaults.cur().privacy.revealed),
             ));
             row_items.push(Space::new().width(8).boxed());
         }
@@ -493,7 +493,7 @@ impl Oryxis {
         // ── Saved conversation reader ──
         // Same slot as the recording viewer below: opening one closes the
         // other in the dispatcher, so only one can be up.
-        if let Some(viewer) = &self.chat_ui.viewer {
+        if let Some(viewer) = &self.vaults.cur().chat_ui.viewer {
             return self.view_chat_viewer(viewer);
         }
 
@@ -514,7 +514,7 @@ impl Oryxis {
             let privacy_applies = viewer_conn
                 .map(|c| self.privacy_active(c))
                 .unwrap_or_else(|| self.privacy_global_active());
-            let mask = privacy_applies && !self.privacy.revealed;
+            let mask = privacy_applies && !self.vaults.cur().privacy.revealed;
             // The transcript renders through the real terminal widget
             // (issues #90/#91): read-only, PTY-less, so selection,
             // copy-on-select and the right-click schemes match the live
@@ -532,9 +532,9 @@ impl Oryxis {
                 .focused(true)
                 .with_mouse_reporting(false)
                 .with_font_size(self.terminal_font_px())
-                .with_font_name(&self.terminal_font_name)
-                .with_font_weight(self.terminal_font_weight.font_weight())
-                .with_text_dilation(self.terminal_text_thickness.px())
+                .with_font_name(&self.vaults.cur().terminal_font_name)
+                .with_font_weight(self.vaults.cur().terminal_font_weight.font_weight())
+                .with_text_dilation(self.vaults.cur().terminal_text_thickness.px())
                 .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
                 .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
                 .with_right_click_action(self.vaults.cur().prefs.terminal_right_click.to_widget())
@@ -600,7 +600,7 @@ impl Oryxis {
                 Space::new().width(Length::Fill).boxed(),
             ];
             if privacy_applies {
-                header_items.push(crate::widgets::privacy_reveal_btn(self.privacy.revealed));
+                header_items.push(crate::widgets::privacy_reveal_btn(self.vaults.cur().privacy.revealed));
                 header_items.push(Space::new().width(8).boxed());
             }
             // Transcript mode switch. A recording that lived on the
@@ -764,7 +764,7 @@ impl Oryxis {
                 shown += 1;
                 // Privacy Mode: labels mask like the timeline rows;
                 // the command line is raw session content, redact it.
-                let mask = !self.privacy.revealed && self.privacy_active(conn);
+                let mask = !self.vaults.cur().privacy.revealed && self.privacy_active(conn);
                 let label = if mask {
                     crate::widgets::mask_blocks(&conn.label)
                 } else {
@@ -893,7 +893,7 @@ impl Oryxis {
         // / dashboard already mask. Per-host override wins; a deleted
         // host falls back to the global default; the Reveal toggle flips
         // it off.
-        let mask = !self.privacy.revealed
+        let mask = !self.vaults.cur().privacy.revealed
             && conn
                 .map(|c| self.privacy_active(c))
                 .unwrap_or_else(|| self.privacy_global_active());

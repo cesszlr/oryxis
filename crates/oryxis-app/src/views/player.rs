@@ -48,7 +48,7 @@ impl Oryxis {
         let privacy_applies = conn
             .map(|c| self.privacy_active(c))
             .unwrap_or_else(|| self.privacy_global_active());
-        let mask = privacy_applies && !self.privacy.revealed;
+        let mask = privacy_applies && !self.vaults.cur().privacy.revealed;
 
         // ── Header: title, geometry chip, reveal, close ──
         let title = if mask {
@@ -69,7 +69,7 @@ impl Oryxis {
             Space::new().width(Length::Fill).boxed(),
         ];
         if privacy_applies {
-            header_items.push(crate::widgets::privacy_reveal_btn(self.privacy.revealed));
+            header_items.push(crate::widgets::privacy_reveal_btn(self.vaults.cur().privacy.revealed));
             header_items.push(Space::new().width(8).boxed());
         }
         // Recording actions, mirroring the static viewer's header: a
@@ -177,8 +177,8 @@ impl Oryxis {
             // below is still sized to the CURRENT grid, so a smaller
             // frame just centers with margins at the same font.
             let font_size = fitted_font_size(
-                &self.terminal_font_name,
-                self.terminal_font_weight.font_weight(),
+                &self.vaults.cur().terminal_font_name,
+                self.vaults.cur().terminal_font_weight.font_weight(),
                 self.terminal_font_px(),
                 p.fit_cols,
                 p.fit_rows,
@@ -188,8 +188,8 @@ impl Oryxis {
                 ),
             );
             let (px_w, px_h) = oryxis_terminal::widget::grid_pixel_size(
-                &self.terminal_font_name,
-                self.terminal_font_weight.font_weight(),
+                &self.vaults.cur().terminal_font_name,
+                self.vaults.cur().terminal_font_weight.font_weight(),
                 font_size,
                 p.cols,
                 p.rows,
@@ -215,9 +215,9 @@ impl Oryxis {
                 .with_chords_unfocused(true)
                 .with_mouse_reporting(false)
                 .with_font_size(font_size)
-                .with_font_name(&self.terminal_font_name)
-                .with_font_weight(self.terminal_font_weight.font_weight())
-                .with_text_dilation(self.terminal_text_thickness.px())
+                .with_font_name(&self.vaults.cur().terminal_font_name)
+                .with_font_weight(self.vaults.cur().terminal_font_weight.font_weight())
+                .with_text_dilation(self.vaults.cur().terminal_text_thickness.px())
                 .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
                 .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
                 // Same right-click scheme as a live pane. Without it the

@@ -26,7 +26,7 @@ impl Oryxis {
             x: (pos.x / SNAP).round() * SNAP,
             y: (pos.y / SNAP).round() * SNAP,
         };
-        let needs_drag_update = self.chat_ui.sidebar_drag.is_some()
+        let needs_drag_update = self.vaults.cur().chat_ui.sidebar_drag.is_some()
             || self.panel_resize_drag.is_some()
             || self.sftp_chrome.split_drag.is_some()
             || self.sftp_chrome.log_drag.is_some()
@@ -111,14 +111,14 @@ impl Oryxis {
         // grows dragging left, the left region grows dragging right.
         // Clamp to a sane band so the user can't accidentally make it
         // unusable.
-        if let Some((side, start_x, start_width)) = self.chat_ui.sidebar_drag {
+        if let Some((side, start_x, start_width)) = self.vaults.cur().chat_ui.sidebar_drag {
             let delta = pos.x - start_x;
             let signed = match side {
                 crate::state::SidebarSide::Left => delta,
                 crate::state::SidebarSide::Right => -delta,
             };
             let new_width = (start_width + signed).clamp(260.0, 700.0);
-            self.chat_ui.sidebar_width[side.idx()] = new_width;
+            self.vaults.cur_mut().chat_ui.sidebar_width[side.idx()] = new_width;
         }
         // While the side-panel editor drawer's edge handle is held
         // down, the drawer width tracks the cursor. The drawer sits on
@@ -129,7 +129,7 @@ impl Oryxis {
         if let Some((start_x, start_width)) = self.panel_resize_drag {
             let delta = pos.x - start_x;
             let signed = if crate::i18n::is_rtl_layout() { delta } else { -delta };
-            self.panel_width = (start_width + signed)
+            self.vaults.cur_mut().panel_width = (start_width + signed)
                 .clamp(crate::app::PANEL_WIDTH_MIN, crate::app::PANEL_WIDTH_MAX);
         }
         // SFTP center divider: the ratio tracks the cursor across the
@@ -777,7 +777,7 @@ impl Oryxis {
                 // Capture cursor x plus the current width; the
                 // MouseMoved handler computes the delta against these.
                 self.panel_resize_drag =
-                    Some((self.cur_mouse().x, self.panel_width));
+                    Some((self.cur_mouse().x, self.vaults.cur().panel_width));
             }
             TabsMessage::WindowExpandVertical => return self.handle_window_expand_vertical(),
             TabsMessage::WindowMinimize => return self.handle_window_minimize(),

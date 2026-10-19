@@ -318,8 +318,8 @@ impl Oryxis {
         let caret = oryxis_terminal::ime_caret_rect(
             bounds,
             self.terminal_font_px(),
-            Some(self.terminal_font_name.as_str()),
-            self.terminal_font_weight.font_weight(),
+            Some(self.vaults.cur().terminal_font_name.as_str()),
+            self.vaults.cur().terminal_font_weight.font_weight(),
             cell,
         );
         Some((caret.x, caret.y + caret.height + CARET_GAP, caret.y))

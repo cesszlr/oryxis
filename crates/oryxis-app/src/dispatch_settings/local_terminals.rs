@@ -405,7 +405,7 @@ pub(crate) fn spawn_local_shell_in(
                 "Spawned local shell: program={} args={:?}",
                 program_label, args_label
             );
-            state.set_palette(app.terminal_palette.clone());
+            state.set_palette(app.vaults.cur().terminal_palette.clone());
             let exited = state.pty.as_mut().and_then(|p| p.take_child_exit());
             let tab_idx = app.tabs.len();
             let label = pick

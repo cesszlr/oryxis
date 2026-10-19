@@ -49,8 +49,8 @@ impl Oryxis {
     /// the instant the dial lands.
     fn sidebar_tab_possible(&self, tab: TerminalSidebarTab) -> bool {
         match tab {
-            TerminalSidebarTab::Chat => self.ai.enabled,
-            TerminalSidebarTab::Files => self.sftp_enabled,
+            TerminalSidebarTab::Chat => self.vaults.cur().ai.enabled,
+            TerminalSidebarTab::Files => self.vaults.cur().sftp_enabled,
             TerminalSidebarTab::Monitor => self.vaults.cur().prefs.host_monitoring,
             TerminalSidebarTab::Tmux => self.vaults.cur().prefs.tmux_manager,
             TerminalSidebarTab::Snippets

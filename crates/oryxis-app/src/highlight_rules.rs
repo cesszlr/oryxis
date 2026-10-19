@@ -176,7 +176,7 @@ impl Oryxis {
         // panic in the render path, and the borrow checker cannot see
         // it.
         let cached = self
-            .highlight_rules_cache
+            .vaults.cur().highlight_rules_cache
             .borrow()
             .get(&id)
             .and_then(|(cached_sig, rules)| (*cached_sig == sig).then(|| rules.clone()));
@@ -190,7 +190,7 @@ impl Oryxis {
         }
         // Bounded: one entry per host that has had a pane open. Dropping
         // the whole map at the cap is fine, it costs one recompile.
-        let mut cache = self.highlight_rules_cache.borrow_mut();
+        let mut cache = self.vaults.cur().highlight_rules_cache.borrow_mut();
         if cache.len() >= MAX_CACHED_HOSTS {
             cache.clear();
         }

@@ -17,8 +17,8 @@ impl Oryxis {
         .width(Length::Fill)
         .align_x(dir_align_x());
 
-        if self.ai.enabled {
-            let current_info = crate::ai::provider_info(&self.ai.provider);
+        if self.vaults.cur().ai.enabled {
+            let current_info = crate::ai::provider_info(&self.vaults.cur().ai.provider);
             let provider_options: Vec<String> = crate::ai::PROVIDERS
                 .iter()
                 .map(|p| p.display.to_string())
@@ -51,7 +51,7 @@ impl Oryxis {
                 t("model"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-ai-model")),
                 10.0,
-                text_input(t("ai_model_placeholder"), &self.ai.model)
+                text_input(t("ai_model_placeholder"), &self.vaults.cur().ai.model)
                     .id(iced::widget::Id::new("set-ai-model"))
                     .on_input(|v| Message::Ai(AiMessage::AiModelChanged(v)))
                     .padding(10)
@@ -75,7 +75,7 @@ impl Oryxis {
                     crate::widgets::toggle_row_desc(
                         t("ai_reasoning"),
                         t("ai_reasoning_desc"),
-                        self.ai.reasoning,
+                        self.vaults.cur().ai.reasoning,
                         Message::Ai(AiMessage::ToggleAiReasoning),
                     ),
                 ),
@@ -89,7 +89,7 @@ impl Oryxis {
                     crate::widgets::toggle_row_desc(
                         t("ai_save_history"),
                         t("ai_save_history_desc"),
-                        self.ai.save_history,
+                        self.vaults.cur().ai.save_history,
                         Message::Ai(AiMessage::ToggleAiSaveHistory),
                     ),
                 ),
@@ -100,7 +100,7 @@ impl Oryxis {
                     t("api_url"),
                     crate::keynav::RowAction::input(iced::widget::Id::new("set-ai-url")),
                     10.0,
-                    text_input("https://api.example.com/v1/chat/completions", &self.ai.api_url)
+                    text_input("https://api.example.com/v1/chat/completions", &self.vaults.cur().ai.api_url)
                         .id(iced::widget::Id::new("set-ai-url"))
                         .on_input(|v| Message::Ai(AiMessage::AiApiUrlChanged(v)))
                         .padding(10)
@@ -117,7 +117,7 @@ impl Oryxis {
             // When a key is already stored, the input is cleared
             // for security but the placeholder communicates that
             // a key exists, typing replaces it on save.
-            let key_placeholder = if self.ai.api_key_set {
+            let key_placeholder = if self.vaults.cur().ai.api_key_set {
                 t("ai_key_saved_placeholder")
             } else {
                 "sk-..."
@@ -138,7 +138,7 @@ impl Oryxis {
                 container(
                     crate::widgets::password_input_with_eye_nav(
                         key_placeholder,
-                        &self.ai.api_key,
+                        &self.vaults.cur().ai.api_key,
                         |v| Message::Ai(AiMessage::AiApiKeyChanged(v.into())),
                         Some(Message::Ai(AiMessage::SaveAiApiKey)),
                         self.revealed_secrets
@@ -167,7 +167,7 @@ impl Oryxis {
                 6.0,
                 styled_button(crate::i18n::t("save"), Message::Ai(AiMessage::SaveAiApiKey), OryxisColors::t().accent),
             );
-            let key_status: Element<'_, Message> = if self.ai.api_key_set {
+            let key_status: Element<'_, Message> = if self.vaults.cur().ai.api_key_set {
                 dir_row(vec![
                     iced_fonts::lucide::circle_check().size(13).color(OryxisColors::t().success).boxed(),
                     Space::new().width(6).boxed(),
@@ -203,7 +203,7 @@ impl Oryxis {
             // System prompt, multi-line editor that grows with the
             // content. `Length::Shrink` lets the editor auto-resize
             // to fit its text, capped by the panel's scroll area.
-            let prompt_editor: Element<'_, Message> = iced::widget::text_editor(&self.ai.system_prompt)
+            let prompt_editor: Element<'_, Message> = iced::widget::text_editor(&self.vaults.cur().ai.system_prompt)
                 .placeholder(t("ai_system_prompt_placeholder"))
                 .on_action(|v| Message::Ai(AiMessage::AiSystemPromptAction(v)))
                 .padding(10)

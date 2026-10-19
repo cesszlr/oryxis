@@ -111,6 +111,89 @@ pub(crate) struct OpenVault {
     /// What the user configured in this vault (every preference that is
     /// not the device's, see `state::DevicePrefs`).
     pub(crate) prefs: crate::state::AppPrefs,
+    /// See [`crate::state::ChatUi`].
+    pub(crate) chat_ui: crate::state::ChatUi,
+    pub(crate) hosts_sort: crate::state::ListSort,
+    pub(crate) keys_sort: crate::state::ListSort,
+    pub(crate) snippets_sort: crate::state::ListSort,
+    /// Resolved + compiled highlight rules per host, keyed by connection
+    /// id and validated by a signature of its inputs (see
+    /// `highlight_rules_for`), so the entry can never go stale.
+    /// A `RefCell` because BOTH consumers need it and one of them is
+    /// `view()`: the widget paints from the same resolved set the
+    /// backend watches with, and a rule that coloured one pattern while
+    /// firing on another would be the worst kind of bug here. Same
+    /// pattern as the keynav recording.
+    pub(crate) highlight_rules_cache: std::cell::RefCell<
+        std::collections::HashMap<uuid::Uuid, (u64, std::sync::Arc<oryxis_terminal::CompiledRules>)>,
+    >,
+    /// Which install script (issue #147) already ran on which host,
+    /// keyed (host id, snippet id) with the last run time. Mirror of
+    /// the vault's `install_runs` table; drives the "installed here"
+    /// hint on the snippet surfaces. Local bookkeeping, never synced.
+    pub(crate) install_runs:
+        std::collections::HashMap<(Uuid, Uuid), chrono::DateTime<chrono::Utc>>,
+    /// Name of the active app theme (built-in or custom UI theme). The
+    /// `AppTheme` enum can't name a custom theme, so this tracks the
+    /// selection for highlighting + delete/rename bookkeeping.
+    pub(crate) active_app_theme_name: String,
+    /// Opt-in toggle (`remote_desktop_enabled` setting, off by default):
+    /// when off, all remote-desktop UI (the "Add remote desktop" entry,
+    /// the settings row) is hidden so it doesn't clutter the light-user
+    /// interface. Existing RemoteDesktop hosts stay visible and usable.
+    pub(crate) remote_desktop_enabled: bool,
+    /// Theme derived from the active app theme, used as the global
+    /// fallback when neither `terminal_theme_override` nor a per-host
+    /// override is set.
+    /// Cached resolved global terminal palette (built-in or custom).
+    /// Applied to new tabs / local shells / cloud sessions; recomputed when
+    /// the global theme or a custom theme changes.
+    pub(crate) terminal_palette: oryxis_terminal::TerminalPalette,
+    /// User pick that overrides the app-theme-derived terminal palette.
+    /// `None` means "follow the app theme" (default). Stored as the
+    /// theme's display name (e.g. "Dracula") so the value survives new
+    /// theme additions without a migration.
+    pub(crate) terminal_theme_override: Option<String>,
+    pub(crate) terminal_font_size: f32,
+    pub(crate) terminal_font_name: String,
+    /// Weight every terminal cell is drawn at (issue #155). Global,
+    /// like the family and the size next to it: a per-host weight
+    /// over a global family would let a host ask for a weight the
+    /// family it can't choose has no face for.
+    pub(crate) terminal_font_weight: crate::fonts::TerminalFontWeight,
+    /// Stroke widening applied to every terminal glyph. Global for the
+    /// same reason the weight is: it compensates for the rasterizer,
+    /// not for a host.
+    pub(crate) terminal_text_thickness: crate::fonts::TextThickness,
+    /// The shell-integration key this vault mints once and every pane then
+    /// demands from `OSC 633 ; E` (see `shell_integration.rs`). Held in
+    /// state only so Settings can show and copy the snippet; the value the
+    /// capture actually compares against lives in the terminal crate,
+    /// installed at boot.
+    pub(crate) shell_integration_nonce: String,
+    /// Privacy Mode (issue #78): global toggle, session override, hint
+    /// flag, always/never mask lists, per-class gates and the Logs
+    /// reveal toggle. See [`crate::state::PrivacyState`].
+    pub(crate) privacy: crate::state::PrivacyState,
+    /// Live width of the right-side editor drawer (host / key / identity /
+    /// snippet / port-forward / cloud forms, all of them: they share one
+    /// width, like they shared one constant). Defaults to `PANEL_WIDTH`,
+    /// dragged via the drawer's edge handle, persisted as the
+    /// `side_panel_width` setting on release.
+    pub(crate) panel_width: f32,
+    /// Toggles the SFTP feature entirely. Off hides the SFTP sidebar
+    /// entry (both expanded and collapsed) so users who never transfer
+    /// files don't have it taking up nav space. The SFTP settings panel
+    /// still renders so the user can re-enable + tweak in one place,
+    /// mirroring how `ai_enabled` works.
+    pub(crate) sftp_enabled: bool,
+    pub(crate) ai: crate::state::AiState,
+    /// When on, the dashboard root shows two sections, Groups (manual
+    /// folder cards) and Hosts (a flat list of every connection,
+    /// including those that live inside a group). When off, root
+    /// matches the legacy behaviour: groups at top, only ungrouped
+    /// hosts beneath. Default: on. (Dashboard layout, not a sync field.)
+    pub(crate) flatten_hosts: bool,
 }
 
 impl OpenVault {
@@ -145,6 +228,26 @@ impl OpenVault {
             custom_ui_themes: Vec::new(),
             files_recent_folders: std::collections::HashMap::new(),
             prefs: crate::state::AppPrefs::default(),
+            privacy: crate::state::PrivacyState::default(),
+            ai: crate::state::AiState::default(),
+            chat_ui: crate::state::ChatUi::default(),
+            terminal_theme_override: None,
+            terminal_palette: oryxis_terminal::TerminalPalette::default(),
+            terminal_font_size: 14.0,
+            terminal_font_name: "SauceCodePro Nerd Font".to_string(),
+            terminal_font_weight: crate::fonts::TerminalFontWeight::default(),
+            terminal_text_thickness: crate::fonts::TextThickness::default(),
+            hosts_sort: crate::state::ListSort::default(),
+            keys_sort: crate::state::ListSort::default(),
+            snippets_sort: crate::state::ListSort::default(),
+            flatten_hosts: true,
+            shell_integration_nonce: String::new(),
+            sftp_enabled: true,
+            remote_desktop_enabled: false,
+            install_runs: std::collections::HashMap::new(),
+            active_app_theme_name: "Oryxis Dark".to_string(),
+            highlight_rules_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
+            panel_width: crate::app::PANEL_WIDTH,
         }
     }
 }

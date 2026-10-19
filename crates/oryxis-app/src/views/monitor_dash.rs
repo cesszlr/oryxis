@@ -170,7 +170,7 @@ impl Oryxis {
         // Grid mode: responsive fixed-width cards. List mode: at most
         // two full-width columns (the owner's "list (2 columns)").
         let panel_open = self.monitor_dash.selected.is_some();
-        let panel_w = if panel_open { self.panel_width } else { 0.0 };
+        let panel_w = if panel_open { self.vaults.cur().panel_width } else { 0.0 };
         let nav_width = self.vault_rail_width();
         let available = (self.cur_window_size().width
             - nav_width
@@ -529,7 +529,7 @@ impl Oryxis {
             ]
             .padding(Padding { top: 16.0, right: 16.0, bottom: 16.0, left: 16.0 }),
         )
-        .width(Length::Fixed(self.panel_width))
+        .width(Length::Fixed(self.vaults.cur().panel_width))
         .height(Length::Fill)
         .style(|_| container::Style {
             background: Some(Background::Color(OryxisColors::t().bg_surface)),

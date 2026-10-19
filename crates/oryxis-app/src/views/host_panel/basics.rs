@@ -286,7 +286,7 @@ impl Oryxis {
             // is offered only where it can actually be used; a host that
             // already IS one keeps the option visible, or editing it
             // would silently rewrite its protocol on the next pick.
-            if self.remote_desktop_enabled || self.editor_form.protocol == Proto::RemoteDesktop {
+            if self.vaults.cur().remote_desktop_enabled || self.editor_form.protocol == Proto::RemoteDesktop {
                 options.push(Proto::RemoteDesktop);
             }
             let picker = self.panel_nav_slot(

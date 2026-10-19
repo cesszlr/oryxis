@@ -67,7 +67,7 @@ impl Oryxis {
 
             // Apply the toolbar sort to folder cards. Hidden groups (no
             // direct match) just fall through the search filter below.
-            self.hosts_sort.sort_items(
+            self.vaults.cur().hosts_sort.sort_items(
                 &mut roots_to_render,
                 |gid| {
                     group_by_id
@@ -185,7 +185,7 @@ impl Oryxis {
                             .is_none_or(|pid| query.profile_id == pid)
                 })
                 .collect();
-            self.hosts_sort.sort_items(
+            self.vaults.cur().hosts_sort.sort_items(
                 &mut dyn_group_order,
                 |&i| self.vaults.cur().groups[i].label.clone(),
                 |&i| self.vaults.cur().groups[i].created_at,
@@ -357,7 +357,7 @@ impl Oryxis {
                             || g.label.to_lowercase().contains(&search_lower))
                 })
                 .collect();
-            self.hosts_sort.sort_items(
+            self.vaults.cur().hosts_sort.sort_items(
                 &mut nested_manual_order,
                 |&i| self.vaults.cur().groups[i].label.clone(),
                 |&i| self.vaults.cur().groups[i].created_at,
@@ -399,7 +399,7 @@ impl Oryxis {
                             .is_none_or(|pid| query.profile_id == pid)
                 })
                 .collect();
-            self.hosts_sort.sort_items(
+            self.vaults.cur().hosts_sort.sort_items(
                 &mut nested_dyn_order,
                 |&i| self.vaults.cur().groups[i].label.clone(),
                 |&i| self.vaults.cur().groups[i].created_at,

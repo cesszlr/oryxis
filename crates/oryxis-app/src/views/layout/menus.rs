@@ -647,7 +647,7 @@ impl Oryxis {
         let hk_hosts = self.hotkey_label_for_strip_slot(0);
         // SFTP is no longer a fixed strip slot; the menu item opens a new SFTP
         // tab, so show the dedicated OpenSftp shortcut instead.
-        let hk_sftp = if self.sftp_enabled {
+        let hk_sftp = if self.vaults.cur().sftp_enabled {
             self.hotkey_label_for_action(crate::hotkeys::HotkeyAction::OpenSftp)
         } else {
             None
@@ -778,7 +778,7 @@ impl Oryxis {
             // Hoisted ahead of the column, this row recorded slot 0 and
             // a stray Enter through the modal router opened an SFTP tab
             // instead of activating the first visible row (issue #169).
-            if self.sftp_enabled {
+            if self.vaults.cur().sftp_enabled {
                 // SFTP is a tab now: the menu opens a fresh SFTP browser tab.
                 item("sftp", Message::Sftp(SftpMessage::NewSftpTab), hk_sftp)
             } else {

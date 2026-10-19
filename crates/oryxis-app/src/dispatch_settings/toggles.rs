@@ -62,10 +62,10 @@ impl Oryxis {
                 return Ok(Task::batch(tasks));
             }
             SettingsMessage::SettingToggleRemoteDesktop => {
-                self.remote_desktop_enabled = !self.remote_desktop_enabled;
+                self.vaults.cur_mut().remote_desktop_enabled = !self.vaults.cur_mut().remote_desktop_enabled;
                 self.persist_setting(
                     "remote_desktop_enabled",
-                    if self.remote_desktop_enabled { "true" } else { "false" },
+                    if self.vaults.cur().remote_desktop_enabled { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleCloseToTray => {
@@ -88,10 +88,10 @@ impl Oryxis {
                 );
             }
             SettingsMessage::SettingToggleSftpEnabled => {
-                self.sftp_enabled = !self.sftp_enabled;
+                self.vaults.cur_mut().sftp_enabled = !self.vaults.cur_mut().sftp_enabled;
                 self.persist_setting(
                     "sftp_enabled",
-                    if self.sftp_enabled { "true" } else { "false" },
+                    if self.vaults.cur().sftp_enabled { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingKeepaliveChanged(val) => {

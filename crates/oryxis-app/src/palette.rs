@@ -192,13 +192,13 @@ impl Oryxis {
             (t("security_privacy"), S::Security),
             (t("features_and_plugins"), S::Plugins),
         ];
-        if self.ai.enabled {
+        if self.vaults.cur().ai.enabled {
             items.push((t("ai_assistant"), S::AI));
         }
         if self.cloud_provider_installed("mcp") {
             items.push((t("mcp_server"), S::Mcp));
         }
-        if self.sftp_enabled {
+        if self.vaults.cur().sftp_enabled {
             items.push(("SFTP", S::Sftp));
         }
         if self.vaults.cur().prefs.host_monitoring {

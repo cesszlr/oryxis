@@ -19,8 +19,8 @@ impl Oryxis {
         let mut tabs: Vec<STab> = STab::ALL
             .into_iter()
             .filter(|t| match t {
-                STab::Chat => self.ai.enabled,
-                STab::Files => self.sftp_enabled,
+                STab::Chat => self.vaults.cur().ai.enabled,
+                STab::Files => self.vaults.cur().sftp_enabled,
                 STab::Monitor => self.vaults.cur().prefs.host_monitoring,
                 _ => true,
             })
@@ -64,8 +64,8 @@ impl Oryxis {
         let tabs: Vec<STab> = STab::ALL
             .into_iter()
             .filter(|t| match t {
-                STab::Chat => self.ai.enabled,
-                STab::Files => self.sftp_enabled,
+                STab::Chat => self.vaults.cur().ai.enabled,
+                STab::Files => self.vaults.cur().sftp_enabled,
                 STab::Monitor => self.vaults.cur().prefs.host_monitoring,
                 STab::Tmux => self.vaults.cur().prefs.tmux_manager,
                 _ => true,
@@ -411,7 +411,7 @@ impl Oryxis {
                 crate::widgets::terminal_theme_card(
                     follow_palette,
                     &follow_label,
-                    self.terminal_theme_override.is_none(),
+                    self.vaults.cur().terminal_theme_override.is_none(),
                     Message::Settings(SettingsMessage::TerminalThemeChanged(String::new())),
                 ),
             ));
@@ -422,7 +422,7 @@ impl Oryxis {
                 continue;
             }
             let is_selected = self
-                .terminal_theme_override
+                .vaults.cur().terminal_theme_override
                 .as_deref()
                 == Some(theme.name());
             theme_cards.push(self.settings_nav_slot(
@@ -448,7 +448,7 @@ impl Oryxis {
                 continue;
             }
             let is_selected =
-                self.terminal_theme_override.as_deref() == Some(ct.name.as_str());
+                self.vaults.cur().terminal_theme_override.as_deref() == Some(ct.name.as_str());
             theme_cards.push(self.settings_nav_slot(
                 crate::keynav::RowAction::activate(Message::Settings(SettingsMessage::TerminalThemeChanged(
                     ct.name.clone(),
@@ -972,7 +972,7 @@ impl Oryxis {
                     }
                 }).boxed(),
                 Space::new().width(8).boxed(),
-                text(format!("{:.0}", self.terminal_font_size)).size(13).color(OryxisColors::t().text_primary).boxed(),
+                text(format!("{:.0}", self.vaults.cur().terminal_font_size)).size(13).color(OryxisColors::t().text_primary).boxed(),
                 Space::new().width(8).boxed(),
                 button(
                     container(text("+").size(14).color(OryxisColors::t().text_primary))
@@ -1041,10 +1041,10 @@ impl Oryxis {
         // list, so `Family::Name` needs no leak.
         // The sample carries the picked weight too, so "does this font
         // have a Medium" is answered by looking at it.
-        let preview_weight = self.terminal_font_weight.font_weight();
+        let preview_weight = self.vaults.cur().terminal_font_weight.font_weight();
         let preview_font = fonts
             .iter()
-            .find(|f| f.as_str() == self.terminal_font_name)
+            .find(|f| f.as_str() == self.vaults.cur().terminal_font_name)
             .map(|f| iced::Font {
                 family: iced::font::Family::Name(f.as_str()),
                 weight: preview_weight,
@@ -1055,7 +1055,7 @@ impl Oryxis {
                 ..iced::Font::MONOSPACE
             });
         let active_term_theme = self
-            .terminal_theme_override
+            .vaults.cur().terminal_theme_override
             .clone()
             .unwrap_or_else(|| crate::theme::AppTheme::active().name().to_string());
         let pal = self
@@ -1064,7 +1064,7 @@ impl Oryxis {
         let (fg, bg) = (pal.foreground, pal.background);
         let (c_green, c_blue, c_cyan, c_yellow) =
             (pal.ansi[2], pal.ansi[4], pal.ansi[6], pal.ansi[3]);
-        let fs = self.terminal_font_size;
+        let fs = self.vaults.cur().terminal_font_size;
         let font_preview = container(
             column![
                 text("The quick brown fox 1234567890 {}[]()<>")
@@ -1104,7 +1104,7 @@ impl Oryxis {
         // it directly.
         let (font_prev, font_next) = crate::keynav::slots::cycle_pair(
             fonts,
-            &self.terminal_font_name,
+            &self.vaults.cur().terminal_font_name,
             |v| Message::Settings(SettingsMessage::TerminalFontChanged(v)),
         );
         let mut font_picker_block = column![
@@ -1118,7 +1118,7 @@ impl Oryxis {
                 crate::keynav::RowAction::picker(font_prev, font_next),
                 8.0,
                 pick_list(
-                    Some(self.terminal_font_name.clone()),
+                    Some(self.vaults.cur().terminal_font_name.clone()),
                     fonts,
                     |s: &String| s.clone(),
                 )
@@ -1162,7 +1162,7 @@ impl Oryxis {
         let weights = crate::fonts::TerminalFontWeight::ALL;
         let (weight_prev, weight_next) = crate::keynav::slots::cycle_pair(
             &weights,
-            &self.terminal_font_weight,
+            &self.vaults.cur().terminal_font_weight,
             |w| Message::Settings(SettingsMessage::TerminalFontWeightChanged(w)),
         );
         let font_picker_block = font_picker_block
@@ -1178,7 +1178,7 @@ impl Oryxis {
                 crate::keynav::RowAction::picker(weight_prev, weight_next),
                 8.0,
                 pick_list(
-                    Some(self.terminal_font_weight),
+                    Some(self.vaults.cur().terminal_font_weight),
                     weights.to_vec(),
                     |w: &crate::fonts::TerminalFontWeight| w.to_string(),
                 )
@@ -1192,8 +1192,8 @@ impl Oryxis {
             ));
         // The weight's honesty line, right under the picker it is about.
         let font_picker_block = if crate::app::terminal_font_serves_weight(
-            &self.terminal_font_name,
-            self.terminal_font_weight.css(),
+            &self.vaults.cur().terminal_font_name,
+            self.vaults.cur().terminal_font_weight.css(),
         ) {
             font_picker_block
         } else {
@@ -1212,7 +1212,7 @@ impl Oryxis {
         let thicknesses = crate::fonts::TextThickness::ALL;
         let (thick_prev, thick_next) = crate::keynav::slots::cycle_pair(
             &thicknesses,
-            &self.terminal_text_thickness,
+            &self.vaults.cur().terminal_text_thickness,
             |t| Message::Settings(SettingsMessage::TerminalTextThicknessChanged(t)),
         );
         let font_picker_block = font_picker_block
@@ -1234,7 +1234,7 @@ impl Oryxis {
                 crate::keynav::RowAction::picker(thick_prev, thick_next),
                 8.0,
                 pick_list(
-                    Some(self.terminal_text_thickness),
+                    Some(self.vaults.cur().terminal_text_thickness),
                     thicknesses.to_vec(),
                     |v: &crate::fonts::TextThickness| v.to_string(),
                 )
@@ -1283,11 +1283,11 @@ impl Oryxis {
         // card, so the preview survives the move; clicking it opens the
         // gallery, the same shape the host editor's picker already has.
         let current_theme_name = self
-            .terminal_theme_override
+            .vaults.cur().terminal_theme_override
             .clone()
             .unwrap_or_else(|| follow_label.clone());
         let current_palette = self
-            .terminal_theme_override
+            .vaults.cur().terminal_theme_override
             .as_deref()
             .and_then(|n| self.terminal_palette_for_name(n))
             .unwrap_or(follow_palette);

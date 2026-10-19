@@ -180,7 +180,7 @@ impl Oryxis {
     pub(crate) fn handle_global(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::TogglePrivacyReveal => {
-                self.privacy.revealed = !self.privacy.revealed;
+                self.vaults.cur_mut().privacy.revealed = !self.vaults.cur_mut().privacy.revealed;
             }
 
             Message::OpenUrl(url) => {

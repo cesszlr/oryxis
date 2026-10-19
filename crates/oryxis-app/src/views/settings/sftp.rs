@@ -74,7 +74,7 @@ impl Oryxis {
             .width(Length::Fill)
             .align_x(dir_align_x());
 
-        if self.sftp_enabled {
+        if self.vaults.cur().sftp_enabled {
             // Parallelism + the four timeout knobs are one transfer-
             // tuning theme, so they share a single card (each block
             // keeps its 13 px sub-title, 16 px between blocks).

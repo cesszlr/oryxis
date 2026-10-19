@@ -474,7 +474,7 @@ impl Oryxis {
     /// move through exactly what's on screen.
     pub(crate) fn dashboard_host_order(&self) -> Vec<usize> {
         let at_root = self.cur_nav().active_group.is_none();
-        let flatten = self.flatten_hosts && at_root;
+        let flatten = self.vaults.cur().flatten_hosts && at_root;
         let search_lower = self.cur_nav().host_search.to_lowercase();
         let hidden_profiles = self.hidden_cloud_profile_ids();
         let mut host_order: Vec<usize> = (0..self.vaults.cur().connections.len())
@@ -516,7 +516,7 @@ impl Oryxis {
                 true
             })
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut host_order,
             |&i| self.vaults.cur().connections[i].label.clone(),
             |&i| self.vaults.cur().connections[i].created_at,
@@ -720,7 +720,7 @@ impl Oryxis {
         // statuses.
         let status: Element<'_, Message> = Space::new().boxed();
         let at_root = self.cur_nav().active_group.is_none();
-        let flatten = self.flatten_hosts && at_root;
+        let flatten = self.vaults.cur().flatten_hosts && at_root;
 
         if let Some(gid) = self.cur_nav().active_group
             && let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == gid)
@@ -753,7 +753,7 @@ impl Oryxis {
         // the side panel reflows the cards into the new column count.
         let nav_width = self.vault_rail_width();
         let panel_open = self.cloud_discover.visible || self.panels.host_panel;
-        let panel_width = if panel_open { self.panel_width } else { 0.0 };
+        let panel_width = if panel_open { self.vaults.cur().panel_width } else { 0.0 };
         // A side-docked tab strip (issue #87) narrows the content band
         // like the other grids; without it the math yields one column
         // too many and the card row clips at the edge.

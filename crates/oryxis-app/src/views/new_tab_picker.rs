@@ -192,7 +192,7 @@ impl Oryxis {
         // `Message::Sftp(SftpMessage::NewSftpTab)`.
         let want_local =
             needle.is_empty() || t("local_shell").to_lowercase().contains(needle);
-        let want_sftp = self.sftp_enabled
+        let want_sftp = self.vaults.cur().sftp_enabled
             && !filling_pane
             && (needle.is_empty() || t("sftp").to_lowercase().contains(needle));
         if want_local {

@@ -1097,7 +1097,7 @@ impl Oryxis {
             );
             return Task::none();
         };
-        state.set_palette(self.terminal_palette.clone());
+        state.set_palette(self.vaults.cur().terminal_palette.clone());
         let exited = state.pty.as_mut().and_then(|p| p.take_child_exit());
         let terminal = Arc::new(Mutex::new(state));
         let label = pick

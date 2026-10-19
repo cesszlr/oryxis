@@ -116,7 +116,7 @@ impl Oryxis {
         let sort_btn = crate::widgets::bounds_reporter(
             crate::widgets::sort_toolbar_button(
                 crate::state::SortMenuKind::Keys,
-                self.keys_sort,
+                self.vaults.cur().keys_sort,
             ),
             self.toolbar_sort_btn_bounds.clone(),
         );
@@ -208,7 +208,7 @@ impl Oryxis {
         // rendered order changes.
         let search_lower = self.keys_ui.search.to_lowercase();
         let mut key_order: Vec<usize> = (0..self.vaults.cur().keys.len()).collect();
-        self.keys_sort.sort_items(
+        self.vaults.cur().keys_sort.sort_items(
             &mut key_order,
             |&i| self.vaults.cur().keys[i].label.clone(),
             |&i| self.vaults.cur().keys[i].created_at,
@@ -465,7 +465,7 @@ impl Oryxis {
             || self.panels.identity_panel
             || self.panels.key_generate_panel
         {
-            self.panel_width
+            self.vaults.cur().panel_width
         } else {
             0.0
         };
@@ -493,7 +493,7 @@ impl Oryxis {
         .padding(Padding { top: 16.0, right: 0.0, bottom: 8.0, left: 0.0 });
 
         let mut identity_order: Vec<usize> = (0..self.vaults.cur().identities.len()).collect();
-        self.keys_sort.sort_items(
+        self.vaults.cur().keys_sort.sort_items(
             &mut identity_order,
             |&i| self.vaults.cur().identities[i].label.clone(),
             |&i| self.vaults.cur().identities[i].created_at,

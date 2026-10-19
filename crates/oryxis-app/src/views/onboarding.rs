@@ -199,13 +199,13 @@ impl Oryxis {
             (
                 t("ai_assistant"),
                 t("feature_ai_desc"),
-                self.ai.enabled,
+                self.vaults.cur().ai.enabled,
                 Message::Ai(AiMessage::ToggleAiEnabled),
             ),
             (
                 "SFTP",
                 t("feature_sftp_desc"),
-                self.sftp_enabled,
+                self.vaults.cur().sftp_enabled,
                 Message::Settings(SettingsMessage::SettingToggleSftpEnabled),
             ),
             (
@@ -217,7 +217,7 @@ impl Oryxis {
             (
                 t("remote_desktop"),
                 t("feature_remote_desktop_desc"),
-                self.remote_desktop_enabled,
+                self.vaults.cur().remote_desktop_enabled,
                 Message::Settings(SettingsMessage::SettingToggleRemoteDesktop),
             ),
             (

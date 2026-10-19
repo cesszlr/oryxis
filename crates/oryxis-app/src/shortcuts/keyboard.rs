@@ -534,7 +534,7 @@ impl Oryxis {
             OpenSettings => Task::done(Message::Navigation(NavigationMessage::ChangeView(View::Settings))),
             FocusViewSearch => Task::done(Message::Tabs(TabsMessage::FocusViewSearch)),
             OpenSftp => {
-                if self.sftp_enabled {
+                if self.vaults.cur().sftp_enabled {
                     Task::done(Message::Sftp(SftpMessage::NewSftpTab))
                 } else {
                     Task::none()
@@ -546,7 +546,7 @@ impl Oryxis {
             // anything else in front there is no such host, so it falls
             // back to the picker the browser tab uses.
             OpenSftpConsole => {
-                if !self.sftp_enabled {
+                if !self.vaults.cur().sftp_enabled {
                     return Task::none();
                 }
                 // On a tab that already HAS a console this is the switch,

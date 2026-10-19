@@ -168,14 +168,14 @@ impl Oryxis {
                 // Capture the region plus cursor x and current width,
                 // the MouseMoved handler computes the delta against
                 // these.
-                self.chat_ui.sidebar_drag =
-                    Some((side, self.cur_mouse().x, self.chat_ui.sidebar_width[side.idx()]));
+                self.vaults.cur_mut().chat_ui.sidebar_drag =
+                    Some((side, self.cur_mouse().x, self.vaults.cur().chat_ui.sidebar_width[side.idx()]));
             }
             AiMessage::ChatSidebarResizeStop => {
                 // Global left-release: a drag-out that never crossed
                 // its threshold dies with the press (issue #167).
                 self.drag_out_arm = None;
-                self.chat_ui.sidebar_drag = None;
+                self.vaults.cur_mut().chat_ui.sidebar_drag = None;
                 // The release that ends a window carry: the tab docks on
                 // the strip under the cursor, or its window stays where
                 // it was let go.
@@ -188,7 +188,7 @@ impl Oryxis {
                 if self.panel_resize_drag.take().is_some() {
                     self.persist_setting(
                         "side_panel_width",
-                        &format!("{:.0}", self.panel_width),
+                        &format!("{:.0}", self.vaults.cur().panel_width),
                     );
                 }
                 // The same global Left-release ends an SFTP divider drag;

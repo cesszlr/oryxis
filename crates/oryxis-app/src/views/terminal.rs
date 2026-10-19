@@ -653,9 +653,9 @@ impl Oryxis {
             .focused(is_focused)
             .with_bell_flash(pane.bell_flash)
             .with_font_size(self.terminal_font_px())
-            .with_font_name(&self.terminal_font_name)
-            .with_font_weight(self.terminal_font_weight.font_weight())
-            .with_text_dilation(self.terminal_text_thickness.px())
+            .with_font_name(&self.vaults.cur().terminal_font_name)
+            .with_font_weight(self.vaults.cur().terminal_font_weight.font_weight())
+            .with_text_dilation(self.vaults.cur().terminal_text_thickness.px())
             .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
             .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
             .with_terminal_chords(self.terminal_chord_resolver())
@@ -778,8 +778,8 @@ impl Oryxis {
             is_focused,
             Arc::clone(&pane.terminal),
             self.terminal_font_px(),
-            self.terminal_font_name.clone(),
-            self.terminal_font_weight.font_weight(),
+            self.vaults.cur().terminal_font_name.clone(),
+            self.vaults.cur().terminal_font_weight.font_weight(),
         );
         // Report this pane's drawn rect so the OS-drop router can find
         // the pane under the cursor (a split tab can host different
@@ -1440,7 +1440,7 @@ impl Oryxis {
             crate::state::SidebarSide::Right => row![resize_handle, panel],
         };
         container(handle_and_panel.width(Length::Fill).height(Length::Fill))
-            .width(Length::Fixed(self.chat_ui.sidebar_width[side.idx()]))
+            .width(Length::Fixed(self.vaults.cur().chat_ui.sidebar_width[side.idx()]))
             .height(Length::Fill)
             .boxed()
     }
@@ -1528,7 +1528,7 @@ impl Oryxis {
         // then scrolls internally. Enter sends the message; Shift+Enter
         // inserts a newline. No send button, every chat-style UI uses
         // Enter today, so the arrow was just visual noise.
-        let chat_editor = iced::widget::text_editor(&self.chat_ui.input)
+        let chat_editor = iced::widget::text_editor(&self.vaults.cur().chat_ui.input)
             // Programmatic focus target for the FocusSidebarList hotkey's
             // Chat stop (the fork's text_editor is operation::Focusable).
             .id(iced::widget::Id::new("chat-input"))

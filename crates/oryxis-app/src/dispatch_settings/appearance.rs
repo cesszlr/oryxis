@@ -13,10 +13,10 @@ impl Oryxis {
     ) -> Result<Task<Message>, SettingsMessage> {
         match message {
             SettingsMessage::FlattenHostsToggle => {
-                self.flatten_hosts = !self.flatten_hosts;
+                self.vaults.cur_mut().flatten_hosts = !self.vaults.cur_mut().flatten_hosts;
                 self.persist_setting(
                     "flatten_hosts",
-                    if self.flatten_hosts { "true" } else { "false" },
+                    if self.vaults.cur().flatten_hosts { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleShowStatusBar => {

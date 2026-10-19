@@ -290,8 +290,8 @@ impl Oryxis {
         // process-wide flag this loop swaps. Fires once per install
         // (`hint_` settings are per-install bookkeeping, excluded from
         // portable export).
-        if oryxis_terminal::take_privacy_mask_drawn() && !self.privacy.hint_shown {
-            self.privacy.hint_shown = true;
+        if oryxis_terminal::take_privacy_mask_drawn() && !self.vaults.cur().privacy.hint_shown {
+            self.vaults.cur_mut().privacy.hint_shown = true;
             self.persist_setting("hint_privacy_mask", "true");
             extra.push(self.show_toast_secs(crate::i18n::t("privacy_hint_toast").to_string(), 6));
         }
@@ -411,7 +411,7 @@ impl Oryxis {
     /// post-keyboard-nav hover restore (which needs exactly one move to
     /// clear `suppress_hover`, after which the gate closes again).
     fn mouse_interest(&self) -> bool {
-        self.chat_ui.sidebar_drag.is_some()
+        self.vaults.cur().chat_ui.sidebar_drag.is_some()
             || self.panel_resize_drag.is_some()
             || self.sftp_chrome.split_drag.is_some()
             || self.sftp_chrome.log_drag.is_some()

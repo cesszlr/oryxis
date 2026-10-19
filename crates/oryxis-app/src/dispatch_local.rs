@@ -276,7 +276,6 @@ impl Oryxis {
         let tab_idx = self.tabs.len();
         let session_log_id = if self.should_record_session(Some(&conn)) {
             let ov = self.vaults.cur_mut();
-
             ov.store.as_ref().map(|vault| {
                 let log_id = Uuid::new_v4();
                 if let Err(e) = vault.create_session_log(&log_id, &conn.id, &conn.label) {
@@ -481,7 +480,7 @@ impl Oryxis {
         else {
             return Task::none();
         };
-        let palette = self.terminal_palette.clone();
+        let palette = self.vaults.cur().terminal_palette.clone();
         let spawned = match terminal.lock() {
             Ok(mut state) => {
                 let program = (!spec.program.is_empty()).then_some(spec.program.as_str());

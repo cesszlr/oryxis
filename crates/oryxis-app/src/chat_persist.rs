@@ -24,7 +24,7 @@ impl Oryxis {
         // quotes (terminal output, command lines) is the material the
         // session recording protects, and that recording is off unless the
         // user asked for it.
-        if !self.ai.save_history {
+        if !self.vaults.cur().ai.save_history {
             return;
         }
         // Read everything out first. The vault is owned by `self`, so
@@ -75,8 +75,8 @@ impl Oryxis {
             .custom_name
             .clone()
             .unwrap_or_else(|| tab.label.clone());
-        let provider = self.ai.provider.clone();
-        let model = self.ai.model.clone();
+        let provider = self.vaults.cur().ai.provider.clone();
+        let model = self.vaults.cur().ai.model.clone();
         let total = savable.len();
 
         let Some(vault) = self.vaults.cur().store.as_ref() else { return };

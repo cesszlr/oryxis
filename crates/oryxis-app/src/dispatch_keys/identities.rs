@@ -161,9 +161,9 @@ impl Oryxis {
                         let b = self.toolbar_split_btn_bounds.get();
                         if b.width > 0.0 {
                             let shift = if crate::i18n::is_rtl_layout() {
-                                -self.panel_width
+                                -self.vaults.cur().panel_width
                             } else {
-                                self.panel_width
+                                self.vaults.cur().panel_width
                             };
                             self.toolbar_split_btn_bounds
                                 .set(iced::Rectangle { x: b.x + shift, ..b });

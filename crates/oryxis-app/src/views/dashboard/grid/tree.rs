@@ -186,7 +186,7 @@ impl Oryxis {
                     || !oryxis_core::models::Group::is_reachable_from_root(&self.vaults.cur().groups, g.id)
             })
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut roots,
             |&i| self.vaults.cur().groups[i].label.clone(),
             |&i| self.vaults.cur().groups[i].created_at,
@@ -220,7 +220,7 @@ impl Oryxis {
                     .is_none()
             })
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut root_sessions,
             |&i| self.vaults.cur().session_groups[i].label.clone(),
             |&i| self.vaults.cur().session_groups[i].created_at,
@@ -244,7 +244,7 @@ impl Oryxis {
                     && host_search_match(i)
             })
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut root_hosts,
             |&i| self.vaults.cur().connections[i].label.clone(),
             |&i| self.vaults.cur().connections[i].created_at,
@@ -319,7 +319,7 @@ impl Oryxis {
         let mut children: Vec<usize> = (0..self.vaults.cur().groups.len())
             .filter(|&i| self.vaults.cur().groups[i].parent_id == Some(gid))
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut children,
             |&i| self.vaults.cur().groups[i].label.clone(),
             |&i| self.vaults.cur().groups[i].created_at,
@@ -348,7 +348,7 @@ impl Oryxis {
         let mut sessions: Vec<usize> = (0..self.vaults.cur().session_groups.len())
             .filter(|&i| self.vaults.cur().session_groups[i].group_id == Some(gid))
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut sessions,
             |&i| self.vaults.cur().session_groups[i].label.clone(),
             |&i| self.vaults.cur().session_groups[i].created_at,
@@ -371,7 +371,7 @@ impl Oryxis {
                     && (label_match || host_search_match(i))
             })
             .collect();
-        self.hosts_sort.sort_items(
+        self.vaults.cur().hosts_sort.sort_items(
             &mut hosts,
             |&i| self.vaults.cur().connections[i].label.clone(),
             |&i| self.vaults.cur().connections[i].created_at,

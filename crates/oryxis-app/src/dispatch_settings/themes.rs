@@ -143,9 +143,9 @@ impl Oryxis {
         // On rename, keep the global override pointed at the same theme.
         if let Some(old) = old_name
             && old != name
-            && self.terminal_theme_override.as_deref() == Some(old.as_str())
+            && self.vaults.cur().terminal_theme_override.as_deref() == Some(old.as_str())
         {
-            self.terminal_theme_override = Some(name.clone());
+            self.vaults.cur_mut().terminal_theme_override = Some(name.clone());
             self.persist_setting("terminal_theme_override", &name);
         }
 
@@ -154,10 +154,63 @@ impl Oryxis {
             .as_ref()
             .and_then(|v| v.list_custom_terminal_themes().ok())
             .unwrap_or_default();
-        self.terminal_palette = self.resolve_global_terminal_palette();
+        self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
         self.repaint_all_terminal_palettes();
         None
     }
+}
+
+/// Apply an app-theme name (a custom UI theme of `custom`, else a
+/// built-in) to the global `OryxisColors`. Returns false if the name
+/// matches neither.
+pub(crate) fn apply_app_theme_in(
+    custom: &[oryxis_core::models::custom_ui_theme::CustomUiTheme],
+    name: &str,
+) -> bool {
+    // Custom themes resolve FIRST: a homonymous custom can only
+    // predate its builtin (the editor refuses new collisions), and
+    // that user's setting meant the custom theme; a new builtin must
+    // not silently take over their vault on upgrade.
+    if let Some(colors) = custom.iter().find(|t| t.name == name).map(|t| t.colors.clone()) {
+        crate::theme::set_active_custom_ui(crate::theme::theme_colors_from_hex(&colors));
+        true
+    } else if let Some(theme) = AppTheme::ALL.iter().find(|t| t.name() == name).copied() {
+        AppTheme::set_active(theme); // also clears any active custom UI theme
+        true
+    } else {
+        false
+    }
+}
+
+/// The palette named `name`: a custom terminal theme of `custom`, else a
+/// built-in.
+pub(crate) fn terminal_palette_in(
+    custom: &[oryxis_core::models::custom_terminal_theme::CustomTerminalTheme],
+    name: &str,
+) -> Option<oryxis_terminal::TerminalPalette> {
+    // Custom first, same rationale as `apply_app_theme_in`: a
+    // pre-builtin homonymous custom keeps meaning the user's palette
+    // after an upgrade ships a builtin with the same name.
+    if let Some(t) = custom.iter().find(|t| t.name == name) {
+        return Some(custom_theme_palette(t));
+    }
+    oryxis_terminal::TerminalTheme::ALL
+        .iter()
+        .find(|t| t.name() == name)
+        .map(|t| t.palette())
+}
+
+/// A vault's effective global terminal palette: its explicit override
+/// (built-in or custom) → the active app theme's mapping.
+pub(crate) fn global_terminal_palette(
+    vault: &crate::vault_slots::OpenVault,
+) -> oryxis_terminal::TerminalPalette {
+    if let Some(name) = &vault.terminal_theme_override
+        && let Some(palette) = terminal_palette_in(&vault.custom_terminal_themes, name)
+    {
+        return palette;
+    }
+    app_theme_to_terminal(AppTheme::active()).palette()
 }
 
 impl Oryxis {
@@ -165,27 +218,9 @@ impl Oryxis {
     /// `OryxisColors`, tracking it in `active_app_theme_name`. Returns false
     /// if the name matches neither. Does not persist; callers that handle a
     /// user action persist + repaint.
-    /// Caller sets `active_app_theme_name` on a `true` result (kept `&self`
-    /// so it can be called while `self.vaults.cur().store` is borrowed during boot).
+    /// Caller sets `active_app_theme_name` on a `true` result.
     pub(crate) fn apply_app_theme_name(&self, name: &str) -> bool {
-        // Custom themes resolve FIRST: a homonymous custom can only
-        // predate its builtin (the editor refuses new collisions), and
-        // that user's setting meant the custom theme; a new builtin must
-        // not silently take over their vault on upgrade.
-        if let Some(colors) = self
-            .vaults.cur().custom_ui_themes
-            .iter()
-            .find(|t| t.name == name)
-            .map(|t| t.colors.clone())
-        {
-            crate::theme::set_active_custom_ui(crate::theme::theme_colors_from_hex(&colors));
-            true
-        } else if let Some(theme) = AppTheme::ALL.iter().find(|t| t.name() == name).copied() {
-            AppTheme::set_active(theme); // also clears any active custom UI theme
-            true
-        } else {
-            false
-        }
+        apply_app_theme_in(&self.vaults.cur().custom_ui_themes, name)
     }
 
     /// Validate + persist the in-progress custom UI theme. Returns
@@ -251,15 +286,15 @@ impl Oryxis {
             .unwrap_or_default();
 
         // If editing the active theme (by old or new name), re-apply live.
-        let was_active = old_name.as_deref() == Some(self.active_app_theme_name.as_str())
-            || self.active_app_theme_name == name;
+        let was_active = old_name.as_deref() == Some(self.vaults.cur().active_app_theme_name.as_str())
+            || self.vaults.cur().active_app_theme_name == name;
         if was_active {
             crate::theme::set_active_custom_ui(crate::theme::theme_colors_from_hex(
                 &theme.colors,
             ));
-            self.active_app_theme_name = name.clone();
+            self.vaults.cur_mut().active_app_theme_name = name.clone();
             self.persist_setting("app_theme", &name);
-            self.terminal_palette = self.resolve_global_terminal_palette();
+            self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
             self.repaint_all_terminal_palettes();
         }
         None
@@ -319,16 +354,7 @@ impl Oryxis {
         &self,
         name: &str,
     ) -> Option<oryxis_terminal::TerminalPalette> {
-        // Custom first, same rationale as `apply_app_theme_name`: a
-        // pre-builtin homonymous custom keeps meaning the user's palette
-        // after an upgrade ships a builtin with the same name.
-        if let Some(t) = self.vaults.cur().custom_terminal_themes.iter().find(|t| t.name == name) {
-            return Some(custom_theme_palette(t));
-        }
-        oryxis_terminal::TerminalTheme::ALL
-            .iter()
-            .find(|t| t.name() == name)
-            .map(|t| t.palette())
+        terminal_palette_in(&self.vaults.cur().custom_terminal_themes, name)
     }
 
     /// Effective global terminal palette: explicit user override (built-in
@@ -336,19 +362,14 @@ impl Oryxis {
     pub(crate) fn resolve_global_terminal_palette(
         &self,
     ) -> oryxis_terminal::TerminalPalette {
-        if let Some(name) = &self.terminal_theme_override
-            && let Some(palette) = self.terminal_palette_for_name(name)
-        {
-            return palette;
-        }
-        app_theme_to_terminal(AppTheme::active()).palette()
+        global_terminal_palette(self.vaults.cur())
     }
 
     /// Display name of the effective global terminal theme (for the
     /// "inherit (Global)" label). Keeps a stale override name from showing
     /// once the custom theme behind it is deleted.
     pub(crate) fn resolve_global_terminal_theme_name(&self) -> String {
-        if let Some(name) = &self.terminal_theme_override
+        if let Some(name) = &self.vaults.cur().terminal_theme_override
             && self.terminal_palette_for_name(name).is_some()
         {
             return name.clone();
@@ -466,16 +487,16 @@ impl Oryxis {
                 // string is ignored so a typo'd setting can't lock
                 // the user out of the picker.
                 if name.is_empty() {
-                    self.terminal_theme_override = None;
+                    self.vaults.cur_mut().terminal_theme_override = None;
                     self.persist_setting("terminal_theme_override", "");
                 } else if self.terminal_palette_for_name(&name).is_some() {
                     // Built-in or custom theme name.
-                    self.terminal_theme_override = Some(name.clone());
+                    self.vaults.cur_mut().terminal_theme_override = Some(name.clone());
                     self.persist_setting("terminal_theme_override", &name);
                 } else {
                     return Ok(Task::none());
                 }
-                self.terminal_palette = self.resolve_global_terminal_palette();
+                self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
                 self.repaint_all_terminal_palettes();
             }
             SettingsMessage::LocalConfigThemeChanged(name) => {
@@ -494,9 +515,9 @@ impl Oryxis {
                 // Promote the session override to the persisted global
                 // default, then drop it (the panes now follow global).
                 if let Some(name) = self.local_terminal_theme.take() {
-                    self.terminal_theme_override = Some(name.clone());
+                    self.vaults.cur_mut().terminal_theme_override = Some(name.clone());
                     self.persist_setting("terminal_theme_override", &name);
-                    self.terminal_palette = self.resolve_global_terminal_palette();
+                    self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
                     self.repaint_all_terminal_palettes();
                 }
             }
@@ -515,7 +536,7 @@ impl Oryxis {
             SettingsMessage::ThemeEditorNew => {
                 // Seed from the active terminal palette so the user starts
                 // from the currently-selected theme.
-                let p = self.terminal_palette.clone();
+                let p = self.vaults.cur().terminal_palette.clone();
                 let hex = |c: iced::Color| {
                     let q = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
                     format!("#{:02x}{:02x}{:02x}", q(c.r), q(c.g), q(c.b))
@@ -627,7 +648,7 @@ impl Oryxis {
                 if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx)
                     && let Some(vault) = &self.vaults.cur().store
                 {
-                    let was_active = self.active_app_theme_name == theme.name;
+                    let was_active = self.vaults.cur().active_app_theme_name == theme.name;
                     let _ = vault.delete_custom_ui_theme(&theme.id);
                     self.vaults.cur_mut().custom_ui_themes =
                         vault.list_custom_ui_themes().unwrap_or_default();
@@ -636,9 +657,9 @@ impl Oryxis {
                         crate::theme::AppTheme::set_active(
                             crate::theme::AppTheme::OryxisDark,
                         );
-                        self.active_app_theme_name = "Oryxis Dark".to_string();
+                        self.vaults.cur_mut().active_app_theme_name = "Oryxis Dark".to_string();
                         self.persist_setting("app_theme", "Oryxis Dark");
-                        self.terminal_palette = self.resolve_global_terminal_palette();
+                        self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
                         self.repaint_all_terminal_palettes();
                     }
                 }
@@ -712,20 +733,20 @@ impl Oryxis {
                         vault.list_custom_terminal_themes().unwrap_or_default();
                     // A host / global override pointing at the deleted theme
                     // now resolves to its fallback; repaint reflects that.
-                    self.terminal_palette = self.resolve_global_terminal_palette();
+                    self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
                     self.repaint_all_terminal_palettes();
                 }
             }
             SettingsMessage::AppThemeChanged(name) => {
                 if self.apply_app_theme_name(&name) {
-                    self.active_app_theme_name = name.clone();
+                    self.vaults.cur_mut().active_app_theme_name = name.clone();
                     self.persist_setting("app_theme", &name);
                     // Refresh the global derived palette and re-paint
                     // every tab. Tabs whose connection has its own
                     // terminal_theme override pick that up via
                     // `resolve_terminal_theme_for_label`, so the user's
                     // per-host pick survives an app theme switch.
-                    self.terminal_palette = self.resolve_global_terminal_palette();
+                    self.vaults.cur_mut().terminal_palette = self.resolve_global_terminal_palette();
                     self.repaint_all_terminal_palettes();
                 }
             }

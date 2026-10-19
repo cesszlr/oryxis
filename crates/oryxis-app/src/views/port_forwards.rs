@@ -330,7 +330,7 @@ impl Oryxis {
         }
 
         let nav_width = self.vault_rail_width();
-        let panel_width = if self.panels.port_forward_panel { self.panel_width } else { 0.0 };
+        let panel_width = if self.panels.port_forward_panel { self.vaults.cur().panel_width } else { 0.0 };
         let available = (self.cur_window_size().width
             - nav_width
             - self.side_strip_reserve()
@@ -577,7 +577,7 @@ impl Oryxis {
             footer,
         ].height(Length::Fill);
 
-        crate::widgets::side_panel_frame(panel_content.boxed(), OryxisColors::t().bg_sidebar, self.panel_width)
+        crate::widgets::side_panel_frame(panel_content.boxed(), OryxisColors::t().bg_sidebar, self.vaults.cur().panel_width)
     }
 
     /// Standalone host-key verification modal, used when a backgrounded

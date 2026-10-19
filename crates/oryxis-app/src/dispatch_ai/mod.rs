@@ -445,16 +445,16 @@ impl Oryxis {
             .as_ref()
             .and_then(|v| v.get_setting("ai_system_prompt").ok().flatten());
         let config = crate::ai::AiConfig {
-            provider: self.ai.provider.clone(),
-            model: self.ai.model.clone(),
+            provider: self.vaults.cur().ai.provider.clone(),
+            model: self.vaults.cur().ai.model.clone(),
             api_key,
-            api_url: if self.ai.api_url.is_empty() {
+            api_url: if self.vaults.cur().ai.api_url.is_empty() {
                 None
             } else {
-                Some(self.ai.api_url.clone())
+                Some(self.vaults.cur().ai.api_url.clone())
             },
             system_prompt: extra_prompt,
-            reasoning: self.ai.reasoning,
+            reasoning: self.vaults.cur().ai.reasoning,
         };
 
         // Snapshot the last ~50 lines of terminal output for context,

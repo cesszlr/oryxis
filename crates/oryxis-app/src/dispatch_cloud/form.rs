@@ -446,7 +446,7 @@ impl Oryxis {
                 // render clamp's 210, pushing the menu past the button).
                 // The panel width only feeds the pre-first-draw fallback.
                 let panel_width = if self.cloud_discover.visible || self.panels.host_panel {
-                    self.panel_width
+                    self.vaults.cur().panel_width
                 } else {
                     0.0
                 };

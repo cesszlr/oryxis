@@ -58,7 +58,7 @@ impl Oryxis {
         // Turning ON requires the SFTP feature (optional, hidden
         // when off; this guards the hotkey path which bypasses
         // the gated UI). Turning OFF above is always allowed.
-        if !self.sftp_enabled {
+        if !self.vaults.cur().sftp_enabled {
             self.sftp_open_at_path = None;
             return select;
         }

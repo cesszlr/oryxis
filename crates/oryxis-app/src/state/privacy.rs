@@ -3,7 +3,7 @@
 //! Pure data; the resolution helpers (`privacy_on`, `privacy_terms`,
 //! `privacy_display_label`) stay on `Oryxis` in `dispatch_settings`.
 
-/// All Privacy Mode state, one field on `Oryxis` (`self.privacy`).
+/// All Privacy Mode state, one field on `Oryxis` (`self.vaults.cur().privacy`).
 pub(crate) struct PrivacyState {
     /// Global Privacy Mode default: when on, sensitive data (host / ip /
     /// user / port / proxy on cards and logs, plus IP and `user@host`

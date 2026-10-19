@@ -288,7 +288,7 @@ impl Oryxis {
         // feature is on AND the tab has a live SSH session to reuse
         // or matches a saved connection (so it isn't shown on
         // local-shell tabs where it would no-op).
-        let can_sftp = self.sftp_enabled
+        let can_sftp = self.vaults.cur().sftp_enabled
             && self
             .tabs
             .get(idx)
@@ -351,7 +351,7 @@ impl Oryxis {
         // (with the reuse pool lending a live link when there is one),
         // so a tab whose session dropped can still open one, which is
         // exactly when someone reaches for it.
-        if self.sftp_enabled && self.tab_console_target(idx).is_some() {
+        if self.vaults.cur().sftp_enabled && self.tab_console_target(idx).is_some() {
             items.push(self.menu_item(
                 iced_fonts::lucide::square_terminal(),
                 crate::i18n::t("open_sftp_console"),
@@ -359,7 +359,7 @@ impl Oryxis {
                 OryxisColors::t().text_secondary,
             ));
         }
-        if has_session && self.sftp_enabled {
+        if has_session && self.vaults.cur().sftp_enabled {
             // Promote the tab's SFTP session to a standalone tab
             // (the server-to-server dual-remote surface).
             items.push(self.menu_item(iced_fonts::lucide::external_link(), crate::i18n::t("tab_detach_sftp"), Message::Tabs(TabsMessage::DetachTabSftp(idx)), OryxisColors::t().text_secondary));
@@ -700,9 +700,9 @@ impl Oryxis {
 
     pub(crate) fn build_menu_sort(&self, kind: crate::state::SortMenuKind) -> Element<'_, Message> {
         let current = match kind {
-            crate::state::SortMenuKind::Hosts => self.hosts_sort,
-            crate::state::SortMenuKind::Keys => self.keys_sort,
-            crate::state::SortMenuKind::Snippets => self.snippets_sort,
+            crate::state::SortMenuKind::Hosts => self.vaults.cur().hosts_sort,
+            crate::state::SortMenuKind::Keys => self.vaults.cur().keys_sort,
+            crate::state::SortMenuKind::Snippets => self.vaults.cur().snippets_sort,
         };
         use crate::state::ListSort;
         // Each row: leading lucide icon, label, trailing

@@ -132,7 +132,6 @@ impl Oryxis {
         // session records exactly like an SSH one.
         let session_log_id = if self.should_record_session(Some(&conn)) {
             let ov = self.vaults.cur_mut();
-
             ov.store.as_ref().map(|vault| {
                 let log_id = Uuid::new_v4();
                 if let Err(e) = vault.create_session_log(&log_id, &conn.id, &conn.label) {

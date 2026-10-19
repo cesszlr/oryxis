@@ -544,7 +544,7 @@ impl Oryxis {
         let mut privacy_rows = column![
             self.nav_toggle_row(
                 crate::i18n::t("privacy_mode_label"),
-                self.privacy.mode,
+                self.vaults.cur().privacy.mode,
                 Message::Settings(SettingsMessage::TogglePrivacyMode),
             ),
             Space::new().height(4),
@@ -557,7 +557,7 @@ impl Oryxis {
         // Never-mask: words the derived terms must skip, seeded with
         // the generic usernames (root, ubuntu, ...) so `ls -l` output
         // stays readable by default.
-        if self.privacy.mode {
+        if self.vaults.cur().privacy.mode {
             // Per-class gates (issue #78 block 1), all on by default.
             // Public IPs get their own switch because documentation
             // screenshots sometimes NEED the public address readable
@@ -569,25 +569,25 @@ impl Oryxis {
                 .push(Space::new().height(10).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("privacy_class_public_ips"),
-                    self.privacy.mask_public_ips,
+                    self.vaults.cur().privacy.mask_public_ips,
                     Message::Settings(SettingsMessage::TogglePrivacyMaskClass(PrivacyMaskClass::PublicIps)),
                 ))
                 .push(Space::new().height(8).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("privacy_class_private_ips"),
-                    self.privacy.mask_private_ips,
+                    self.vaults.cur().privacy.mask_private_ips,
                     Message::Settings(SettingsMessage::TogglePrivacyMaskClass(PrivacyMaskClass::PrivateIps)),
                 ))
                 .push(Space::new().height(8).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("privacy_class_usernames"),
-                    self.privacy.mask_usernames,
+                    self.vaults.cur().privacy.mask_usernames,
                     Message::Settings(SettingsMessage::TogglePrivacyMaskClass(PrivacyMaskClass::Usernames)),
                 ))
                 .push(Space::new().height(8).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("privacy_class_hostnames"),
-                    self.privacy.mask_hostnames,
+                    self.vaults.cur().privacy.mask_hostnames,
                     Message::Settings(SettingsMessage::TogglePrivacyMaskClass(PrivacyMaskClass::Hostnames)),
                 ));
             privacy_rows = privacy_rows
@@ -619,7 +619,7 @@ impl Oryxis {
                     // text::Alignment::Default internally, which already
                     // right-aligns genuinely-RTL lines; forcing layout
                     // alignment would need a fork change (off-limits).
-                    iced::widget::text_editor(&self.privacy.always_mask_editor)
+                    iced::widget::text_editor(&self.vaults.cur().privacy.always_mask_editor)
                         .placeholder("internal.example.com, acme-corp")
                         .id(iced::widget::Id::new("set-security-privacy-always"))
                         .on_action(|a| Message::Settings(SettingsMessage::SettingPrivacyAlwaysMaskAction(a)))
@@ -647,7 +647,7 @@ impl Oryxis {
                         "set-security-privacy-never",
                     )),
                     10.0,
-                    iced::widget::text_editor(&self.privacy.never_mask_editor)
+                    iced::widget::text_editor(&self.vaults.cur().privacy.never_mask_editor)
                         .placeholder("root, ubuntu, admin")
                         .id(iced::widget::Id::new("set-security-privacy-never"))
                         .on_action(|a| Message::Settings(SettingsMessage::SettingPrivacyNeverMaskAction(a)))

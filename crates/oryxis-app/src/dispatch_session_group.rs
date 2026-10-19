@@ -555,7 +555,7 @@ impl Oryxis {
                         };
                         match spawned {
                             Ok((mut state, rx)) => {
-                                state.set_palette(self.terminal_palette.clone());
+                                state.set_palette(self.vaults.cur().terminal_palette.clone());
                                 let exited =
                                     state.pty.as_mut().and_then(|p| p.take_child_exit());
                                 let mut pane =

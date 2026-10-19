@@ -39,7 +39,7 @@ impl Oryxis {
                     toggle_row_desc(
                         crate::i18n::t("ai_assistant"),
                         crate::i18n::t("feature_ai_desc"),
-                        self.ai.enabled,
+                        self.vaults.cur().ai.enabled,
                         Message::Ai(AiMessage::ToggleAiEnabled),
                     ),
                 ),
@@ -55,7 +55,7 @@ impl Oryxis {
                     toggle_row_desc(
                         "SFTP",
                         crate::i18n::t("feature_sftp_desc"),
-                        self.sftp_enabled,
+                        self.vaults.cur().sftp_enabled,
                         Message::Settings(SettingsMessage::SettingToggleSftpEnabled),
                     ),
                 ),
@@ -79,7 +79,7 @@ impl Oryxis {
                     toggle_row_desc(
                         crate::i18n::t("remote_desktop"),
                         crate::i18n::t("feature_remote_desktop_desc"),
-                        self.remote_desktop_enabled,
+                        self.vaults.cur().remote_desktop_enabled,
                         Message::Settings(SettingsMessage::SettingToggleRemoteDesktop),
                     ),
                 ),

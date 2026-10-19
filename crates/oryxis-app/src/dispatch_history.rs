@@ -48,7 +48,7 @@ impl Oryxis {
                 // content-search results that pointed into the wiped rows.
                 self.viewing_session_log = None;
                 self.session_player = None;
-                self.chat_ui.viewer = None;
+                self.vaults.cur_mut().chat_ui.viewer = None;
                 // A tab still appending to a wiped conversation must start a
                 // fresh row instead of resurrecting a deleted one.
                 for tab in &mut self.tabs {
@@ -424,25 +424,25 @@ impl Oryxis {
                     }
                 };
                 let label = self
-                    .chat_ui.conversations
+                    .vaults.cur().chat_ui.conversations
                     .iter()
                     .find(|c| c.id == id)
                     .map(|c| c.label.clone())
                     .unwrap_or_default();
-                self.chat_ui.viewer = Some(crate::state::ChatViewer {
+                self.vaults.cur_mut().chat_ui.viewer = Some(crate::state::ChatViewer {
                     conversation_id: id,
                     label,
                     messages,
                 });
             }
             HistoryMessage::CloseChatConversation => {
-                self.chat_ui.viewer = None;
+                self.vaults.cur_mut().chat_ui.viewer = None;
             }
             HistoryMessage::RequestDeleteChatConversation(idx) => {
                 // Reached from the row kebab; drop it before the dialog.
                 self.overlay = None;
                 let label = self
-                    .chat_ui.conversations
+                    .vaults.cur().chat_ui.conversations
                     .get(idx)
                     .map(|e| e.label.clone())
                     .unwrap_or_default();
@@ -463,17 +463,17 @@ impl Oryxis {
                 });
             }
             HistoryMessage::DeleteChatConversation(idx) => {
-                let Some(id) = self.chat_ui.conversations.get(idx).map(|e| e.id) else {
+                let Some(id) = self.vaults.cur().chat_ui.conversations.get(idx).map(|e| e.id) else {
                     return Task::none();
                 };
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_chat_conversation(&id);
-                    self.chat_ui.conversations =
+                    self.vaults.cur_mut().chat_ui.conversations =
                         vault.list_chat_conversations().unwrap_or_default();
                 }
                 // The reader cannot outlive what it is reading.
-                if self.chat_ui.viewer.as_ref().is_some_and(|v| v.conversation_id == id) {
-                    self.chat_ui.viewer = None;
+                if self.vaults.cur().chat_ui.viewer.as_ref().is_some_and(|v| v.conversation_id == id) {
+                    self.vaults.cur_mut().chat_ui.viewer = None;
                 }
                 // A tab still appending to this conversation must not
                 // resurrect it: detach so its next turn starts a new row.
@@ -938,7 +938,7 @@ impl Oryxis {
         // last persisted.
         self.flush_session_logs_final();
         // The History slot holds one reader at a time.
-        self.chat_ui.viewer = None;
+        self.vaults.cur_mut().chat_ui.viewer = None;
         let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };

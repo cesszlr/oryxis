@@ -88,7 +88,7 @@ impl Oryxis {
         progress: &crate::state::ConnectionProgress,
         s: &str,
     ) -> String {
-        if !self.progress_privacy_on(progress) || self.privacy.revealed {
+        if !self.progress_privacy_on(progress) || self.vaults.cur().privacy.revealed {
             return s.to_string();
         }
         let conn = self.progress_connection(progress);
@@ -220,7 +220,7 @@ impl Oryxis {
                 Message::TogglePrivacyReveal,
                 6.0,
                 false,
-                crate::widgets::privacy_reveal_btn(self.privacy.revealed),
+                crate::widgets::privacy_reveal_btn(self.vaults.cur().privacy.revealed),
             ));
         }
         // Saved hosts offer Edit only once the connect failed (the card

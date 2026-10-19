@@ -724,8 +724,6 @@ pub struct Oryxis {
     pub(crate) theme_ui: crate::state::ThemeEditorUi,
     /// See [`crate::state::VaultImportState`].
     pub(crate) vault_import: crate::state::VaultImportState,
-    /// See [`crate::state::ChatUi`].
-    pub(crate) chat_ui: crate::state::ChatUi,
     /// Everything the user can change and the vault persists in its
     /// `settings` table, in one place instead of 112 fields.
     ///
@@ -959,9 +957,6 @@ pub struct Oryxis {
     // settings keys; loaded on boot and rewritten on each pick. The
     // active value drives both the trigger button's glyph and the
     // check mark in the dropdown.
-    pub(crate) hosts_sort: crate::state::ListSort,
-    pub(crate) keys_sort: crate::state::ListSort,
-    pub(crate) snippets_sort: crate::state::ListSort,
 
     pub(crate) proxy_identity_form: crate::state::ProxyIdentityForm,
 
@@ -969,17 +964,6 @@ pub struct Oryxis {
     /// run cannot abort the one that replaced it.
     pub(crate) login_script_generation: u64,
     pub(crate) login_script_form: crate::state::LoginScriptForm,
-    /// Resolved + compiled highlight rules per host, keyed by connection
-    /// id and validated by a signature of its inputs (see
-    /// `highlight_rules_for`), so the entry can never go stale.
-    /// A `RefCell` because BOTH consumers need it and one of them is
-    /// `view()`: the widget paints from the same resolved set the
-    /// backend watches with, and a rule that coloured one pattern while
-    /// firing on another would be the worst kind of bug here. Same
-    /// pattern as the keynav recording.
-    pub(crate) highlight_rules_cache: std::cell::RefCell<
-        std::collections::HashMap<uuid::Uuid, (u64, std::sync::Arc<oryxis_terminal::CompiledRules>)>,
-    >,
     /// Settings > Terminal: the inline editor for one highlight rule.
     /// The list itself is a preference (`prefs.highlight_rules`).
     pub(crate) highlight_rule_form: crate::state::HighlightRuleForm,
@@ -1086,12 +1070,6 @@ pub struct Oryxis {
 
 
 
-    /// Which install script (issue #147) already ran on which host,
-    /// keyed (host id, snippet id) with the last run time. Mirror of
-    /// the vault's `install_runs` table; drives the "installed here"
-    /// hint on the snippet surfaces. Local bookkeeping, never synced.
-    pub(crate) install_runs:
-        std::collections::HashMap<(Uuid, Uuid), chrono::DateTime<chrono::Utc>>,
     /// Import-UI-theme modal (paste the Oryxis UI theme JSON), mirroring
     /// the terminal scheme import modal above.
     /// Single external editor used by the SFTP "Open with default text
@@ -1145,10 +1123,6 @@ pub struct Oryxis {
     /// the hovered card (mirrors the terminal-theme editor).
     pub(crate) ui_theme_editor: Option<crate::state::UiThemeEditorForm>,
     pub(crate) ui_color_popover: Option<(usize, iced::Point)>,
-    /// Name of the active app theme (built-in or custom UI theme). The
-    /// `AppTheme` enum can't name a custom theme, so this tracks the
-    /// selection for highlighting + delete/rename bookkeeping.
-    pub(crate) active_app_theme_name: String,
     /// Snippet run/paste waiting on its `{placeholders}` (modal open
     /// while `Some`).
     pub(crate) pending_snippet_vars: Option<crate::state::PendingSnippetVars>,
@@ -1212,11 +1186,6 @@ pub struct Oryxis {
     /// Monotonic launch counter feeding the generation in
     /// `remote_desktop_forwards`; bumped once per Open.
     pub(crate) remote_desktop_seq: u64,
-    /// Opt-in toggle (`remote_desktop_enabled` setting, off by default):
-    /// when off, all remote-desktop UI (the "Add remote desktop" entry,
-    /// the settings row) is hidden so it doesn't clutter the light-user
-    /// interface. Existing RemoteDesktop hosts stay visible and usable.
-    pub(crate) remote_desktop_enabled: bool,
     /// Rules whose connect is in flight (drives the per-row spinner and
     /// prevents a double-start).
     pub(crate) port_forward_starting: std::collections::HashSet<Uuid>,
@@ -1254,25 +1223,12 @@ pub struct Oryxis {
     pub(crate) gif_export: crate::state::GifExportState,
 
     // Terminal theme
-    /// Theme derived from the active app theme, used as the global
-    /// fallback when neither `terminal_theme_override` nor a per-host
-    /// override is set.
-    /// Cached resolved global terminal palette (built-in or custom).
-    /// Applied to new tabs / local shells / cloud sessions; recomputed when
-    /// the global theme or a custom theme changes.
-    pub(crate) terminal_palette: oryxis_terminal::TerminalPalette,
-    /// User pick that overrides the app-theme-derived terminal palette.
-    /// `None` means "follow the app theme" (default). Stored as the
-    /// theme's display name (e.g. "Dracula") so the value survives new
-    /// theme additions without a migration.
-    pub(crate) terminal_theme_override: Option<String>,
     /// Session-only theme override applied to local/ephemeral terminal
     /// panes (which have no saved Connection). `None` follows the global
     /// terminal theme. Set from the Host config sidebar tab when the
     /// focused pane is a local shell; not persisted unless the user saves
     /// it as the global default.
     pub(crate) local_terminal_theme: Option<String>,
-    pub(crate) terminal_font_size: f32,
     /// Whole points added to `terminal_font_size` by the zoom chords
     /// (Ctrl+= / Ctrl+- and Ctrl+wheel) for THIS session. Never
     /// persisted: a zoom is "the text is too small right now", the way
@@ -1282,16 +1238,6 @@ pub struct Oryxis {
     /// size every terminal canvas draws at; the Settings stepper edits
     /// and shows the preference alone.
     pub(crate) terminal_font_zoom: f32,
-    pub(crate) terminal_font_name: String,
-    /// Weight every terminal cell is drawn at (issue #155). Global,
-    /// like the family and the size next to it: a per-host weight
-    /// over a global family would let a host ask for a weight the
-    /// family it can't choose has no face for.
-    pub(crate) terminal_font_weight: crate::fonts::TerminalFontWeight,
-    /// Stroke widening applied to every terminal glyph. Global for the
-    /// same reason the weight is: it compensates for the rasterizer,
-    /// not for a host.
-    pub(crate) terminal_text_thickness: crate::fonts::TextThickness,
 
     // Settings
     pub(crate) settings_section: SettingsSection,
@@ -1327,12 +1273,6 @@ pub struct Oryxis {
     /// adapter)`, e.g. `("Vulkan", "NVIDIA GeForce RTX 3080")`. Shows
     /// what "Automatic" resolved to so a backend fallback is diagnosable.
     pub(crate) renderer_active: Option<(String, String)>,
-    /// The shell-integration key this vault mints once and every pane then
-    /// demands from `OSC 633 ; E` (see `shell_integration.rs`). Held in
-    /// state only so Settings can show and copy the snippet; the value the
-    /// capture actually compares against lives in the terminal crate,
-    /// installed at boot.
-    pub(crate) shell_integration_nonce: String,
     /// Terminal-sidebar Snippets tab: its own drill-in group (kept
     /// separate from the vault view's so the two surfaces navigate
     /// independently).
@@ -1341,10 +1281,6 @@ pub struct Oryxis {
     /// by the render probe, so the unlock path can raise a one-time toast
     /// explaining why. Cleared when the toast is emitted.
     pub(crate) pending_perf_mode_toast: bool,
-    /// Privacy Mode (issue #78): global toggle, session override, hint
-    /// flag, always/never mask lists, per-class gates and the Logs
-    /// reveal toggle. See [`crate::state::PrivacyState`].
-    pub(crate) privacy: crate::state::PrivacyState,
     /// Download-mirror block state (Settings > Advanced): persisted
     /// choice + custom-URL editing + probe outcome. The effective
     /// choice also lives in `net_mirror`'s process-wide slot so the
@@ -1402,12 +1338,6 @@ pub struct Oryxis {
     /// be found by searching for the handle, and the handle only means
     /// something next to the tab it was minted in.
     pub(crate) pane_drag_from: Option<(uuid::Uuid, iced::widget::pane_grid::Pane)>,
-    /// Live width of the right-side editor drawer (host / key / identity /
-    /// snippet / port-forward / cloud forms, all of them: they share one
-    /// width, like they shared one constant). Defaults to `PANEL_WIDTH`,
-    /// dragged via the drawer's edge handle, persisted as the
-    /// `side_panel_width` setting on release.
-    pub(crate) panel_width: f32,
     /// In-progress drawer resize drag: (cursor x at press, width at
     /// press). `None` when not dragging.
     pub(crate) panel_resize_drag: Option<(f32, f32)>,
@@ -1416,12 +1346,6 @@ pub struct Oryxis {
     /// `editor_autosave_dirty` compares against. `None` = no baseline
     /// yet; the first post-open editor message records it.
     pub(crate) editor_saved_snapshot: Option<String>,
-    /// Toggles the SFTP feature entirely. Off hides the SFTP sidebar
-    /// entry (both expanded and collapsed) so users who never transfer
-    /// files don't have it taking up nav space. The SFTP settings panel
-    /// still renders so the user can re-enable + tweak in one place,
-    /// mirroring how `ai_enabled` works.
-    pub(crate) sftp_enabled: bool,
     /// Secret fields currently revealed via their eye toggle. Render
     /// state only, never persisted; cleared per-field on toggle.
     pub(crate) revealed_secrets: std::collections::HashSet<crate::state::SecretField>,
@@ -1483,7 +1407,6 @@ pub struct Oryxis {
     pub(crate) reconnect_counters: std::collections::HashMap<Uuid, u32>,
 
     // AI Chat settings
-    pub(crate) ai: crate::state::AiState,
 
 
     /// Transient bottom-of-chat status chip, e.g. the "Copied to
@@ -1581,12 +1504,6 @@ pub struct Oryxis {
     // ssh-agent socket. Feature-gated (off by default), in-core (the
     // signing oracle needs the unlocked vault in-process).
     pub(crate) agent: crate::state::AgentState,
-    /// When on, the dashboard root shows two sections, Groups (manual
-    /// folder cards) and Hosts (a flat list of every connection,
-    /// including those that live inside a group). When off, root
-    /// matches the legacy behaviour: groups at top, only ungrouped
-    /// hosts beneath. Default: on. (Dashboard layout, not a sync field.)
-    pub(crate) flatten_hosts: bool,
 
     pub(crate) export_password: String,
     pub(crate) export_include_keys: bool,

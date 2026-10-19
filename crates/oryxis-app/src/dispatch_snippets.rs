@@ -220,7 +220,7 @@ impl Oryxis {
             return;
         };
         let text =
-            crate::shell_integration::fill_nonce(cmd, &self.shell_integration_nonce);
+            crate::shell_integration::fill_nonce(cmd, &self.vaults.cur().shell_integration_nonce);
         self.pending_paste = Some((tab._id, text));
         self.pending_paste_install = Some((snippet_id, run));
         self.pending_paste_snippet = None;
@@ -243,7 +243,7 @@ impl Oryxis {
         if let Some(vault) = &self.vaults.cur().store {
             let _ = vault.record_install_run(&host_id, &snippet_id);
         }
-        self.install_runs
+        self.vaults.cur_mut().install_runs
             .insert((host_id, snippet_id), chrono::Utc::now());
     }
 

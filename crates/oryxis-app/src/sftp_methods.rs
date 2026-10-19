@@ -805,7 +805,7 @@ impl Oryxis {
         };
         let width = |side: SidebarSide| {
             if self.sidebar_region_shown(tab, side) {
-                self.chat_ui.sidebar_width[side.idx()]
+                self.vaults.cur().chat_ui.sidebar_width[side.idx()]
             } else {
                 0.0
             }

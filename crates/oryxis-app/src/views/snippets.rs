@@ -18,7 +18,7 @@ impl Oryxis {
         let sort_btn = crate::widgets::bounds_reporter(
             crate::widgets::sort_toolbar_button(
                 crate::state::SortMenuKind::Snippets,
-                self.snippets_sort,
+                self.vaults.cur().snippets_sort,
             ),
             self.toolbar_sort_btn_bounds.clone(),
         );
@@ -187,7 +187,7 @@ impl Oryxis {
         // matches tags and the group name; the toolbar tag filter keeps
         // snippets carrying ANY selected tag.
         let mut snippet_order: Vec<usize> = (0..self.vaults.cur().snippets.len()).collect();
-        self.snippets_sort.sort_items(
+        self.vaults.cur().snippets_sort.sort_items(
             &mut snippet_order,
             |&i| self.vaults.cur().snippets[i].label.clone(),
             |&i| self.vaults.cur().snippets[i].created_at,
@@ -300,7 +300,7 @@ impl Oryxis {
         }
 
         let nav_width = self.vault_rail_width();
-        let panel_width = if self.panels.snippet_panel { self.panel_width } else { 0.0 };
+        let panel_width = if self.panels.snippet_panel { self.vaults.cur().panel_width } else { 0.0 };
         let available = (self.cur_window_size().width
             - nav_width
             - self.side_strip_reserve()
@@ -829,6 +829,6 @@ self.keynav_ring_content(kb_selected, card_el)
             footer,
         ].height(Length::Fill);
 
-        crate::widgets::side_panel_frame(panel_content.boxed(), OryxisColors::t().bg_sidebar, self.panel_width)
+        crate::widgets::side_panel_frame(panel_content.boxed(), OryxisColors::t().bg_sidebar, self.vaults.cur().panel_width)
     }
 }

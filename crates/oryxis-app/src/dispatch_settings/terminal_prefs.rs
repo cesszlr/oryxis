@@ -81,24 +81,24 @@ impl Oryxis {
                 }
             }
             SettingsMessage::TerminalFontSizeIncrease => {
-                self.terminal_font_size = (self.terminal_font_size + 1.0).min(24.0);
+                self.vaults.cur_mut().terminal_font_size = (self.vaults.cur_mut().terminal_font_size + 1.0).min(24.0);
                 self.normalize_terminal_font_zoom();
                 self.persist_setting(
                     "terminal_font_size",
-                    &format!("{}", self.terminal_font_size),
+                    &format!("{}", self.vaults.cur().terminal_font_size),
                 );
             }
             SettingsMessage::TerminalFontSizeDecrease => {
-                self.terminal_font_size = (self.terminal_font_size - 1.0).max(10.0);
+                self.vaults.cur_mut().terminal_font_size = (self.vaults.cur_mut().terminal_font_size - 1.0).max(10.0);
                 self.normalize_terminal_font_zoom();
                 self.persist_setting(
                     "terminal_font_size",
-                    &format!("{}", self.terminal_font_size),
+                    &format!("{}", self.vaults.cur().terminal_font_size),
                 );
             }
             SettingsMessage::TerminalFontChanged(name) => {
-                self.terminal_font_name = name;
-                self.persist_setting("terminal_font_name", &self.terminal_font_name);
+                self.vaults.cur_mut().terminal_font_name = name;
+                self.persist_setting("terminal_font_name", &self.vaults.cur().terminal_font_name);
                 // Picking a pack font (issue #109) pulls its file on
                 // demand, once per session (guard contract of
                 // `loaded_cjk_fonts`). A cached file loads silently;
@@ -110,7 +110,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::TerminalFontWeightChanged(weight) => {
-                self.terminal_font_weight = weight;
+                self.vaults.cur_mut().terminal_font_weight = weight;
                 self.persist_setting("terminal_font_weight", weight.setting_value());
                 // A pack family keeps one file per weight, so the new
                 // weight may be a face this machine has never fetched.
@@ -119,7 +119,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::TerminalTextThicknessChanged(thickness) => {
-                self.terminal_text_thickness = thickness;
+                self.vaults.cur_mut().terminal_text_thickness = thickness;
                 self.persist_setting(
                     "terminal_text_thickness",
                     thickness.setting_value(),
@@ -503,7 +503,7 @@ impl Oryxis {
             }
             SettingsMessage::CopyShellIntegrationSnippet => {
                 let snippet =
-                    crate::shell_integration::snippet(&self.shell_integration_nonce);
+                    crate::shell_integration::snippet(&self.vaults.cur().shell_integration_nonce);
                 self.set_toast(crate::i18n::t("shell_integration_copied").to_string());
                 return Ok(crate::dispatch_global::write_clipboard_text(snippet));
             }
@@ -515,7 +515,7 @@ impl Oryxis {
                 // the old snippet stops being recorded from this moment,
                 // which is exactly what retiring a leaked key means.
                 oryxis_terminal::osc::set_global_command_nonce(Some(fresh.clone()));
-                self.shell_integration_nonce = fresh;
+                self.vaults.cur_mut().shell_integration_nonce = fresh;
                 self.set_toast(crate::i18n::t("shell_integration_rotated").to_string());
             }
             SettingsMessage::HintModeChanged(name) => {
@@ -582,8 +582,8 @@ impl Oryxis {
     /// the user the weight could not be served exactly.
     fn ensure_pack_face(&mut self) -> Option<Task<Message>> {
         let face = crate::fonts::pack_face_for(
-            &self.terminal_font_name,
-            self.terminal_font_weight,
+            &self.vaults.cur().terminal_font_name,
+            self.vaults.cur().terminal_font_weight,
         )?;
         if !self.loaded_pack_fonts.insert(face.key().to_string()) {
             return None;
@@ -616,7 +616,7 @@ impl Oryxis {
     /// The size every terminal canvas draws at: the preference plus the
     /// session zoom, clamped to the stepper's range.
     pub(crate) fn terminal_font_px(&self) -> f32 {
-        (self.terminal_font_size + self.terminal_font_zoom)
+        (self.vaults.cur().terminal_font_size + self.terminal_font_zoom)
             .clamp(Self::TERMINAL_FONT_MIN, Self::TERMINAL_FONT_MAX)
     }
 
@@ -626,7 +626,7 @@ impl Oryxis {
     pub(crate) fn zoom_terminal_font(&mut self, steps: f32) {
         let target = (self.terminal_font_px() + steps)
             .clamp(Self::TERMINAL_FONT_MIN, Self::TERMINAL_FONT_MAX);
-        self.terminal_font_zoom = target - self.terminal_font_size;
+        self.terminal_font_zoom = target - self.vaults.cur().terminal_font_size;
     }
 
     /// Back to the preference: what "reset zoom" means once the zoom is
@@ -643,7 +643,7 @@ impl Oryxis {
     /// names the old size.
     pub(crate) fn normalize_terminal_font_zoom(&mut self) {
         self.terminal_font_zoom =
-            normalized_font_zoom(self.terminal_font_size, self.terminal_font_zoom);
+            normalized_font_zoom(self.vaults.cur().terminal_font_size, self.terminal_font_zoom);
     }
 }
 

@@ -28,8 +28,8 @@ impl Oryxis {
     /// never `privacy.mode` directly, when deciding whether a
     /// surface without a per-host context masks.
     pub(crate) fn privacy_global_active(&self) -> bool {
-        self.privacy.session_override
-            .unwrap_or(self.privacy.mode)
+        self.vaults.cur().privacy.session_override
+            .unwrap_or(self.vaults.cur().privacy.mode)
     }
 
     /// Whether Privacy Mode is active for a connection. The session
@@ -48,8 +48,8 @@ impl Oryxis {
     /// written yet). Single authority: `privacy_active` delegates here
     /// so the precedence cannot be stated twice and drift.
     pub(crate) fn privacy_active_for_override(&self, over: Option<bool>) -> bool {
-        self.privacy.session_override
-            .unwrap_or_else(|| over.unwrap_or(self.privacy.mode))
+        self.vaults.cur().privacy.session_override
+            .unwrap_or_else(|| over.unwrap_or(self.vaults.cur().privacy.mode))
     }
 
     /// Strings Privacy Mode masks literally wherever they appear (live
@@ -74,7 +74,7 @@ impl Oryxis {
         // host's own, else its folder's default, else its identity's):
         // that is the word the prompt, the progress lines and the card
         // carry, and a host that inherits it has nothing in the field.
-        let users: Vec<String> = if self.privacy.mask_usernames {
+        let users: Vec<String> = if self.vaults.cur().privacy.mask_usernames {
             self.vaults.cur().connections
                 .iter()
                 .filter_map(|c| self.effective_username(c))
@@ -85,12 +85,12 @@ impl Oryxis {
         let hosts = self
             .vaults.cur().connections
             .iter()
-            .filter(|_| self.privacy.mask_hostnames)
+            .filter(|_| self.vaults.cur().privacy.mask_hostnames)
             .map(|c| c.hostname.as_str());
         crate::widgets::assemble_privacy_terms(
             hosts.chain(users.iter().map(String::as_str)),
-            &self.privacy.always_mask,
-            &self.privacy.never_mask,
+            &self.vaults.cur().privacy.always_mask,
+            &self.vaults.cur().privacy.never_mask,
         )
     }
 
@@ -99,9 +99,9 @@ impl Oryxis {
     /// filtered in [`Self::privacy_terms`].
     pub(crate) fn privacy_classes(&self) -> oryxis_terminal::PrivacyClasses {
         oryxis_terminal::PrivacyClasses {
-            public_ips: self.privacy.mask_public_ips,
-            private_ips: self.privacy.mask_private_ips,
-            usernames: self.privacy.mask_usernames,
+            public_ips: self.vaults.cur().privacy.mask_public_ips,
+            private_ips: self.vaults.cur().privacy.mask_private_ips,
+            usernames: self.vaults.cur().privacy.mask_usernames,
         }
     }
 
@@ -150,10 +150,10 @@ impl Oryxis {
     ) -> Result<Task<Message>, SettingsMessage> {
         match message {
             SettingsMessage::TogglePrivacyMode => {
-                self.privacy.mode = !self.privacy.mode;
+                self.vaults.cur_mut().privacy.mode = !self.vaults.cur_mut().privacy.mode;
                 self.persist_setting(
                     "privacy_mode",
-                    if self.privacy.mode { "true" } else { "false" },
+                    if self.vaults.cur().privacy.mode { "true" } else { "false" },
                 );
             }
             SettingsMessage::TogglePrivacySessionOverride => {
@@ -162,11 +162,11 @@ impl Oryxis {
                 // press falls back to the settings. The toast spells
                 // the resulting state out because a silent flip is how
                 // the original #53 confusion happened.
-                self.privacy.session_override = match self.privacy.session_override {
-                    None => Some(!self.privacy.mode),
+                self.vaults.cur_mut().privacy.session_override = match self.vaults.cur_mut().privacy.session_override {
+                    None => Some(!self.vaults.cur().privacy.mode),
                     Some(_) => None,
                 };
-                let key = match self.privacy.session_override {
+                let key = match self.vaults.cur().privacy.session_override {
                     Some(true) => "privacy_toast_session_on",
                     Some(false) => "privacy_toast_session_off",
                     None => "privacy_toast_follow",
@@ -178,21 +178,21 @@ impl Oryxis {
                 // `privacy_terms()` reads per frame) and the vault row
                 // only refresh on actual edits, not cursor motion.
                 let was_edit = action.is_edit();
-                self.privacy.always_mask_editor.perform(action);
+                self.vaults.cur_mut().privacy.always_mask_editor.perform(action);
                 if was_edit {
-                    self.privacy.always_mask =
-                        self.privacy.always_mask_editor.text();
-                    let v = self.privacy.always_mask.clone();
+                    self.vaults.cur_mut().privacy.always_mask =
+                        self.vaults.cur().privacy.always_mask_editor.text();
+                    let v = self.vaults.cur().privacy.always_mask.clone();
                     self.persist_setting("privacy_always_mask", &v);
                 }
             }
             SettingsMessage::SettingPrivacyNeverMaskAction(action) => {
                 let was_edit = action.is_edit();
-                self.privacy.never_mask_editor.perform(action);
+                self.vaults.cur_mut().privacy.never_mask_editor.perform(action);
                 if was_edit {
-                    self.privacy.never_mask =
-                        self.privacy.never_mask_editor.text();
-                    let v = self.privacy.never_mask.clone();
+                    self.vaults.cur_mut().privacy.never_mask =
+                        self.vaults.cur().privacy.never_mask_editor.text();
+                    let v = self.vaults.cur().privacy.never_mask.clone();
                     self.persist_setting("privacy_never_mask", &v);
                 }
             }
@@ -201,19 +201,19 @@ impl Oryxis {
                 let (key, field): (&str, &mut bool) = match class {
                     PrivacyMaskClass::PublicIps => (
                         "privacy_mask_public_ips",
-                        &mut self.privacy.mask_public_ips,
+                        &mut self.vaults.cur_mut().privacy.mask_public_ips,
                     ),
                     PrivacyMaskClass::PrivateIps => (
                         "privacy_mask_private_ips",
-                        &mut self.privacy.mask_private_ips,
+                        &mut self.vaults.cur_mut().privacy.mask_private_ips,
                     ),
                     PrivacyMaskClass::Usernames => (
                         "privacy_mask_usernames",
-                        &mut self.privacy.mask_usernames,
+                        &mut self.vaults.cur_mut().privacy.mask_usernames,
                     ),
                     PrivacyMaskClass::Hostnames => (
                         "privacy_mask_hostnames",
-                        &mut self.privacy.mask_hostnames,
+                        &mut self.vaults.cur_mut().privacy.mask_hostnames,
                     ),
                 };
                 *field = !*field;

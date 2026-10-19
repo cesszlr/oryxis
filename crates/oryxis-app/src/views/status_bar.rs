@@ -367,10 +367,10 @@ impl Oryxis {
         // state is never silent (the original #53 confusion). Clicking
         // toggles the session override, same as the Ctrl+Shift+M
         // hotkey.
-        if self.privacy_global_active() || self.privacy.session_override.is_some() {
+        if self.privacy_global_active() || self.vaults.cur().privacy.session_override.is_some() {
             items.push(privacy_segment_btn(
                 self.privacy_global_active(),
-                self.privacy.session_override.is_some(),
+                self.vaults.cur().privacy.session_override.is_some(),
             ));
             items.push(Space::new().width(10).boxed());
         }

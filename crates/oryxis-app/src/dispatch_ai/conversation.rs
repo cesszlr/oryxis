@@ -16,13 +16,13 @@ impl Oryxis {
     pub(super) fn handle_ai_conversation(&mut self, message: AiMessage) -> Task<Message> {
         match message {
             AiMessage::ChatInputAction(action) => {
-                self.chat_ui.input.perform(action);
+                self.vaults.cur_mut().chat_ui.input.perform(action);
             }
             AiMessage::ChatScrolled(relative_y) => {
                 // Strict end check (not "near end"), relative_offset.y
                 // becomes 1.0 when the user is exactly at the bottom.
                 // Tiny epsilon covers f32 rounding from the layout pass.
-                self.chat_ui.scroll_at_bottom = relative_y >= 0.999;
+                self.vaults.cur_mut().chat_ui.scroll_at_bottom = relative_y >= 0.999;
             }
             AiMessage::ChatResetConversation => {
                 // Cancel any in-flight stream first, otherwise the detached
@@ -41,7 +41,7 @@ impl Oryxis {
                     // user cleared.
                     self.detach_saved_chat(idx);
                 }
-                self.chat_ui.scroll_at_bottom = true;
+                self.vaults.cur_mut().chat_ui.scroll_at_bottom = true;
             }
             AiMessage::ChatModeChanged(mode) => {
                 // Apply to the active tab's conversation and remember it as
@@ -57,8 +57,8 @@ impl Oryxis {
                 }
             }
             AiMessage::SendChat => {
-                let input = self.chat_ui.input.text().trim().to_string();
-                if input.is_empty() || !self.ai.enabled {
+                let input = self.vaults.cur().chat_ui.input.text().trim().to_string();
+                if input.is_empty() || !self.vaults.cur().ai.enabled {
                     return Task::none();
                 }
                 let Some(idx) = self.cur_active_tab() else {
@@ -76,11 +76,11 @@ impl Oryxis {
                 // doesn't bleed into this one.
                 tab.chat_auto_run_history.clear();
                 tab.chat_auto_run_streak = 0;
-                self.chat_ui.input = text_editor::Content::new();
+                self.vaults.cur_mut().chat_ui.input = text_editor::Content::new();
                 // Sending a message snaps focus back to the latest
                 // exchange, so the next assistant response should
                 // also follow (until the user scrolls up again).
-                self.chat_ui.scroll_at_bottom = true;
+                self.vaults.cur_mut().chat_ui.scroll_at_bottom = true;
 
                 let stream_task = self.spawn_chat_stream_for(idx);
                 return Task::batch(vec![chat_scroll_to_end(), stream_task]);
@@ -115,7 +115,7 @@ impl Oryxis {
                 }
                 // Only follow the scroll when the streaming tab is the one
                 // on screen; a background stream must not yank the view.
-                if is_active && self.chat_ui.scroll_at_bottom {
+                if is_active && self.vaults.cur().chat_ui.scroll_at_bottom {
                     return chat_scroll_to_end();
                 }
             }
@@ -156,7 +156,7 @@ impl Oryxis {
                     // conversation cannot capture a half-streamed answer.
                     self.flush_chat_history(idx);
                 }
-                if is_active && self.chat_ui.scroll_at_bottom {
+                if is_active && self.vaults.cur().chat_ui.scroll_at_bottom {
                     return chat_scroll_to_end();
                 }
             }
@@ -188,7 +188,7 @@ impl Oryxis {
                     self.tabs[idx].chat_task = None;
                     self.tabs[idx].chat_loading = false;
                 }
-                if is_active && self.chat_ui.scroll_at_bottom {
+                if is_active && self.vaults.cur().chat_ui.scroll_at_bottom {
                     return chat_scroll_to_end();
                 }
             }
@@ -235,7 +235,7 @@ impl Oryxis {
                 // History screen mid-conversation does.) Cheap and
                 // idempotent, and a no-op when saving is off.
                 self.flush_chat_history(idx);
-                self.chat_ui.scroll_at_bottom = true;
+                self.vaults.cur_mut().chat_ui.scroll_at_bottom = true;
                 let stream_task = self.spawn_chat_stream_for(idx);
                 return Task::batch(vec![chat_scroll_to_end(), stream_task]);
             }

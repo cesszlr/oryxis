@@ -145,7 +145,7 @@ impl Oryxis {
                     crate::keynav::SidebarRow::button(Message::Ai(AiMessage::ToggleSidebarSort)),
                     stab,
                     6.0,
-                    chat_header_btn(sort_glyph(self.snippets_sort), Message::Ai(AiMessage::ToggleSidebarSort)),
+                    chat_header_btn(sort_glyph(self.vaults.cur().snippets_sort), Message::Ai(AiMessage::ToggleSidebarSort)),
                 ),
                 Space::new().width(2).boxed(),
                 self.sidebar_nav_slot(
@@ -225,7 +225,7 @@ impl Oryxis {
         let needle = self.sidebar_snippet_search.to_lowercase();
         let host_tags = self.focused_host_tags_lower();
         let mut order: Vec<usize> = (0..self.vaults.cur().snippets.len()).collect();
-        self.snippets_sort.sort_items(
+        self.vaults.cur().snippets_sort.sort_items(
             &mut order,
             |&i| self.vaults.cur().snippets[i].label.clone(),
             |&i| self.vaults.cur().snippets[i].created_at,
@@ -412,7 +412,7 @@ impl Oryxis {
                 self.cur_nav().hover.snippet_card == Some(idx),
                 snip.install.then(|| {
                     install_host
-                        .and_then(|h| self.install_runs.get(&(h, snip.id)).copied())
+                        .and_then(|h| self.vaults.cur().install_runs.get(&(h, snip.id)).copied())
                 }),
             );
             list = list.push(self.sidebar_nav_slot(
@@ -454,28 +454,28 @@ impl Oryxis {
                     ListSort::LabelAsc,
                     iced_fonts::lucide::arrow_down_a_z::<iced::Theme>(),
                     "sort_label_asc",
-                    self.snippets_sort == ListSort::LabelAsc,
+                    self.vaults.cur().snippets_sort == ListSort::LabelAsc,
                 ),
                 crate::widgets::sort_menu_row(
                     SortMenuKind::Snippets,
                     ListSort::LabelDesc,
                     iced_fonts::lucide::arrow_down_z_a::<iced::Theme>(),
                     "sort_label_desc",
-                    self.snippets_sort == ListSort::LabelDesc,
+                    self.vaults.cur().snippets_sort == ListSort::LabelDesc,
                 ),
                 crate::widgets::sort_menu_row(
                     SortMenuKind::Snippets,
                     ListSort::NewestFirst,
                     iced_fonts::lucide::calendar_arrow_down::<iced::Theme>(),
                     "sort_newest_first",
-                    self.snippets_sort == ListSort::NewestFirst,
+                    self.vaults.cur().snippets_sort == ListSort::NewestFirst,
                 ),
                 crate::widgets::sort_menu_row(
                     SortMenuKind::Snippets,
                     ListSort::OldestFirst,
                     iced_fonts::lucide::calendar_arrow_up::<iced::Theme>(),
                     "sort_oldest_first",
-                    self.snippets_sort == ListSort::OldestFirst,
+                    self.vaults.cur().snippets_sort == ListSort::OldestFirst,
                 ),
             ])
             .width(Length::Fixed(190.0))

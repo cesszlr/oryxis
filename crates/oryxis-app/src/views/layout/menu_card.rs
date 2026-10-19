@@ -97,7 +97,7 @@ impl Oryxis {
         idx: usize,
     ) -> Element<'_, Message> {
         let mut col = iced::widget::Column::<iced::Element<'_, _>>::new().spacing(2);
-        if let Some(id) = self.chat_ui.conversations.get(idx).map(|c| c.id) {
+        if let Some(id) = self.vaults.cur().chat_ui.conversations.get(idx).map(|c| c.id) {
             col = col.push(self.menu_item(
                 iced_fonts::lucide::bot(),
                 crate::i18n::t("chat_open"),
@@ -149,7 +149,7 @@ impl Oryxis {
         let mut rows = 4.0; // Connect + Connect in new window + Edit + Duplicate
         if protocol == ConnectionProtocol::Ssh {
             rows += 1.0; // Share
-            if self.sftp_enabled {
+            if self.vaults.cur().sftp_enabled {
                 rows += 1.0; // Open SFTP tab
                 if conn.is_some_and(Oryxis::host_can_console) {
                     rows += 1.0; // Open SFTP console
@@ -275,7 +275,7 @@ impl Oryxis {
                 .push(self.menu_item(iced_fonts::lucide::share(), crate::i18n::t("share"), by_idx(|i| Message::Share(ShareMessage::ShareConnection(i))), OryxisColors::t().text_secondary));
             // SFTP is an optional feature: its entry hides with the
             // toggle, like every other SFTP surface.
-            if self.sftp_enabled {
+            if self.vaults.cur().sftp_enabled {
                 items = items.push(self.menu_item(iced_fonts::lucide::folder_tree(), crate::i18n::t("open_sftp_tab"), by_idx(|i| Message::Sftp(SftpMessage::OpenSftpForConnection(i))), OryxisColors::t().text_secondary));
                 // The console right beside the browser, because they are
                 // two answers to the same question and the whole point of

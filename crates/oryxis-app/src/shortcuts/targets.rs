@@ -70,7 +70,7 @@ impl Oryxis {
                 self.tabs.iter().position(|t| t._id == *id).map(|v| Message::Tabs(TabsMessage::SelectTab(v)))
             }
             TabRef::Sftp(id) => {
-                if !self.sftp_enabled {
+                if !self.vaults.cur().sftp_enabled {
                     return None;
                 }
                 self.sftp_tabs.iter().position(|t| t.id == *id).map(|v| Message::Sftp(SftpMessage::SelectSftpTab(v)))
