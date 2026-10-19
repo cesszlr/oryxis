@@ -204,7 +204,7 @@ impl Oryxis {
                 } else if label == crate::i18n::t("startup_custom") {
                     self.editor_startup_choice = StartupChoice::Custom;
                 } else if let Some(s) =
-                    self.snippets.iter().find(|s| s.label == label)
+                    self.vaults.cur().snippets.iter().find(|s| s.label == label)
                 {
                     self.editor_startup_choice = StartupChoice::Snippet(s.id);
                 }

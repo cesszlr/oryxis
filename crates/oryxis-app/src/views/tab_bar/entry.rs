@@ -189,7 +189,7 @@ impl Oryxis {
             // identity is the badge's job, like the terminal OS
             // badge). `tab_accent_color = "app"` only pins the gated
             // accent that drives text / wash / border.
-            let brand = self.connections
+            let brand = self.vaults.cur().connections
                 .iter()
                 .find(|c| c.label == tab.label)
                 .and_then(|c| c.custom_color.as_deref().or(c.color.as_deref()))
@@ -300,7 +300,7 @@ impl Oryxis {
             // in the strip (fill, text, borders fall back to the app
             // accent); the badge below keeps its brand colour.
             None
-        } else { self.connections.iter()
+        } else { self.vaults.cur().connections.iter()
             .find(|c| c.label == base_label)
             // `custom_color` is what the icon picker writes (the
             // user-chosen accent). The legacy `color` field is a
@@ -405,7 +405,7 @@ impl Oryxis {
         // Session-group tabs carry the group's own icon + color.
         let session_group = tab
             .session_group_id
-            .and_then(|id| self.session_groups.iter().find(|g| g.id == id));
+            .and_then(|id| self.vaults.cur().session_groups.iter().find(|g| g.id == id));
         let sg_custom_color = session_group
             .and_then(|g| g.color.as_deref())
             .and_then(crate::widgets::parse_hex_color);
@@ -597,7 +597,7 @@ impl Oryxis {
             let compact = tab.pinned && compact_pins;
             let session_group = tab
                 .session_group_id
-                .and_then(|id| self.session_groups.iter().find(|g| g.id == id));
+                .and_then(|id| self.vaults.cur().session_groups.iter().find(|g| g.id == id));
             let sg_color = session_group
                 .and_then(|g| g.color.as_deref())
                 .and_then(crate::widgets::parse_hex_color);
@@ -615,7 +615,7 @@ impl Oryxis {
             ))
         } else if let Some(sftp_tab) = self.sftp_tabs.iter().find(|t| t.id == dragged) {
             let detected_os = self.tab_detected_os(&sftp_tab.label);
-            let brand = self.connections
+            let brand = self.vaults.cur().connections
                 .iter()
                 .find(|c| c.label == sftp_tab.label)
                 .and_then(|c| c.custom_color.as_deref().or(c.color.as_deref()))

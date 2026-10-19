@@ -61,9 +61,9 @@ impl Oryxis {
         // Saved arrangements count as content: a vault holding only
         // session groups still has rows to show (the empty-state gate
         // once hid them behind the placeholder).
-        if self.connections.is_empty()
-            && self.groups.is_empty()
-            && self.session_groups.is_empty()
+        if self.vaults.cur().connections.is_empty()
+            && self.vaults.cur().groups.is_empty()
+            && self.vaults.cur().session_groups.is_empty()
         {
             return column![header, placeholder(t("hosts_tree_empty"))]
                 .width(Length::Fill)
@@ -102,10 +102,10 @@ impl Oryxis {
         // cycle from recursing forever.
         let mut visited: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
         let mut roots: Vec<&Group> = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter(|g| {
-                g.parent_id.is_none() || !Group::is_reachable_from_root(&self.groups, g.id)
+                g.parent_id.is_none() || !Group::is_reachable_from_root(&self.vaults.cur().groups, g.id)
             })
             .collect();
         self.hosts_sort.sort_items(&mut roots, |g| g.label.clone(), |g| g.created_at);
@@ -129,9 +129,9 @@ impl Oryxis {
         self.tree_session_rows(&mut rows, None, 0, &needle, false);
         // Root hosts: no group, or a group id that no longer resolves.
         let group_exists =
-            |gid: Uuid| self.groups.iter().any(|g| g.id == gid);
+            |gid: Uuid| self.vaults.cur().groups.iter().any(|g| g.id == gid);
         let mut root_hosts: Vec<(usize, &oryxis_core::models::Connection)> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .enumerate()
             .filter(|(_, c)| c.group_id.filter(|gid| group_exists(*gid)).is_none())
@@ -204,7 +204,7 @@ impl Oryxis {
             || !searching
             || group.label.to_lowercase().contains(needle);
         let mut children: Vec<&Group> = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter(|g| g.parent_id == Some(group.id))
             .collect();
@@ -228,7 +228,7 @@ impl Oryxis {
         // like a folder of sessions in one click).
         self.tree_session_rows(rows, Some(group.id), depth + 1, needle, label_match);
         let mut hosts: Vec<(usize, &oryxis_core::models::Connection)> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .enumerate()
             .filter(|(_, c)| c.group_id == Some(group.id))
@@ -287,7 +287,7 @@ impl Oryxis {
                 return v;
             }
             memo.insert(gid, false);
-            let Some(group) = app.groups.iter().find(|g| g.id == gid) else {
+            let Some(group) = app.vaults.cur().groups.iter().find(|g| g.id == gid) else {
                 return false;
             };
             let searching = !needle.is_empty();
@@ -310,7 +310,7 @@ impl Oryxis {
                     true
                 } else {
                     group.label.to_lowercase().contains(needle)
-                        || app.connections.iter().any(|c| {
+                        || app.vaults.cur().connections.iter().any(|c| {
                             c.group_id == Some(gid)
                                 && crate::util::host_matches_search(
                                     c,
@@ -319,14 +319,14 @@ impl Oryxis {
                                 )
                         })
                         || app
-                            .session_groups
+                            .vaults.cur().session_groups
                             .iter()
                             .any(|sg| {
                                 sg.group_id == Some(gid)
                                     && sg.label.to_lowercase().contains(needle)
                             })
                         || app
-                            .groups
+                            .vaults.cur().groups
                             .iter()
                             .filter(|g| g.parent_id == Some(gid))
                             .any(|g| {
@@ -338,7 +338,7 @@ impl Oryxis {
             v
         }
         let mut memo = std::collections::HashMap::new();
-        for g in &self.groups {
+        for g in &self.vaults.cur().groups {
             visible(self, g.id, needle, hidden_profiles, counts, &mut memo);
         }
         memo
@@ -583,9 +583,9 @@ impl Oryxis {
         needle: &str,
         parent_matched: bool,
     ) {
-        let group_exists = |gid: Uuid| self.groups.iter().any(|g| g.id == gid);
+        let group_exists = |gid: Uuid| self.vaults.cur().groups.iter().any(|g| g.id == gid);
         let mut sessions: Vec<(usize, &oryxis_core::models::SessionGroup)> = self
-            .session_groups
+            .vaults.cur().session_groups
             .iter()
             .enumerate()
             .filter(|(_, sg)| match folder {
@@ -665,7 +665,7 @@ impl Oryxis {
         hidden_profiles: &std::collections::HashSet<Uuid>,
     ) -> TreeSubtreeCounts {
         let parent_of: std::collections::HashMap<Uuid, Option<Uuid>> =
-            self.groups.iter().map(|g| (g.id, g.parent_id)).collect();
+            self.vaults.cur().groups.iter().map(|g| (g.id, g.parent_id)).collect();
         let mut counts = TreeSubtreeCounts::default();
         let up_chain = |start: Uuid, mark: &mut dyn FnMut(Uuid)| {
             let mut seen: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
@@ -678,17 +678,17 @@ impl Oryxis {
                 cur = parent_of.get(&g).copied().flatten();
             }
         };
-        for c in &self.connections {
+        for c in &self.vaults.cur().connections {
             if let Some(gid) = c.group_id {
                 up_chain(gid, &mut |g| *counts.hosts.entry(g).or_insert(0) += 1);
             }
         }
-        for sg in &self.session_groups {
+        for sg in &self.vaults.cur().session_groups {
             if let Some(gid) = sg.group_id {
                 up_chain(gid, &mut |g| *counts.sessions.entry(g).or_insert(0) += 1);
             }
         }
-        for g in &self.groups {
+        for g in &self.vaults.cur().groups {
             if g.cloud_query
                 .as_ref()
                 .is_some_and(|q| !hidden_profiles.contains(&q.profile_id))

@@ -374,7 +374,7 @@ impl Oryxis {
             self.sync.relay_deploy.result = Some(Err(t("relay_deploy_no_host").to_string()));
             return Task::none();
         };
-        let Some(mut conn) = self.connections.iter().find(|c| c.id == host_id).cloned() else {
+        let Some(mut conn) = self.vaults.cur().connections.iter().find(|c| c.id == host_id).cloned() else {
             self.sync.relay_deploy.result = Some(Err(t("relay_deploy_no_host").to_string()));
             return Task::none();
         };
@@ -556,13 +556,13 @@ impl Oryxis {
     /// "connect once from a tab" fixes apart from one it does not.
     fn route_host_keys_on_file(&self, conn: &oryxis_core::models::connection::Connection) -> bool {
         let known = |host: &str, port: u16| {
-            self.known_hosts.iter().any(|k| k.hostname == host && k.port == port)
+            self.vaults.cur().known_hosts.iter().any(|k| k.hostname == host && k.port == port)
         };
         let mut route = conn.clone();
         self.expand_jump_chain(&mut route);
         known(&conn.hostname, conn.port)
             && route.jump_chain.iter().all(|id| {
-                self.connections
+                self.vaults.cur().connections
                     .iter()
                     .find(|c| c.id == *id)
                     .is_some_and(|hop| known(&hop.hostname, hop.port))

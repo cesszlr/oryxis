@@ -203,7 +203,7 @@ impl Oryxis {
         let pane = self.pane_by_id(pane_id);
         let conn = pane.and_then(|p| match &p.origin {
             crate::state::PaneOrigin::Host(id) => {
-                self.connections.iter().find(|c| c.id == *id)
+                self.vaults.cur().connections.iter().find(|c| c.id == *id)
             }
             _ => None,
         });
@@ -213,8 +213,8 @@ impl Oryxis {
         let entries = rank_password_sources(
             conn,
             target.as_ref(),
-            &self.connections,
-            &self.identities,
+            &self.vaults.cur().connections,
+            &self.vaults.cur().identities,
             &with_password,
             &identities_with_password,
             &|c| self.effective_username(c),

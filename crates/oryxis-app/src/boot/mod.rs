@@ -341,12 +341,12 @@ impl Oryxis {
 
         let (mut app, task) = (
             Self {
-                vaults: crate::vault_slots::VaultSlots::single(crate::vault_slots::OpenVault {
-                    id: oryxis_vault::device::installed()
+                vaults: crate::vault_slots::VaultSlots::single(crate::vault_slots::OpenVault::new(
+                    oryxis_vault::device::installed()
                         .map(|d| d.boot_vault().id)
                         .unwrap_or(oryxis_vault::device::FIRST_VAULT_ID),
-                    store: vault,
-                }),
+                    vault,
+                )),
                 vault_ui: crate::state::VaultUi {
                     state: vault_state,
                     open_error: vault_open_error,
@@ -364,10 +364,7 @@ impl Oryxis {
                 // handles share the one asset; the SVG scales to each call
                 // site's box.
                 logo_handle: svg::Handle::from_memory(include_bytes!("../../../../resources/logo.svg").as_slice()),
-                connections: Vec::new(),
                 quick_connects: std::collections::HashMap::new(),
-                groups: Vec::new(),
-                session_groups: Vec::new(),
                 active_view: View::Dashboard,
                 tabs: Vec::new(),
                 closed_tabs: Vec::new(),
@@ -429,8 +426,6 @@ impl Oryxis {
                 pending_console_purpose: false,
                 sftp_click_gen: 0,
                 sftp_edit_reopen: None,
-                command_history: Vec::new(),
-                command_history_host: None,
                 cmd_history_search: String::new(),
                 snippet_context_menu: None,
                 card_context_menu: None,
@@ -524,27 +519,20 @@ impl Oryxis {
                 alt_sides: crate::key_encode::OptionSides::default(),
                 #[cfg(target_os = "windows")]
                 last_printscreen: None,
-                keys: Vec::new(),
                 cert_viewer: None,
                 history_search_content: false,
                 history_content: crate::state::HistoryContentSearch::default(),
-                identities: Vec::new(),
-                identities_with_password: std::collections::HashSet::new(),
-                connections_with_password: std::collections::HashSet::new(),
                 identity_form: crate::state::IdentityForm::default(),
                 identity_context_menu: None,
                 hosts_sort: crate::state::ListSort::default(),
                 keys_sort: crate::state::ListSort::default(),
                 snippets_sort: crate::state::ListSort::default(),
-                proxy_identities: Vec::new(),
                 proxy_identity_form: crate::state::ProxyIdentityForm::default(),
-                login_scripts: Vec::new(),
                 login_script_generation: 0,
                 login_script_form: crate::state::LoginScriptForm::default(),
                 highlight_rules_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
                 highlight_rule_form: crate::state::HighlightRuleForm::default(),
                 trigger_confirm: None,
-                cloud_profiles: Vec::new(),
                 cloud_form: crate::state::CloudForm::default(),
                 host_editor_parent_combo_bounds: crate::widgets::new_bounds_cell(),
                 editor_startup_combo: iced::widget::combo_box::State::new(Vec::new()),
@@ -578,10 +566,7 @@ impl Oryxis {
                 plugins_auto_update_global: true,
                 plugins: Vec::new(),
                 plugin_install_modal: None,
-                snippets: Vec::new(),
                 install_runs: std::collections::HashMap::new(),
-                custom_terminal_themes: Vec::new(),
-                custom_ui_themes: Vec::new(),
                 theme_ui: crate::state::ThemeEditorUi::default(),
                 monitor: Default::default(),
                 tmux: Default::default(),
@@ -615,15 +600,8 @@ impl Oryxis {
                 ui_theme_editor: None,
                 ui_color_popover: None,
                 active_app_theme_name: "Oryxis Dark".to_string(),
-                known_hosts: Vec::new(),
-                logs: Vec::new(),
-                logs_page: 0,
-                logs_total: 0,
                 clear_history_confirm: false,
-                session_logs: Vec::new(),
                 chat_ui: crate::state::ChatUi::default(),
-                session_logs_page: 0,
-                session_logs_total: 0,
                 viewing_session_log: None,
                 session_player: None,
                 gif_export: crate::state::GifExportState::default(),
@@ -631,7 +609,6 @@ impl Oryxis {
                 snippet_runs: Vec::new(),
                 snippet_run_seq: 0,
                 startup_runs_due: Vec::new(),
-                port_forward_rules: Vec::new(),
                 active_forwards: std::collections::HashMap::new(),
                 forward_conns: std::collections::HashMap::new(),
                 pf_aborted_pending: std::collections::HashMap::new(),
@@ -661,7 +638,6 @@ impl Oryxis {
                 settings_search: String::new(),
                 settings_active_match: 0,
                 renderer_active: None,
-                files_recent_folders: std::collections::HashMap::new(),
                 // Replaced by the vault's own key during
                 // `load_data_from_vault`; empty until then, which is also
                 // what a locked vault shows, and an empty key is never
@@ -829,7 +805,7 @@ impl Oryxis {
         if app.vault_ui.state == VaultState::Unlocked
             && let Some(connect_id) = app.pending_auto_connect.take()
             && let Some(idx) = app
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .position(|c| c.id == connect_id)
         {
@@ -974,7 +950,7 @@ impl Oryxis {
         // that simply never looked. The rescan merges and persists; it
         // never opens a shell.
         if app.local_terminals.is_none()
-            && app.connections.iter().any(|c| {
+            && app.vaults.cur().connections.iter().any(|c| {
                 c.protocol == oryxis_core::models::connection::ConnectionProtocol::Local
             })
         {

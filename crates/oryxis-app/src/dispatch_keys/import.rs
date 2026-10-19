@@ -214,13 +214,13 @@ impl Oryxis {
             }
             KeysMessage::ImportKey => return Ok(self.import_key_from_form()),
             KeysMessage::RequestDeleteKey(idx) => {
-                if let Some(key) = self.keys.get(idx) {
+                if let Some(key) = self.vaults.cur().keys.get(idx) {
                     let name = key.label.clone();
                     self.confirm_remove(name, Message::Keys(KeysMessage::DeleteKey(idx)));
                 }
             }
             KeysMessage::DeleteKey(idx) => {
-                if let Some(key) = self.keys.get(idx) {
+                if let Some(key) = self.vaults.cur().keys.get(idx) {
                     let id = key.id;
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_key(&id);
@@ -252,7 +252,7 @@ impl Oryxis {
                 self.overlay = None;
             }
             KeysMessage::EditKey(idx) => {
-                if let Some(key) = self.keys.get(idx) {
+                if let Some(key) = self.vaults.cur().keys.get(idx) {
                     self.keys_ui.import_form.editing_id = Some(key.id);
                     self.keys_ui.import_form.label = key.label.clone();
                     // Load existing private key PEM from vault
@@ -342,7 +342,7 @@ impl Oryxis {
             if let Some(existing_id) = self.keys_ui.import_form.editing_id {
                 key.id = existing_id;
                 if let Some(existing) =
-                    self.keys.iter().find(|k| k.id == existing_id)
+                    self.vaults.cur().keys.iter().find(|k| k.id == existing_id)
                 {
                     // Same rule as the private path: a security-key row is
                     // never agent-exposed, however the row it replaces was
@@ -461,7 +461,7 @@ impl Oryxis {
                 if let Some(existing_id) = self.keys_ui.import_form.editing_id {
                     generated.key.id = existing_id;
                     if let Some(existing) =
-                        self.keys.iter().find(|k| k.id == existing_id)
+                        self.vaults.cur().keys.iter().find(|k| k.id == existing_id)
                     {
                         // A security key is never agent-exposed: our agent
                         // would have to hand a credential handle to a

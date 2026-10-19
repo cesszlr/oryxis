@@ -38,7 +38,7 @@ impl Oryxis {
     ) -> TelnetConfig {
         self.apply_group_inheritance(conn);
         let (username, mut password) = if let Some(iid) = conn.identity_id {
-            let identity = self.identities.iter().find(|i| i.id == iid);
+            let identity = self.vaults.cur().identities.iter().find(|i| i.id == iid);
             (
                 conn.username
                     .clone()
@@ -131,12 +131,14 @@ impl Oryxis {
         // Session recording rides the shared PtyOutput path, so a Telnet
         // session records exactly like an SSH one.
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vaults.cur().store.as_ref().map(|vault| {
+            let ov = self.vaults.cur_mut();
+
+            ov.store.as_ref().map(|vault| {
                 let log_id = Uuid::new_v4();
                 if let Err(e) = vault.create_session_log(&log_id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");
                 }
-                self.session_logs_total += 1;
+                ov.session_logs_total += 1;
                 log_id
             })
         } else {
@@ -250,7 +252,7 @@ impl Oryxis {
             None
         };
         if session_log_id.is_some() {
-            self.session_logs_total += 1;
+            self.vaults.cur_mut().session_logs_total += 1;
         }
         if let Some(log_id) = session_log_id
             && let Some(pane) = self.tabs[tab_idx].pane_by_id_mut(pane_id)

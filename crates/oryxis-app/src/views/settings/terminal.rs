@@ -439,7 +439,7 @@ impl Oryxis {
         // hover edit / delete affordances. Enter applies the theme
         // (the card's own click action); edit / delete stay
         // hover-only.
-        for (idx, ct) in self.custom_terminal_themes.iter().enumerate() {
+        for (idx, ct) in self.vaults.cur().custom_terminal_themes.iter().enumerate() {
             let palette = self
                 .terminal_palette_for_name(&ct.name)
                 .unwrap_or_default();

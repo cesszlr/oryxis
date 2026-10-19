@@ -170,7 +170,7 @@ impl Oryxis {
                             let id = match &self.highlight_rule_form.rule.action {
                                 TriggerAction::Snippet { id } => id.clone(),
                                 _ => self
-                                    .snippets
+                                    .vaults.cur().snippets
                                     .first()
                                     .map(|s| s.id.to_string())
                                     .unwrap_or_default(),
@@ -182,7 +182,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::HighlightRuleSnippetChanged(label) => {
-                if let Some(snippet) = self.snippets.iter().find(|s| s.label == label) {
+                if let Some(snippet) = self.vaults.cur().snippets.iter().find(|s| s.label == label) {
                     self.highlight_rule_form.rule.action = TriggerAction::Snippet {
                         id: snippet.id.to_string(),
                     };
@@ -202,7 +202,7 @@ impl Oryxis {
                 // is refused here rather than failing silently at match
                 // time, when there is nobody to tell.
                 if let TriggerAction::Snippet { id } = &rule.action
-                    && !self.snippets.iter().any(|s| s.id.to_string() == *id)
+                    && !self.vaults.cur().snippets.iter().any(|s| s.id.to_string() == *id)
                 {
                     self.highlight_rule_form.error =
                         Some(crate::i18n::t("hl_rule_snippet_required").to_string());

@@ -278,7 +278,7 @@ impl Oryxis {
 
         // ── Dynamic: saved hosts ───────────────────────────────────────
         let connect = t("connect");
-        for (ci, conn) in self.connections.iter().enumerate() {
+        for (ci, conn) in self.vaults.cur().connections.iter().enumerate() {
             candidates.push(Candidate {
                 label: format!("{connect}: {}", conn.label),
                 keywords: "connect_host_ssh",

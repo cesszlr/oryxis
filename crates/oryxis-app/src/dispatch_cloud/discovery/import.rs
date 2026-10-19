@@ -33,7 +33,7 @@ impl Oryxis {
                 let Some(profile_id) = self.cloud_discover.profile_id else {
                     return Ok(Task::none());
                 };
-                if !self.cloud_profiles.iter().any(|p| p.id == profile_id) {
+                if !self.vaults.cur().cloud_profiles.iter().any(|p| p.id == profile_id) {
                     return Ok(Task::none());
                 }
                 let CloudDiscoverState::Loaded(result) = &self.cloud_discover.state else {
@@ -67,7 +67,8 @@ impl Oryxis {
                     return Ok(Task::none());
                 }
 
-                if let Some(vault) = &self.vaults.cur().store {
+                let ov = self.vaults.cur_mut();
+                if let Some(vault) = &ov.store {
                     // Resolve the target group from the typed name.
                     // Empty = root (no parent). Matching label = reuse
                     // existing group. Non-matching = create a new
@@ -75,13 +76,13 @@ impl Oryxis {
                     // can type any folder name (existing or new) and
                     // have it materialised in one go.
                     let typed = self.cloud_discover.default_group_name.trim().to_string();
-                    let provider_id_str = self
+                    let provider_id_str = ov
                         .cloud_profiles
                         .iter()
                         .find(|p| p.id == profile_id)
                         .map(|p| p.provider.clone())
                         .unwrap_or_default();
-                    let profile_label = self
+                    let profile_label = ov
                         .cloud_profiles
                         .iter()
                         .find(|p| p.id == profile_id)
@@ -100,7 +101,7 @@ impl Oryxis {
                         // group that impersonates a real path.
                         let mut created = Vec::new();
                         let gid =
-                            Group::resolve_or_create_path(&mut self.groups, &typed, &mut created);
+                            Group::resolve_or_create_path(&mut ov.groups, &typed, &mut created);
                         // Brand glyph only when the user kept the
                         // profile-label default (always a single
                         // segment). A custom folder name / path gets a

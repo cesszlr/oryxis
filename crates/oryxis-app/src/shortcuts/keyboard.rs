@@ -60,7 +60,7 @@ impl Oryxis {
         let items = self.keynav.modal.items.borrow();
         match items.get(idx).and_then(|a| a.activate.as_ref()) {
             Some(Message::Ssh(crate::app::SshMessage::ConnectSsh(ci))) => {
-                self.connections.get(*ci).map(|c| c.id)
+                self.vaults.cur().connections.get(*ci).map(|c| c.id)
             }
             _ => None,
         }
@@ -127,7 +127,7 @@ impl Oryxis {
                 }
                 // Conflicts: the static table and other snippets.
                 let in_table = self.hotkey_bindings.values().any(|b| b.shares_keypress(&binding));
-                let in_snippets = self.snippets.iter().any(|sn| {
+                let in_snippets = self.vaults.cur().snippets.iter().any(|sn| {
                     self.snippet_form.editing_id != Some(sn.id)
                         && sn.hotkey.as_deref()
                             == Some(binding.serialize()).as_deref()
@@ -311,7 +311,7 @@ impl Oryxis {
         //      in Files mode gates PTY writes off, so firing here would
         //      just dead-end (worst case through the vars modal).
         if !modal_owns_keys && pty_owns_keys && !self.panels.snippet_panel {
-            let hit = self.snippets.iter().position(|sn| {
+            let hit = self.vaults.cur().snippets.iter().position(|sn| {
                 sn.hotkey
                     .as_deref()
                     .and_then(crate::hotkeys::HotkeyBinding::parse)
@@ -514,7 +514,7 @@ impl Oryxis {
             OpenPortForwards => {
                 if let Some(id) = self
                     .active_tab_connection_idx()
-                    .and_then(|idx| self.connections.get(idx))
+                    .and_then(|idx| self.vaults.cur().connections.get(idx))
                     .map(|c| c.id)
                 {
                     Task::done(Message::Editor(EditorMessage::EditConnection(id)))
@@ -876,7 +876,7 @@ impl Oryxis {
                     Some((
                         crate::keynav::FocusZone::Content,
                         crate::keynav::NavItem::Dash(crate::keynav::DashNavItem::Host(i)),
-                    )) => self.connections.get(i).map(|c| vec![c.id]),
+                    )) => self.vaults.cur().connections.get(i).map(|c| vec![c.id]),
                     _ => None,
                 };
                 let ids = ringed.unwrap_or_else(|| self.selected_hosts_in_view_order());

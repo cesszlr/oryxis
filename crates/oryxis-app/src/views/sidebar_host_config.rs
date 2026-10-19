@@ -61,7 +61,7 @@ impl Oryxis {
                 on_pick(theme.name().to_string()),
             ));
         }
-        for ct in self.custom_terminal_themes.iter() {
+        for ct in self.vaults.cur().custom_terminal_themes.iter() {
             let palette = self
                 .terminal_palette_for_name(&ct.name)
                 .unwrap_or_default();
@@ -226,7 +226,7 @@ impl Oryxis {
         // Local/ephemeral panes have no saved host: offer a session-only
         // theme for the open local terminals instead.
         let conn = match &tab.active().origin {
-            crate::state::PaneOrigin::Host(id) => self.connections.iter().find(|cn| cn.id == *id),
+            crate::state::PaneOrigin::Host(id) => self.vaults.cur().connections.iter().find(|cn| cn.id == *id),
             _ => None,
         };
         let Some(conn) = conn else {

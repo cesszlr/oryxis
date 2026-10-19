@@ -18,7 +18,7 @@ impl Oryxis {
         {
             return;
         }
-        let rules = legacy_forwards_to_rules(&self.connections);
+        let rules = legacy_forwards_to_rules(&self.vaults.cur().connections);
         let mut created = 0usize;
         for rule in &rules {
             match vault.save_port_forward_rule(rule) {
@@ -29,7 +29,7 @@ impl Oryxis {
         let _ = vault.set_setting("port_forwards_migrated", "true");
         if created > 0 {
             tracing::info!("migrated {created} legacy port forward(s) into standalone rules");
-            self.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
+            self.vaults.cur_mut().port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
         }
     }
 
@@ -44,12 +44,12 @@ impl Oryxis {
     ///      root with `parent_id = None`. We now nest them under the
     ///      provider folder.
     ///
-    /// This walks `self.groups` once, mutates rows that need it, and
+    /// This walks `self.vaults.cur().groups` once, mutates rows that need it, and
     /// rewrites them via `save_group` (no-op if nothing changed).
     pub(super) fn migrate_legacy_cloud_layout(&mut self, vault: &oryxis_vault::store::VaultStore) {
         // Snapshot so we can mutate the vault while iterating logic.
-        let groups_snapshot = self.groups.clone();
-        let profiles = self.cloud_profiles.clone();
+        let groups_snapshot = self.vaults.cur().groups.clone();
+        let profiles = self.vaults.cur().cloud_profiles.clone();
 
         // Provider folders → canonical icon. A provider folder is any
         // group whose label matches a profile's label *and* has no
@@ -121,7 +121,7 @@ impl Oryxis {
 
         // Re-pull groups so the in-memory state matches what we just
         // wrote (icons + parent ids).
-        self.groups = vault.list_groups().unwrap_or_default();
+        self.vaults.cur_mut().groups = vault.list_groups().unwrap_or_default();
     }
 }
 

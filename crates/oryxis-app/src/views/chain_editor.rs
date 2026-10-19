@@ -106,7 +106,7 @@ impl Oryxis {
         }
 
         for (idx, id) in self.editor_form.jump_chain.iter().enumerate() {
-            let conn = self.connections.iter().find(|c| c.id == *id);
+            let conn = self.vaults.cur().connections.iter().find(|c| c.id == *id);
             let badge = self.chain_host_badge(conn);
             let (label, breadcrumb) = match conn {
                 Some(c) => (c.label.clone(), self.breadcrumb_for(c)),
@@ -123,7 +123,7 @@ impl Oryxis {
         let dest_conn = self
             .editor_form
             .editing_id
-            .and_then(|id| self.connections.iter().find(|c| c.id == id));
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id));
         let dest_badge = self.chain_host_badge(dest_conn);
         let dest_label = if self.editor_form.label.trim().is_empty() {
             t("new_host").to_string()
@@ -234,9 +234,9 @@ impl Oryxis {
         let needle = self.chain_editor_search.to_lowercase();
         let editing_id = self.editor_form.editing_id;
 
-        let mut idxs: Vec<usize> = (0..self.connections.len())
+        let mut idxs: Vec<usize> = (0..self.vaults.cur().connections.len())
             .filter(|&i| {
-                let c = &self.connections[i];
+                let c = &self.vaults.cur().connections[i];
                 // Exclude the host being edited (a self-hop is a loop)
                 // and any host already in the chain (no duplicates).
                 if Some(c.id) == editing_id {
@@ -250,7 +250,7 @@ impl Oryxis {
                 }
                 let group = c
                     .group_id
-                    .and_then(|gid| self.groups.iter().find(|g| g.id == gid))
+                    .and_then(|gid| self.vaults.cur().groups.iter().find(|g| g.id == gid))
                     .map(|g| g.label.to_lowercase())
                     .unwrap_or_default();
                 // The effective login, like the hosts search.
@@ -262,18 +262,18 @@ impl Oryxis {
             })
             .collect();
         idxs.sort_by(|a, b| {
-            self.connections[*a]
+            self.vaults.cur().connections[*a]
                 .label
                 .to_lowercase()
-                .cmp(&self.connections[*b].label.to_lowercase())
+                .cmp(&self.vaults.cur().connections[*b].label.to_lowercase())
         });
 
         let mut rows: Vec<Element<'_, Message>> = Vec::new();
         for (pos, ci) in idxs.iter().enumerate() {
-            let conn = &self.connections[*ci];
+            let conn = &self.vaults.cur().connections[*ci];
             let group_name = conn
                 .group_id
-                .and_then(|gid| self.groups.iter().find(|g| g.id == gid))
+                .and_then(|gid| self.vaults.cur().groups.iter().find(|g| g.id == gid))
                 .map(|g| g.label.clone());
             let breadcrumb = match group_name {
                 Some(g) => format!("{} / {}", t("personal"), g),
@@ -335,7 +335,7 @@ impl Oryxis {
     fn breadcrumb_for(&self, c: &Connection) -> String {
         match c
             .group_id
-            .and_then(|gid| self.groups.iter().find(|g| g.id == gid))
+            .and_then(|gid| self.vaults.cur().groups.iter().find(|g| g.id == gid))
         {
             Some(g) => format!("{} / {}", t("personal"), g.label),
             None => t("personal").to_string(),

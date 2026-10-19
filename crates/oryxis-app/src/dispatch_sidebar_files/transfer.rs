@@ -394,7 +394,7 @@ impl Oryxis {
                 // no vault connection (quick-connect, cloud, local).
                 let host = match self.active_pane_mut().map(|p| p.origin.clone()) {
                     Some(crate::state::PaneOrigin::Host(id)) => self
-                        .connections
+                        .vaults.cur().connections
                         .iter()
                         .find(|c| c.id == id)
                         .map(|c| c.label.clone()),

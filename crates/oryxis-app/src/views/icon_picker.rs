@@ -32,7 +32,7 @@ impl Oryxis {
                 .unwrap_or(OryxisColors::t().accent);
         }
         self.icon_picker.for_id
-            .and_then(|id| self.connections.iter().find(|c| c.id == id))
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .and_then(|c| c.detected_os.as_deref())
             .map(|os| os_icon::resolve_icon(Some(os), OryxisColors::t().accent).1)
             .unwrap_or(OryxisColors::t().accent)

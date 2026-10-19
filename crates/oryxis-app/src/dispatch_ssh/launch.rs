@@ -33,7 +33,7 @@ impl Oryxis {
                         return self.connect_ssh_into_pane(idx, tab_idx, target, axis);
                     }
                 }
-                if let Some(conn) = self.connections.get(idx).cloned() {
+                if let Some(conn) = self.vaults.cur().connections.get(idx).cloned() {
                     let id = conn.id;
                     return self.start_ssh_tab(conn, crate::state::ProgressOrigin::Saved(id));
                 }
@@ -43,7 +43,7 @@ impl Oryxis {
                 // dropped it) by the time the retry fires; declining is
                 // the only honest answer, the progress card is already
                 // showing the failure.
-                if let Some(idx) = self.connections.iter().position(|c| c.id == id) {
+                if let Some(idx) = self.vaults.cur().connections.iter().position(|c| c.id == id) {
                     return self.update(Message::Ssh(SshMessage::ConnectSsh(idx)));
                 }
             }

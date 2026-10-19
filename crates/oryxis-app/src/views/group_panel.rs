@@ -197,7 +197,7 @@ impl Oryxis {
         let is_dynamic = self
             .group_edit
             .id
-            .and_then(|gid| self.groups.iter().find(|g| g.id == gid))
+            .and_then(|gid| self.vaults.cur().groups.iter().find(|g| g.id == gid))
             .is_some_and(|g| g.cloud_query.is_some());
         let defaults_section: Element<'_, Message> = if is_dynamic {
             Space::new().height(0).boxed()

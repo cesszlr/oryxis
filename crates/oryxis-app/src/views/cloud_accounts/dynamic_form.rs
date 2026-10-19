@@ -87,7 +87,7 @@ impl Oryxis {
         // Key picker, list available keys + a "(none)" sentinel.
         let key_options = {
             let mut opts = vec!["(none)".to_string()];
-            opts.extend(self.keys.iter().map(|k| k.label.clone()));
+            opts.extend(self.vaults.cur().keys.iter().map(|k| k.label.clone()));
             opts
         };
         let key_pick = pick_list(
@@ -108,7 +108,7 @@ impl Oryxis {
         // Identity picker, same shape as keys.
         let identity_options = {
             let mut opts = vec!["(none)".to_string()];
-            opts.extend(self.identities.iter().map(|i| i.label.clone()));
+            opts.extend(self.vaults.cur().identities.iter().map(|i| i.label.clone()));
             opts
         };
         let identity_pick = pick_list(

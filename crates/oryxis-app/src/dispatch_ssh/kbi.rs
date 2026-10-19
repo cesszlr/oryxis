@@ -66,7 +66,7 @@ impl Oryxis {
                         // it carries one (the selector label shows it); the
                         // typed username stays otherwise.
                         if let Some(u) = self
-                            .identities
+                            .vaults.cur().identities
                             .iter()
                             .find(|i| i.id == iid)
                             .and_then(|i| i.username.clone())

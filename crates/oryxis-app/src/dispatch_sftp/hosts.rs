@@ -72,7 +72,8 @@ impl Oryxis {
         let value = path
             .map(|p| p.trim().to_string())
             .filter(|p| !p.is_empty());
-        let Some(conn) = self.connections.iter_mut().find(|c| c.label == label) else {
+        let ov = self.vaults.cur_mut();
+        let Some(conn) = ov.connections.iter_mut().find(|c| c.label == label) else {
             return self.show_toast_secs(
                 crate::i18n::t("sftp_initial_path_no_host").to_string(),
                 4,
@@ -82,7 +83,7 @@ impl Oryxis {
         conn.updated_at = chrono::Utc::now();
         // Full save (like the icon picker's): the row must persist without
         // clobbering the host's other columns.
-        if let Some(vault) = &self.vaults.cur().store
+        if let Some(vault) = &ov.store
             && let Err(e) = vault.save_connection(conn, None)
         {
             return self.show_toast_secs(format!("{e}"), 5);
@@ -105,7 +106,7 @@ impl Oryxis {
     ) -> Result<Task<Message>, SftpMessage> {
         match message {
             SftpMessage::SftpPickHost(idx) => {
-                let mut conn = match self.connections.get(idx).cloned() {
+                let mut conn = match self.vaults.cur().connections.get(idx).cloned() {
                     Some(c) => c,
                     None => {
                         // Bail-out must drop any one-shot initial-path hint or
@@ -564,7 +565,7 @@ impl Oryxis {
                 }
                 if let Some(label) = self.cur_sftp().pane(side).host_label.clone()
                     && let Some(idx) = self
-                        .connections
+                        .vaults.cur().connections
                         .iter()
                         .position(|c| c.label == label)
                 {
@@ -607,7 +608,7 @@ impl Oryxis {
                 // it doesn't linger over the SFTP surface (mirrors ConnectSsh).
                 self.card_context_menu = None;
                 self.overlay = None;
-                if self.connections.get(idx).is_none() {
+                if self.vaults.cur().connections.get(idx).is_none() {
                     // Bail-out must drop any one-shot initial-path hint or
                     // it would leak into the next unrelated mount.
                     self.sftp_open_at_path = None;
@@ -623,7 +624,7 @@ impl Oryxis {
                 // this came from must not linger over the console.
                 self.card_context_menu = None;
                 self.overlay = None;
-                let Some(conn) = self.connections.iter().find(|c| c.id == id).cloned() else {
+                let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == id).cloned() else {
                     return Ok(Task::none());
                 };
                 // From a card there is no shell whose directory to

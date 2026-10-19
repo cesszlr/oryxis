@@ -252,7 +252,7 @@ impl Oryxis {
             ),
             StepKind::RunSnippet => {
                 let others: Vec<Uuid> = self
-                    .snippets
+                    .vaults.cur().snippets
                     .iter()
                     .filter(|s| Some(s.id) != self.snippet_form.editing_id && !s.install)
                     .map(|s| s.id)
@@ -270,7 +270,7 @@ impl Oryxis {
                     }
                 };
                 let label_of = move |id: &Uuid| {
-                    self.snippets
+                    self.vaults.cur().snippets
                         .iter()
                         .find(|s| s.id == *id)
                         .map_or_else(|| "?".to_string(), |s| s.label.clone())

@@ -76,7 +76,7 @@ impl Oryxis {
 
     /// The chords snippets hold: a set never takes them.
     fn snippet_chords(&self) -> Vec<HotkeyBinding> {
-        self.snippets
+        self.vaults.cur().snippets
             .iter()
             .filter_map(|sn| sn.hotkey.as_deref().and_then(HotkeyBinding::parse))
             .collect()

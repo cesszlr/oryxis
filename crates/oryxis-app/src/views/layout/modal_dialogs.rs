@@ -59,7 +59,7 @@ impl Oryxis {
                 .size(12)
                 .color(OryxisColors::t().text_muted)]
             .spacing(6);
-            for g in &self.groups {
+            for g in &self.vaults.cur().groups {
                 let id = g.id;
                 list = list.push(self.modal_nav_slot(
                     crate::keynav::RowAction::activate(Message::Share(ShareMessage::ShareToggleGroup(id))),
@@ -1024,7 +1024,7 @@ impl Oryxis {
     /// Content for the Logs "Clear all" confirmation (entry count, then
     /// Cancel + Clear all).
     pub(crate) fn build_clear_history_dialog(&self) -> Element<'_, Message> {
-        let total = self.logs_total + self.session_logs_total;
+        let total = self.vaults.cur().logs_total + self.vaults.cur().session_logs_total;
         let dialog = container(
             column![
                 text(crate::i18n::t("clear_history_title"))

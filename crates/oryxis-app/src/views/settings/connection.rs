@@ -42,17 +42,17 @@ impl Oryxis {
         let auth_selected = crate::util::auth_method_label(&self.prefs.default_auth_method);
 
         let mut identity_options = vec![none_label.clone()];
-        identity_options.extend(self.identities.iter().map(|i| i.label.clone()));
+        identity_options.extend(self.vaults.cur().identities.iter().map(|i| i.label.clone()));
         let identity_selected = self
             .prefs.default_identity_id
-            .and_then(|id| self.identities.iter().find(|i| i.id == id).map(|i| i.label.clone()))
+            .and_then(|id| self.vaults.cur().identities.iter().find(|i| i.id == id).map(|i| i.label.clone()))
             .unwrap_or_else(|| none_label.clone());
 
         let mut key_options = vec![none_label.clone()];
-        key_options.extend(self.keys.iter().map(|k| k.label.clone()));
+        key_options.extend(self.vaults.cur().keys.iter().map(|k| k.label.clone()));
         let key_selected = self
             .prefs.default_key_id
-            .and_then(|id| self.keys.iter().find(|k| k.id == id).map(|k| k.label.clone()))
+            .and_then(|id| self.vaults.cur().keys.iter().find(|k| k.id == id).map(|k| k.label.clone()))
             .unwrap_or_else(|| none_label.clone());
 
         // Parent group: only the visible (non-phantom) groups, matching
@@ -61,23 +61,23 @@ impl Oryxis {
         let visible_groups = self.visible_group_ids();
         let mut group_options = vec![none_label.clone()];
         group_options.extend(
-            self.groups
+            self.vaults.cur().groups
                 .iter()
                 .filter(|g| visible_groups.contains(&g.id))
-                .map(|g| oryxis_core::models::Group::path_of(&self.groups, g.id)),
+                .map(|g| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, g.id)),
         );
         let group_selected = self
             .prefs.default_group_id
-            .filter(|id| self.groups.iter().any(|g| g.id == *id))
-            .map(|id| oryxis_core::models::Group::path_of(&self.groups, id))
+            .filter(|id| self.vaults.cur().groups.iter().any(|g| g.id == *id))
+            .map(|id| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, id))
             .unwrap_or_else(|| none_label.clone());
 
         let mut proxy_options = vec![none_label.clone()];
-        proxy_options.extend(self.proxy_identities.iter().map(|p| p.label.clone()));
+        proxy_options.extend(self.vaults.cur().proxy_identities.iter().map(|p| p.label.clone()));
         let proxy_selected = self
             .prefs.default_proxy_identity_id
             .and_then(|id| {
-                self.proxy_identities.iter().find(|p| p.id == id).map(|p| p.label.clone())
+                self.vaults.cur().proxy_identities.iter().find(|p| p.id == id).map(|p| p.label.clone())
             })
             .unwrap_or_else(|| none_label.clone());
 

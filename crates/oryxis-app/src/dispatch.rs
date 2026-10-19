@@ -174,7 +174,7 @@ impl Oryxis {
         // apply, leaves the selection; same funnel as the strip order.
         if !self.cur_nav().dash_selection.is_empty() {
             let alive: std::collections::HashSet<uuid::Uuid> =
-                self.connections.iter().map(|c| c.id).collect();
+                self.vaults.cur().connections.iter().map(|c| c.id).collect();
             self.nav.dash_selection.prune(|id| alive.contains(&id));
         }
         // A selection belongs to the folder / search / filter / view mode

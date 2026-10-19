@@ -32,7 +32,7 @@ impl Oryxis {
                 // everything recorded up to this moment.
                 self.overlay = None;
                 self.flush_session_logs_final();
-                let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
+                let Some(entry) = self.vaults.cur().session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
                 let Some(vault) = &self.vaults.cur().store else {
@@ -57,7 +57,7 @@ impl Oryxis {
                 // per-host terminal theme override first, then the
                 // global theme (mirrors the `.cast` export header).
                 let palette = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == entry.connection_id)
                     .map(|c| self.resolve_terminal_palette_for_connection(c))
@@ -172,10 +172,10 @@ impl Oryxis {
         // Computed here so the `player` borrow is released before the
         // `self.update` below.
         let privacy_applies = self
-            .session_logs
+            .vaults.cur().session_logs
             .iter()
             .find(|e| e.id == log_id)
-            .and_then(|e| self.connections.iter().find(|c| c.id == e.connection_id))
+            .and_then(|e| self.vaults.cur().connections.iter().find(|c| c.id == e.connection_id))
             .map(|c| self.privacy_active(c))
             .unwrap_or_else(|| self.privacy_global_active());
         let msg = match key {

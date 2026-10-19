@@ -23,13 +23,13 @@ impl Oryxis {
             // chain (owner call 2026-07-23): with nested subgroups the
             // chain ate the toolbar's width; the arrow covers the same
             // navigation one hop at a time, SFTP-style.
-            let current = self.groups.iter().find(|g| g.id == gid);
+            let current = self.vaults.cur().groups.iter().find(|g| g.id == gid);
             let label = current.map(|g| g.label.clone()).unwrap_or_default();
             // A dangling parent (deleted on another device) backs out
             // to root, matching how the grid re-homes the subtree.
             let parent = current
                 .and_then(|g| g.parent_id)
-                .filter(|pid| self.groups.iter().any(|g| g.id == *pid));
+                .filter(|pid| self.vaults.cur().groups.iter().any(|g| g.id == *pid));
             let back_msg = match parent {
                 Some(pid) => Message::Navigation(NavigationMessage::OpenGroup(pid)),
                 // Top level: ChangeView(Dashboard) clears the active
@@ -211,7 +211,7 @@ impl Oryxis {
         ) = if let Some(gid) = self.cur_nav().active_group {
             // Is this a dynamic group?
             let dynamic_query_profile = self
-                .groups
+                .vaults.cur().groups
                 .iter()
                 .find(|g| g.id == gid)
                 .and_then(|g| g.cloud_query.as_ref())
@@ -240,12 +240,12 @@ impl Oryxis {
                 // child host's cloud_ref or any child dynamic group's
                 // cloud_query.
                 let linked_profile = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .filter(|c| c.group_id == Some(gid))
                     .find_map(|c| c.cloud_ref.as_ref().map(|r| r.profile_id))
                     .or_else(|| {
-                        self.groups
+                        self.vaults.cur().groups
                             .iter()
                             .filter(|g| g.parent_id == Some(gid))
                             .find_map(|g| g.cloud_query.as_ref().map(|q| q.profile_id))

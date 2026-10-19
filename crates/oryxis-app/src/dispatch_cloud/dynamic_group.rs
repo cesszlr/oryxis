@@ -18,7 +18,7 @@ impl Oryxis {
     /// a failure explicitly. Shared by the dashboard `OpenGroup` path and
     /// the new-tab picker drill-in so both honour the same TTL.
     pub(crate) fn dynamic_group_needs_resolve(&self, gid: uuid::Uuid) -> bool {
-        self.groups
+        self.vaults.cur().groups
             .iter()
             .any(|g| g.id == gid && g.cloud_query.is_some())
             && match self.cloud_dynamic_group_state.get(&gid) {
@@ -39,7 +39,7 @@ impl Oryxis {
     ) -> Result<Task<Message>, CloudMessage> {
         match message {
             CloudMessage::DynamicGroupResolve(gid) => {
-                let Some(group) = self.groups.iter().find(|g| g.id == gid).cloned() else {
+                let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == gid).cloned() else {
                     return Ok(Task::none());
                 };
                 let Some(query) = group.cloud_query.clone() else {
@@ -109,7 +109,7 @@ impl Oryxis {
             // ---- Edit dynamic group panel ----
             CloudMessage::EditDynamicGroup(gid) => {
                 self.overlay = None;
-                let Some(group) = self.groups.iter().find(|g| g.id == gid).cloned() else {
+                let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == gid).cloned() else {
                     return Ok(Task::none());
                 };
                 let Some(query) = group.cloud_query.clone() else {
@@ -133,11 +133,11 @@ impl Oryxis {
                     query.template.initial_command.clone().unwrap_or_default();
                 self.cloud_dynamic_form.transport = query.template.transport;
                 self.cloud_dynamic_form.selected_key = query.template.key_id.and_then(|kid| {
-                    self.keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
+                    self.vaults.cur().keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
                 });
                 self.cloud_dynamic_form.selected_identity =
                     query.template.identity_id.and_then(|iid| {
-                        self.identities
+                        self.vaults.cur().identities
                             .iter()
                             .find(|i| i.id == iid)
                             .map(|i| i.label.clone())
@@ -149,8 +149,8 @@ impl Oryxis {
                 // picker displays and what the save resolves first.
                 self.cloud_dynamic_form.parent_label = group
                     .parent_id
-                    .filter(|pid| self.groups.iter().any(|g| g.id == *pid))
-                    .map(|pid| oryxis_core::models::Group::path_of(&self.groups, pid))
+                    .filter(|pid| self.vaults.cur().groups.iter().any(|g| g.id == *pid))
+                    .map(|pid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, pid))
                     .unwrap_or_default();
                 match &query.kind {
                     oryxis_core::models::cloud::CloudQueryKind::EcsTasks {
@@ -261,7 +261,7 @@ impl Oryxis {
                 let Some(gid) = self.cloud_dynamic_form.group_id else {
                     return Ok(Task::none());
                 };
-                let Some(mut group) = self.groups.iter().find(|g| g.id == gid).cloned()
+                let Some(mut group) = self.vaults.cur().groups.iter().find(|g| g.id == gid).cloned()
                 else {
                     return Ok(Task::none());
                 };
@@ -285,13 +285,13 @@ impl Oryxis {
                     .cloud_dynamic_form.selected_key
                     .as_ref()
                     .and_then(|label| {
-                        self.keys.iter().find(|k| &k.label == label).map(|k| k.id)
+                        self.vaults.cur().keys.iter().find(|k| &k.label == label).map(|k| k.id)
                     });
                 query.template.identity_id = self
                     .cloud_dynamic_form.selected_identity
                     .as_ref()
                     .and_then(|label| {
-                        self.identities
+                        self.vaults.cur().identities
                             .iter()
                             .find(|i| &i.label == label)
                             .map(|i| i.id)
@@ -353,7 +353,7 @@ impl Oryxis {
                 // renders again. Mirrors the import-side filter in
                 // `dispatch_cloud/discovery.rs`.
                 group.parent_id = oryxis_core::models::Group::resolve_path_or_label(
-                    &self.groups,
+                    &self.vaults.cur().groups,
                     &self.cloud_dynamic_form.parent_label,
                     &std::collections::HashSet::from([gid]),
                 );

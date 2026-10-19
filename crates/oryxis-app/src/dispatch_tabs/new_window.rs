@@ -242,7 +242,7 @@ impl Oryxis {
         let ids: Vec<Uuid> = ids
             .iter()
             .copied()
-            .filter(|id| self.connections.iter().any(|c| c.id == *id))
+            .filter(|id| self.vaults.cur().connections.iter().any(|c| c.id == *id))
             .collect();
         if ids.is_empty() {
             return Task::none();

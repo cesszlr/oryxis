@@ -16,7 +16,7 @@ impl Oryxis {
         // Header with a "Re-verify all" / "Clear all" action so users can wipe
         // every entry at once (e.g. when every host was auto-accepted by an
         // older build and they want the verification dialog back).
-        let has_entries = !self.known_hosts.is_empty();
+        let has_entries = !self.vaults.cur().known_hosts.is_empty();
         // Solid destructive style, matching the Logs "CLEAR ALL"
         // primary action. Only requests the wipe; the actual
         // ClearAllKnownHosts runs from the confirm dialog.
@@ -84,7 +84,7 @@ impl Oryxis {
         .padding(Padding { top: 16.0, right: 24.0, bottom: 16.0, left: 24.0 })
         .width(Length::Fill);
 
-        if self.known_hosts.is_empty() {
+        if self.vaults.cur().known_hosts.is_empty() {
             // Nothing navigable in the empty state.
             self.keynav_clear_content();
             let empty = crate::widgets::empty_state(
@@ -107,12 +107,12 @@ impl Oryxis {
         // this view). Enter triggers the row's only action, the
         // confirm-gated Remove.
         self.keynav_set_content_rows(
-            (0..self.known_hosts.len())
+            (0..self.vaults.cur().known_hosts.len())
                 .map(|i| vec![crate::keynav::NavItem::KnownHost(i)])
                 .collect(),
         );
 
-        for (idx, kh) in self.known_hosts.iter().enumerate() {
+        for (idx, kh) in self.vaults.cur().known_hosts.iter().enumerate() {
             let kb_selected = self.kn().selected_in(crate::keynav::FocusZone::Content)
                 == Some(crate::keynav::NavItem::KnownHost(idx));
             let fp_short = if kh.fingerprint.len() > 40 {

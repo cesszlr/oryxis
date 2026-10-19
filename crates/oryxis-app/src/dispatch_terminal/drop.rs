@@ -190,7 +190,7 @@ impl Oryxis {
         // browser rides the same host-bound SFTP.
         let zmodem_drops = pane
             .saved_conn_id()
-            .and_then(|id| self.connections.iter().find(|c| c.id == id))
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .is_some_and(|c| c.zmodem_drops);
 
         // SSH with a visible browser directory or an exact shell cwd:

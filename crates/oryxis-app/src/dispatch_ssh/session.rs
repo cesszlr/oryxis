@@ -232,7 +232,7 @@ impl Oryxis {
                 // Persist + update in-memory list so the icon refreshes.
                 // Quick-connect hosts update in memory only (tab badge,
                 // save-host prefill); nothing is written to the vault.
-                if let Some(conn) = self.connections.iter_mut().find(|c| c.id == conn_id) {
+                if let Some(conn) = self.vaults.cur_mut().connections.iter_mut().find(|c| c.id == conn_id) {
                     conn.detected_os = os.clone();
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_detected_os(&conn_id, os.as_deref());
@@ -422,11 +422,12 @@ impl Oryxis {
                         let _ = vault.add_log(&entry);
                     }
                     // Refresh session logs list (count + current page)
-                    if let Some(vault) = &self.vaults.cur().store {
-                        self.session_logs_total =
+                    let ov = self.vaults.cur_mut();
+                    if let Some(vault) = &ov.store {
+                        ov.session_logs_total =
                             vault.count_session_logs().unwrap_or(0);
-                        self.session_logs = vault
-                            .list_session_logs_page(self.session_logs_page * 50, 50)
+                        ov.session_logs = vault
+                            .list_session_logs_page(ov.session_logs_page * 50, 50)
                             .unwrap_or_default();
                     }
                     // The tab-level "(disconnected)" relabel + idle toast +
@@ -544,7 +545,7 @@ impl Oryxis {
                         let inherited = self
                             .vaults.cur().store
                             .as_ref()
-                            .and_then(|v| v.resolve_effective(c, &self.groups, &self.identities).ok())
+                            .and_then(|v| v.resolve_effective(c, &self.vaults.cur().groups, &self.vaults.cur().identities).ok())
                             .and_then(|e| e.startup_snippet_id.map(|(id, _)| id));
                         (c.startup_snippet_id.or(inherited), c.initial_command.clone())
                     })
@@ -552,7 +553,7 @@ impl Oryxis {
                 // A startup snippet with actions runs them (variables are
                 // not asked for here, as a startup command's are not).
                 let (fallback_cmd, startup_run) = match startup_snip
-                    .and_then(|id| self.snippets.iter().find(|s| s.id == id))
+                    .and_then(|id| self.vaults.cur().snippets.iter().find(|s| s.id == id))
                     .cloned()
                 {
                     Some(snip) if snip.has_steps() => (None, self.startup_snippet_run(&snip)),

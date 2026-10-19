@@ -18,7 +18,7 @@ impl Oryxis {
                 // Resolve the row to an id NOW, while the index is the
                 // one the user clicked; the dialog it arms outlives that
                 // certainty (see `KnownHostMessage::DeleteKnownHost`).
-                let Some(kh) = self.known_hosts.get(idx) else {
+                let Some(kh) = self.vaults.cur().known_hosts.get(idx) else {
                     return Task::none();
                 };
                 let (id, label) = (kh.id, format!("{}:{}", kh.hostname, kh.port));
@@ -60,7 +60,7 @@ impl Oryxis {
             }
             KnownHostMessage::ClearAllKnownHosts => {
                 if let Some(vault) = &self.vaults.cur().store {
-                    for kh in self.known_hosts.clone() {
+                    for kh in self.vaults.cur().known_hosts.clone() {
                         let _ = vault.delete_known_host(&kh.id);
                     }
                     self.load_data_from_vault();

@@ -57,14 +57,14 @@ impl Oryxis {
         col = col.push(self.group_default_picker(
             t("identity"),
             "group-default-identity",
-            self.identities.iter().map(|i| i.label.clone()).collect(),
+            self.vaults.cur().identities.iter().map(|i| i.label.clone()).collect(),
             self.group_edit.identity_label.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultIdentity(v)),
         ));
         col = col.push(self.group_default_picker(
             t("group_default_proxy"),
             "group-default-proxy",
-            self.proxy_identities.iter().map(|p| p.label.clone()).collect(),
+            self.vaults.cur().proxy_identities.iter().map(|p| p.label.clone()).collect(),
             self.group_edit.proxy_identity_label.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultProxyIdentity(v)),
         ));
@@ -75,7 +75,7 @@ impl Oryxis {
             .iter()
             .map(|t| t.name().to_string())
             .collect();
-        themes.extend(self.custom_terminal_themes.iter().map(|t| t.name.clone()));
+        themes.extend(self.vaults.cur().custom_terminal_themes.iter().map(|t| t.name.clone()));
         col = col.push(self.group_default_picker(
             t("terminal_theme"),
             "group-default-theme",
@@ -87,7 +87,7 @@ impl Oryxis {
         col = col.push(self.group_default_picker(
             t("group_default_snippet"),
             "group-default-snippet",
-            self.snippets.iter().map(|s| s.label.clone()).collect(),
+            self.vaults.cur().snippets.iter().map(|s| s.label.clone()).collect(),
             self.group_edit.startup_snippet_label.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultSnippet(v)),
         ));

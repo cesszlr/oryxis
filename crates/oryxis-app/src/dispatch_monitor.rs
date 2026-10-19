@@ -90,7 +90,7 @@ impl Oryxis {
                             // rows on one server would otherwise raise
                             // three toasts about the same disk.
                             let host = self
-                                .connections
+                                .vaults.cur().connections
                                 .iter()
                                 .find(|c| c.id == conn_id)
                                 .map(|c| c.label.clone())
@@ -115,7 +115,7 @@ impl Oryxis {
                 Task::none()
             }
             MonitorMessage::EnableHost(conn_id) => {
-                if let Some(conn) = self.connections.iter_mut().find(|c| c.id == conn_id) {
+                if let Some(conn) = self.vaults.cur_mut().connections.iter_mut().find(|c| c.id == conn_id) {
                     conn.monitor_enabled = true;
                     let conn = conn.clone();
                     // A failed persist must be loud: the flag would work
@@ -151,7 +151,7 @@ impl Oryxis {
                     _ => "127.0.0.1".to_string(),
                 };
                 let label = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == conn_id)
                     .map(|c| format!("{} :{port}", c.label))
@@ -197,7 +197,7 @@ impl Oryxis {
                     return Task::none();
                 };
                 let host = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == conn_id)
                     .map(|c| c.label.clone())
@@ -384,7 +384,7 @@ impl Oryxis {
     /// RENDER as well as the probing (a lingering series must not keep
     /// painting frozen vitals as if they were live).
     pub(crate) fn monitor_host_opted_in(&self, conn_id: &Uuid) -> bool {
-        self.connections
+        self.vaults.cur().connections
             .iter()
             .any(|c| c.id == *conn_id && self.monitor_conn_opted_in(c))
     }

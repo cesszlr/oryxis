@@ -113,7 +113,7 @@ impl Oryxis {
         // open it, the widget owns arrows/Esc while focused.
         let key_options = {
             let mut opts = vec!["(none)".to_string()];
-            opts.extend(self.keys.iter().map(|k| k.label.clone()));
+            opts.extend(self.vaults.cur().keys.iter().map(|k| k.label.clone()));
             opts
         };
         let key_selected = self.identity_form.key.clone().unwrap_or_else(|| "(none)".into());
@@ -145,7 +145,7 @@ impl Oryxis {
 
         // Linked connections (only when editing)
         let linked_section: Element<'_, Message> = if let Some(editing_id) = self.identity_form.editing_id {
-            let linked: Vec<&Connection> = self.connections.iter()
+            let linked: Vec<&Connection> = self.vaults.cur().connections.iter()
                 .filter(|c| c.identity_id == Some(editing_id))
                 .collect();
             if linked.is_empty() {

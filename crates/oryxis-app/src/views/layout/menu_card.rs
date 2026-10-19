@@ -26,7 +26,7 @@ impl Oryxis {
         idx: usize,
         include_play: bool,
     ) -> Element<'_, Message> {
-        let log_id = self.session_logs.get(idx).map(|e| e.id);
+        let log_id = self.vaults.cur().session_logs.get(idx).map(|e| e.id);
         let mut col = iced::widget::Column::<iced::Element<'_, _>>::new().spacing(2);
         if let Some(log_id) = log_id {
             // Replay actions (in-app player, .cast export) pair with
@@ -144,7 +144,7 @@ impl Oryxis {
         if dashboard && self.card_menu_collapses_to_selection(id) {
             return 4.0;
         }
-        let conn = self.connections.iter().find(|c| c.id == id);
+        let conn = self.vaults.cur().connections.iter().find(|c| c.id == id);
         let protocol = conn.map(|c| c.protocol).unwrap_or(ConnectionProtocol::Ssh);
         let mut rows = 4.0; // Connect + Connect in new window + Edit + Duplicate
         if protocol == ConnectionProtocol::Ssh {
@@ -239,8 +239,8 @@ impl Oryxis {
         // update() -> view(), so the rebuilt items carry the host's new
         // position rather than aiming at whoever took the old one. A
         // host that vanished leaves the actions inert.
-        let idx = self.connections.iter().position(|c| c.id == id);
-        let conn = idx.and_then(|i| self.connections.get(i));
+        let idx = self.vaults.cur().connections.iter().position(|c| c.id == id);
+        let conn = idx.and_then(|i| self.vaults.cur().connections.get(i));
         // Every index-taking action goes through this, so a vanished
         // host cannot dispatch one against a stale position.
         let by_idx = |msg: fn(usize) -> Message| idx.map_or(Message::NoOp, msg);
@@ -377,7 +377,7 @@ impl Oryxis {
         // Oryxis's own agent can never serve them; the toggle would be
         // a lie there and is hidden.
         if self.agent.enabled
-            && let Some(key) = self.keys.get(idx)
+            && let Some(key) = self.vaults.cur().keys.get(idx)
             && !key.algorithm.is_security_key()
         {
             let (glyph, label) = if key.expose_via_agent {
@@ -393,7 +393,7 @@ impl Oryxis {
             ));
         }
         // Certificate actions, only when the key carries one (B2).
-        if let Some(key) = self.keys.get(idx)
+        if let Some(key) = self.vaults.cur().keys.get(idx)
             && key.certificate.is_some()
         {
             items = items.push(self.menu_item(

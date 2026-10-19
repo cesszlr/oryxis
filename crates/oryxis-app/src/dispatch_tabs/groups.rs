@@ -12,7 +12,7 @@ impl Oryxis {
         match message {
             TabsMessage::EditGroup(gid) => {
                 self.overlay = None;
-                if let Some(group) = self.groups.iter().find(|g| g.id == gid) {
+                if let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == gid) {
                     self.group_edit.id = Some(gid);
                     self.group_edit.label = group.label.clone();
                     self.group_edit.icon = group.icon.clone().unwrap_or_default();
@@ -23,8 +23,8 @@ impl Oryxis {
                     // as root, matching how the grid renders it.
                     self.group_edit.parent_label = group
                         .parent_id
-                        .filter(|pid| self.groups.iter().any(|g| g.id == *pid))
-                        .map(|pid| oryxis_core::models::Group::path_of(&self.groups, pid))
+                        .filter(|pid| self.vaults.cur().groups.iter().any(|g| g.id == *pid))
+                        .map(|pid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, pid))
                         .unwrap_or_default();
                     self.hydrate_group_defaults_form(gid);
                     self.group_edit.visible = true;
@@ -45,10 +45,10 @@ impl Oryxis {
                 // Only a manual folder can contain manual children
                 // (dynamic groups derive their contents from the query).
                 let parent_label = self
-                    .groups
+                    .vaults.cur().groups
                     .iter()
                     .any(|g| g.id == gid && g.cloud_query.is_none())
-                    .then(|| oryxis_core::models::Group::path_of(&self.groups, gid));
+                    .then(|| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid));
                 if let Some(parent_label) = parent_label {
                     self.group_edit = crate::state::GroupEditForm {
                         visible: true,
@@ -180,12 +180,12 @@ impl Oryxis {
                     let excluded = self
                         .group_edit
                         .id
-                        .map(|gid| oryxis_core::models::Group::subtree_ids(&self.groups, gid))
+                        .map(|gid| oryxis_core::models::Group::subtree_ids(&self.vaults.cur().groups, gid))
                         .unwrap_or_default();
                     // Full-path match first (what the picker fills in),
                     // bare label as the typed-by-hand fallback.
                     let parent_id = oryxis_core::models::Group::resolve_path_or_label(
-                        &self.groups,
+                        &self.vaults.cur().groups,
                         &self.group_edit.parent_label,
                         &excluded,
                     );
@@ -205,14 +205,15 @@ impl Oryxis {
                     // nothing rather than a dangling id.
                     let defaults = self.group_edit_defaults();
                     if let Some(gid) = self.group_edit.id {
-                        if let Some(group) = self.groups.iter_mut().find(|g| g.id == gid) {
+                        let ov = self.vaults.cur_mut();
+                        if let Some(group) = ov.groups.iter_mut().find(|g| g.id == gid) {
                             group.label = trimmed;
                             group.icon = icon;
                             group.color = color;
                             group.parent_id = parent_id;
                             group.defaults = defaults;
                             group.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vaults.cur().store {
+                            if let Some(vault) = &ov.store {
                                 let _ = vault.save_group(group);
                             }
                         }
@@ -232,7 +233,7 @@ impl Oryxis {
                         // no-op. Navigation is intentionally left alone,
                         // matching the fresh-create branch below.
                         let dup = self
-                            .groups
+                            .vaults.cur().groups
                             .iter()
                             .find(|g| {
                                 g.cloud_query.is_none()
@@ -241,14 +242,15 @@ impl Oryxis {
                             })
                             .map(|g| g.id);
                         if let Some(gid) = dup {
+                            let ov = self.vaults.cur_mut();
                             if let Some(group) =
-                                self.groups.iter_mut().find(|g| g.id == gid)
+                                ov.groups.iter_mut().find(|g| g.id == gid)
                             {
                                 group.icon = icon;
                                 group.color = color;
                                 group.defaults = defaults;
                                 group.updated_at = chrono::Utc::now();
-                                if let Some(vault) = &self.vaults.cur().store {
+                                if let Some(vault) = &ov.store {
                                     let _ = vault.save_group(group);
                                 }
                             }
@@ -261,7 +263,7 @@ impl Oryxis {
                             if let Some(vault) = &self.vaults.cur().store {
                                 let _ = vault.save_group(&group);
                             }
-                            self.groups.push(group);
+                            self.vaults.cur_mut().groups.push(group);
                         }
                     }
                 }
@@ -283,7 +285,7 @@ impl Oryxis {
                     // top-level folder, which preserves the pre-subgroup
                     // behavior).
                     let new_parent = self
-                        .groups
+                        .vaults.cur().groups
                         .iter()
                         .find(|g| g.id == gid)
                         .and_then(|g| g.parent_id);
@@ -294,11 +296,12 @@ impl Oryxis {
                     // So we surface failures and skip the final delete
                     // unless every child was re-homed successfully.
                     let mut write_failed = false;
-                    for conn in self.connections.iter_mut() {
+                    let ov = self.vaults.cur_mut();
+                    for conn in ov.connections.iter_mut() {
                         if conn.group_id == Some(gid) {
                             conn.group_id = new_parent;
                             conn.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vaults.cur().store
+                            if let Some(vault) = &ov.store
                                 && let Err(e) = vault.save_connection(conn, None)
                             {
                                 tracing::error!(
@@ -313,11 +316,12 @@ impl Oryxis {
                     // ECS / K8s dynamic groups alike), so they don't
                     // dangle off the deleted parent and vanish from
                     // every view.
-                    for g in self.groups.iter_mut() {
+                    let ov = self.vaults.cur_mut();
+                    for g in ov.groups.iter_mut() {
                         if g.parent_id == Some(gid) {
                             g.parent_id = new_parent;
                             g.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vaults.cur().store
+                            if let Some(vault) = &ov.store
                                 && let Err(e) = vault.save_group(g)
                             {
                                 tracing::error!(
@@ -350,7 +354,7 @@ impl Oryxis {
                         removed = true;
                     }
                     if removed {
-                        self.groups.retain(|g| g.id != gid);
+                        self.vaults.cur_mut().groups.retain(|g| g.id != gid);
                         if self.cur_nav().active_group == Some(gid) {
                             self.nav.active_group = new_parent;
                         }
@@ -367,7 +371,7 @@ impl Oryxis {
                 if let Some(gid) = self.folder_delete {
                     // Drop every host inside the folder, then the folder.
                     let to_drop: Vec<_> = self
-                        .connections
+                        .vaults.cur().connections
                         .iter()
                         .filter(|c| c.group_id == Some(gid))
                         .map(|c| c.id)
@@ -379,7 +383,7 @@ impl Oryxis {
                     // silently lost and nothing dangles off the removed
                     // parent.
                     let new_parent = self
-                        .groups
+                        .vaults.cur().groups
                         .iter()
                         .find(|g| g.id == gid)
                         .and_then(|g| g.parent_id);
@@ -390,11 +394,12 @@ impl Oryxis {
                     // tombstone, stranding it at root. Skip the final
                     // group delete unless every write succeeded.
                     let mut write_failed = false;
-                    for g in self.groups.iter_mut() {
+                    let ov = self.vaults.cur_mut();
+                    for g in ov.groups.iter_mut() {
                         if g.parent_id == Some(gid) {
                             g.parent_id = new_parent;
                             g.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vaults.cur().store
+                            if let Some(vault) = &ov.store
                                 && let Err(e) = vault.save_group(g)
                             {
                                 tracing::error!(
@@ -426,7 +431,7 @@ impl Oryxis {
                     // Drop from memory only the hosts actually removed
                     // from the vault, so a failed delete doesn't vanish
                     // the row while its record survives on disk.
-                    self.connections.retain(|c| !dropped.contains(&c.id));
+                    self.vaults.cur_mut().connections.retain(|c| !dropped.contains(&c.id));
                     // Only tombstone the folder once every child write
                     // landed. On failure, abort with a toast and keep the
                     // folder so nothing is stranded; the user can retry.
@@ -446,7 +451,7 @@ impl Oryxis {
                         removed = true;
                     }
                     if removed {
-                        self.groups.retain(|g| g.id != gid);
+                        self.vaults.cur_mut().groups.retain(|g| g.id != gid);
                         if self.cur_nav().active_group == Some(gid) {
                             self.nav.active_group = new_parent;
                         }

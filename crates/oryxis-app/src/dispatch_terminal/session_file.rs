@@ -149,7 +149,7 @@ impl Oryxis {
     pub(crate) fn session_log_file_path(&self, log_id: &Uuid, origin: &PaneOrigin) -> PathBuf {
         let label = match origin {
             PaneOrigin::Host(id) => self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == *id)
                 .map(|c| c.label.clone()),

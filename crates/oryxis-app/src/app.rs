@@ -2,11 +2,6 @@ use iced::keyboard;
 use iced::widget::svg;
 use iced::{Point, Theme};
 
-use oryxis_core::models::connection::Connection;
-use oryxis_core::models::group::Group;
-use oryxis_core::models::identity::Identity;
-use oryxis_core::models::key::SshKey;
-
 use std::sync::OnceLock;
 use uuid::Uuid;
 
@@ -323,18 +318,12 @@ pub struct Oryxis {
     // clarity even though both now point at the same asset.
     pub(crate) logo_handle: svg::Handle,
 
-    // Data
-    pub(crate) connections: Vec<Connection>,
     /// Ad-hoc quick-connect hosts, keyed by connection id. Never touches
     /// the vault or `connections` (so no grid / sync / export leakage).
     /// Entries carry the credentials typed in the editor flow so a
     /// reconnect can reuse them; swept on vault lock, pruned when the
     /// last pane referencing an entry closes.
     pub(crate) quick_connects: std::collections::HashMap<Uuid, crate::state::QuickConnectEntry>,
-    pub(crate) groups: Vec<Group>,
-    /// Saved split-panel arrangements. Each references hosts by id and/or
-    /// local shells; opening one rebuilds a single splitted tab.
-    pub(crate) session_groups: Vec<oryxis_core::models::SessionGroup>,
 
     // UI state
     pub(crate) active_view: View,
@@ -627,12 +616,6 @@ pub struct Oryxis {
     /// from the sidebar Files browser, which has no SFTP state at all,
     /// and a parked dialog would strand unanswered.
     pub(crate) sftp_edit_reopen: Option<crate::state::EditReopenPrompt>,
-    /// Loaded command history for `command_history_host`, most recent
-    /// first (the History tab derives its "frequent" shortlist from this).
-    pub(crate) command_history: Vec<oryxis_vault::CommandHistoryEntry>,
-    /// Which saved host `command_history` was loaded for (`None` when the
-    /// focused pane isn't a saved host).
-    pub(crate) command_history_host: Option<Uuid>,
     /// Filter text of the sidebar History tab's search field (distinct
     /// from `history_search`, which filters the session-logs view).
     pub(crate) cmd_history_search: String,
@@ -957,8 +940,6 @@ pub struct Oryxis {
     pub(crate) editing_hotkey:
         Option<(crate::hotkeys::HotkeyAction, crate::hotkeys::HotkeySlot)>,
 
-    // Keys
-    pub(crate) keys: Vec<SshKey>,
     /// Parsed certificate on display in the read-only cert viewer modal
     /// (B2). `Some` = modal open; keyed to `Modal::CertificateViewer`.
     pub(crate) cert_viewer: Option<crate::state::CertViewerData>,
@@ -969,24 +950,6 @@ pub struct Oryxis {
     /// Async results + scan progress for the content search above.
     pub(crate) history_content: crate::state::HistoryContentSearch,
 
-    // Identities
-    pub(crate) identities: Vec<Identity>,
-    // Cached set of identity ids whose `password` column is non-NULL.
-    // Hydrated by `load_data_from_vault`. The keychain view reads this
-    // per card to decide whether to render the masked-bullets badge,
-    // a per-frame `get_identity_password` decrypt would otherwise run
-    // for every identity on every view() rebuild and slow the main
-    // loop enough to fill iced's 100-slot subscription channel.
-    pub(crate) identities_with_password: std::collections::HashSet<Uuid>,
-    /// Cached set of connection ids whose `password` column holds a
-    /// value, hydrated by `load_data_from_vault` like the identity set
-    /// above. It answers `host_answers_credentials` for the listing's
-    /// effective login (a group's identity default is gated on it), so
-    /// the card can say per frame what the dial will do without a
-    /// query per host. Every `save_connection` site that does not
-    /// reload passes `None` for the password, which is what keeps the
-    /// set true between loads.
-    pub(crate) connections_with_password: std::collections::HashSet<Uuid>,
     pub(crate) identity_form: crate::state::IdentityForm,
     pub(crate) identity_context_menu: Option<usize>,
 
@@ -999,18 +962,8 @@ pub struct Oryxis {
     pub(crate) keys_sort: crate::state::ListSort,
     pub(crate) snippets_sort: crate::state::ListSort,
 
-    // Proxy Identities, reusable proxy configs edited inline inside
-    // the Settings → Proxies section. The saved list lives here; the
-    // inline editor's transient state is grouped in `proxy_identity_form`
-    // (in-memory only until SaveProxyIdentity flushes to the vault).
-    pub(crate) proxy_identities: Vec<oryxis_core::models::proxy_identity::ProxyIdentity>,
     pub(crate) proxy_identity_form: crate::state::ProxyIdentityForm,
 
-    // Login scripts: reusable expect/send automations for hosts behind
-    // an interactive bastion, referenced by `Connection.login_script_id`.
-    // Created from the host editor (where the user is already looking at
-    // the host that needs one) and managed in Settings → Connection.
-    pub(crate) login_scripts: Vec<oryxis_core::models::LoginScript>,
     /// Bumped per armed run so a stale timeout tick from a finished
     /// run cannot abort the one that replaced it.
     pub(crate) login_script_generation: u64,
@@ -1034,11 +987,6 @@ pub struct Oryxis {
     /// for it is remote output.
     pub(crate) trigger_confirm: Option<crate::dispatch_terminal::TriggerConfirmCard>,
 
-    // Cloud Accounts, CloudProfile rows + the wizard form. Wizard is
-    // intentionally minimal in v0.6 PR 3: provider + AWS profile auth
-    // only. Access key + SSO + the discover-and-pick step land in
-    // follow-up PRs once the foundation is exercised.
-    pub(crate) cloud_profiles: Vec<oryxis_core::models::cloud_profile::CloudProfile>,
     /// Transient state for the add/edit cloud-account wizard (covers all
     /// provider + auth combinations).
     pub(crate) cloud_form: crate::state::CloudForm,
@@ -1137,22 +1085,12 @@ pub struct Oryxis {
 
 
 
-    // Snippets
-    pub(crate) snippets: Vec<oryxis_core::models::snippet::Snippet>,
     /// Which install script (issue #147) already ran on which host,
     /// keyed (host id, snippet id) with the last run time. Mirror of
     /// the vault's `install_runs` table; drives the "installed here"
     /// hint on the snippet surfaces. Local bookkeeping, never synced.
     pub(crate) install_runs:
         std::collections::HashMap<(Uuid, Uuid), chrono::DateTime<chrono::Utc>>,
-    /// User-defined terminal color schemes, shown in the theme pickers
-    /// alongside the built-in presets and resolved by name.
-    pub(crate) custom_terminal_themes:
-        Vec<oryxis_core::models::custom_terminal_theme::CustomTerminalTheme>,
-    /// User-defined chrome (UI) themes, shown in Interface alongside the
-    /// built-in app themes and resolved by name.
-    pub(crate) custom_ui_themes:
-        Vec<oryxis_core::models::custom_ui_theme::CustomUiTheme>,
     /// Import-UI-theme modal (paste the Oryxis UI theme JSON), mirroring
     /// the terminal scheme import modal above.
     /// Single external editor used by the SFTP "Open with default text
@@ -1222,9 +1160,6 @@ pub struct Oryxis {
     /// output funnel (pane, label, steps).
     pub(crate) startup_runs_due: Vec<(uuid::Uuid, String, Vec<oryxis_core::models::SnippetStep>)>,
 
-    // Port forwards (standalone entity, independent of any terminal)
-    pub(crate) port_forward_rules:
-        Vec<oryxis_core::models::port_forward_rule::PortForwardRule>,
     /// Runtime-only registry of live forwards, keyed by rule id. Not
     /// persisted, the on/off state lives only here. Dropping the
     /// `ForwardSession` cancels its tasks.
@@ -1303,18 +1238,9 @@ pub struct Oryxis {
     /// kebab mounted while the pointer travels to the menu.
     pub(crate) port_forward_context_menu: Option<usize>,
 
-    // Known hosts & logs
-    pub(crate) known_hosts: Vec<oryxis_core::models::known_host::KnownHost>,
-    pub(crate) logs: Vec<oryxis_core::models::log_entry::LogEntry>,
-    pub(crate) logs_page: usize,
-    pub(crate) logs_total: usize,
     /// "Clear all" confirmation modal for the Logs view.
     pub(crate) clear_history_confirm: bool,
 
-    // Session logs (terminal recording)
-    pub(crate) session_logs: Vec<oryxis_vault::SessionLogEntry>,
-    pub(crate) session_logs_page: usize,
-    pub(crate) session_logs_total: usize,
     pub(crate) viewing_session_log: Option<crate::state::SessionLogViewer>,
     /// The in-app session player (issue #71), rendered as a full
     /// surface on the History view while `Some`. Mutually exclusive
@@ -1410,15 +1336,6 @@ pub struct Oryxis {
     /// separate from the vault view's so the two surfaces navigate
     /// independently).
     pub(crate) sidebar_snippet_group: Option<String>,
-    /// Recently visited Files-sidebar folders, keyed by saved-host id.
-    ///
-    /// The per-pane list is deliberately wiped on disconnect, because a
-    /// reconnect can land on a different tree; keeping the history HERE,
-    /// scoped to the host it belongs to, is what makes that wipe harmless
-    /// and lets the list survive closing the tab (issue #114 / #85).
-    /// Only `PaneOrigin::Host` panes qualify: a quick-connect id is
-    /// in-memory and a local shell has no host to key on.
-    pub(crate) files_recent_folders: std::collections::HashMap<uuid::Uuid, Vec<String>>,
     /// Set once at boot when [`setting_performance_mode`] was auto-enabled
     /// by the render probe, so the unlock path can raise a one-time toast
     /// explaining why. Cleared when the toast is emitted.
@@ -1752,8 +1669,8 @@ impl Oryxis {
     pub(crate) fn logs_surface_visible(&self) -> bool {
         self.prefs.session_logging
             || self.prefs.connection_history
-            || self.logs_total > 0
-            || self.session_logs_total > 0
+            || self.vaults.cur().logs_total > 0
+            || self.vaults.cur().session_logs_total > 0
     }
 
     /// Vertical offset (px) that toolbar dropdown anchors should use
@@ -1854,7 +1771,7 @@ impl Oryxis {
         n: usize,
     ) -> Vec<&oryxis_core::models::connection::Connection> {
         let mut recent: Vec<&oryxis_core::models::connection::Connection> =
-            self.connections.iter().filter(|c| c.last_used.is_some()).collect();
+            self.vaults.cur().connections.iter().filter(|c| c.last_used.is_some()).collect();
         recent.sort_by_key(|c| std::cmp::Reverse(c.last_used));
         recent.truncate(n);
         recent

@@ -56,7 +56,7 @@ impl Oryxis {
                     return Ok(Task::none());
                 }
                 let mut identity = if let Some(id) = self.identity_form.editing_id {
-                    self.identities.iter().find(|i| i.id == id).cloned()
+                    self.vaults.cur().identities.iter().find(|i| i.id == id).cloned()
                         .unwrap_or_else(|| Identity::new(""))
                 } else {
                     Identity::new("")
@@ -68,7 +68,7 @@ impl Oryxis {
                     Some(self.identity_form.username.clone())
                 };
                 identity.key_id = self.identity_form.key.as_ref().and_then(|label| {
-                    self.keys.iter().find(|k| k.label == *label).map(|k| k.id)
+                    self.vaults.cur().keys.iter().find(|k| k.label == *label).map(|k| k.id)
                 });
                 identity.updated_at = chrono::Utc::now();
 
@@ -83,7 +83,7 @@ impl Oryxis {
                 self.panels.identity_panel = false;
             }
             KeysMessage::EditIdentity(idx) => {
-                if let Some(identity) = self.identities.get(idx) {
+                if let Some(identity) = self.vaults.cur().identities.get(idx) {
                     self.identity_form.editing_id = Some(identity.id);
                     self.identity_form.label = identity.label.clone();
                     self.identity_form.username = identity.username.clone().unwrap_or_default();
@@ -93,7 +93,7 @@ impl Oryxis {
                         .and_then(|v| v.get_identity_password(&identity.id).ok().flatten())
                         .is_some();
                     self.identity_form.key = identity.key_id.and_then(|kid| {
-                        self.keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
+                        self.vaults.cur().keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
                     });
                     self.panels.identity_panel = true;
                     self.identity_context_menu = None;
@@ -101,13 +101,13 @@ impl Oryxis {
                 }
             }
             KeysMessage::RequestDeleteIdentity(idx) => {
-                if let Some(identity) = self.identities.get(idx) {
+                if let Some(identity) = self.vaults.cur().identities.get(idx) {
                     let name = identity.label.clone();
                     self.confirm_remove(name, Message::Keys(KeysMessage::DeleteIdentity(idx)));
                 }
             }
             KeysMessage::DeleteIdentity(idx) => {
-                if let Some(identity) = self.identities.get(idx) {
+                if let Some(identity) = self.vaults.cur().identities.get(idx) {
                     let id = identity.id;
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_identity(&id);

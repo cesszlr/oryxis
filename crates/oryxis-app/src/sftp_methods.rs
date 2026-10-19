@@ -1184,7 +1184,7 @@ impl Oryxis {
             if p.is_remote {
                 p.host_label
                     .as_ref()
-                    .and_then(|l| self.connections.iter().find(|c| &c.label == l))
+                    .and_then(|l| self.vaults.cur().connections.iter().find(|c| &c.label == l))
                     .map(|c| crate::state::SftpPaneSpec::Remote(c.id))
                     .unwrap_or(crate::state::SftpPaneSpec::Local)
             } else {
@@ -1230,7 +1230,7 @@ impl Oryxis {
         };
         [right, left].into_iter().find_map(|p| match p {
             crate::state::SftpPaneSpec::Remote(id) => self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == *id)
                 .map(|c| c.label.clone()),

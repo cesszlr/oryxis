@@ -29,7 +29,7 @@ impl Oryxis {
     pub(super) fn handle_tabs_selection(&mut self, message: TabsMessage) -> Task<Message> {
         match message {
             TabsMessage::CardPressed(idx) => {
-                let Some(id) = self.connections.get(idx).map(|c| c.id) else {
+                let Some(id) = self.vaults.cur().connections.get(idx).map(|c| c.id) else {
                     return Task::none();
                 };
                 // `button` publishes no modifiers; the app tracks them
@@ -89,7 +89,7 @@ impl Oryxis {
                 let visible: Vec<Uuid> = self
                     .dashboard_visible_host_order()
                     .into_iter()
-                    .map(|i| self.connections[i].id)
+                    .map(|i| self.vaults.cur().connections[i].id)
                     .collect();
                 self.nav.dash_selection.extend(visible);
                 Task::none()
@@ -208,7 +208,7 @@ impl Oryxis {
             let Some(id) = self.batch_dials.pop_front() else {
                 break;
             };
-            if !self.connections.iter().any(|c| c.id == id) {
+            if !self.vaults.cur().connections.iter().any(|c| c.id == id) {
                 continue;
             }
             // By id: the dial resolves the row at fire time, after the
@@ -303,7 +303,7 @@ impl Oryxis {
         let mut out: Vec<Uuid> = self
             .dashboard_visible_host_order()
             .into_iter()
-            .map(|i| self.connections[i].id)
+            .map(|i| self.vaults.cur().connections[i].id)
             .filter(|id| self.cur_nav().dash_selection.contains(*id))
             .collect();
         if !self.cur_nav().dash_multi_select {
@@ -311,7 +311,7 @@ impl Oryxis {
         }
         let shown: std::collections::HashSet<Uuid> = out.iter().copied().collect();
         let alive: std::collections::HashSet<Uuid> =
-            self.connections.iter().map(|c| c.id).collect();
+            self.vaults.cur().connections.iter().map(|c| c.id).collect();
         let before = out.len();
         out.extend(
             self.cur_nav().dash_selection
@@ -334,7 +334,7 @@ impl Oryxis {
         }
         let labels: Vec<&str> = ids
             .iter()
-            .filter_map(|id| self.connections.iter().find(|c| c.id == *id))
+            .filter_map(|id| self.vaults.cur().connections.iter().find(|c| c.id == *id))
             .map(|c| c.label.as_str())
             .collect();
         if labels.is_empty() {
@@ -355,7 +355,7 @@ impl Oryxis {
         let order: Vec<Uuid> = self
             .dashboard_visible_host_order()
             .into_iter()
-            .map(|i| self.connections[i].id)
+            .map(|i| self.vaults.cur().connections[i].id)
             .collect();
         let a = order.iter().position(|x| *x == anchor);
         let b = order.iter().position(|x| *x == id);
@@ -373,7 +373,7 @@ impl Oryxis {
     /// no-op move writes nothing and bumps no `updated_at`.
     pub(crate) fn move_hosts_to_group(&mut self, ids: &[Uuid], target: Option<Uuid>) -> Task<Message> {
         if let Some(gid) = target
-            && !self.groups.iter().any(|g| g.id == gid && g.cloud_query.is_none())
+            && !self.vaults.cur().groups.iter().any(|g| g.id == gid && g.cloud_query.is_none())
         {
             return Task::none();
         }
@@ -394,13 +394,14 @@ impl Oryxis {
         };
         let mut moved = 0usize;
         let mut failed = 0usize;
-        for conn in self.connections.iter_mut().filter(|c| ids.contains(&c.id)) {
+        let ov = self.vaults.cur_mut();
+        for conn in ov.connections.iter_mut().filter(|c| ids.contains(&c.id)) {
             if conn.group_id == target {
                 continue;
             }
             conn.group_id = target;
             conn.updated_at = chrono::Utc::now();
-            match &self.vaults.cur().store {
+            match &ov.store {
                 Some(vault) => match vault.save_connection(conn, None) {
                     Ok(()) => moved += 1,
                     Err(e) => {
@@ -419,7 +420,7 @@ impl Oryxis {
             self.set_toast(crate::i18n::t("hosts_move_failed").to_string());
         } else if moved > 0 {
             let group = match target {
-                Some(gid) => oryxis_core::models::Group::path_of(&self.groups, gid),
+                Some(gid) => oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid),
                 None => crate::i18n::t("group_picker_root").to_string(),
             };
             self.set_toast(
@@ -453,7 +454,7 @@ impl Oryxis {
         };
         let ids = if ids.is_empty() { vec![id] } else { ids };
         let label = if ids.len() == 1 {
-            self.connections
+            self.vaults.cur().connections
                 .iter()
                 .find(|c| c.id == id)
                 .map(|c| c.label.clone())
@@ -478,8 +479,8 @@ impl Oryxis {
     pub(crate) fn card_drop_target(&self) -> Option<Option<Uuid>> {
         if self.cur_nav().hover.folder_back {
             let open = self.cur_nav().active_group?;
-            let parent = self.groups.iter().find(|g| g.id == open).and_then(|g| g.parent_id);
-            return match parent.and_then(|pid| self.groups.iter().find(|g| g.id == pid)) {
+            let parent = self.vaults.cur().groups.iter().find(|g| g.id == open).and_then(|g| g.parent_id);
+            return match parent.and_then(|pid| self.vaults.cur().groups.iter().find(|g| g.id == pid)) {
                 // A dynamic parent's contents come from its query: the
                 // drop is refused, never redirected to the top level.
                 Some(p) if p.cloud_query.is_some() => None,
@@ -490,7 +491,7 @@ impl Oryxis {
             };
         }
         let gid = self.cur_nav().hover.folder_card?;
-        self.groups
+        self.vaults.cur().groups
             .iter()
             .any(|g| g.id == gid && g.cloud_query.is_none())
             .then_some(Some(gid))

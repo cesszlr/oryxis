@@ -46,7 +46,7 @@ impl Oryxis {
             // ARE opted in and the board is waiting for a session
             // instead (issue #197).
             let waiting_for_session = self.prefs.monitor_dash_live_only
-                && self.connections.iter().any(|c| self.monitor_conn_opted_in(c));
+                && self.vaults.cur().connections.iter().any(|c| self.monitor_conn_opted_in(c));
             let (empty, hint) = if waiting_for_session {
                 ("monitor_dash_empty_live", "monitor_dash_empty_live_hint")
             } else {
@@ -155,7 +155,7 @@ impl Oryxis {
         let hosts: Vec<uuid::Uuid> = fleet
             .into_iter()
             .filter(|id| {
-                let Some(conn) = self.connections.iter().find(|c| c.id == *id) else {
+                let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == *id) else {
                     return false;
                 };
                 let by_search =
@@ -222,7 +222,7 @@ impl Oryxis {
     /// content action) opens the detail panel; nothing on the card
     /// itself touches the host.
     fn dash_card(&self, conn_id: uuid::Uuid) -> Element<'_, Message> {
-        let Some(conn) = self.connections.iter().find(|c| c.id == conn_id) else {
+        let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == conn_id) else {
             return Space::new().boxed();
         };
         // Both the link and the window belong to the MACHINE (issue
@@ -387,7 +387,7 @@ impl Oryxis {
         if via == card {
             return message.to_string();
         }
-        match self.connections.iter().find(|c| c.id == via) {
+        match self.vaults.cur().connections.iter().find(|c| c.id == via) {
             Some(conn) => format!("{}: {message}", conn.label),
             None => message.to_string(),
         }
@@ -397,7 +397,7 @@ impl Oryxis {
     /// host, plus the explicit actions (open terminal / retry).
     fn dash_detail_panel(&self, conn_id: uuid::Uuid) -> Element<'_, Message> {
         let label = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .find(|c| c.id == conn_id)
             .map(|c| c.label.clone())
@@ -481,7 +481,7 @@ impl Oryxis {
         let via_hint: Element<'_, Message> = match link.map(|l| l.via()) {
             Some(via) if via != conn_id => {
                 let name = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == via)
                     .map(|c| c.label.clone())
@@ -658,7 +658,7 @@ impl Oryxis {
 
         let mut table = column![header, Space::new().height(4)].spacing(2);
         for conn_id in rows {
-            let Some(conn) = self.connections.iter().find(|c| c.id == conn_id) else {
+            let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == conn_id) else {
                 continue;
             };
             let link = self

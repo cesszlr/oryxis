@@ -88,7 +88,7 @@ impl Oryxis {
         }
         let existing = form
             .editing_id
-            .and_then(|id| self.custom_terminal_themes.iter().find(|t| t.id == id).cloned());
+            .and_then(|id| self.vaults.cur().custom_terminal_themes.iter().find(|t| t.id == id).cloned());
         // A NEW builtin-colliding name is refused; a custom theme that
         // already carries one (imported before the builtin existed) stays
         // editable under its own name. Name resolution favors custom, so
@@ -100,7 +100,7 @@ impl Oryxis {
             return Some(crate::i18n::t("theme_error_name_builtin").to_string());
         }
         if self
-            .custom_terminal_themes
+            .vaults.cur().custom_terminal_themes
             .iter()
             .any(|t| t.name == name && Some(t.id) != form.editing_id)
         {
@@ -149,7 +149,7 @@ impl Oryxis {
             self.persist_setting("terminal_theme_override", &name);
         }
 
-        self.custom_terminal_themes = self
+        self.vaults.cur_mut().custom_terminal_themes = self
             .vaults.cur().store
             .as_ref()
             .and_then(|v| v.list_custom_terminal_themes().ok())
@@ -173,7 +173,7 @@ impl Oryxis {
         // that user's setting meant the custom theme; a new builtin must
         // not silently take over their vault on upgrade.
         if let Some(colors) = self
-            .custom_ui_themes
+            .vaults.cur().custom_ui_themes
             .iter()
             .find(|t| t.name == name)
             .map(|t| t.colors.clone())
@@ -200,7 +200,7 @@ impl Oryxis {
         }
         let existing = form
             .editing_id
-            .and_then(|id| self.custom_ui_themes.iter().find(|t| t.id == id).cloned());
+            .and_then(|id| self.vaults.cur().custom_ui_themes.iter().find(|t| t.id == id).cloned());
         // Same rule as the terminal editor: only a NEW builtin-colliding
         // name is refused; a pre-existing homonymous custom theme stays
         // editable (and wins name resolution).
@@ -209,7 +209,7 @@ impl Oryxis {
             return Some(crate::i18n::t("theme_error_name_builtin").to_string());
         }
         if self
-            .custom_ui_themes
+            .vaults.cur().custom_ui_themes
             .iter()
             .any(|t| t.name == name && Some(t.id) != form.editing_id)
         {
@@ -244,7 +244,7 @@ impl Oryxis {
                 return Some(crate::i18n::t("theme_error_save_failed").to_string());
             }
         }
-        self.custom_ui_themes = self
+        self.vaults.cur_mut().custom_ui_themes = self
             .vaults.cur().store
             .as_ref()
             .and_then(|v| v.list_custom_ui_themes().ok())
@@ -322,7 +322,7 @@ impl Oryxis {
         // Custom first, same rationale as `apply_app_theme_name`: a
         // pre-builtin homonymous custom keeps meaning the user's palette
         // after an upgrade ships a builtin with the same name.
-        if let Some(t) = self.custom_terminal_themes.iter().find(|t| t.name == name) {
+        if let Some(t) = self.vaults.cur().custom_terminal_themes.iter().find(|t| t.name == name) {
             return Some(custom_theme_palette(t));
         }
         oryxis_terminal::TerminalTheme::ALL
@@ -373,7 +373,7 @@ impl Oryxis {
         if let Some(name) = self
             .vaults.cur().store
             .as_ref()
-            .and_then(|v| v.resolve_effective(conn, &self.groups, &self.identities).ok())
+            .and_then(|v| v.resolve_effective(conn, &self.vaults.cur().groups, &self.vaults.cur().identities).ok())
             .and_then(|e| e.terminal_theme.map(|(name, _)| name))
             && let Some(palette) = self.terminal_palette_for_name(&name)
         {
@@ -391,7 +391,7 @@ impl Oryxis {
         label: &str,
     ) -> oryxis_terminal::TerminalPalette {
         let base = label.trim_end_matches(" (disconnected)");
-        if let Some(conn) = self.connections.iter().find(|c| c.label == base) {
+        if let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.label == base) {
             return self.resolve_terminal_palette_for_connection(conn);
         }
         self.resolve_global_terminal_palette()
@@ -580,7 +580,7 @@ impl Oryxis {
                     Some(crate::state::UiThemeEditorForm::new_from_colors(seed));
             }
             SettingsMessage::UiThemeEditorEdit(idx) => {
-                if let Some(theme) = self.custom_ui_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx) {
                     self.ui_theme_editor =
                         Some(crate::state::UiThemeEditorForm::from_theme(theme));
                 }
@@ -624,12 +624,12 @@ impl Oryxis {
                 }
             }
             SettingsMessage::UiThemeDelete(idx) => {
-                if let Some(theme) = self.custom_ui_themes.get(idx)
+                if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx)
                     && let Some(vault) = &self.vaults.cur().store
                 {
                     let was_active = self.active_app_theme_name == theme.name;
                     let _ = vault.delete_custom_ui_theme(&theme.id);
-                    self.custom_ui_themes =
+                    self.vaults.cur_mut().custom_ui_themes =
                         vault.list_custom_ui_themes().unwrap_or_default();
                     if was_active {
                         // The active theme is gone; fall back to the default.
@@ -650,7 +650,7 @@ impl Oryxis {
                 self.nav.hover.leave_ui_theme_card(idx);
             }
             SettingsMessage::ThemeEditorEdit(idx) => {
-                if let Some(theme) = self.custom_terminal_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_terminal_themes.get(idx) {
                     self.theme_ui.editor =
                         Some(crate::state::ThemeEditorForm::from_theme(theme));
                 }
@@ -686,7 +686,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::ThemeDeleteRequested(idx) => {
-                if let Some(theme) = self.custom_terminal_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_terminal_themes.get(idx) {
                     let name = theme.name.clone();
                     self.confirm_remove(
                         name,
@@ -695,7 +695,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::UiThemeDeleteRequested(idx) => {
-                if let Some(theme) = self.custom_ui_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx) {
                     let name = theme.name.clone();
                     self.confirm_remove(
                         name,
@@ -704,11 +704,11 @@ impl Oryxis {
                 }
             }
             SettingsMessage::ThemeDelete(idx) => {
-                if let Some(theme) = self.custom_terminal_themes.get(idx)
+                if let Some(theme) = self.vaults.cur().custom_terminal_themes.get(idx)
                     && let Some(vault) = &self.vaults.cur().store
                 {
                     let _ = vault.delete_custom_terminal_theme(&theme.id);
-                    self.custom_terminal_themes =
+                    self.vaults.cur_mut().custom_terminal_themes =
                         vault.list_custom_terminal_themes().unwrap_or_default();
                     // A host / global override pointing at the deleted theme
                     // now resolves to its fallback; repaint reflects that.
@@ -736,7 +736,7 @@ impl Oryxis {
                 self.nav.hover.leave_builtin_theme_card(idx);
             }
             SettingsMessage::ThemeClone(idx) => {
-                if let Some(theme) = self.custom_terminal_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_terminal_themes.get(idx) {
                     let mut form = crate::state::ThemeEditorForm::from_theme(theme);
                     form.editing_id = None;
                     form.name = self.unique_terminal_theme_name(&theme.name);
@@ -761,7 +761,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::ThemeExport(idx) => {
-                if let Some(theme) = self.custom_terminal_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_terminal_themes.get(idx) {
                     let json = crate::theme_export::terminal_theme_to_json(theme);
                     let file_name = format!(
                         "{}.json",
@@ -869,7 +869,7 @@ impl Oryxis {
                 self.nav.hover.leave_builtin_ui_theme_card(idx);
             }
             SettingsMessage::UiThemeClone(idx) => {
-                if let Some(theme) = self.custom_ui_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx) {
                     self.ui_theme_editor = Some(crate::state::UiThemeEditorForm {
                         editing_id: None,
                         name: self.unique_ui_theme_name(&theme.name),
@@ -889,7 +889,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::UiThemeExport(idx) => {
-                if let Some(theme) = self.custom_ui_themes.get(idx) {
+                if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx) {
                     let json = crate::theme_export::ui_theme_to_json(theme);
                     let file_name = format!(
                         "{}.json",
@@ -1017,7 +1017,7 @@ impl Oryxis {
             crate::i18n::t("theme_copy_suffix"),
             |n| {
                 oryxis_terminal::TerminalTheme::ALL.iter().any(|t| t.name() == n)
-                    || self.custom_terminal_themes.iter().any(|t| t.name == n)
+                    || self.vaults.cur().custom_terminal_themes.iter().any(|t| t.name == n)
             },
         )
     }
@@ -1025,7 +1025,7 @@ impl Oryxis {
     /// True when a UI theme name collides with a built-in or custom theme.
     fn ui_theme_name_taken(&self, name: &str) -> bool {
         AppTheme::ALL.iter().any(|t| t.name() == name)
-            || self.custom_ui_themes.iter().any(|t| t.name == name)
+            || self.vaults.cur().custom_ui_themes.iter().any(|t| t.name == name)
     }
 
     /// Seed name for a cloned / imported UI theme, unique across built-ins

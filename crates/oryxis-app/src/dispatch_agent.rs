@@ -59,8 +59,9 @@ impl Oryxis {
                 }
             }
             AgentMessage::KeyExposeViaAgentToggled(id) => {
-                if let Some(vault) = &self.vaults.cur().store
-                    && let Some(key) = self.keys.iter_mut().find(|k| k.id == id)
+                let ov = self.vaults.cur_mut();
+                if let Some(vault) = &ov.store
+                    && let Some(key) = ov.keys.iter_mut().find(|k| k.id == id)
                 {
                     key.expose_via_agent = !key.expose_via_agent;
                     key.updated_at = chrono::Utc::now();

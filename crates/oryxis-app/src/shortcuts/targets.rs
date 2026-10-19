@@ -112,7 +112,7 @@ impl Oryxis {
         None
     }
 
-    /// Resolves the active tab to its position in `self.connections`,
+    /// Resolves the active tab to its position in `self.vaults.cur().connections`,
     /// or `None` when no tab is active, the tab is a local shell, or
     /// the saved host has since been deleted. Used by Ctrl+P to open
     /// the host editor for the current connection.
@@ -120,7 +120,7 @@ impl Oryxis {
         let tab_idx = self.cur_active_tab()?;
         let tab = self.tabs.get(tab_idx)?;
         let base_label = tab.label.trim_end_matches(" (disconnected)");
-        self.connections.iter().position(|c| c.label == base_label)
+        self.vaults.cur().connections.iter().position(|c| c.label == base_label)
     }
 
     /// Returns the `widget::Id` of the search/filter input for the

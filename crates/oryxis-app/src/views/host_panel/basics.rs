@@ -191,7 +191,7 @@ impl Oryxis {
         // Icon + color reflect the detected OS (once the silent probe has
         // run) or a user-picked override.
         let editing_conn = self.editor_form.editing_id.and_then(|id| {
-            self.connections.iter().find(|c| c.id == id)
+            self.vaults.cur().connections.iter().find(|c| c.id == id)
         });
         let (addr_glyph, addr_color) = crate::os_icon::resolve_for(
             editing_conn.and_then(|c| c.detected_os.as_deref()),

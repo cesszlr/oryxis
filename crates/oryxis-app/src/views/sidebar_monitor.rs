@@ -205,7 +205,7 @@ impl Oryxis {
         // them. On Auto an empty list really does mean the probe found
         // nothing, and the section stays out of the way.
         let custom_selection = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .any(|c| c.id == conn_id && c.monitor_disks.is_some());
         if !sample.disks.is_empty() || custom_selection {

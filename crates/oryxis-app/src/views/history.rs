@@ -30,7 +30,7 @@ enum TimelineKind<'a> {
     Failure(&'a oryxis_core::models::log_entry::LogEntry),
     /// A recorded session, successful start through end (or still
     /// in progress). Carries the session row + its index in
-    /// `self.session_logs` so the View/Delete buttons can target it.
+    /// `self.vaults.cur().session_logs` so the View/Delete buttons can target it.
     Session {
         idx: usize,
         entry: &'a oryxis_vault::SessionLogEntry,
@@ -58,14 +58,14 @@ impl Oryxis {
 
         // Fully empty: no recorded sessions and no failed-connect logs
         // that would become timeline rows. (Plain Connected/Disconnected
-        // events live in `self.logs` but never render as rows, so checking
-        // `self.logs.is_empty()` would leave the toolbar up with "0
+        // events live in `self.vaults.cur().logs` but never render as rows, so checking
+        // `self.vaults.cur().logs.is_empty()` would leave the toolbar up with "0
         // entries".) Show just the empty state, no toolbar / pagination /
         // Clear all, matching the other empty vault views.
-        let has_timeline = !self.session_logs.is_empty()
+        let has_timeline = !self.vaults.cur().session_logs.is_empty()
             || !self.chat_ui.conversations.is_empty()
             || self
-                .logs
+                .vaults.cur().logs
                 .iter()
                 .any(|e| matches!(e.event, LogEvent::AuthFailed | LogEvent::Error));
         if !has_timeline {
@@ -104,7 +104,7 @@ impl Oryxis {
         // session log row, so we drop Connected/Disconnected events
         // here to avoid showing the same connection twice.
         let mut rows: Vec<TimelineRow<'_>> = Vec::new();
-        for entry in &self.logs {
+        for entry in &self.vaults.cur().logs {
             if !matches!(entry.event, LogEvent::AuthFailed | LogEvent::Error) {
                 continue;
             }
@@ -122,13 +122,13 @@ impl Oryxis {
         let conn_by_id: std::collections::HashMap<
             uuid::Uuid,
             &oryxis_core::models::connection::Connection,
-        > = self.connections.iter().map(|c| (c.id, c)).collect();
+        > = self.vaults.cur().connections.iter().map(|c| (c.id, c)).collect();
         let mut conn_by_label: std::collections::HashMap<&str, _> =
             std::collections::HashMap::new();
-        for c in &self.connections {
+        for c in &self.vaults.cur().connections {
             conn_by_label.entry(c.label.as_str()).or_insert(c);
         }
-        for (idx, entry) in self.session_logs.iter().enumerate() {
+        for (idx, entry) in self.vaults.cur().session_logs.iter().enumerate() {
             // Look up the connection by id so we can show its
             // hostname next to the label (matches the Termius row).
             let hostname = conn_by_id
@@ -211,7 +211,7 @@ impl Oryxis {
 
         let total = rows.len();
         let max_page = total.saturating_sub(1) / per_page.max(1);
-        let page = self.logs_page.min(max_page);
+        let page = self.vaults.cur().logs_page.min(max_page);
         let can_prev = page > 0;
         let can_next = page < max_page;
         let range_label = if total == 0 {
@@ -241,8 +241,8 @@ impl Oryxis {
         // only *requests* the wipe; the actual ClearLogs runs from the
         // confirmation modal in layout.rs.
         // Nothing to clear → the button is disabled (muted, no action).
-        let has_entries = !self.logs.is_empty()
-            || !self.session_logs.is_empty()
+        let has_entries = !self.vaults.cur().logs.is_empty()
+            || !self.vaults.cur().session_logs.is_empty()
             || !self.chat_ui.conversations.is_empty();
         let mut clear_btn = button(
             container(
@@ -353,7 +353,7 @@ impl Oryxis {
         // Privacy reveal toggle, shown whenever Privacy Mode could mask
         // something in this view (global on, or any host forces it on).
         let privacy_applies = self.privacy_global_active()
-            || self.connections.iter().any(|c| c.privacy_mode == Some(true));
+            || self.vaults.cur().connections.iter().any(|c| c.privacy_mode == Some(true));
         if privacy_applies {
             row_items.push(self.keynav_toolbar_slot(
                 crate::keynav::ToolbarItem::PrivacyReveal,
@@ -507,10 +507,10 @@ impl Oryxis {
             // Resolve the recording's host to decide Privacy Mode. Per-host
             // override wins; a deleted host falls back to the global default.
             let viewer_conn = self
-                .session_logs
+                .vaults.cur().session_logs
                 .iter()
                 .find(|e| e.id == log_id)
-                .and_then(|e| self.connections.iter().find(|c| c.id == e.connection_id));
+                .and_then(|e| self.vaults.cur().connections.iter().find(|c| c.id == e.connection_id));
             let privacy_applies = viewer_conn
                 .map(|c| self.privacy_active(c))
                 .unwrap_or_else(|| self.privacy_global_active());
@@ -627,7 +627,7 @@ impl Oryxis {
             // Resolve the viewed recording's index for the actions menu;
             // a row deleted underneath the viewer resolves to None and
             // simply drops the affordances.
-            let viewed_idx = self.session_logs.iter().position(|e| e.id == log_id);
+            let viewed_idx = self.vaults.cur().session_logs.iter().position(|e| e.id == log_id);
             if let Some(idx) = viewed_idx {
                 // Play pairs with full-detail recording, same gate as
                 // the row menu (owner call 2026-07-04).

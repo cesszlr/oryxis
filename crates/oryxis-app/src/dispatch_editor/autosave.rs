@@ -84,7 +84,7 @@ impl Oryxis {
     fn editor_owns_write(&self) -> bool {
         self.editor_form
             .editing_id
-            .is_some_and(|id| self.connections.iter().any(|c| c.id == id))
+            .is_some_and(|id| self.vaults.cur().connections.iter().any(|c| c.id == id))
             && self.editor_saved_snapshot.is_some()
     }
 
@@ -155,13 +155,13 @@ impl Oryxis {
         let Some(id) = self.editor_form.editing_id else {
             return;
         };
-        let Some(conn) = self.connections.iter().find(|c| c.id == id) else {
+        let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == id) else {
             return;
         };
         self.editor_form.group_name = conn
             .group_id
-            .filter(|gid| self.groups.iter().any(|g| g.id == *gid))
-            .map(|gid| oryxis_core::models::Group::path_of(&self.groups, gid))
+            .filter(|gid| self.vaults.cur().groups.iter().any(|g| g.id == *gid))
+            .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
             .unwrap_or_default();
         if !was_dirty && self.editor_saved_snapshot.is_some() {
             self.editor_saved_snapshot = self.editor_form_signature();
@@ -192,7 +192,7 @@ impl Oryxis {
     /// user off the surface they are on. Leaves the baseline empty; the
     /// post-dispatch kick records it from this very form.
     pub(crate) fn editor_prefill_existing(&mut self, id: uuid::Uuid) {
-        let Some(conn) = self.connections.iter().find(|c| c.id == id) else {
+        let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == id) else {
             return;
         };
         self.host_panel_error = None;
@@ -227,7 +227,7 @@ impl Oryxis {
         // literal command is Custom; else None. A dangling
         // snippet id falls back to None.
         self.editor_startup_choice = match conn.startup_snippet_id {
-            Some(id) if self.snippets.iter().any(|s| s.id == id) => {
+            Some(id) if self.vaults.cur().snippets.iter().any(|s| s.id == id) => {
                 crate::state::StartupChoice::Snippet(id)
             }
             _ if !cmd.trim().is_empty() => crate::state::StartupChoice::Custom,
@@ -252,9 +252,9 @@ impl Oryxis {
         let stored = self
             .editor_form
             .editing_id
-            .and_then(|id| self.connections.iter().find(|c| c.id == id))
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .and_then(|c| c.group_id)
-            .map(|gid| oryxis_core::models::Group::path_of(&self.groups, gid))
+            .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
             .unwrap_or_default();
         self.editor_form.group_name.trim() != stored.trim()
     }

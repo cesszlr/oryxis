@@ -143,14 +143,14 @@ impl Oryxis {
                         .and_then(|c| {
                             c.key_id.or_else(|| {
                                 c.identity_id.and_then(|iid| {
-                                    self.identities
+                                    self.vaults.cur().identities
                                         .iter()
                                         .find(|i| i.id == iid)
                                         .and_then(|i| i.key_id)
                                 })
                             })
                         })
-                        .and_then(|kid| self.keys.iter().find(|k| k.id == kid))
+                        .and_then(|kid| self.vaults.cur().keys.iter().find(|k| k.id == kid))
                         .is_some_and(|k| k.algorithm.is_security_key());
                     if sk_pinned && err.to_lowercase().contains("agent") {
                         format!("{err}\n{}", crate::i18n::t("sk_agent_hint"))

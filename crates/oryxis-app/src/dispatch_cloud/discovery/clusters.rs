@@ -26,7 +26,7 @@ impl Oryxis {
                     return Ok(Task::none());
                 };
                 let Some(mut profile) = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == profile_id)
                     .cloned()
@@ -67,7 +67,7 @@ impl Oryxis {
                 let Some(vault) = self.vaults.cur().store.as_ref() else {
                     return Ok(Task::none());
                 };
-                let exists = self.cloud_profiles.iter().any(|p| {
+                let exists = self.vaults.cur().cloud_profiles.iter().any(|p| {
                     p.provider == "k8s"
                         && serde_json::from_str::<serde_json::Value>(&p.config)
                             .ok()
@@ -125,7 +125,7 @@ impl Oryxis {
                 // can't contain a dot, so `cluster.rg` never collides the
                 // way `cluster-rg` did across hyphenated resource groups.
                 let composite = format!("{cluster}.{resource_group}");
-                let already = self.cloud_profiles.iter().any(|p| {
+                let already = self.vaults.cur().cloud_profiles.iter().any(|p| {
                     p.provider == "k8s"
                         && serde_json::from_str::<serde_json::Value>(&p.config)
                             .ok()
@@ -141,7 +141,7 @@ impl Oryxis {
                     return Ok(Task::none());
                 };
                 let Some(mut profile) = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == profile_id)
                     .cloned()
@@ -178,7 +178,7 @@ impl Oryxis {
                 let Some(vault) = self.vaults.cur().store.as_ref() else {
                     return Ok(Task::none());
                 };
-                let exists = self.cloud_profiles.iter().any(|p| {
+                let exists = self.vaults.cur().cloud_profiles.iter().any(|p| {
                     p.provider == "k8s"
                         && serde_json::from_str::<serde_json::Value>(&p.config)
                             .ok()
@@ -240,7 +240,7 @@ impl Oryxis {
                     return Ok(Task::none());
                 }
                 let Some(mut profile) = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == profile_id)
                     .cloned()
@@ -315,7 +315,7 @@ impl Oryxis {
                 // cluster (a different RAM user, a different RBAC) never
                 // has its Kubernetes account repointed at our credential.
                 let existing = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| points_at(p, &path))
                     .cloned();
@@ -416,7 +416,7 @@ impl Oryxis {
     /// would leave a cluster credential on disk that no list shows.
     ///
     /// The account list is read from the vault here, never from
-    /// `self.cloud_profiles` (which `load_vault_entities` fills with an
+    /// `self.vaults.cur().cloud_profiles` (which `load_vault_entities` fills with an
     /// empty default when the read fails), and a failed read or a locked
     /// vault sweeps nothing: an empty list would read as "nothing is
     /// referenced" and take every file with it. Files whose fetch is in

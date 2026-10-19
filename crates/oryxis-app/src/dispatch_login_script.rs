@@ -55,7 +55,7 @@ impl Oryxis {
         // deleted proxy identity.
         let Some(script) = conn
             .login_script_id
-            .and_then(|sid| self.login_scripts.iter().find(|s| s.id == sid))
+            .and_then(|sid| self.vaults.cur().login_scripts.iter().find(|s| s.id == sid))
         else {
             return (startup, Task::none());
         };

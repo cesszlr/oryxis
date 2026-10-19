@@ -72,7 +72,7 @@ impl Oryxis {
             if let Some(script) = self
                 .editor_form
                 .login_script_id
-                .and_then(|id| self.login_scripts.iter().find(|s| s.id == id))
+                .and_then(|id| self.vaults.cur().login_scripts.iter().find(|s| s.id == id))
             {
                 let mut steps = iced::widget::Column::<iced::Element<'_, _>>::new().spacing(2);
                 for (i, step) in script.steps.iter().enumerate() {

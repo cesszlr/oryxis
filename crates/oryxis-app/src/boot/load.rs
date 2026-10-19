@@ -62,28 +62,29 @@ impl Oryxis {
         let stored_group = |app: &Self| {
             app.editor_form
                 .editing_id
-                .and_then(|id| app.connections.iter().find(|c| c.id == id))
+                .and_then(|id| app.vaults.cur().connections.iter().find(|c| c.id == id))
                 .map(|c| {
                     c.group_id
-                        .filter(|gid| app.groups.iter().any(|g| g.id == *gid))
-                        .map(|gid| oryxis_core::models::Group::path_of(&app.groups, gid))
+                        .filter(|gid| app.vaults.cur().groups.iter().any(|g| g.id == *gid))
+                        .map(|gid| oryxis_core::models::Group::path_of(&app.vaults.cur().groups, gid))
                 })
         };
         let group_before = stored_group(self);
         let group_id_of = |app: &Self| {
             app.editor_form
                 .editing_id
-                .and_then(|id| app.connections.iter().find(|c| c.id == id))
+                .and_then(|id| app.vaults.cur().connections.iter().find(|c| c.id == id))
                 .map(|c| c.group_id)
         };
         let group_id_before = group_id_of(self);
         self.load_vault_entities();
-        if let Some(vault) = &self.vaults.cur().store {
-            self.known_hosts = vault.list_known_hosts().unwrap_or_default();
-            self.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
+            ov.known_hosts = vault.list_known_hosts().unwrap_or_default();
+            ov.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
             // A P2P round pulls snippets too; the snippet editor holds its
             // row by id, so a re-sorted list cannot redirect its save.
-            self.snippets = vault.list_snippets().unwrap_or_default();
+            ov.snippets = vault.list_snippets().unwrap_or_default();
         }
         // When the external write MOVED the host (or renamed or moved its
         // folder), the form's Parent Group follows the row FIRST, in both
@@ -114,7 +115,8 @@ impl Oryxis {
     /// then the core entity lists: connections, groups (parent repair),
     /// session groups, keys, identities, proxy identities, cloud profiles.
     fn load_vault_entities(&mut self) {
-        if let Some(vault) = &self.vaults.cur().store {
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
             // Auto-archive sweep: when the user has opted into the
             // cleanup, drop orphan-imported hosts whose `orphaned_at`
             // is older than the configured threshold. Runs before the
@@ -139,11 +141,11 @@ impl Oryxis {
                     }
                 }
             }
-            self.connections = vault.list_connections().unwrap_or_default();
-            self.connections_with_password = vault
+            ov.connections = vault.list_connections().unwrap_or_default();
+            ov.connections_with_password = vault
                 .list_connection_ids_with_password()
                 .unwrap_or_default();
-            self.groups = vault.list_groups().unwrap_or_default();
+            ov.groups = vault.list_groups().unwrap_or_default();
             // Repair invalid parent links before anything renders. Only a
             // manual folder is a container: a dynamic (cloud_query) group
             // resolves its own children and is never opened as a folder,
@@ -154,23 +156,24 @@ impl Oryxis {
             // Re-home each such group on its nearest manual-folder ancestor
             // (or root) and persist the fix. Idempotent: a no-op once the
             // hierarchy is clean.
-            repair_group_parents(&mut self.groups, vault);
-            self.session_groups = vault.list_session_groups().unwrap_or_default();
-            self.keys = vault.list_keys().unwrap_or_default();
-            self.identities = vault.list_identities().unwrap_or_default();
-            self.identities_with_password = vault
+            repair_group_parents(&mut ov.groups, vault);
+            ov.session_groups = vault.list_session_groups().unwrap_or_default();
+            ov.keys = vault.list_keys().unwrap_or_default();
+            ov.identities = vault.list_identities().unwrap_or_default();
+            ov.identities_with_password = vault
                 .list_identity_ids_with_password()
                 .unwrap_or_default();
-            self.proxy_identities = vault.list_proxy_identities().unwrap_or_default();
-            self.login_scripts = vault.list_login_scripts().unwrap_or_default();
-            self.cloud_profiles = vault.list_cloud_profiles().unwrap_or_default();
+            ov.proxy_identities = vault.list_proxy_identities().unwrap_or_default();
+            ov.login_scripts = vault.list_login_scripts().unwrap_or_default();
+            ov.cloud_profiles = vault.list_cloud_profiles().unwrap_or_default();
         }
     }
 
     /// Plugin rows, content lists (snippets, custom themes, port-forward
     /// rules, known hosts) and the retention-pruned event / session logs.
     fn load_vault_plugins_and_logs(&mut self) {
-        if let Some(vault) = &self.vaults.cur().store {
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
 
             // Plugins panel: global auto-update default from settings,
             // then rebuild the per-provider rows from the on-disk
@@ -184,7 +187,7 @@ impl Oryxis {
             );
 
             // (migration runs after the rest of the load, see end of fn)
-            self.snippets = vault.list_snippets().unwrap_or_default();
+            ov.snippets = vault.list_snippets().unwrap_or_default();
             // Install-script presets (issue #147), seeded ONCE per vault:
             // editable copies, so a user's edit or delete must never be
             // overwritten by a later boot. Fixed ids + fixed old
@@ -197,12 +200,12 @@ impl Oryxis {
                 for preset in
                     crate::install_presets::presets(&crate::shell_integration::template())
                 {
-                    if !self.snippets.iter().any(|s| s.id == preset.id) {
+                    if !ov.snippets.iter().any(|s| s.id == preset.id) {
                         let _ = vault.save_snippet(&preset);
-                        self.snippets.push(preset);
+                        ov.snippets.push(preset);
                     }
                 }
-                self.snippets.sort_by(|a, b| a.label.cmp(&b.label));
+                ov.snippets.sort_by(|a, b| a.label.cmp(&b.label));
                 let _ = vault.set_setting("install_presets_seeded", "true");
             }
             // Which install scripts already ran where, for the
@@ -213,11 +216,11 @@ impl Oryxis {
                 .into_iter()
                 .map(|(host, snippet, at)| ((host, snippet), at))
                 .collect();
-            self.custom_terminal_themes =
+            ov.custom_terminal_themes =
                 vault.list_custom_terminal_themes().unwrap_or_default();
-            self.custom_ui_themes = vault.list_custom_ui_themes().unwrap_or_default();
-            self.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
-            self.known_hosts = vault.list_known_hosts().unwrap_or_default();
+            ov.custom_ui_themes = vault.list_custom_ui_themes().unwrap_or_default();
+            ov.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
+            ov.known_hosts = vault.list_known_hosts().unwrap_or_default();
             // Retention: drop events + finished recordings past the
             // configured age before the lists are loaded, so the boot
             // state never shows rows that are about to disappear.
@@ -231,11 +234,11 @@ impl Oryxis {
                     Err(e) => tracing::warn!("logs retention prune failed: {e}"),
                 }
             }
-            self.logs_total = vault.count_logs().unwrap_or(0);
-            self.logs = vault.list_logs_page(self.logs_page * 50, 50).unwrap_or_default();
-            self.session_logs_total = vault.count_session_logs().unwrap_or(0);
-            self.session_logs = vault
-                .list_session_logs_page(self.session_logs_page * 50, 50)
+            ov.logs_total = vault.count_logs().unwrap_or(0);
+            ov.logs = vault.list_logs_page(ov.logs_page * 50, 50).unwrap_or_default();
+            ov.session_logs_total = vault.count_session_logs().unwrap_or(0);
+            ov.session_logs = vault
+                .list_session_logs_page(ov.session_logs_page * 50, 50)
                 .unwrap_or_default();
             // Saved AI conversations share the History timeline. The list is
             // metadata only (turn bodies load when one is opened), so it is
@@ -533,7 +536,8 @@ impl Oryxis {
 
     /// Terminal / SFTP / tab-appearance settings and the vault nav shape.
     fn load_vault_terminal_settings(&mut self) {
-        if let Some(vault) = &self.vaults.cur().store {
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
 
             // Terminal / SFTP / connection settings, load whatever
             // the user previously typed, fall back to defaults silently
@@ -623,7 +627,7 @@ impl Oryxis {
                     std::collections::HashMap<uuid::Uuid, Vec<String>>,
                 >(&v)
             {
-                self.files_recent_folders = map;
+                ov.files_recent_folders = map;
             }
             if let Ok(Some(v)) = vault.get_setting("keyword_highlight") {
                 self.prefs.keyword_highlight = v == "true";
@@ -1146,7 +1150,7 @@ impl Oryxis {
             // load earlier in the boot sequence (`load_data_from_vault`
             // order), so the list is already populated.
             user_chords.extend(
-                self.snippets
+                self.vaults.cur().snippets
                     .iter()
                     .filter_map(|sn| sn.hotkey.as_deref())
                     .filter_map(crate::hotkeys::HotkeyBinding::parse)

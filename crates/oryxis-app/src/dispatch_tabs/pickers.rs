@@ -160,7 +160,7 @@ impl Oryxis {
                 // user clicking Save (even just to change the color)
                 // accidentally overrode the auto-detected icon with
                 // the generic stack glyph.
-                if let Some(conn) = self.connections.iter().find(|c| c.id == conn_id) {
+                if let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == conn_id) {
                     self.icon_picker.icon = conn
                         .custom_icon
                         .clone()

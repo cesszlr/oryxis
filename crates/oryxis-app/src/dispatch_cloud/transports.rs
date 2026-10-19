@@ -141,7 +141,7 @@ impl Oryxis {
                 // tab as a dead placeholder with no explanation when
                 // its backing group had been deleted; surface a dialog
                 // instead.
-                let Some(group) = self.groups.iter().find(|g| g.id == group_id).cloned()
+                let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == group_id).cloned()
                 else {
                     self.show_error_dialog(
                         crate::i18n::t("ecs_exec_start_failed_title").to_string(),
@@ -194,7 +194,7 @@ impl Oryxis {
                 // to an empty string if it's absent, the ECS API
                 // call itself rejects with a clear "region required".
                 let region = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == query.profile_id)
                     .map(|p| super::region_from_profile_config(&p.config))
@@ -257,7 +257,7 @@ impl Oryxis {
                 // pending split-pane target, kubectl exec opens a full tab.
                 self.panels.new_tab_picker = false;
                 self.pending_pane_split = None;
-                let Some(group) = self.groups.iter().find(|g| g.id == group_id).cloned() else {
+                let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == group_id).cloned() else {
                     return Ok(Task::none());
                 };
                 let Some(query) = group.cloud_query.clone() else {
@@ -543,7 +543,7 @@ impl Oryxis {
                 // A short task-id suffix keeps two tasks of the same
                 // service distinguishable.
                 let human = self
-                    .groups
+                    .vaults.cur().groups
                     .iter()
                     .find(|g| g.id == group_id)
                     .and_then(|g| g.cloud_query.as_ref())

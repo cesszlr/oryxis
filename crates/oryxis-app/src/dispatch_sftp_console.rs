@@ -285,7 +285,7 @@ impl Oryxis {
             crate::state::PaneOrigin::Host(id) => id,
             _ => return None,
         };
-        let conn = self.connections.iter().find(|c| c.id == conn_id)?.clone();
+        let conn = self.vaults.cur().connections.iter().find(|c| c.id == conn_id)?.clone();
         if !Self::host_can_console(&conn) {
             return None;
         }

@@ -130,7 +130,7 @@ impl Oryxis {
             ));
         }
         // User-defined themes, selectable per host like the built-ins.
-        for ct in self.custom_terminal_themes.iter() {
+        for ct in self.vaults.cur().custom_terminal_themes.iter() {
             let palette = self.terminal_palette_for_name(&ct.name).unwrap_or_default();
             let traits = palette.traits();
             if !shows(&ct.name, Some(&traits)) {

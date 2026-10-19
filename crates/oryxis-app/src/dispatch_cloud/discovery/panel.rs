@@ -37,7 +37,7 @@ impl Oryxis {
                 // zero typing. The user can clear or change before
                 // hitting Import.
                 self.cloud_discover.default_group_name = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == profile_id)
                     .map(|p| p.label.clone())
@@ -76,7 +76,7 @@ impl Oryxis {
                     && let Some(id) = self.cloud_discover.profile_id
                     && let Some(vault) = &self.vaults.cur().store
                     && let Some(mut cp) = self
-                        .cloud_profiles
+                        .vaults.cur().cloud_profiles
                         .iter()
                         .find(|p| p.id == id)
                         .cloned()

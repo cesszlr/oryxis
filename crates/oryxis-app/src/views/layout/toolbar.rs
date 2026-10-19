@@ -127,7 +127,7 @@ impl Oryxis {
         let mut first = true;
         for _ in 0..5 {
             let Some(id) = cursor else { break };
-            let Some(g) = self.groups.iter().find(|g| g.id == id) else {
+            let Some(g) = self.vaults.cur().groups.iter().find(|g| g.id == id) else {
                 break;
             };
             if !first {

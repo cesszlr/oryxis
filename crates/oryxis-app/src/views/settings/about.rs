@@ -97,7 +97,7 @@ impl Oryxis {
                 8.0,
                 crate::widgets::settings_row_nav(
                     crate::i18n::t("hosts"),
-                    self.connections.len().to_string(),
+                    self.vaults.cur().connections.len().to_string(),
                     Message::Navigation(NavigationMessage::ChangeView(crate::state::View::Dashboard)),
                 ),
             ),
@@ -109,7 +109,7 @@ impl Oryxis {
                 8.0,
                 crate::widgets::settings_row_nav(
                     crate::i18n::t("keychain"),
-                    (self.keys.len() + self.identities.len()).to_string(),
+                    (self.vaults.cur().keys.len() + self.vaults.cur().identities.len()).to_string(),
                     Message::Navigation(NavigationMessage::ChangeView(crate::state::View::Keys)),
                 ),
             ),
@@ -121,7 +121,7 @@ impl Oryxis {
                 8.0,
                 crate::widgets::settings_row_nav(
                     crate::i18n::t("snippets"),
-                    self.snippets.len().to_string(),
+                    self.vaults.cur().snippets.len().to_string(),
                     Message::Navigation(NavigationMessage::ChangeView(crate::state::View::Snippets)),
                 ),
             ),
@@ -133,7 +133,7 @@ impl Oryxis {
                 8.0,
                 crate::widgets::settings_row_nav(
                     t("groups"),
-                    self.groups.len().to_string(),
+                    self.vaults.cur().groups.len().to_string(),
                     Message::Navigation(NavigationMessage::ChangeView(crate::state::View::Dashboard)),
                 ),
             ),
@@ -145,7 +145,7 @@ impl Oryxis {
                 8.0,
                 crate::widgets::settings_row_nav(
                     t("logs"),
-                    (self.logs_total + self.session_logs_total).to_string(),
+                    (self.vaults.cur().logs_total + self.vaults.cur().session_logs_total).to_string(),
                     Message::Navigation(NavigationMessage::ChangeView(crate::state::View::History)),
                 ),
             ),

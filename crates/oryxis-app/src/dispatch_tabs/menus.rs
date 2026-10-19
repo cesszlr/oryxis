@@ -28,7 +28,7 @@ impl Oryxis {
                 // downstream (the menu's items, the card's own kebab
                 // highlight) keys off the id, so a re-sort under the
                 // open menu can't re-aim it at another host.
-                let Some(id) = self.connections.get(idx).map(|c| c.id) else {
+                let Some(id) = self.vaults.cur().connections.get(idx).map(|c| c.id) else {
                     return Task::none();
                 };
                 if self.card_context_menu == Some(id) {
@@ -51,7 +51,7 @@ impl Oryxis {
                 // `card_context_menu` here: that flag pins the
                 // dashboard card's kebab, which the tree row doesn't
                 // have.
-                let Some(id) = self.connections.get(idx).map(|c| c.id) else {
+                let Some(id) = self.vaults.cur().connections.get(idx).map(|c| c.id) else {
                     return Task::none();
                 };
                 let anchor = self.keynav_take_menu_anchor();

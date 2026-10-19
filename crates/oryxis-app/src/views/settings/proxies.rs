@@ -20,7 +20,7 @@ impl Oryxis {
         // Keyboard-navigation order (one row each), collected as the
         // rows render so it always matches the filtered set on screen.
         let mut proxy_nav: Vec<Vec<crate::keynav::NavItem>> = Vec::new();
-        for pi in self.proxy_identities.iter().filter(|pi| {
+        for pi in self.vaults.cur().proxy_identities.iter().filter(|pi| {
             needle.is_empty()
                 || pi.label.to_lowercase().contains(&needle)
                 || pi.host.to_lowercase().contains(&needle)
@@ -198,7 +198,7 @@ impl Oryxis {
         // Empty + no form open → polished centered empty state (matches
         // Hosts / Keychain / Snippets), no toolbar (search hidden + the
         // "+ New" lives in the CTA).
-        if self.proxy_identities.is_empty() && !self.proxy_identity_form.visible {
+        if self.vaults.cur().proxy_identities.is_empty() && !self.proxy_identity_form.visible {
             let empty = crate::widgets::empty_state(
                 iced_fonts::lucide::router()
                     .size(32)

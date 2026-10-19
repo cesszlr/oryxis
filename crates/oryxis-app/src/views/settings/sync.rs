@@ -256,7 +256,7 @@ impl Oryxis {
         // current selection or a placeholder.
         let selected_conn = self
             .sync.sftp.host_id
-            .and_then(|id| self.connections.iter().find(|c| c.id == id));
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id));
         let host_trigger_inner: Element<'_, Message> = if let Some(c) = selected_conn {
             dir_row(vec![
                 host_badge(c, &self.prefs.default_host_icon, 22.0),

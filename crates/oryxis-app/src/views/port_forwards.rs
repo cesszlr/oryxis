@@ -111,7 +111,7 @@ impl Oryxis {
             Space::new().boxed()
         };
 
-        if self.port_forward_rules.is_empty() {
+        if self.vaults.cur().port_forward_rules.is_empty() {
             let empty_state = crate::widgets::empty_state(
                 iced_fonts::lucide::route()
                     .size(32)
@@ -144,9 +144,9 @@ impl Oryxis {
         // Keyboard-navigation order, collected as the cards render so
         // it always matches the filtered set on screen.
         let mut pf_nav: Vec<crate::keynav::NavItem> = Vec::new();
-        for (idx, rule) in self.port_forward_rules.iter().enumerate() {
+        for (idx, rule) in self.vaults.cur().port_forward_rules.iter().enumerate() {
             let host_label = self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == rule.host_id)
                 .map(|c| c.label.clone())
@@ -403,13 +403,13 @@ impl Oryxis {
 
         // Host picker. Options are connection labels; the on_select closure
         // resolves the label back to the connection id.
-        let host_options: Vec<String> = self.connections.iter().map(|c| c.label.clone()).collect();
+        let host_options: Vec<String> = self.vaults.cur().connections.iter().map(|c| c.label.clone()).collect();
         let selected_host_label = self
             .port_forward_form.host_id
-            .and_then(|id| self.connections.iter().find(|c| c.id == id))
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .map(|c| c.label.clone());
         let host_lookup: std::collections::HashMap<String, uuid::Uuid> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .map(|c| (c.label.clone(), c.id))
             .collect();
@@ -525,7 +525,7 @@ impl Oryxis {
         // Cancel/Save pair).
         let mut body = column![form];
         if let Some(edit_id) = self.port_forward_form.editing_id
-            && let Some(idx) = self.port_forward_rules.iter().position(|r| r.id == edit_id)
+            && let Some(idx) = self.vaults.cur().port_forward_rules.iter().position(|r| r.id == edit_id)
         {
             let del_btn = self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::PortForward(PortForwardMessage::RequestDeletePortForwardRule(idx))),

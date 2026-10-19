@@ -19,7 +19,7 @@ impl Oryxis {
     /// reference gets cleaned up.
     pub(crate) fn hydrate_group_defaults_form(&mut self, gid: uuid::Uuid) {
         let defaults = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .find(|g| g.id == gid)
             .and_then(|g| g.defaults.clone())
@@ -28,19 +28,19 @@ impl Oryxis {
         self.group_edit.username = defaults.username.clone().unwrap_or_default();
         self.group_edit.port = defaults.port.map(|p| p.to_string()).unwrap_or_default();
         self.group_edit.identity_label = defaults.identity_id.and_then(|id| {
-            self.identities
+            self.vaults.cur().identities
                 .iter()
                 .find(|i| i.id == id)
                 .map(|i| i.label.clone())
         });
         self.group_edit.proxy_identity_label = defaults.proxy_identity_id.and_then(|id| {
-            self.proxy_identities
+            self.vaults.cur().proxy_identities
                 .iter()
                 .find(|p| p.id == id)
                 .map(|p| p.label.clone())
         });
         self.group_edit.startup_snippet_label = defaults.startup_snippet_id.and_then(|id| {
-            self.snippets
+            self.vaults.cur().snippets
                 .iter()
                 .find(|s| s.id == id)
                 .map(|s| s.label.clone())
@@ -67,13 +67,13 @@ impl Oryxis {
         let defaults = GroupDefaults {
             username: Some(form.username.trim().to_string()).filter(|u| !u.is_empty()),
             identity_id: form.identity_label.as_ref().and_then(|label| {
-                self.identities
+                self.vaults.cur().identities
                     .iter()
                     .find(|i| &i.label == label)
                     .map(|i| i.id)
             }),
             proxy_identity_id: form.proxy_identity_label.as_ref().and_then(|label| {
-                self.proxy_identities
+                self.vaults.cur().proxy_identities
                     .iter()
                     .find(|p| &p.label == label)
                     .map(|p| p.id)
@@ -90,7 +90,7 @@ impl Oryxis {
                 .collect(),
             terminal_theme: form.terminal_theme.clone().filter(|t| !t.is_empty()),
             startup_snippet_id: form.startup_snippet_label.as_ref().and_then(|label| {
-                self.snippets
+                self.vaults.cur().snippets
                     .iter()
                     .find(|s| &s.label == label)
                     .map(|s| s.id)
@@ -114,7 +114,7 @@ impl Oryxis {
             if !seen.insert(id) {
                 return None;
             }
-            let group = self.groups.iter().find(|g| g.id == id)?;
+            let group = self.vaults.cur().groups.iter().find(|g| g.id == id)?;
             if let Some(port) = group.defaults.as_ref().and_then(|d| d.port) {
                 return Some(port);
             }

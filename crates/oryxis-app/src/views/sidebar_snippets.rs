@@ -218,22 +218,22 @@ impl Oryxis {
         };
 
         // Sort then filter, carrying original indices so Run/Paste/Edit
-        // address the right snippet (the list reorders, `self.snippets`
+        // address the right snippet (the list reorders, `self.vaults.cur().snippets`
         // does not). The search needle also matches tags and the group
         // name; the tag filter (when on and a tagged saved host is
         // focused) keeps only snippets sharing at least one tag.
         let needle = self.sidebar_snippet_search.to_lowercase();
         let host_tags = self.focused_host_tags_lower();
-        let mut order: Vec<usize> = (0..self.snippets.len()).collect();
+        let mut order: Vec<usize> = (0..self.vaults.cur().snippets.len()).collect();
         self.snippets_sort.sort_items(
             &mut order,
-            |&i| self.snippets[i].label.clone(),
-            |&i| self.snippets[i].created_at,
+            |&i| self.vaults.cur().snippets[i].label.clone(),
+            |&i| self.vaults.cur().snippets[i].created_at,
         );
         let visible: Vec<usize> = order
             .into_iter()
             .filter(|&idx| {
-                let snip = &self.snippets[idx];
+                let snip = &self.vaults.cur().snippets[idx];
                 let needle_ok = needle.is_empty()
                     || snip.label.to_lowercase().contains(&needle)
                     || snip.command.to_lowercase().contains(&needle)
@@ -315,7 +315,7 @@ impl Oryxis {
                 .iter()
                 .copied()
                 .filter(|&i| {
-                    self.snippets[i]
+                    self.vaults.cur().snippets[i]
                         .group
                         .as_ref()
                         .is_some_and(|g| g.eq_ignore_ascii_case(&open))
@@ -328,7 +328,7 @@ impl Oryxis {
                 let count = visible
                     .iter()
                     .filter(|&&i| {
-                        self.snippets[i]
+                        self.vaults.cur().snippets[i]
                             .group
                             .as_ref()
                             .is_some_and(|g| g.eq_ignore_ascii_case(&name))
@@ -341,7 +341,7 @@ impl Oryxis {
             snippet_rows = visible
                 .iter()
                 .copied()
-                .filter(|&i| self.snippets[i].group.is_none())
+                .filter(|&i| self.vaults.cur().snippets[i].group.is_none())
                 .collect();
         }
         for (name, count) in folder_rows {
@@ -403,7 +403,7 @@ impl Oryxis {
                 _ => None,
             });
         for idx in snippet_rows {
-            let snip = &self.snippets[idx];
+            let snip = &self.vaults.cur().snippets[idx];
             let row = snippet_row(
                 idx,
                 &snip.label,
@@ -614,7 +614,7 @@ impl Oryxis {
         .padding(12);
 
         if let Some(edit_id) = self.snippet_form.editing_id
-            && let Some(idx) = self.snippets.iter().position(|s| s.id == edit_id)
+            && let Some(idx) = self.vaults.cur().snippets.iter().position(|s| s.id == edit_id)
         {
             let delete = button(
                 container(text(t("delete")).size(13).color(OryxisColors::t().error))

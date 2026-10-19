@@ -827,7 +827,7 @@ impl Oryxis {
                     .and_then(|p| p.mosh_ambiguous_width)
                     .unwrap_or_else(|| {
                         rules_conn_id
-                            .and_then(|id| self.connections.iter().find(|c| c.id == id))
+                            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
                             .is_some_and(|c| c.ambiguous_width_effective())
                     });
                 // What each action-bearing rule should DO, resolved

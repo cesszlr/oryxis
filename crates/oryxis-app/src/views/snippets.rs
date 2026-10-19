@@ -153,7 +153,7 @@ impl Oryxis {
             Space::new().boxed()
         };
 
-        if self.snippets.is_empty() {
+        if self.vaults.cur().snippets.is_empty() {
             let empty_state = crate::widgets::empty_state(
                 iced_fonts::lucide::code()
                     .size(32)
@@ -186,16 +186,16 @@ impl Oryxis {
         // EditSnippet / RunSnippet messages carry). The needle also
         // matches tags and the group name; the toolbar tag filter keeps
         // snippets carrying ANY selected tag.
-        let mut snippet_order: Vec<usize> = (0..self.snippets.len()).collect();
+        let mut snippet_order: Vec<usize> = (0..self.vaults.cur().snippets.len()).collect();
         self.snippets_sort.sort_items(
             &mut snippet_order,
-            |&i| self.snippets[i].label.clone(),
-            |&i| self.snippets[i].created_at,
+            |&i| self.vaults.cur().snippets[i].label.clone(),
+            |&i| self.vaults.cur().snippets[i].created_at,
         );
         let visible: Vec<usize> = snippet_order
             .into_iter()
             .filter(|&idx| {
-                let snip = &self.snippets[idx];
+                let snip = &self.vaults.cur().snippets[idx];
                 let needle_ok = snippet_needle.is_empty()
                     || snip.label.to_lowercase().contains(&snippet_needle)
                     || snip.command.to_lowercase().contains(&snippet_needle)
@@ -233,7 +233,7 @@ impl Oryxis {
                 .iter()
                 .copied()
                 .filter(|&i| {
-                    self.snippets[i]
+                    self.vaults.cur().snippets[i]
                         .group
                         .as_ref()
                         .is_some_and(|g| g.eq_ignore_ascii_case(open_group))
@@ -260,7 +260,7 @@ impl Oryxis {
                 let count = visible
                     .iter()
                     .filter(|&&i| {
-                        self.snippets[i]
+                        self.vaults.cur().snippets[i]
                             .group
                             .as_ref()
                             .is_some_and(|g| g.eq_ignore_ascii_case(name))
@@ -279,7 +279,7 @@ impl Oryxis {
             let ungrouped: Vec<usize> = visible
                 .iter()
                 .copied()
-                .filter(|&i| self.snippets[i].group.is_none())
+                .filter(|&i| self.vaults.cur().snippets[i].group.is_none())
                 .collect();
             if !ungrouped.is_empty() || section_blocks.is_empty() {
                 snippet_nav_sections.push(
@@ -450,7 +450,7 @@ impl Oryxis {
     /// hashtag line + hover kebab + selection ring). Extracted so the
     /// root and in-group layouts share it.
     fn snippet_card(&self, idx: usize) -> Element<'_, Message> {
-        let snip = &self.snippets[idx];
+        let snip = &self.vaults.cur().snippets[idx];
             let kb_selected = self.kn().selected_in(crate::keynav::FocusZone::Content)
                 == Some(crate::keynav::NavItem::Snippet(idx));
             // Use host_icon so the snippet badge follows the global

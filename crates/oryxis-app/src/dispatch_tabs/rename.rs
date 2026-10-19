@@ -92,7 +92,7 @@ impl Oryxis {
             TabsMessage::StartRenameFolder(gid) => {
                 self.overlay = None;
                 let current = self
-                    .groups
+                    .vaults.cur().groups
                     .iter()
                     .find(|g| g.id == gid)
                     .map(|g| g.label.clone())
@@ -107,12 +107,13 @@ impl Oryxis {
             TabsMessage::ConfirmRenameFolder => {
                 if let Some((gid, new_label)) = self.folder_rename.take() {
                     let trimmed = new_label.trim();
+                    let ov = self.vaults.cur_mut();
                     if !trimmed.is_empty()
-                        && let Some(group) = self.groups.iter_mut().find(|g| g.id == gid)
+                        && let Some(group) = ov.groups.iter_mut().find(|g| g.id == gid)
                     {
                         group.label = trimmed.to_string();
                         group.updated_at = chrono::Utc::now();
-                        if let Some(vault) = &self.vaults.cur().store {
+                        if let Some(vault) = &ov.store {
                             let _ = vault.save_group(group);
                         }
                     }

@@ -170,7 +170,7 @@ impl Oryxis {
     fn arm_local_startup(&mut self, pane_id: Uuid, conn: &oryxis_core::models::Connection) {
         let snippet = conn
             .startup_snippet_id
-            .and_then(|id| self.snippets.iter().find(|s| s.id == id))
+            .and_then(|id| self.vaults.cur().snippets.iter().find(|s| s.id == id))
             .cloned();
         // A startup snippet with actions runs them once the shell is quiet.
         if let Some(snip) = snippet.as_ref().filter(|s| s.has_steps()) {
@@ -275,12 +275,14 @@ impl Oryxis {
         let terminal = Arc::new(Mutex::new(state));
         let tab_idx = self.tabs.len();
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vaults.cur().store.as_ref().map(|vault| {
+            let ov = self.vaults.cur_mut();
+
+            ov.store.as_ref().map(|vault| {
                 let log_id = Uuid::new_v4();
                 if let Err(e) = vault.create_session_log(&log_id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");
                 }
-                self.session_logs_total += 1;
+                ov.session_logs_total += 1;
                 log_id
             })
         } else {
@@ -422,7 +424,7 @@ impl Oryxis {
             None
         };
         if session_log_id.is_some() {
-            self.session_logs_total += 1;
+            self.vaults.cur_mut().session_logs_total += 1;
         }
         let Some(pane) = self.tabs.get_mut(tab_idx).and_then(|t| t.pane_by_id_mut(pane_id)) else {
             return Task::none();

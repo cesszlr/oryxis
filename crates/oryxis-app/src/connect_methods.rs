@@ -80,7 +80,7 @@ impl Oryxis {
     /// from the in-memory key list; resolved alongside the private key so
     /// a certificate can never be paired with the wrong key.
     pub(crate) fn key_certificate(&self, kid: &uuid::Uuid) -> Option<String> {
-        self.keys
+        self.vaults.cur().keys
             .iter()
             .find(|k| k.id == *kid)
             .and_then(|k| k.certificate.clone())
@@ -94,10 +94,10 @@ impl Oryxis {
     pub(crate) fn pinned_agent_public(&self, conn: &Connection) -> Option<String> {
         let kid = conn.key_id.or_else(|| {
             conn.identity_id.and_then(|iid| {
-                self.identities.iter().find(|i| i.id == iid).and_then(|i| i.key_id)
+                self.vaults.cur().identities.iter().find(|i| i.id == iid).and_then(|i| i.key_id)
             })
         })?;
-        self.keys
+        self.vaults.cur().keys
             .iter()
             .find(|k| k.id == kid)
             .map(|k| k.public_key.clone())
@@ -120,10 +120,10 @@ impl Oryxis {
         }
         let kid = conn.key_id.or_else(|| {
             conn.identity_id.and_then(|iid| {
-                self.identities.iter().find(|i| i.id == iid).and_then(|i| i.key_id)
+                self.vaults.cur().identities.iter().find(|i| i.id == iid).and_then(|i| i.key_id)
             })
         });
-        if let Some(key) = kid.and_then(|kid| self.keys.iter().find(|k| k.id == kid)) {
+        if let Some(key) = kid.and_then(|kid| self.vaults.cur().keys.iter().find(|k| k.id == kid)) {
             return key.algorithm.is_security_key() && key.has_private;
         }
         oryxis_vault::resolve_disk_key(
@@ -189,7 +189,7 @@ impl Oryxis {
                 .as_ref()
                 .and_then(|v| v.get_identity_password(&iid).ok().flatten());
             let kid = self
-                .identities
+                .vaults.cur().identities
                 .iter()
                 .find(|i| i.id == iid)
                 .and_then(|i| i.key_id);
@@ -233,7 +233,7 @@ impl Oryxis {
         conn.jump_chain = oryxis_core::jump_route::expanded_jump_chain(
             conn.id,
             &conn.jump_chain,
-            &self.connections,
+            &self.vaults.cur().connections,
         );
     }
 
@@ -275,7 +275,7 @@ impl Oryxis {
         for jid in &conn.jump_chain {
             // A dangling hop id stays a resolver miss, reported by the
             // engine as "jump host not found" like before.
-            let Some(hop) = self.connections.iter().find(|c| c.id == *jid) else {
+            let Some(hop) = self.vaults.cur().connections.iter().find(|c| c.id == *jid) else {
                 continue;
             };
             let mut hop = hop.clone();
@@ -376,7 +376,7 @@ impl Oryxis {
     /// `known_hosts` snapshot. Read-only, known-host writes still happen
     /// in the connect handler itself.
     pub(crate) fn make_host_key_check(&self) -> oryxis_ssh::HostKeyCheckCallback {
-        let snapshot = Arc::new(Mutex::new(self.known_hosts.clone()));
+        let snapshot = Arc::new(Mutex::new(self.vaults.cur().known_hosts.clone()));
         Arc::new(move |host, port, key_type, fingerprint| {
             let hosts = match snapshot.lock() {
                 Ok(g) => g,
@@ -404,7 +404,7 @@ impl Oryxis {
     /// resolves to the vault-backed host). The label-keyed reconnect and
     /// status paths use this to cover ad-hoc tabs too.
     pub(crate) fn any_connection_by_label(&self, label: &str) -> Option<&Connection> {
-        self.connections
+        self.vaults.cur().connections
             .iter()
             .find(|c| c.label == label)
             .or_else(|| {
@@ -444,7 +444,7 @@ impl Oryxis {
     /// a group's identity default, answered here from app state the way
     /// the vault answers it from its column.
     pub(crate) fn host_answers_credentials(&self, conn: &Connection) -> bool {
-        conn.key_id.is_some() || self.connections_with_password.contains(&conn.id)
+        conn.key_id.is_some() || self.vaults.cur().connections_with_password.contains(&conn.id)
     }
 
     /// The login `conn` will dial with once its groups have had their
@@ -464,12 +464,12 @@ impl Oryxis {
     ) -> oryxis_core::models::inheritance::EffectiveLogin {
         let chain = conn
             .group_id
-            .map(|gid| oryxis_core::models::Group::ancestry(&self.groups, gid).chain)
+            .map(|gid| oryxis_core::models::Group::ancestry(&self.vaults.cur().groups, gid).chain)
             .unwrap_or_default();
         oryxis_core::models::inheritance::effective_login(
             conn,
             &chain,
-            &self.identities,
+            &self.vaults.cur().identities,
             self.host_answers_credentials(conn),
         )
     }
@@ -629,7 +629,7 @@ impl Oryxis {
             return None;
         }
         let needle = target.host.to_lowercase();
-        let matches_saved = self.connections.iter().any(|c| {
+        let matches_saved = self.vaults.cur().connections.iter().any(|c| {
             c.label.to_lowercase().contains(&needle)
                 || c.hostname.to_lowercase().contains(&needle)
         });

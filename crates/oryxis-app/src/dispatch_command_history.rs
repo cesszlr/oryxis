@@ -27,19 +27,19 @@ impl Oryxis {
                 self.cmd_history_search = v;
             }
             CommandHistoryMessage::ExportCommandHistory => {
-                let Some(host) = self.command_history_host else {
+                let Some(host) = self.vaults.cur().command_history_host else {
                     return Task::none();
                 };
-                if self.command_history.is_empty() {
+                if self.vaults.cur().command_history.is_empty() {
                     return Task::none();
                 }
                 let label = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == host)
                     .map(|c| c.label.clone())
                     .unwrap_or_else(|| host.to_string());
-                let body = render_history_txt(&label, &self.command_history);
+                let body = render_history_txt(&label, &self.vaults.cur().command_history);
                 let default_name = format!("oryxis-history-{}.txt", crate::util::sanitize_file_stem(&label));
                 return Task::perform(
                     tokio::task::spawn_blocking(move || {
@@ -113,7 +113,7 @@ impl Oryxis {
                 // the row on hover, one pixel from the paste click, so it
                 // goes through the shared confirm (Enter confirms via the
                 // modal keyboard layer, like every other destructive).
-                if let Some(entry) = self.command_history.iter().find(|e| e.id == id) {
+                if let Some(entry) = self.vaults.cur().command_history.iter().find(|e| e.id == id) {
                     let name: String = entry.command.lines().next().unwrap_or("").chars().take(48).collect();
                     self.confirm_remove(name, Message::CommandHistory(CommandHistoryMessage::DeleteHistoryCommand(id)));
                 }
@@ -127,7 +127,7 @@ impl Oryxis {
                 // any future "my history vanished" report is
                 // attributable at a glance.
                 tracing::info!(%id, "command-history: entry deleted by user");
-                self.command_history.retain(|e| e.id != id);
+                self.vaults.cur_mut().command_history.retain(|e| e.id != id);
             }
         }
         Task::none()
@@ -403,7 +403,7 @@ impl Oryxis {
         // purpose (no vault), that is the feature.
         if self.prefs.command_history_file {
             let label = self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == host)
                 .map(|c| c.label.clone())
@@ -413,7 +413,7 @@ impl Oryxis {
             }
         }
         if self.sidebar_tab_shown(crate::state::TerminalSidebarTab::History)
-            && self.command_history_host == Some(host)
+            && self.vaults.cur().command_history_host == Some(host)
         {
             self.refresh_command_history();
         }
@@ -536,8 +536,8 @@ impl Oryxis {
                 crate::state::PaneOrigin::Host(id) => Some(*id),
                 _ => None,
             });
-        self.command_history_host = host;
-        self.command_history = match (host, &self.vaults.cur().store) {
+        self.vaults.cur_mut().command_history_host = host;
+        self.vaults.cur_mut().command_history = match (host, &self.vaults.cur_mut().store) {
             (Some(h), Some(v)) => v.list_command_history(&h).unwrap_or_default(),
             _ => Vec::new(),
         };
@@ -550,7 +550,7 @@ impl Oryxis {
     /// counts another use.
     fn inject_history_command(&mut self, id: Uuid, run: bool) {
         let Some(cmd) = self
-            .command_history
+            .vaults.cur().command_history
             .iter()
             .find(|e| e.id == id)
             .map(|e| e.command.clone())

@@ -303,7 +303,7 @@ impl Oryxis {
                 t.active().session.as_ref().is_some_and(|s| {
                     s.ssh().is_some() || s.survives_roaming()
                 })
-                    || self.connections.iter().any(|c| {
+                    || self.vaults.cur().connections.iter().any(|c| {
                         c.label == base
                             && c.protocol
                                 == oryxis_core::models::connection::ConnectionProtocol::Ssh
@@ -591,7 +591,7 @@ impl Oryxis {
             // `ConnectSsh` takes a position in `connections`, resolved in
             // the same frame the row is drawn, which is how every other
             // host row in the app reaches it (the picker's included).
-            let Some(idx) = self.connections.iter().position(|x| x.id == c.id) else {
+            let Some(idx) = self.vaults.cur().connections.iter().position(|x| x.id == c.id) else {
                 continue;
             };
             let label =
@@ -759,10 +759,10 @@ impl Oryxis {
         // Rows are full breadcrumb paths so a subgroup is a pickable
         // import target; the import side resolves paths first.
         let mut all_groups: Vec<String> = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter(|g| g.cloud_query.is_none())
-            .map(|g| oryxis_core::models::Group::path_of(&self.groups, g.id))
+            .map(|g| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, g.id))
             .filter(|path| {
                 picker_needle.is_empty()
                     || path.to_lowercase().contains(&picker_needle)
@@ -912,7 +912,7 @@ impl Oryxis {
             crate::state::GroupPickerTarget::GroupEditParent => self
                 .group_edit
                 .id
-                .map(|gid| oryxis_core::models::Group::subtree_ids(&self.groups, gid))
+                .map(|gid| oryxis_core::models::Group::subtree_ids(&self.vaults.cur().groups, gid))
                 .unwrap_or_default(),
             _ => Default::default(),
         };
@@ -921,10 +921,10 @@ impl Oryxis {
         // the path, and picking fills the path into the combo (the
         // save side resolves paths first).
         let mut all_groups: Vec<String> = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter(|g| g.cloud_query.is_none() && !excluded.contains(&g.id))
-            .map(|g| oryxis_core::models::Group::path_of(&self.groups, g.id))
+            .map(|g| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, g.id))
             .filter(|path| {
                 needle.is_empty() || path.to_lowercase().contains(&needle)
             })
@@ -1069,19 +1069,19 @@ impl Oryxis {
                 match self.cur_nav().active_group {
                     Some(gid)
                         if self
-                            .groups
+                            .vaults.cur().groups
                             .iter()
                             .find(|g| g.id == gid)
                             .and_then(|g| g.cloud_query.as_ref())
                             .is_some() => {}
                     Some(gid) => {
                         let linked = self
-                            .connections
+                            .vaults.cur().connections
                             .iter()
                             .filter(|c| c.group_id == Some(gid))
                             .find_map(|c| c.cloud_ref.as_ref().map(|r| r.profile_id))
                             .or_else(|| {
-                                self.groups
+                                self.vaults.cur().groups
                                     .iter()
                                     .filter(|g| g.parent_id == Some(gid))
                                     .find_map(|g| {
@@ -1262,7 +1262,7 @@ impl Oryxis {
                     Message::History(HistoryMessage::LogsPageNext),
                     secondary,
                 ));
-                if !self.logs.is_empty() || !self.session_logs.is_empty() {
+                if !self.vaults.cur().logs.is_empty() || !self.vaults.cur().session_logs.is_empty() {
                     col = col.push(self.menu_item(
                         iced_fonts::lucide::trash(),
                         crate::i18n::t("clear_all"),

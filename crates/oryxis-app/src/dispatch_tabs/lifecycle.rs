@@ -599,11 +599,11 @@ impl Oryxis {
             // the legacy fallback below.
             let conn_idx = match &tab.active().origin {
                 crate::state::PaneOrigin::Host(hid) => {
-                    self.connections.iter().position(|c| c.id == *hid)?
+                    self.vaults.cur().connections.iter().position(|c| c.id == *hid)?
                 }
-                _ => self.connections.iter().position(|c| c.label == base_label)?,
+                _ => self.vaults.cur().connections.iter().position(|c| c.label == base_label)?,
             };
-            let plain_ssh = self.connections[conn_idx]
+            let plain_ssh = self.vaults.cur().connections[conn_idx]
                 .cloud_ref
                 .as_ref()
                 .is_none_or(|c| c.transport_pref == TransportKind::Ssh);
@@ -713,9 +713,9 @@ impl Oryxis {
             // covers panes without one.
             let conn_idx = match &tab.active().origin {
                 crate::state::PaneOrigin::Host(hid) => {
-                    self.connections.iter().position(|c| c.id == *hid)
+                    self.vaults.cur().connections.iter().position(|c| c.id == *hid)
                 }
-                _ => self.connections.iter().position(|c| c.label == base_label),
+                _ => self.vaults.cur().connections.iter().position(|c| c.label == base_label),
             };
             // A quick-connect tab has no saved connection; rebuild it
             // from its stored entry instead of silently closing.
@@ -886,12 +886,12 @@ impl Oryxis {
                 .trim_end_matches(" (disconnected)")
                 .trim_start_matches(crate::app::SSM_TAB_PREFIX)
                 .to_string();
-            if let Some(ci) = self.connections.iter().position(|c| c.label == base_label) {
+            if let Some(ci) = self.vaults.cur().connections.iter().position(|c| c.label == base_label) {
                 // A remote-desktop host opens an OS client, never a tab
                 // (`start_ssh_tab` punts to `launch_remote_desktop`), so
                 // arming here would park the request on nothing.
                 let spawns_tab = !matches!(
-                    self.connections[ci].protocol,
+                    self.vaults.cur().connections[ci].protocol,
                     oryxis_core::models::connection::ConnectionProtocol::RemoteDesktop
                 );
                 if spawns_tab {
@@ -925,7 +925,7 @@ impl Oryxis {
         let mut cloud = false;
         let open = match spec {
             PinnedTabSpec::Host { id, .. } => self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .position(|c| c.id == *id)
                 .map(|v| Message::Ssh(SshMessage::ConnectSsh(v))),

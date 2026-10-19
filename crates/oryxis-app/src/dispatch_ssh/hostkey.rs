@@ -53,7 +53,7 @@ impl Oryxis {
                         &query.hostname, query.port, &query.key_type, &query.fingerprint,
                     );
                     let _ = vault.save_known_host(&kh);
-                    self.known_hosts = vault.list_known_hosts().unwrap_or_default();
+                    self.vaults.cur_mut().known_hosts = vault.list_known_hosts().unwrap_or_default();
                 }
                 self.pending_host_key = None;
                 if let Some(tx) = self.active_host_key_tx.take() {
@@ -142,7 +142,7 @@ impl Oryxis {
                 // the server wants an algorithm russh can't provide, so show
                 // a plain error instead of looping the dialog.
                 let already_pinned = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == conn_id)
                     .or_else(|| self.quick_connects.get(&conn_id).map(|e| &e.conn))
@@ -219,11 +219,11 @@ impl Oryxis {
                         to_full(oryxis_ssh::algorithms::expanded_host_keys());
                 };
                 if let Some(idx) =
-                    self.connections.iter().position(|c| c.id == pending.conn_id)
+                    self.vaults.cur().connections.iter().position(|c| c.id == pending.conn_id)
                 {
-                    expand(&mut self.connections[idx]);
+                    expand(&mut self.vaults.cur_mut().connections[idx]);
                     if remember && let Some(vault) = &self.vaults.cur().store {
-                        let _ = vault.save_connection(&self.connections[idx], None);
+                        let _ = vault.save_connection(&self.vaults.cur().connections[idx], None);
                     }
                 } else if let Some(entry) = self.quick_connects.get_mut(&pending.conn_id) {
                     // Ad-hoc host: expand the in-memory entry only. There

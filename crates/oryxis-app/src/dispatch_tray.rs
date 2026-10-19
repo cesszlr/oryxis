@@ -422,7 +422,7 @@ impl Oryxis {
             }
             TrayMessage::OpenHost(uuid) => {
                 if let Some(idx) =
-                    self.connections.iter().position(|c| c.id == uuid)
+                    self.vaults.cur().connections.iter().position(|c| c.id == uuid)
                 {
                     return Task::batch(vec![
                         Task::done(Message::Tray(TrayMessage::Show)),

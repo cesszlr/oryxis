@@ -41,10 +41,10 @@ impl Oryxis {
         // host override wins, a deleted host falls back to the global
         // default; the toolbar Reveal toggle lifts the masking.
         let conn = self
-            .session_logs
+            .vaults.cur().session_logs
             .iter()
             .find(|e| e.id == p.log_id)
-            .and_then(|e| self.connections.iter().find(|c| c.id == e.connection_id));
+            .and_then(|e| self.vaults.cur().connections.iter().find(|c| c.id == e.connection_id));
         let privacy_applies = conn
             .map(|c| self.privacy_active(c))
             .unwrap_or_else(|| self.privacy_global_active());
@@ -77,7 +77,7 @@ impl Oryxis {
         // `...` menu (exports + delete). Resolved by index like the
         // viewer does; a row deleted underneath the player simply
         // drops the affordances.
-        if let Some(idx) = self.session_logs.iter().position(|e| e.id == p.log_id) {
+        if let Some(idx) = self.vaults.cur().session_logs.iter().position(|e| e.id == p.log_id) {
             header_items.push(super::history::viewer_header_btn(
                 iced_fonts::lucide::file_text()
                     .size(11)

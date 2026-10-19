@@ -608,7 +608,7 @@ pub(crate) fn initial_path_items<'a>(
         .pane(side)
         .host_label
         .as_ref()
-        .and_then(|label| app.connections.iter().find(|c| &c.label == label))
+        .and_then(|label| app.vaults.cur().connections.iter().find(|c| &c.label == label))
     else {
         return Vec::new();
     };

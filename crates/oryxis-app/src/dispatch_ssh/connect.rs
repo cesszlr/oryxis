@@ -124,7 +124,7 @@ impl Oryxis {
     /// stamped, which is the same answer a pin gives it.
     pub(crate) fn mark_host_used(&mut self, id: uuid::Uuid) {
         let now = chrono::Utc::now();
-        let Some(conn) = self.connections.iter_mut().find(|c| c.id == id) else {
+        let Some(conn) = self.vaults.cur_mut().connections.iter_mut().find(|c| c.id == id) else {
             return;
         };
         conn.last_used = Some(now);
@@ -236,7 +236,7 @@ impl Oryxis {
                         // Keep the in-memory count live so the
                         // History nav stays visible if logging is
                         // toggled off mid-session.
-                        self.session_logs_total += 1;
+                        self.vaults.cur_mut().session_logs_total += 1;
                         Some(log_id)
                     } else {
                         None
@@ -369,7 +369,7 @@ impl Oryxis {
 
                 // Host key verification: check callback + ask channel
                 let known_hosts_snapshot: Arc<Mutex<Vec<oryxis_core::models::known_host::KnownHost>>> =
-                    Arc::new(Mutex::new(self.known_hosts.clone()));
+                    Arc::new(Mutex::new(self.vaults.cur().known_hosts.clone()));
                 let kh_ref = known_hosts_snapshot.clone();
                 let host_key_check: oryxis_ssh::HostKeyCheckCallback = Arc::new(move |host, port, key_type, fingerprint| {
                     // Tolerate a poisoned mutex (some other lock-holder panicked)
@@ -530,7 +530,7 @@ impl Oryxis {
                         return InstanceConnectPlan::MissingRegion;
                     };
                     let Some(profile) = self
-                        .cloud_profiles
+                        .vaults.cur().cloud_profiles
                         .iter()
                         .find(|p| p.id == cref.profile_id)
                         .cloned()
@@ -549,7 +549,7 @@ impl Oryxis {
                     };
                     let key_id = conn.key_id.or_else(|| {
                         conn.identity_id.and_then(|iid| {
-                            self.identities
+                            self.vaults.cur().identities
                                 .iter()
                                 .find(|i| i.id == iid)
                                 .and_then(|i| i.key_id)
@@ -559,7 +559,7 @@ impl Oryxis {
                         return InstanceConnectPlan::MissingKey;
                     };
                     let Some(pubkey) = self
-                        .keys
+                        .vaults.cur().keys
                         .iter()
                         .find(|k| k.id == key_id)
                         .map(|k| k.public_key.clone())
@@ -1138,7 +1138,7 @@ impl Oryxis {
             .map(|p| &p.origin)?;
         match origin {
             crate::state::PaneOrigin::Host(id) => {
-                self.connections.iter().find(|c| c.id == *id)
+                self.vaults.cur().connections.iter().find(|c| c.id == *id)
             }
             crate::state::PaneOrigin::QuickHost(id) => {
                 self.quick_connects.get(id).map(|e| &e.conn)
@@ -1158,7 +1158,7 @@ impl Oryxis {
         target: iced::widget::pane_grid::Pane,
         axis: iced::widget::pane_grid::Axis,
     ) -> Task<Message> {
-        let Some(conn) = self.connections.get(conn_idx).cloned() else {
+        let Some(conn) = self.vaults.cur().connections.get(conn_idx).cloned() else {
             return Task::none();
         };
         // SSM / ECS / kubectl transports need their own plugin PTY, not a
@@ -1242,7 +1242,7 @@ impl Oryxis {
         tab_idx: usize,
         pane_id: Uuid,
     ) -> Task<Message> {
-        let Some(conn) = self.connections.get(conn_idx).cloned() else {
+        let Some(conn) = self.vaults.cur().connections.get(conn_idx).cloned() else {
             return Task::none();
         };
         self.spawn_ssh_for_pane_conn(conn, None, tab_idx, pane_id)
@@ -1291,7 +1291,7 @@ impl Oryxis {
     /// included.
     pub(crate) fn refresh_live_pane_quirks(&mut self) {
         let resolved: std::collections::HashMap<uuid::Uuid, _> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .map(|c| (c.id, self.resolve_quirks(c)))
             .collect();
@@ -1341,7 +1341,7 @@ impl Oryxis {
         // -> None with a warning), an inherited identity's username
         // fills an empty field, and a resolution failure falls back to
         // the host's own proxy, the pre-D4 behaviour.
-        vault.apply_effective(conn, &self.groups, &self.identities);
+        vault.apply_effective(conn, &self.vaults.cur().groups, &self.vaults.cur().identities);
     }
 
     /// Open a pane on a connection that is already up (F2 reuse).
@@ -1574,7 +1574,7 @@ impl Oryxis {
         if session_log_id.is_some() {
             // Keep the count live so the History nav doesn't vanish if
             // logging is toggled off while this session is still open.
-            self.session_logs_total += 1;
+            self.vaults.cur_mut().session_logs_total += 1;
         }
         if let Some(log_id) = session_log_id
             && let Some(pane) = self.tabs[tab_idx].pane_by_id_mut(pane_id)

@@ -193,7 +193,7 @@ impl Oryxis {
                             // its select is the last branch below.
                             let outranked = self
                                 .pending_auto_connect
-                                .is_some_and(|id| self.connections.iter().any(|c| c.id == id))
+                                .is_some_and(|id| self.vaults.cur().connections.iter().any(|c| c.id == id))
                                 || self.pending_deep_link.is_some()
                                 || self.pending_connect_target.is_some();
                             let landing = self.take_launch_landing_task(outranked);
@@ -205,7 +205,7 @@ impl Oryxis {
                             // `--connect <uuid>` from the launch CLI args.
                             if let Some(connect_id) = self.pending_auto_connect.take()
                                 && let Some(idx) = self
-                                    .connections
+                                    .vaults.cur().connections
                                     .iter()
                                     .position(|c| c.id == connect_id)
                             {

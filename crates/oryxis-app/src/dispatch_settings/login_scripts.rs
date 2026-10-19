@@ -39,7 +39,7 @@ impl Oryxis {
                 return Task::batch([open, edit]);
             }
             SettingsMessage::LoginScriptEdit(id) => {
-                if let Some(script) = self.login_scripts.iter().find(|s| s.id == id) {
+                if let Some(script) = self.vaults.cur().login_scripts.iter().find(|s| s.id == id) {
                     self.login_script_form = crate::state::LoginScriptForm {
                         editing_id: Some(id),
                         name: script.name.clone(),
@@ -129,7 +129,7 @@ impl Oryxis {
                         Some(format!("{}: {e}", crate::i18n::t("login_script_invalid")));
                     return Task::none();
                 }
-                let Some(script) = self.login_scripts.iter_mut().find(|s| s.id == id) else {
+                let Some(script) = self.vaults.cur_mut().login_scripts.iter_mut().find(|s| s.id == id) else {
                     self.login_script_form = crate::state::LoginScriptForm::default();
                     return Task::none();
                 };
@@ -143,7 +143,7 @@ impl Oryxis {
                     self.login_script_form.error = Some(e.to_string());
                     return Task::none();
                 }
-                self.login_scripts.sort_by(|a, b| a.name.cmp(&b.name));
+                self.vaults.cur_mut().login_scripts.sort_by(|a, b| a.name.cmp(&b.name));
                 self.login_script_form = crate::state::LoginScriptForm::default();
             }
             SettingsMessage::LoginScriptRequestDelete(id) => {
@@ -156,11 +156,11 @@ impl Oryxis {
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_login_script(&id);
                 }
-                self.login_scripts.retain(|s| s.id != id);
+                self.vaults.cur_mut().login_scripts.retain(|s| s.id != id);
                 // The vault detached every host that referenced it; the
                 // in-memory copies have to agree or the editor would
                 // still offer a script that no longer exists.
-                for conn in &mut self.connections {
+                for conn in &mut self.vaults.cur_mut().connections {
                     if conn.login_script_id == Some(id) {
                         conn.login_script_id = None;
                         conn.login_script_vars.clear();

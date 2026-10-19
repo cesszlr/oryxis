@@ -23,7 +23,7 @@ impl Oryxis {
                 self.editor_flush_pending();
                 self.card_context_menu = None;
                 self.overlay = None;
-                if self.connections.iter().any(|c| c.id == id) {
+                if self.vaults.cur().connections.iter().any(|c| c.id == id) {
                     // Mutually exclusive right-panel slot.
                     self.cloud_form.visible = false;
                     self.cloud_dynamic_form.visible = false;
@@ -91,7 +91,7 @@ impl Oryxis {
                 self.editor_initial_command =
                     iced::widget::text_editor::Content::with_text(cmd);
                 self.editor_startup_choice = match entry.conn.startup_snippet_id {
-                    Some(sid) if self.snippets.iter().any(|s| s.id == sid) => {
+                    Some(sid) if self.vaults.cur().snippets.iter().any(|s| s.id == sid) => {
                         crate::state::StartupChoice::Snippet(sid)
                     }
                     _ if !cmd.trim().is_empty() => crate::state::StartupChoice::Custom,
@@ -254,7 +254,7 @@ impl Oryxis {
                 self.editor_saved_snapshot = None;
             }
             EditorMessage::RequestDeleteConnection(idx) => {
-                if let Some(conn) = self.connections.get(idx) {
+                if let Some(conn) = self.vaults.cur().connections.get(idx) {
                     let name = conn.label.clone();
                     // The confirmed action carries the ID: the list can
                     // re-sort while the dialog is up (an auto-saved
@@ -274,7 +274,7 @@ impl Oryxis {
             EditorMessage::DuplicateConnection(idx) => {
                 self.card_context_menu = None;
                 self.overlay = None;
-                if let Some(conn) = self.connections.get(idx).cloned() {
+                if let Some(conn) = self.vaults.cur().connections.get(idx).cloned() {
                     // Clone, then reset what must NOT carry. The
                     // previous hand-written copy list had silently
                     // fallen behind the model (a duplicate lost its
@@ -357,7 +357,7 @@ impl Oryxis {
                         // the vault has candidates; on an empty vault
                         // the opened section explains itself and an
                         // empty picker would only confuse.
-                        if !self.connections.is_empty() {
+                        if !self.vaults.cur().connections.is_empty() {
                             self.panels.chain_editor = true;
                             self.chain_editor_adding = true;
                             self.chain_editor_search.clear();
@@ -548,7 +548,7 @@ impl Oryxis {
         // from the row as it was BEFORE the edit: that is the window
         // this host has been filling until now.
         let reset_key = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .find(|c| c.id == conn.id)
             .filter(|original| {
@@ -781,7 +781,7 @@ impl Oryxis {
         let ids: Vec<uuid::Uuid> = ids
             .iter()
             .copied()
-            .filter(|id| self.connections.iter().any(|c| c.id == *id))
+            .filter(|id| self.vaults.cur().connections.iter().any(|c| c.id == *id))
             .collect();
         if ids.is_empty() || self.vaults.cur().store.is_none() {
             return;

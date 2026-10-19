@@ -20,7 +20,7 @@ impl Oryxis {
         let infer_brand = |gid: &Uuid| pre.infer_brand(self, gid);
         let mut group_cards: Vec<(Element<'_, Message>, Color, DashNavItem)> = Vec::new();
         let group_by_id: std::collections::HashMap<Uuid, _> =
-            self.groups.iter().map(|g| (g.id, g)).collect();
+            self.vaults.cur().groups.iter().map(|g| (g.id, g)).collect();
         if self.cur_nav().active_group.is_none() {
             // Root view: show folder cards for manual groups that have
             // either direct connections or nested children (e.g. an
@@ -30,14 +30,14 @@ impl Oryxis {
             // they render inside their parent folder instead.
             let mut shown_groups = std::collections::HashSet::new();
             let mut roots_to_render: Vec<uuid::Uuid> = Vec::new();
-            for conn in &self.connections {
+            for conn in &self.vaults.cur().connections {
                 if let Some(gid) = conn.group_id
                     && shown_groups.insert(gid)
                 {
                     roots_to_render.push(gid);
                 }
             }
-            for g in &self.groups {
+            for g in &self.vaults.cur().groups {
                 if g.cloud_query.is_some() { continue }
                 if shown_groups.contains(&g.id) { continue }
                 // Render a manual folder at root when it has nested
@@ -53,10 +53,10 @@ impl Oryxis {
                 // inside their parent (which shows via its own children),
                 // so there's no double-render.
                 let has_children =
-                    self.groups.iter().any(|c| c.parent_id == Some(g.id));
+                    self.vaults.cur().groups.iter().any(|c| c.parent_id == Some(g.id));
                 let belongs_at_root = g.parent_id.is_none()
                     || !oryxis_core::models::Group::is_reachable_from_root(
-                        &self.groups,
+                        &self.vaults.cur().groups,
                         g.id,
                     );
                 if has_children || belongs_at_root {
@@ -131,7 +131,7 @@ impl Oryxis {
                 // data can't loop here.
                 if group.parent_id.is_some()
                     && oryxis_core::models::Group::is_reachable_from_root(
-                        &self.groups,
+                        &self.vaults.cur().groups,
                         gid,
                     )
                 {
@@ -169,9 +169,9 @@ impl Oryxis {
             // (label / created_at) instead of vault-insertion order.
             // Filter first so the sort only touches the cards that
             // actually render instead of the whole group list.
-            let mut dyn_group_order: Vec<usize> = (0..self.groups.len())
+            let mut dyn_group_order: Vec<usize> = (0..self.vaults.cur().groups.len())
                 .filter(|&i| {
-                    let g = &self.groups[i];
+                    let g = &self.vaults.cur().groups[i];
                     let Some(query) = g.cloud_query.as_ref() else {
                         return false;
                     };
@@ -187,11 +187,11 @@ impl Oryxis {
                 .collect();
             self.hosts_sort.sort_items(
                 &mut dyn_group_order,
-                |&i| self.groups[i].label.clone(),
-                |&i| self.groups[i].created_at,
+                |&i| self.vaults.cur().groups[i].label.clone(),
+                |&i| self.vaults.cur().groups[i].created_at,
             );
             for dyn_i in dyn_group_order {
-                let group = &self.groups[dyn_i];
+                let group = &self.vaults.cur().groups[dyn_i];
                 let Some(query) = group.cloud_query.as_ref() else { continue };
                 let gid = group.id;
                 let subtitle = match &query.kind {
@@ -341,9 +341,9 @@ impl Oryxis {
             // dynamic order. All manual children render, including
             // empty ones, so a freshly created subgroup is visible
             // immediately.
-            let mut nested_manual_order: Vec<usize> = (0..self.groups.len())
+            let mut nested_manual_order: Vec<usize> = (0..self.vaults.cur().groups.len())
                 .filter(|&i| {
-                    let g = &self.groups[i];
+                    let g = &self.vaults.cur().groups[i];
                     g.cloud_query.is_none()
                         && g.parent_id == Some(active_gid)
                         && !hidden_groups.contains(&g.id)
@@ -359,11 +359,11 @@ impl Oryxis {
                 .collect();
             self.hosts_sort.sort_items(
                 &mut nested_manual_order,
-                |&i| self.groups[i].label.clone(),
-                |&i| self.groups[i].created_at,
+                |&i| self.vaults.cur().groups[i].label.clone(),
+                |&i| self.vaults.cur().groups[i].created_at,
             );
             for nested_i in nested_manual_order {
-                let group = &self.groups[nested_i];
+                let group = &self.vaults.cur().groups[nested_i];
                 let gid = group.id;
                 let direct_hosts =
                     direct_host_count.get(&gid).copied().unwrap_or(0);
@@ -383,9 +383,9 @@ impl Oryxis {
             // too so the nested view stays consistent with the root.
             // Filter first, same as the root pass, so the sort only
             // covers the cards that actually render.
-            let mut nested_dyn_order: Vec<usize> = (0..self.groups.len())
+            let mut nested_dyn_order: Vec<usize> = (0..self.vaults.cur().groups.len())
                 .filter(|&i| {
-                    let g = &self.groups[i];
+                    let g = &self.vaults.cur().groups[i];
                     let Some(query) = g.cloud_query.as_ref() else {
                         return false;
                     };
@@ -401,11 +401,11 @@ impl Oryxis {
                 .collect();
             self.hosts_sort.sort_items(
                 &mut nested_dyn_order,
-                |&i| self.groups[i].label.clone(),
-                |&i| self.groups[i].created_at,
+                |&i| self.vaults.cur().groups[i].label.clone(),
+                |&i| self.vaults.cur().groups[i].created_at,
             );
             for nested_i in nested_dyn_order {
-                let group = &self.groups[nested_i];
+                let group = &self.vaults.cur().groups[nested_i];
                 let Some(query) = group.cloud_query.as_ref() else { continue };
                 let gid = group.id;
                 let subtitle = match &query.kind {

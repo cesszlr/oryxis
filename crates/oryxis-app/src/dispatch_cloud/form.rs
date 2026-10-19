@@ -74,7 +74,7 @@ impl Oryxis {
                 self.cloud_form.test_state = CloudTestState::Idle;
 
                 if let Some(id) = maybe_id
-                    && let Some(cp) = self.cloud_profiles.iter().find(|p| p.id == id)
+                    && let Some(cp) = self.vaults.cur().cloud_profiles.iter().find(|p| p.id == id)
                 {
                     self.cloud_form.editing_id = Some(id);
                     self.cloud_form.label = cp.label.clone();
@@ -326,13 +326,13 @@ impl Oryxis {
                 // (linked by label until v0.7 adds a stable cloud
                 // profile id column to groups).
                 let old_label = self.cloud_form.editing_id.and_then(|id| {
-                    self.cloud_profiles
+                    self.vaults.cur().cloud_profiles
                         .iter()
                         .find(|p| p.id == id)
                         .map(|p| p.label.clone())
                 });
                 let mut profile = if let Some(id) = self.cloud_form.editing_id {
-                    self.cloud_profiles
+                    self.vaults.cur().cloud_profiles
                         .iter()
                         .find(|p| p.id == id)
                         .cloned()
@@ -375,14 +375,14 @@ impl Oryxis {
                                 && old != label
                             {
                                 let to_rename: Vec<_> = self
-                                    .groups
+                                    .vaults.cur().groups
                                     .iter()
                                     .filter(|g| g.label == old && g.cloud_query.is_none())
                                     .map(|g| g.id)
                                     .collect();
                                 for gid in to_rename {
                                     if let Some(g) =
-                                        self.groups.iter().find(|g| g.id == gid).cloned()
+                                        self.vaults.cur().groups.iter().find(|g| g.id == gid).cloned()
                                     {
                                         let mut renamed = g;
                                         renamed.label = label.clone();
@@ -409,7 +409,7 @@ impl Oryxis {
                 // the app's own kubeconfig directory qualify; a file the
                 // user typed in by hand is theirs.
                 let owned_kubeconfig = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == id && p.provider == "k8s")
                     .and_then(|p| serde_json::from_str::<serde_json::Value>(&p.config).ok())

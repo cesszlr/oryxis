@@ -585,7 +585,7 @@ impl Oryxis {
     /// promise a dial either.
     fn has_in_place_dial(&self, spec: &crate::state::PinnedTabSpec) -> bool {
         if let crate::state::PinnedTabSpec::Host { id, .. } = spec
-            && self.connections.iter().any(|c| {
+            && self.vaults.cur().connections.iter().any(|c| {
                 c.id == *id
                     && (c.protocol
                         == oryxis_core::models::connection::ConnectionProtocol::RemoteDesktop

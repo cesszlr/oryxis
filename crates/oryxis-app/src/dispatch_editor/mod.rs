@@ -159,10 +159,10 @@ impl Oryxis {
         // lands it there: prefill with the full breadcrumb path, which
         // is what the field displays and what the save resolves first.
         if let Some(gid) = self.cur_nav().active_group
-            && self.groups.iter().any(|g| g.id == gid && g.cloud_query.is_none())
+            && self.vaults.cur().groups.iter().any(|g| g.id == gid && g.cloud_query.is_none())
         {
             self.editor_form.group_name =
-                oryxis_core::models::Group::path_of(&self.groups, gid);
+                oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid);
             // The group's default port (D4) prefills a host born here,
             // and this is the ONLY place it applies: resolving it at
             // connect time would move an existing host's destination
@@ -189,11 +189,11 @@ impl Oryxis {
         // proxy) to the label the form uses, dropping any that point at a
         // deleted entity so a stale default never blocks a new host.
         let default_identity = self.prefs.default_identity_id.and_then(|id| {
-            self.identities.iter().find(|i| i.id == id).map(|i| i.label.clone())
+            self.vaults.cur().identities.iter().find(|i| i.id == id).map(|i| i.label.clone())
         });
         let default_key = self
             .prefs.default_key_id
-            .and_then(|id| self.keys.iter().find(|k| k.id == id))
+            .and_then(|id| self.vaults.cur().keys.iter().find(|k| k.id == id))
             // A Certificate default only accepts cert-carrying keys (the
             // combo filters them out, so a bare default would be stuck).
             .filter(|k| {
@@ -204,15 +204,15 @@ impl Oryxis {
             .map(|k| k.label.clone());
         let default_group = self
             .prefs.default_group_id
-            .filter(|id| self.groups.iter().any(|g| g.id == *id))
-            .map(|id| oryxis_core::models::Group::path_of(&self.groups, id))
+            .filter(|id| self.vaults.cur().groups.iter().any(|g| g.id == *id))
+            .map(|id| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, id))
             .unwrap_or_default();
         // A default proxy is a saved Proxy Identity reference; inline
         // proxies are per-host by nature and aren't defaulted. Drop a
         // dangling reference (identity deleted) back to no proxy.
         let proxy_kind = self
             .prefs.default_proxy_identity_id
-            .filter(|id| self.proxy_identities.iter().any(|p| p.id == *id))
+            .filter(|id| self.vaults.cur().proxy_identities.iter().any(|p| p.id == *id))
             .map(crate::state::ProxyKind::Identity)
             .unwrap_or(crate::state::ProxyKind::None);
         crate::state::ConnectionForm {
@@ -248,7 +248,7 @@ impl Oryxis {
     ///
     /// Parent Group is NOT one of them: it is a text_input + the shared
     /// group picker popover (`GroupPickerTarget::HostEditorParent`),
-    /// which reads `self.groups` live and needs no state of its own.
+    /// which reads `self.vaults.cur().groups` live and needs no state of its own.
     ///
     /// Initial Command / Snippet: a forced-selection searchable combo.
     /// Options are the `None` / `Custom` sentinels first, then every
@@ -273,7 +273,7 @@ impl Oryxis {
             crate::i18n::t("startup_none").to_string(),
             crate::i18n::t("startup_custom").to_string(),
         ];
-        for s in &self.snippets {
+        for s in &self.vaults.cur().snippets {
             opts.push(s.label.clone());
         }
         opts
@@ -307,7 +307,7 @@ impl Oryxis {
             AuthMethod::Agent => KeyComboFilter::SecurityKeysFirst,
             _ => KeyComboFilter::All,
         };
-        key_combo_options(&self.keys, filter)
+        key_combo_options(&self.vaults.cur().keys, filter)
     }
 
     /// (Re)build the SSH Key combo with an empty typed value. Same
@@ -352,7 +352,7 @@ impl Oryxis {
             crate::state::StartupChoice::None => crate::i18n::t("startup_none").to_string(),
             crate::state::StartupChoice::Custom => crate::i18n::t("startup_custom").to_string(),
             crate::state::StartupChoice::Snippet(id) => self
-                .snippets
+                .vaults.cur().snippets
                 .iter()
                 .find(|s| s.id == *id)
                 .map(|s| s.label.clone())
@@ -388,7 +388,7 @@ impl Oryxis {
             GroupWrite::Create => {
                 let mut created = Vec::new();
                 let gid =
-                    Group::resolve_or_create_path(&mut self.groups, &group_name, &mut created);
+                    Group::resolve_or_create_path(&mut self.vaults.cur_mut().groups, &group_name, &mut created);
                 if let Some(vault) = &self.vaults.cur().store {
                     for g in &created {
                         let _ = vault.save_group(g);
@@ -397,7 +397,7 @@ impl Oryxis {
                 gid
             }
             GroupWrite::Keep => self.editor_form.editing_id.and_then(|id| {
-                self.connections
+                self.vaults.cur().connections
                     .iter()
                     .find(|c| c.id == id)
                     .and_then(|c| c.group_id)
@@ -412,7 +412,7 @@ impl Oryxis {
         let original: Option<Connection> = self
             .editor_form
             .editing_id
-            .and_then(|id| self.connections.iter().find(|c| c.id == id).cloned());
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id).cloned());
 
         let mut conn = original
             .clone()
@@ -523,7 +523,7 @@ impl Oryxis {
         conn.auth_method = self.editor_form.auth_method.clone();
         conn.group_id = group_id;
         conn.key_id = self.editor_form.selected_key.as_ref().and_then(|label| {
-            self.keys.iter().find(|k| k.label == *label).map(|k| k.id)
+            self.vaults.cur().keys.iter().find(|k| k.label == *label).map(|k| k.id)
         });
         conn.use_disk_key = self.editor_form.use_disk_key;
         // Blank is "scan the default names", which is what the field's
@@ -531,7 +531,7 @@ impl Oryxis {
         conn.identity_file = Some(self.editor_form.identity_file.trim().to_string())
             .filter(|p| !p.is_empty());
         conn.identity_id = self.editor_form.selected_identity.as_ref().and_then(|label| {
-            self.identities.iter().find(|i| i.label == *label).map(|i| i.id)
+            self.vaults.cur().identities.iter().find(|i| i.label == *label).map(|i| i.id)
         });
         // Persist the full ordered chain. Drop any hop pointing
         // at a host that no longer exists or at this host itself
@@ -543,7 +543,7 @@ impl Oryxis {
             .jump_chain
             .iter()
             .filter(|id| Some(**id) != self_id)
-            .filter(|id| self.connections.iter().any(|c| c.id == **id))
+            .filter(|id| self.vaults.cur().connections.iter().any(|c| c.id == **id))
             .copied()
             .collect();
         conn.port_forwards = self.editor_form.port_forwards.iter().filter_map(|pf| {
@@ -683,11 +683,11 @@ impl Oryxis {
         conn.login_script_id = is_ssh_now
             .then_some(self.editor_form.login_script_id)
             .flatten()
-            .filter(|sid| self.login_scripts.iter().any(|s| s.id == *sid));
+            .filter(|sid| self.vaults.cur().login_scripts.iter().any(|s| s.id == *sid));
         conn.login_script_vars = match conn.login_script_id {
             Some(sid) => {
                 let names: Vec<String> = self
-                    .login_scripts
+                    .vaults.cur().login_scripts
                     .iter()
                     .find(|s| s.id == sid)
                     .map(|s| {
@@ -887,15 +887,15 @@ impl Oryxis {
             // empty (root), matching how the grid renders it.
             group_name: conn
                 .group_id
-                .filter(|gid| self.groups.iter().any(|g| g.id == *gid))
-                .map(|gid| oryxis_core::models::Group::path_of(&self.groups, gid))
+                .filter(|gid| self.vaults.cur().groups.iter().any(|g| g.id == *gid))
+                .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
                 .unwrap_or_default(),
             selected_key: conn.key_id.and_then(|kid| {
-                self.keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
+                self.vaults.cur().keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
             }),
             jump_chain: conn.jump_chain.clone(),
             selected_identity: conn.identity_id.and_then(|iid| {
-                self.identities.iter().find(|i| i.id == iid).map(|i| i.label.clone())
+                self.vaults.cur().identities.iter().find(|i| i.id == iid).map(|i| i.label.clone())
             }),
             editing_id: Some(conn.id),
             has_existing_password: has_pw,
@@ -975,7 +975,7 @@ impl Oryxis {
             // same rule `resolve_proxy` follows for proxy identities.
             login_script_id: conn
                 .login_script_id
-                .filter(|sid| self.login_scripts.iter().any(|s| s.id == *sid)),
+                .filter(|sid| self.vaults.cur().login_scripts.iter().any(|s| s.id == *sid)),
             login_script_vars: conn
                 .login_script_vars
                 .iter()
@@ -1195,14 +1195,14 @@ impl Oryxis {
         else {
             return;
         };
-        let Some(idx) = self.connections.iter().position(|c| c.id == id) else {
+        let Some(idx) = self.vaults.cur().connections.iter().position(|c| c.id == id) else {
             return;
         };
-        mutate(&mut self.connections[idx]);
-        let label = self.connections[idx].label.clone();
+        mutate(&mut self.vaults.cur_mut().connections[idx]);
+        let label = self.vaults.cur().connections[idx].label.clone();
         if let Some(vault) = &self.vaults.cur().store {
             // `None` preserves the encrypted password column untouched.
-            let _ = vault.save_connection(&self.connections[idx], None);
+            let _ = vault.save_connection(&self.vaults.cur().connections[idx], None);
         }
         if repaint {
             self.repaint_terminal_palettes_for_label(&label);

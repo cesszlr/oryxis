@@ -65,7 +65,7 @@ impl Oryxis {
                 self.cert_viewer = None;
             }
             KeysMessage::RequestRemoveKeyCertificate(idx) => {
-                if let Some(key) = self.keys.get(idx) {
+                if let Some(key) = self.vaults.cur().keys.get(idx) {
                     let name = key.label.clone();
                     self.confirm_remove(name, Message::Keys(KeysMessage::RemoveKeyCertificate(idx)));
                 }
@@ -77,7 +77,7 @@ impl Oryxis {
                 self.overlay = None;
             }
             KeysMessage::RemoveKeyCertificate(idx) => {
-                if let Some(key) = self.keys.get(idx) {
+                if let Some(key) = self.vaults.cur().keys.get(idx) {
                     let mut key = key.clone();
                     key.certificate = None;
                     key.updated_at = chrono::Utc::now();
@@ -108,7 +108,7 @@ impl Oryxis {
         &self,
         idx: usize,
     ) -> Option<crate::state::CertViewerData> {
-        let key = self.keys.get(idx)?;
+        let key = self.vaults.cur().keys.get(idx)?;
         let cert_line = key.certificate.as_deref()?;
         let cert = ssh_key::Certificate::from_openssh(cert_line.trim()).ok()?;
 

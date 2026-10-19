@@ -145,7 +145,7 @@ impl Oryxis {
                 self.port_forward_form.kind = oryxis_core::models::port_forward_rule::ForwardKind::Local;
                 // Default the host to the first connection so the picker
                 // isn't empty on a fresh rule.
-                self.port_forward_form.host_id = self.connections.first().map(|c| c.id);
+                self.port_forward_form.host_id = self.vaults.cur().connections.first().map(|c| c.id);
                 self.port_forward_form.listen_host = "127.0.0.1".into();
                 self.port_forward_form.listen_port.clear();
                 self.port_forward_form.target_host.clear();
@@ -169,7 +169,7 @@ impl Oryxis {
             }
             PortForwardMessage::PfAutoStartToggled(v) => self.port_forward_form.auto_start = v,
             PortForwardMessage::EditPortForwardRule(idx) => {
-                if let Some(rule) = self.port_forward_rules.get(idx) {
+                if let Some(rule) = self.vaults.cur().port_forward_rules.get(idx) {
                     self.panels.port_forward_panel = true;
                     self.port_forward_form.editing_id = Some(rule.id);
                     self.port_forward_form.label = rule.label.clone();
@@ -207,7 +207,7 @@ impl Oryxis {
                 // carry a jump chain, a bound address and an auto-start
                 // flag, and there is no undo short of restoring a portable
                 // export, so neither one should fire on a single click.
-                if let Some(rule) = self.port_forward_rules.get(idx) {
+                if let Some(rule) = self.vaults.cur().port_forward_rules.get(idx) {
                     // Name it the way its card does: the user's label plus
                     // the ports, because several rules can share a label and
                     // the ports are what makes one distinguishable.
@@ -224,7 +224,7 @@ impl Oryxis {
                 }
             }
             PortForwardMessage::DeletePortForwardRule(idx) => {
-                if let Some(rule) = self.port_forward_rules.get(idx) {
+                if let Some(rule) = self.vaults.cur().port_forward_rules.get(idx) {
                     let id = rule.id;
                     // Tear down a live forward before the rule disappears.
                     let session = self.active_forwards.remove(&id);
@@ -296,7 +296,7 @@ impl Oryxis {
                         // connect was in flight: if the rule is gone, or a stop
                         // was requested, drop the session so it doesn't linger
                         // with no UI to stop (or against the user's intent).
-                        if was_starting && self.port_forward_rules.iter().any(|r| r.id == id) {
+                        if was_starting && self.vaults.cur().port_forward_rules.iter().any(|r| r.id == id) {
                             self.active_forwards.insert(id, session);
                             // Came up: clear any retry so a later drop starts
                             // the backoff fresh from the shortest interval.
@@ -440,7 +440,7 @@ impl Oryxis {
         let Some(host_id) = self.port_forward_form.host_id else {
             return Some(crate::i18n::t("pf_err_host").to_string());
         };
-        if !self.connections.iter().any(|c| c.id == host_id) {
+        if !self.vaults.cur().connections.iter().any(|c| c.id == host_id) {
             return Some(crate::i18n::t("pf_err_host").to_string());
         }
         let Some(listen_port) = parse_port(&self.port_forward_form.listen_port) else {
@@ -460,7 +460,7 @@ impl Oryxis {
         };
 
         let mut rule = if let Some(id) = self.port_forward_form.editing_id {
-            self.port_forward_rules
+            self.vaults.cur().port_forward_rules
                 .iter()
                 .find(|r| r.id == id)
                 .cloned()
@@ -503,7 +503,7 @@ impl Oryxis {
         if self.active_forwards.contains_key(&id) || self.port_forward_starting.contains(&id) {
             return Task::none();
         }
-        let Some(rule) = self.port_forward_rules.iter().find(|r| r.id == id) else {
+        let Some(rule) = self.vaults.cur().port_forward_rules.iter().find(|r| r.id == id) else {
             return Task::none();
         };
         let host_id = rule.host_id;
@@ -533,7 +533,7 @@ impl Oryxis {
         }
 
         let Some(mut conn) = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .find(|c| c.id == host_id)
             .cloned()
@@ -765,7 +765,7 @@ impl Oryxis {
     /// rule deleted while queued has already left `port_forward_starting`,
     /// so the silent no-op is correct.
     fn attach_port_forward_task(&self, fconn: ForwardConn, id: Uuid) -> Task<Message> {
-        let Some(rule) = self.port_forward_rules.iter().find(|r| r.id == id).cloned() else {
+        let Some(rule) = self.vaults.cur().port_forward_rules.iter().find(|r| r.id == id).cloned() else {
             return Task::none();
         };
         Task::perform(
@@ -850,7 +850,7 @@ impl Oryxis {
     /// connection, not leave it idling. `Connecting` entries are exempt,
     /// their `PortForwardConnReady` is still in flight and settles them.
     fn pf_gc_host_conns(&mut self) {
-        let rules = &self.port_forward_rules;
+        let rules = &self.vaults.cur().port_forward_rules;
         let active = &self.active_forwards;
         let starting = &self.port_forward_starting;
         self.forward_conns.retain(|host_id, state| match state {
@@ -869,7 +869,7 @@ impl Oryxis {
     /// into the caller's task list.
     pub(crate) fn auto_start_port_forwards(&mut self) -> Vec<Task<Message>> {
         let ids: Vec<Uuid> = self
-            .port_forward_rules
+            .vaults.cur().port_forward_rules
             .iter()
             .filter(|r| r.auto_start)
             .map(|r| r.id)
@@ -886,7 +886,7 @@ impl Oryxis {
     /// already climbing).
     fn pf_mark_retry_pending(&mut self, id: Uuid, cause: PfRetryCause) {
         let is_auto = self
-            .port_forward_rules
+            .vaults.cur().port_forward_rules
             .iter()
             .any(|r| r.id == id && r.auto_start);
         let allowed = match cause {
@@ -1011,7 +1011,7 @@ impl Oryxis {
         let mut due = Vec::new();
         for id in ids {
             let still_wanted = self
-                .port_forward_rules
+                .vaults.cur().port_forward_rules
                 .iter()
                 .any(|r| r.id == id && pf_retry_still_wanted(r.auto_start, auto_reconnect));
             if !still_wanted || self.active_forwards.contains_key(&id) {

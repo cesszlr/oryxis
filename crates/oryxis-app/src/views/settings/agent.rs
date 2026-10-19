@@ -105,7 +105,7 @@ impl Oryxis {
             // The external count is the #98 diagnostic: KeePassXC keys
             // are swept on vault lock, and without this line the only
             // symptom of an empty roster was a failed auth downstream.
-            let vault_served = self.keys.iter().filter(|k| k.expose_via_agent).count();
+            let vault_served = self.vaults.cur().keys.iter().filter(|k| k.expose_via_agent).count();
             let status_row: Element<'_, Message> = {
                 let mut parts = vec![
                     text(format!("{}: {}", t("agent_vault_keys_served"), vault_served))

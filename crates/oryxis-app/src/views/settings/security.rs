@@ -1166,13 +1166,13 @@ impl Oryxis {
         if self.sftp_backup.open {
             let is_import = self.sftp_backup.is_import;
             let host_options: Vec<String> =
-                self.connections.iter().map(|c| c.label.clone()).collect();
+                self.vaults.cur().connections.iter().map(|c| c.label.clone()).collect();
             let selected_host = self
                 .sftp_backup.host
-                .and_then(|i| self.connections.get(i))
+                .and_then(|i| self.vaults.cur().connections.get(i))
                 .map(|c| c.label.clone());
             let host_lookup: std::collections::HashMap<String, usize> = self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .enumerate()
                 .map(|(i, c)| (c.label.clone(), i))

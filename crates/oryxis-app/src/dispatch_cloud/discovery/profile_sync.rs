@@ -20,7 +20,7 @@ impl Oryxis {
                 // failing profile doesn't hold up the others. Empty
                 // profile list short-circuits.
                 let profile_ids: Vec<uuid::Uuid> =
-                    self.cloud_profiles.iter().map(|p| p.id).collect();
+                    self.vaults.cur().cloud_profiles.iter().map(|p| p.id).collect();
                 let mut tasks: Vec<Task<Message>> = Vec::new();
                 for pid in profile_ids {
                     tasks.push(self.handle_cloud(CloudMessage::CloudProfileSync(pid)));
@@ -34,7 +34,7 @@ impl Oryxis {
                 // of the Discover panel; the profile card's Sync
                 // button can fire this without opening any UI.
                 let Some(mut profile) = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == profile_id)
                     .cloned()
@@ -79,9 +79,9 @@ impl Oryxis {
                             .collect();
                         // Compute merge first so the vault save loop
                         // doesn't have to fight a mutable borrow of
-                        // `self.connections` during the diff.
+                        // `self.vaults.cur().connections` during the diff.
                         let mut updated: Vec<Connection> = Vec::new();
-                        for conn in &self.connections {
+                        for conn in &self.vaults.cur().connections {
                             let Some(cref) = conn.cloud_ref.as_ref() else {
                                 continue;
                             };
@@ -169,7 +169,7 @@ impl Oryxis {
                             }
                         }
                         let cp_to_save = self
-                            .cloud_profiles
+                            .vaults.cur().cloud_profiles
                             .iter()
                             .find(|p| p.id == profile_id)
                             .cloned()
@@ -195,16 +195,16 @@ impl Oryxis {
                         }
                         for conn in updated {
                             if let Some(slot) =
-                                self.connections.iter_mut().find(|c| c.id == conn.id)
+                                self.vaults.cur_mut().connections.iter_mut().find(|c| c.id == conn.id)
                             {
                                 *slot = conn;
                             } else {
-                                self.connections.push(conn);
+                                self.vaults.cur_mut().connections.push(conn);
                             }
                         }
                         if let Some(cp) = cp_to_save
                             && let Some(slot) =
-                                self.cloud_profiles.iter_mut().find(|p| p.id == cp.id)
+                                self.vaults.cur_mut().cloud_profiles.iter_mut().find(|p| p.id == cp.id)
                         {
                             *slot = cp;
                         }

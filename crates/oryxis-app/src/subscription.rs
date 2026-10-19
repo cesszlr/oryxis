@@ -613,7 +613,7 @@ impl Oryxis {
         // background API calls. Interval reads the persisted setting
         // and falls back to 30 min on any parse failure so a malformed
         // value doesn't pin the ticker at 1 ms.
-        if self.prefs.cloud_auto_refresh_enabled && !self.cloud_profiles.is_empty() {
+        if self.prefs.cloud_auto_refresh_enabled && !self.vaults.cur().cloud_profiles.is_empty() {
             let minutes = self
                 .prefs.cloud_auto_refresh_interval_minutes
                 .parse::<u64>()

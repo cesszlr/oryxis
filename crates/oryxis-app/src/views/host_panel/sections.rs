@@ -164,7 +164,7 @@ impl Oryxis {
                 match form.proxy_kind {
                     crate::state::ProxyKind::None => {}
                     crate::state::ProxyKind::Identity(id) => tokens.push(
-                        self.proxy_identities
+                        self.vaults.cur().proxy_identities
                             .iter()
                             .find(|pi| pi.id == id)
                             .map(|pi| pi.label.clone())

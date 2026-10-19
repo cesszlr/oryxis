@@ -21,10 +21,10 @@ const FREQUENT_MIN_USES: i64 = 2;
 impl Oryxis {
     pub(crate) fn history_tab_content(&self) -> Element<'_, Message> {
         // No saved host focused: nothing to key history on.
-        if self.command_history_host.is_none() {
+        if self.vaults.cur().command_history_host.is_none() {
             return sidebar_placeholder(t("history_unavailable"));
         }
-        if self.command_history.is_empty() {
+        if self.vaults.cur().command_history.is_empty() {
             return sidebar_placeholder(t("history_empty"));
         }
 
@@ -77,7 +77,7 @@ impl Oryxis {
         // the search results below are the whole answer then.
         if needle.is_empty() {
             let mut frequent: Vec<&oryxis_vault::CommandHistoryEntry> = self
-                .command_history
+                .vaults.cur().command_history
                 .iter()
                 .filter(|e| e.use_count >= FREQUENT_MIN_USES)
                 .collect();
@@ -97,7 +97,7 @@ impl Oryxis {
         }
 
         let mut any = false;
-        for entry in &self.command_history {
+        for entry in &self.vaults.cur().command_history {
             if !needle.is_empty() && !entry.command.to_lowercase().contains(&needle) {
                 continue;
             }

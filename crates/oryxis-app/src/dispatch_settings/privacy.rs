@@ -75,7 +75,7 @@ impl Oryxis {
         // that is the word the prompt, the progress lines and the card
         // carry, and a host that inherits it has nothing in the field.
         let users: Vec<String> = if self.privacy.mask_usernames {
-            self.connections
+            self.vaults.cur().connections
                 .iter()
                 .filter_map(|c| self.effective_username(c))
                 .collect()
@@ -83,7 +83,7 @@ impl Oryxis {
             Vec::new()
         };
         let hosts = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .filter(|_| self.privacy.mask_hostnames)
             .map(|c| c.hostname.as_str());
@@ -110,7 +110,7 @@ impl Oryxis {
     /// local shells / WSL / PowerShell fall back to the global default.
     pub(crate) fn privacy_active_for_label(&self, label: &str) -> bool {
         let base = label.trim_end_matches(" (disconnected)");
-        self.connections
+        self.vaults.cur().connections
             .iter()
             .find(|c| c.label == base)
             .map(|c| self.privacy_active(c))

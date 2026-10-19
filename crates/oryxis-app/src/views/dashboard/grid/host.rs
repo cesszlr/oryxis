@@ -26,7 +26,7 @@ impl Oryxis {
         idx: usize,
         privacy_terms: &[String],
     ) -> (Element<'a, Message>, Color) {
-        let conn = &self.connections[idx];
+        let conn = &self.vaults.cur().connections[idx];
         // Privacy Mode also redacts the LABEL (issue #78): labels
         // routinely embed the hostname or IP, which made the card
         // leak what the subtitle mask hides. Same hover reveal as
@@ -126,7 +126,7 @@ impl Oryxis {
         // event loop) and just toggles its glyph color + hover bg.
         let show_dots = self.cur_nav().hover.card == Some(idx)
             || (self.cur_card_context_menu().is_some()
-                && self.cur_card_context_menu() == self.connections.get(idx).map(|c| c.id));
+                && self.cur_card_context_menu() == self.vaults.cur().connections.get(idx).map(|c| c.id));
         // Multi-selection (issue #230): the card wears the selected
         // fill and accent border whenever it is in the selection, and its
         // leading check appears ONLY while the multi-select mode is on.
@@ -162,7 +162,7 @@ impl Oryxis {
         let cloud_decoration: Option<(&'static str, Color, bool)> =
             conn.cloud_ref.as_ref().map(|cr| {
                 let provider = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == cr.profile_id)
                     .map(|p| p.provider.as_str())

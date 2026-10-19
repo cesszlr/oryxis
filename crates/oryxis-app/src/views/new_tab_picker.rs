@@ -108,7 +108,7 @@ impl Oryxis {
         // builder and the back-header agree on the level being shown.
         let drilled = self
             .new_tab_picker_group
-            .and_then(|gid| self.groups.iter().find(|g| g.id == gid));
+            .and_then(|gid| self.vaults.cur().groups.iter().find(|g| g.id == gid));
 
         let list_inner: Vec<Element<'_, Message>> = match drilled {
             Some(group) => self.picker_group_rows(group, &needle, filling_pane),
@@ -225,7 +225,7 @@ impl Oryxis {
         // Root groups (parent_id == None). Sub-groups surface when the user
         // drills into their parent, mirroring the dashboard hierarchy.
         let mut group_rows: Vec<Element<'_, Message>> = Vec::new();
-        for g in self.groups.iter().filter(|g| g.parent_id.is_none()) {
+        for g in self.vaults.cur().groups.iter().filter(|g| g.parent_id.is_none()) {
             if filling_pane && g.cloud_query.is_some() {
                 continue;
             }
@@ -251,19 +251,19 @@ impl Oryxis {
         }
 
         // Recent connections: every saved host, most-recently-used first.
-        let mut idxs: Vec<usize> = (0..self.connections.len())
+        let mut idxs: Vec<usize> = (0..self.vaults.cur().connections.len())
             .filter(|&i| {
                 if needle.is_empty() {
                     return true;
                 }
-                let c = &self.connections[i];
+                let c = &self.vaults.cur().connections[i];
                 c.label.to_lowercase().contains(needle)
                     || c.hostname.to_lowercase().contains(needle)
             })
             .collect();
         idxs.sort_by(|a, b| {
-            let la = self.connections[*a].last_used;
-            let lb = self.connections[*b].last_used;
+            let la = self.vaults.cur().connections[*a].last_used;
+            let lb = self.vaults.cur().connections[*b].last_used;
             lb.cmp(&la)
         });
 
@@ -308,7 +308,7 @@ impl Oryxis {
 
         // Manual group: sub-groups first, then member connections.
         let mut any = false;
-        for g in self.groups.iter().filter(|g| g.parent_id == Some(group.id)) {
+        for g in self.vaults.cur().groups.iter().filter(|g| g.parent_id == Some(group.id)) {
             if filling_pane && g.cloud_query.is_some() {
                 continue;
             }
@@ -322,19 +322,19 @@ impl Oryxis {
             rows.push(self.picker_group_row(g));
             any = true;
         }
-        let mut member_idxs: Vec<usize> = (0..self.connections.len())
-            .filter(|&i| self.connections[i].group_id == Some(group.id))
+        let mut member_idxs: Vec<usize> = (0..self.vaults.cur().connections.len())
+            .filter(|&i| self.vaults.cur().connections[i].group_id == Some(group.id))
             .filter(|&i| {
                 if needle.is_empty() {
                     return true;
                 }
-                let c = &self.connections[i];
+                let c = &self.vaults.cur().connections[i];
                 c.label.to_lowercase().contains(needle)
                     || c.hostname.to_lowercase().contains(needle)
             })
             .collect();
         member_idxs.sort_by(|a, b| {
-            self.connections[*b].last_used.cmp(&self.connections[*a].last_used)
+            self.vaults.cur().connections[*b].last_used.cmp(&self.vaults.cur().connections[*a].last_used)
         });
         let privacy_terms = self.privacy_terms();
         for (pos, ci) in member_idxs.iter().enumerate() {
@@ -489,12 +489,12 @@ impl Oryxis {
     /// folder is shown at all (count 0 -> hidden).
     fn picker_group_child_count(&self, gid: uuid::Uuid) -> usize {
         let conns = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .filter(|c| c.group_id == Some(gid))
             .count();
         let subs = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter(|g| g.parent_id == Some(gid))
             .count();
@@ -575,14 +575,14 @@ impl Oryxis {
     /// redacts the rendered label with it (issue #78). No hover reveal
     /// here: the picker is transient and the search input echoes raw.
     fn connection_row(&self, ci: usize, pos: usize, terms: &[String]) -> Element<'_, Message> {
-        let conn = &self.connections[ci];
+        let conn = &self.vaults.cur().connections[ci];
         let display_label = if self.privacy_active(conn) {
             crate::widgets::redact_for_display(&conn.label, terms, self.privacy_classes())
         } else {
             conn.label.clone()
         };
         let group_name = conn.group_id.and_then(|gid| {
-            self.groups.iter().find(|g| g.id == gid).map(|g| g.label.clone())
+            self.vaults.cur().groups.iter().find(|g| g.id == gid).map(|g| g.label.clone())
         });
         let breadcrumb = match group_name {
             Some(g) => format!("{} / {}", t("personal"), g),

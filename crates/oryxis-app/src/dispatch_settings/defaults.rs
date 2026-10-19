@@ -53,7 +53,7 @@ impl Oryxis {
                 self.prefs.default_identity_id = if val == crate::i18n::t("new_default_none") {
                     None
                 } else {
-                    self.identities.iter().find(|i| i.label == val).map(|i| i.id)
+                    self.vaults.cur().identities.iter().find(|i| i.label == val).map(|i| i.id)
                 };
                 self.persist_setting(
                     "default_identity_id",
@@ -64,7 +64,7 @@ impl Oryxis {
                 self.prefs.default_key_id = if val == crate::i18n::t("new_default_none") {
                     None
                 } else {
-                    self.keys.iter().find(|k| k.label == val).map(|k| k.id)
+                    self.vaults.cur().keys.iter().find(|k| k.label == val).map(|k| k.id)
                 };
                 self.persist_setting(
                     "default_key_id",
@@ -79,7 +79,7 @@ impl Oryxis {
                     // valid defaults); bare labels keep working for
                     // pre-path stored selections.
                     oryxis_core::models::Group::resolve_path_or_label(
-                        &self.groups,
+                        &self.vaults.cur().groups,
                         &val,
                         &Default::default(),
                     )
@@ -96,7 +96,7 @@ impl Oryxis {
                     if val == crate::i18n::t("new_default_none") {
                         None
                     } else {
-                        self.proxy_identities.iter().find(|p| p.label == val).map(|p| p.id)
+                        self.vaults.cur().proxy_identities.iter().find(|p| p.label == val).map(|p| p.id)
                     };
                 self.persist_setting(
                     "default_proxy_identity_id",

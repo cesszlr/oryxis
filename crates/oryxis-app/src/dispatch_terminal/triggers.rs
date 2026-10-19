@@ -78,7 +78,7 @@ impl Oryxis {
                 }
             }
             TriggerAction::Snippet { id } => {
-                let Some(snippet) = self.snippets.iter().find(|s| s.id.to_string() == *id) else {
+                let Some(snippet) = self.vaults.cur().snippets.iter().find(|s| s.id.to_string() == *id) else {
                     // The snippet was deleted after the rule was
                     // written. The highlight still paints; only the
                     // action is gone, and saying so beats silence.
@@ -89,7 +89,7 @@ impl Oryxis {
                 // A snippet with actions runs them, nested ones expanded
                 // now, so the confirmation lists what will actually run.
                 let steps = if snippet.has_steps() {
-                    match crate::snippet_run::flatten(&self.snippets, snippet) {
+                    match crate::snippet_run::flatten(&self.vaults.cur().snippets, snippet) {
                         Ok(steps) => Some(steps),
                         Err(e) => {
                             return self.show_toast(crate::dispatch_snippet_run::plan_error_text(&label, &e));

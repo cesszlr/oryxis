@@ -850,7 +850,7 @@ impl Oryxis {
     /// open tabs without a reconnect.
     pub(crate) fn tab_auto_title(&self, tab: &crate::state::TerminalTab) -> bool {
         if let crate::state::PaneOrigin::Host(id) = &tab.active().origin
-            && let Some(conn) = self.connections.iter().find(|c| c.id == *id)
+            && let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == *id)
             && let Some(over) = conn.auto_title
         {
             return over;

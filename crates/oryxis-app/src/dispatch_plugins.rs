@@ -151,7 +151,7 @@ impl Oryxis {
     pub(crate) fn hidden_cloud_profile_ids(
         &self,
     ) -> std::collections::HashSet<uuid::Uuid> {
-        self.cloud_profiles
+        self.vaults.cur().cloud_profiles
             .iter()
             .filter(|p| !self.cloud_provider_installed(&p.provider))
             .map(|p| p.id)

@@ -155,7 +155,7 @@ impl Oryxis {
             .map(|p| p.label.clone())
             .or_else(|| {
                 let log_id = self.viewing_session_log.as_ref()?.log_id;
-                self.session_logs
+                self.vaults.cur().session_logs
                     .iter()
                     .find(|e| e.id == log_id)
                     .map(|e| e.label.clone())

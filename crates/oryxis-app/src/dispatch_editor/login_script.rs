@@ -20,9 +20,9 @@ impl Oryxis {
     /// Display strings for the login-automation combo, in the order the
     /// picker shows them: off, every saved script, then "new".
     pub(crate) fn login_script_options(&self) -> Vec<String> {
-        let mut opts = Vec::with_capacity(self.login_scripts.len() + 2);
+        let mut opts = Vec::with_capacity(self.vaults.cur().login_scripts.len() + 2);
         opts.push(crate::i18n::t(LOGIN_SCRIPT_OFF).to_string());
-        opts.extend(self.login_scripts.iter().map(|s| s.name.clone()));
+        opts.extend(self.vaults.cur().login_scripts.iter().map(|s| s.name.clone()));
         opts.push(crate::i18n::t(LOGIN_SCRIPT_NEW).to_string());
         opts
     }
@@ -34,7 +34,7 @@ impl Oryxis {
         }
         self.editor_form
             .login_script_id
-            .and_then(|id| self.login_scripts.iter().find(|s| s.id == id))
+            .and_then(|id| self.vaults.cur().login_scripts.iter().find(|s| s.id == id))
             .map(|s| s.name.clone())
             .unwrap_or_else(|| crate::i18n::t(LOGIN_SCRIPT_OFF).to_string())
     }
@@ -46,7 +46,7 @@ impl Oryxis {
         let Some(script) = self
             .editor_form
             .login_script_id
-            .and_then(|id| self.login_scripts.iter().find(|s| s.id == id))
+            .and_then(|id| self.vaults.cur().login_scripts.iter().find(|s| s.id == id))
         else {
             return Vec::new();
         };
@@ -70,7 +70,7 @@ impl Oryxis {
     pub(crate) fn login_script_uses_target_password(&self) -> bool {
         self.editor_form
             .login_script_id
-            .and_then(|id| self.login_scripts.iter().find(|s| s.id == id))
+            .and_then(|id| self.vaults.cur().login_scripts.iter().find(|s| s.id == id))
             .is_some_and(|s| {
                 s.steps.iter().any(|step| {
                     matches!(
@@ -101,7 +101,7 @@ impl Oryxis {
                             crate::state::ScriptTemplate::JumpServer,
                         ));
                 } else if let Some(script) =
-                    self.login_scripts.iter().find(|s| s.name == choice)
+                    self.vaults.cur().login_scripts.iter().find(|s| s.name == choice)
                 {
                     self.editor_form.login_script_id = Some(script.id);
                     self.editor_form.login_script_draft = None;
@@ -209,8 +209,8 @@ impl Oryxis {
                 self.host_panel_error = None;
                 self.editor_form.login_script_id = Some(script.id);
                 self.editor_form.login_script_draft = None;
-                self.login_scripts.push(script);
-                self.login_scripts.sort_by(|a, b| a.name.cmp(&b.name));
+                self.vaults.cur_mut().login_scripts.push(script);
+                self.vaults.cur_mut().login_scripts.sort_by(|a, b| a.name.cmp(&b.name));
                 self.rebuild_editor_combos();
             }
             EditorMessage::EditorScriptDraftCancel => {

@@ -107,7 +107,7 @@ impl Oryxis {
         else {
             return false;
         };
-        self.connections.iter().find(|c| c.id == *id).is_some_and(|c| {
+        self.vaults.cur().connections.iter().find(|c| c.id == *id).is_some_and(|c| {
             c.protocol == oryxis_core::models::connection::ConnectionProtocol::Local
                 && c.local.as_ref().is_some_and(|l| {
                     l.terminal_id.is_some()
@@ -133,17 +133,17 @@ impl Oryxis {
             crate::state::PinnedTabSpec::Host { id, .. } => {
                 // A host deleted since the snapshot stays a dormant
                 // chip: selecting it says so, the way it always did.
-                let conn_idx = self.connections.iter().position(|c| c.id == id)?;
+                let conn_idx = self.vaults.cur().connections.iter().position(|c| c.id == id)?;
                 // A host edited into a remote desktop since the snapshot
                 // has no pane to dial into: the in-place path would only
                 // launch the external client, unasked, at startup. It
                 // stays dormant and a select opens it the usual way.
-                if self.connections[conn_idx].protocol
+                if self.vaults.cur().connections[conn_idx].protocol
                     == oryxis_core::models::connection::ConnectionProtocol::RemoteDesktop
                 {
                     return None;
                 }
-                let conn = self.connections[conn_idx].clone();
+                let conn = self.vaults.cur().connections[conn_idx].clone();
                 self.tabs[tab_idx].pending_reopen = None;
                 // What a fresh dial of this host would give the tab: its
                 // current label (it may have been renamed since), its

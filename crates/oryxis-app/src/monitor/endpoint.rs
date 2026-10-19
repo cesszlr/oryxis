@@ -127,7 +127,7 @@ impl Oryxis {
     /// The monitor key of a saved host, or `None` when the row is gone
     /// (deleted mid-probe, a stale id in a message still in flight).
     pub(crate) fn monitor_key(&self, conn_id: &Uuid) -> Option<MonitorKey> {
-        self.connections
+        self.vaults.cur().connections
             .iter()
             .find(|c| c.id == *conn_id)
             .map(MonitorKey::new)
@@ -160,7 +160,7 @@ impl Oryxis {
     /// machine's.
     pub(crate) fn monitor_key_members(&self, key: &MonitorKey) -> Vec<Uuid> {
         let mut members: Vec<(String, Uuid)> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .filter(|c| self.monitor_conn_opted_in(c) && MonitorKey::new(c) == *key)
             .map(|c| (c.label.to_lowercase(), c.id))
@@ -174,7 +174,7 @@ impl Oryxis {
     pub(crate) fn monitor_disk_patterns(&self, key: &MonitorKey) -> Option<Vec<String>> {
         let members = self.monitor_key_members(key);
         union_disk_patterns(members.iter().map(|id| {
-            self.connections
+            self.vaults.cur().connections
                 .iter()
                 .find(|c| c.id == *id)
                 .and_then(|c| c.monitor_disks.as_ref())

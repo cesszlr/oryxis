@@ -265,10 +265,10 @@ impl Oryxis {
             // The origin's stable id wins over the display label:
             // labels collide across hosts and can be edited.
             crate::state::PaneOrigin::Host(hid) => {
-                let idx = self.connections.iter().position(|c| c.id == *hid)?;
+                let idx = self.vaults.cur().connections.iter().position(|c| c.id == *hid)?;
                 Some(PaneRestartTarget::Saved(
                     idx,
-                    self.connections[idx].label.clone(),
+                    self.vaults.cur().connections[idx].label.clone(),
                 ))
             }
             crate::state::PaneOrigin::QuickHost(qid) => {

@@ -715,7 +715,7 @@ impl Oryxis {
             }
             SnippetStep::RunSnippet { id } => {
                 let name = self
-                    .snippets
+                    .vaults.cur().snippets
                     .iter()
                     .find(|s| s.id == *id)
                     .map_or_else(|| "?".to_string(), |s| s.label.clone());
@@ -764,7 +764,7 @@ impl Oryxis {
         &mut self,
         snip: &oryxis_core::models::Snippet,
     ) -> Option<(String, Vec<SnippetStep>)> {
-        match crate::snippet_run::flatten(&self.snippets, snip) {
+        match crate::snippet_run::flatten(&self.vaults.cur().snippets, snip) {
             Ok(steps) => Some((snip.label.clone(), steps)),
             Err(e) => {
                 let text = plan_error_text(&snip.label, &e);

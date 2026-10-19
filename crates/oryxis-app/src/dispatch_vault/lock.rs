@@ -311,11 +311,11 @@ impl Oryxis {
                         self.mcp.token_visible = false;
                         // Same reset as the soft lock: lead with biometrics.
                         self.vault_ui.password_fallback = false;
-                        self.connections.clear();
+                        self.vaults.cur_mut().connections.clear();
                         self.quick_connects.clear();
-                        self.keys.clear();
-                        self.snippets.clear();
-                        self.groups.clear();
+                        self.vaults.cur_mut().keys.clear();
+                        self.vaults.cur_mut().snippets.clear();
+                        self.vaults.cur_mut().groups.clear();
                         // The relay deploy's parked SSH session and its
                         // rendered plan (the plan carries the token):
                         // the lock severs every live connection, this

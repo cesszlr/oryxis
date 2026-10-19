@@ -155,7 +155,7 @@ impl Oryxis {
             return global;
         };
         let Some(host) = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .find(|c| c.id == id)
             .and_then(|c| c.highlight_rules.as_ref())

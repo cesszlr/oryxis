@@ -203,7 +203,7 @@ impl Oryxis {
                 // A `_sk` file picked up from `~/.ssh` counts as well: the
                 // hint is about having SOMETHING the token can sign with.
                 let signable = self
-                    .keys
+                    .vaults.cur().keys
                     .iter()
                     .any(|k| k.algorithm.is_security_key() && k.has_private)
                     || matches!(
@@ -254,7 +254,7 @@ impl Oryxis {
                 )
             } else if !cert_mode {
                 None
-            } else if !self.keys.iter().any(|k| k.certificate.is_some())
+            } else if !self.vaults.cur().keys.iter().any(|k| k.certificate.is_some())
                 // A disk key with its `<key>-cert.pub` sibling is a
                 // certificate this host can offer, so the "no key in
                 // the vault carries one" warning would contradict the
@@ -273,7 +273,7 @@ impl Oryxis {
                     .boxed(),
                 )
             } else {
-                let selected = self.keys.iter().find(|k| k.label == key_selected);
+                let selected = self.vaults.cur().keys.iter().find(|k| k.label == key_selected);
                 match selected.and_then(|k| k.certificate.as_deref()) {
                     Some(line) => ssh_key::Certificate::from_openssh(line.trim()).ok().map(
                         |cert| {

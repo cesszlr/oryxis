@@ -143,7 +143,7 @@ impl Oryxis {
         // Resolve the gateway SSH host to tunnel through. A missing / non-SSH
         // id degrades to a direct connection with a warning (never an error),
         // mirroring `resolve_proxy`'s dangling-identity handling.
-        let gateway = resolve_rd_gateway(conn.rd_gateway_id, &self.connections).cloned();
+        let gateway = resolve_rd_gateway(conn.rd_gateway_id, &self.vaults.cur().connections).cloned();
         if conn.rd_gateway_id.is_some() && gateway.is_none() {
             tracing::warn!(
                 "remote-desktop gateway {:?} missing or not SSH; connecting directly",

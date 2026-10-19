@@ -53,7 +53,7 @@ impl Oryxis {
                             [(SftpPaneSide::Right, &right), (SftpPaneSide::Left, &left)]
                         {
                             if let SftpPaneSpec::Remote(id) = spec
-                                && let Some(ci) = self.connections.iter().position(|c| c.id == *id)
+                                && let Some(ci) = self.vaults.cur().connections.iter().position(|c| c.id == *id)
                             {
                                 tasks.push(Task::done(Message::Sftp(SftpMessage::SftpRemountPane(side, ci))));
                             }

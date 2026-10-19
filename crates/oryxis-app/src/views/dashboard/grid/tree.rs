@@ -86,7 +86,7 @@ impl Oryxis {
                 }
                 TreeEntry::Session { idx, depth } => {
                     let (el, color) =
-                        self.dash_tree_session_row(idx, &self.session_groups[idx], depth);
+                        self.dash_tree_session_row(idx, &self.vaults.cur().session_groups[idx], depth);
                     (el, color, DashNavItem::SessionGroup(idx))
                 }
                 TreeEntry::Host { idx, depth } => {
@@ -97,7 +97,7 @@ impl Oryxis {
             .collect()
     }
 
-    /// The host rows of the tree, as indices into `self.connections`,
+    /// The host rows of the tree, as indices into `self.vaults.cur().connections`,
     /// in display order: what `dashboard_host_order` answers for the
     /// grid and list modes. Hosts inside collapsed folders are not on
     /// screen and are not in it.
@@ -131,7 +131,7 @@ impl Oryxis {
         // is applied in the walk, where a matching ancestor short-
         // circuits it (a folder that matches shows all its children).
         let host_passes = |i: usize| -> bool {
-            let conn = &self.connections[i];
+            let conn = &self.vaults.cur().connections[i];
             if conn
                 .cloud_ref
                 .as_ref()
@@ -156,8 +156,8 @@ impl Oryxis {
         let host_search_match = |i: usize| -> bool {
             !searching
                 || crate::util::host_matches_search(
-                    &self.connections[i],
-                    self.effective_username(&self.connections[i]).as_deref(),
+                    &self.vaults.cur().connections[i],
+                    self.effective_username(&self.vaults.cur().connections[i]).as_deref(),
                     &search_lower,
                 )
         };
@@ -179,22 +179,22 @@ impl Oryxis {
 
         // Roots: parentless groups plus broken-ancestry ones (dangling
         // or cyclic parents degrade to root, the dashboard policy).
-        let mut roots: Vec<usize> = (0..self.groups.len())
+        let mut roots: Vec<usize> = (0..self.vaults.cur().groups.len())
             .filter(|&i| {
-                let g = &self.groups[i];
+                let g = &self.vaults.cur().groups[i];
                 g.parent_id.is_none()
-                    || !oryxis_core::models::Group::is_reachable_from_root(&self.groups, g.id)
+                    || !oryxis_core::models::Group::is_reachable_from_root(&self.vaults.cur().groups, g.id)
             })
             .collect();
         self.hosts_sort.sort_items(
             &mut roots,
-            |&i| self.groups[i].label.clone(),
-            |&i| self.groups[i].created_at,
+            |&i| self.vaults.cur().groups[i].label.clone(),
+            |&i| self.vaults.cur().groups[i].created_at,
         );
         for i in roots {
             self.tree_walk_group(
                 &mut rows,
-                &self.groups[i],
+                &self.vaults.cur().groups[i],
                 0,
                 searching,
                 &search_lower,
@@ -211,10 +211,10 @@ impl Oryxis {
         }
 
         // Root session groups (no folder, or a dangling folder id).
-        let group_exists = |gid: Uuid| self.groups.iter().any(|g| g.id == gid);
-        let mut root_sessions: Vec<usize> = (0..self.session_groups.len())
+        let group_exists = |gid: Uuid| self.vaults.cur().groups.iter().any(|g| g.id == gid);
+        let mut root_sessions: Vec<usize> = (0..self.vaults.cur().session_groups.len())
             .filter(|&i| {
-                self.session_groups[i]
+                self.vaults.cur().session_groups[i]
                     .group_id
                     .filter(|gid| group_exists(*gid))
                     .is_none()
@@ -222,11 +222,11 @@ impl Oryxis {
             .collect();
         self.hosts_sort.sort_items(
             &mut root_sessions,
-            |&i| self.session_groups[i].label.clone(),
-            |&i| self.session_groups[i].created_at,
+            |&i| self.vaults.cur().session_groups[i].label.clone(),
+            |&i| self.vaults.cur().session_groups[i].created_at,
         );
         for i in root_sessions {
-            let sg = &self.session_groups[i];
+            let sg = &self.vaults.cur().session_groups[i];
             if searching && !sg.label.to_lowercase().contains(&search_lower) {
                 continue;
             }
@@ -234,9 +234,9 @@ impl Oryxis {
         }
 
         // Root hosts: no group, or a group id that no longer resolves.
-        let mut root_hosts: Vec<usize> = (0..self.connections.len())
+        let mut root_hosts: Vec<usize> = (0..self.vaults.cur().connections.len())
             .filter(|&i| {
-                self.connections[i]
+                self.vaults.cur().connections[i]
                     .group_id
                     .filter(|gid| group_exists(*gid))
                     .is_none()
@@ -246,8 +246,8 @@ impl Oryxis {
             .collect();
         self.hosts_sort.sort_items(
             &mut root_hosts,
-            |&i| self.connections[i].label.clone(),
-            |&i| self.connections[i].created_at,
+            |&i| self.vaults.cur().connections[i].label.clone(),
+            |&i| self.vaults.cur().connections[i].created_at,
         );
         rows.extend(root_hosts.into_iter().map(|idx| TreeEntry::Host { idx, depth: 0 }));
         rows
@@ -316,18 +316,18 @@ impl Oryxis {
             return;
         }
 
-        let mut children: Vec<usize> = (0..self.groups.len())
-            .filter(|&i| self.groups[i].parent_id == Some(gid))
+        let mut children: Vec<usize> = (0..self.vaults.cur().groups.len())
+            .filter(|&i| self.vaults.cur().groups[i].parent_id == Some(gid))
             .collect();
         self.hosts_sort.sort_items(
             &mut children,
-            |&i| self.groups[i].label.clone(),
-            |&i| self.groups[i].created_at,
+            |&i| self.vaults.cur().groups[i].label.clone(),
+            |&i| self.vaults.cur().groups[i].created_at,
         );
         for i in children {
             self.tree_walk_group(
                 rows,
-                &self.groups[i],
+                &self.vaults.cur().groups[i],
                 depth + 1,
                 searching,
                 search_lower,
@@ -345,16 +345,16 @@ impl Oryxis {
             );
         }
 
-        let mut sessions: Vec<usize> = (0..self.session_groups.len())
-            .filter(|&i| self.session_groups[i].group_id == Some(gid))
+        let mut sessions: Vec<usize> = (0..self.vaults.cur().session_groups.len())
+            .filter(|&i| self.vaults.cur().session_groups[i].group_id == Some(gid))
             .collect();
         self.hosts_sort.sort_items(
             &mut sessions,
-            |&i| self.session_groups[i].label.clone(),
-            |&i| self.session_groups[i].created_at,
+            |&i| self.vaults.cur().session_groups[i].label.clone(),
+            |&i| self.vaults.cur().session_groups[i].created_at,
         );
         for i in sessions {
-            let sg = &self.session_groups[i];
+            let sg = &self.vaults.cur().session_groups[i];
             if searching
                 && !label_match
                 && !sg.label.to_lowercase().contains(search_lower)
@@ -364,17 +364,17 @@ impl Oryxis {
             rows.push(TreeEntry::Session { idx: i, depth: depth + 1 });
         }
 
-        let mut hosts: Vec<usize> = (0..self.connections.len())
+        let mut hosts: Vec<usize> = (0..self.vaults.cur().connections.len())
             .filter(|&i| {
-                self.connections[i].group_id == Some(gid)
+                self.vaults.cur().connections[i].group_id == Some(gid)
                     && host_passes(i)
                     && (label_match || host_search_match(i))
             })
             .collect();
         self.hosts_sort.sort_items(
             &mut hosts,
-            |&i| self.connections[i].label.clone(),
-            |&i| self.connections[i].created_at,
+            |&i| self.vaults.cur().connections[i].label.clone(),
+            |&i| self.vaults.cur().connections[i].created_at,
         );
         rows.extend(hosts.into_iter().map(|idx| TreeEntry::Host { idx, depth: depth + 1 }));
     }
@@ -466,7 +466,7 @@ impl Oryxis {
         privacy_terms: &[String],
         depth: usize,
     ) -> (Element<'a, Message>, Color) {
-        let conn = &self.connections[idx];
+        let conn = &self.vaults.cur().connections[idx];
         let hovered = self.cur_nav().hover.card == Some(idx) || self.cur_card_context_menu() == Some(conn.id);
         let dragging_this = self
             .card_drag
@@ -544,7 +544,7 @@ impl Oryxis {
         // the same signals as the card, one line tall.
         let cloud: Option<(&'static str, Color, bool)> = conn.cloud_ref.as_ref().map(|cr| {
             let provider = self
-                .cloud_profiles
+                .vaults.cur().cloud_profiles
                 .iter()
                 .find(|p| p.id == cr.profile_id)
                 .map(|p| p.provider.as_str())
@@ -938,11 +938,11 @@ fn search_visible_entry(
             return v;
         }
         memo.insert(gid, false);
-        let Some(group) = app.groups.iter().find(|g| g.id == gid) else {
+        let Some(group) = app.vaults.cur().groups.iter().find(|g| g.id == gid) else {
             return false;
         };
         let v = group.label.to_lowercase().contains(search_lower)
-            || app.connections.iter().any(|c| {
+            || app.vaults.cur().connections.iter().any(|c| {
                 c.group_id == Some(gid)
                     && crate::util::host_matches_search(
                         c,
@@ -950,11 +950,11 @@ fn search_visible_entry(
                         search_lower,
                     )
             })
-            || app.session_groups.iter().any(|sg| {
+            || app.vaults.cur().session_groups.iter().any(|sg| {
                 sg.group_id == Some(gid) && sg.label.to_lowercase().contains(search_lower)
             })
             || app
-                .groups
+                .vaults.cur().groups
                 .iter()
                 .filter(|g| g.parent_id == Some(gid))
                 .any(|g| rec(app, g.id, search_lower, memo));

@@ -58,12 +58,12 @@ impl Oryxis {
         // `cred_items` moved every row below it, so the password input
         // lost its state, focus included, on that keystroke.
         let mut suggestions = iced::widget::Column::<iced::Element<'_, _>>::new();
-        if is_ssh && self.editor_form.username_focused && self.editor_form.selected_identity.is_none() && !self.identities.is_empty() {
+        if is_ssh && self.editor_form.username_focused && self.editor_form.selected_identity.is_none() && !self.vaults.cur().identities.is_empty() {
             let search = self.editor_form.username.to_lowercase();
             let matching: Vec<&Identity> = if search.is_empty() {
-                self.identities.iter().collect()
+                self.vaults.cur().identities.iter().collect()
             } else {
-                self.identities.iter()
+                self.vaults.cur().identities.iter()
                     .filter(|i| i.label.to_lowercase().contains(&search)
                         || i.username.as_deref().unwrap_or("").to_lowercase().contains(&search))
                     .collect()
@@ -76,7 +76,7 @@ impl Oryxis {
                         identity.username.as_deref().unwrap_or(""),
                         if identity.key_id.is_some() {
                             let key_name = identity.key_id.and_then(|kid| {
-                                self.keys.iter().find(|k| k.id == kid).map(|k| k.label.as_str())
+                                self.vaults.cur().keys.iter().find(|k| k.id == kid).map(|k| k.label.as_str())
                             }).unwrap_or("key");
                             format!(", {}", key_name)
                         } else { String::new() },

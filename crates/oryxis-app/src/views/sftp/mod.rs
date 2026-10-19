@@ -452,7 +452,7 @@ impl Oryxis {
             .boxed()
         } else {
             let mounted_conn = pane.host_label.as_ref().and_then(|label| {
-                self.connections.iter().find(|c| &c.label == label)
+                self.vaults.cur().connections.iter().find(|c| &c.label == label)
             });
             if let Some(conn) = mounted_conn {
                 let (glyph, badge_color) = crate::os_icon::resolve_icon(
@@ -1066,7 +1066,7 @@ impl Oryxis {
     fn view_sftp_picker(&self) -> Element<'_, Message> {
         let needle = self.cur_sftp().picker_search.to_lowercase();
         let matches: Vec<usize> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .enumerate()
             .filter(|(_, c)| {
@@ -1129,7 +1129,7 @@ impl Oryxis {
             }
         }
         for ci in matches {
-            let conn = &self.connections[ci];
+            let conn = &self.vaults.cur().connections[ci];
             let active = self
                 .tabs
                 .iter()

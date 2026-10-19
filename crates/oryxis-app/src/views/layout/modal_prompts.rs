@@ -427,13 +427,13 @@ impl Oryxis {
     /// delete with hosts, collapsing to a single action for empty folders).
     pub(crate) fn build_folder_delete_dialog(&self, gid: uuid::Uuid) -> Element<'_, Message> {
         let folder_name = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .find(|g| g.id == gid)
             .map(|g| g.label.clone())
             .unwrap_or_default();
         let host_count = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .filter(|c| c.group_id == Some(gid))
             .count();
@@ -442,7 +442,7 @@ impl Oryxis {
         // up; the copy below says so instead of calling the folder
         // "empty".
         let sub_count = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter(|g| g.parent_id == Some(gid))
             .count();

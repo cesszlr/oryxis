@@ -270,13 +270,13 @@ impl Oryxis {
             let label = tab.label.trim_end_matches(" (disconnected)");
             // 0) session-group tabs breathe the group's own colour.
             if let Some(sg_id) = tab.session_group_id
-                && let Some(g) = self.session_groups.iter().find(|g| g.id == sg_id)
+                && let Some(g) = self.vaults.cur().session_groups.iter().find(|g| g.id == sg_id)
                 && let Some(col) = g.color.as_deref().and_then(crate::widgets::parse_hex_color)
             {
                 return col;
             }
             // 1) per-host colour from a matching saved Connection.
-            if let Some(c) = self.connections.iter().find(|c| c.label == label)
+            if let Some(c) = self.vaults.cur().connections.iter().find(|c| c.label == label)
                 && let Some(hex) = c.custom_color.as_deref().or(c.color.as_deref())
                 && let Some(col) = crate::widgets::parse_hex_color(hex)
             {
@@ -302,7 +302,7 @@ impl Oryxis {
             && let Some(tab) = self.sftp_tabs.get(i)
         {
             if let Some(col) = self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.label == tab.label)
                 .and_then(|c| c.custom_color.as_deref().or(c.color.as_deref()))
@@ -371,16 +371,16 @@ impl Oryxis {
     pub(crate) fn active_view_search_empty(&self) -> bool {
         match self.cur_view() {
             View::Dashboard => {
-                self.connections.is_empty()
-                    && self.groups.is_empty()
-                    && self.session_groups.is_empty()
+                self.vaults.cur().connections.is_empty()
+                    && self.vaults.cur().groups.is_empty()
+                    && self.vaults.cur().session_groups.is_empty()
             }
-            View::Keys => self.keys.is_empty() && self.identities.is_empty(),
-            View::Snippets => self.snippets.is_empty(),
-            View::PortForwarding => self.port_forward_rules.is_empty(),
-            View::History => self.logs.is_empty() && self.session_logs.is_empty(),
-            View::Cloud => self.cloud_profiles.is_empty(),
-            View::Proxies => self.proxy_identities.is_empty(),
+            View::Keys => self.vaults.cur().keys.is_empty() && self.vaults.cur().identities.is_empty(),
+            View::Snippets => self.vaults.cur().snippets.is_empty(),
+            View::PortForwarding => self.vaults.cur().port_forward_rules.is_empty(),
+            View::History => self.vaults.cur().logs.is_empty() && self.vaults.cur().session_logs.is_empty(),
+            View::Cloud => self.vaults.cur().cloud_profiles.is_empty(),
+            View::Proxies => self.vaults.cur().proxy_identities.is_empty(),
             View::Monitoring => self.dash_hosts().is_empty(),
             _ => true,
         }

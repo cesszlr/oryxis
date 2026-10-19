@@ -31,7 +31,7 @@ impl Oryxis {
             Space::new().height(12),
         ];
 
-        if self.login_scripts.is_empty() {
+        if self.vaults.cur().login_scripts.is_empty() {
             col = col.push(
                 text(t("login_script_empty"))
                     .size(12)
@@ -40,7 +40,7 @@ impl Oryxis {
             return panel_section(col);
         }
 
-        for script in &self.login_scripts {
+        for script in &self.vaults.cur().login_scripts {
             let count = usage.get(&script.id).copied().unwrap_or(0);
             let editing = self.login_script_form.editing_id == Some(script.id);
             let confirming = self.login_script_form.confirm_delete == Some(script.id);

@@ -356,7 +356,7 @@ impl Oryxis {
         // with no sign of why. The snippet recorder refuses a chord the
         // table holds; this is the other half. The capture stays armed so
         // the next keypress can try another chord.
-        if let Some(snippet) = self.snippets.iter().find(|sn| {
+        if let Some(snippet) = self.vaults.cur().snippets.iter().find(|sn| {
             sn.hotkey
                 .as_deref()
                 .and_then(crate::hotkeys::HotkeyBinding::parse)

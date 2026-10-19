@@ -127,14 +127,14 @@ impl Oryxis {
         ));
         if let TriggerAction::Snippet { id } = &rule.action {
             let selected = self
-                .snippets
+                .vaults.cur().snippets
                 .iter()
                 .find(|s| s.id.to_string() == *id)
                 .map(|s| s.label.clone())
                 .unwrap_or_default();
             body = body.push(Space::new().height(10).boxed()).push(self.hl_modal_pick(
                 t("hl_rule_snippet"),
-                self.snippets.iter().map(|s| s.label.clone()).collect(),
+                self.vaults.cur().snippets.iter().map(|s| s.label.clone()).collect(),
                 selected,
                 |l| Message::Settings(SettingsMessage::HighlightRuleSnippetChanged(l)),
             ));

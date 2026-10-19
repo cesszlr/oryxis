@@ -35,7 +35,7 @@ impl Oryxis {
         label: &str,
     ) -> Option<&oryxis_core::models::TerminalAppearance> {
         let base = label.trim_end_matches(" (disconnected)");
-        self.connections
+        self.vaults.cur().connections
             .iter()
             .find(|c| c.label == base)
             .and_then(|c| c.terminal_appearance.as_ref())

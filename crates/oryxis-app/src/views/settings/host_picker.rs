@@ -77,7 +77,7 @@ pub(super) fn sync_host_picker_modal(app: &Oryxis, target: HostPickerTarget) -> 
     app.modal_nav_reset();
     let q = target.search(app).to_lowercase();
     let mut list = iced::widget::Column::<iced::Element<'_, _>>::new().spacing(2);
-    for conn in app.connections.iter().filter(|c| {
+    for conn in app.vaults.cur().connections.iter().filter(|c| {
         q.is_empty()
             || c.label.to_lowercase().contains(&q)
             || c.hostname.to_lowercase().contains(&q)

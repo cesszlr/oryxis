@@ -402,7 +402,7 @@ impl Oryxis {
             // Gateway: `None` = Direct, else an SSH host to tunnel through.
             let gw_options: Vec<Option<uuid::Uuid>> = std::iter::once(None)
                 .chain(
-                    self.connections
+                    self.vaults.cur().connections
                         .iter()
                         .filter(|c| c.protocol == Proto::Ssh)
                         .map(|c| Some(c.id)),
@@ -411,7 +411,7 @@ impl Oryxis {
             let gw_labels: std::collections::HashMap<Option<uuid::Uuid>, String> =
                 std::iter::once((None, t("remote_desktop_direct").to_string()))
                     .chain(
-                        self.connections
+                        self.vaults.cur().connections
                             .iter()
                             .filter(|c| c.protocol == Proto::Ssh)
                             .map(|c| (Some(c.id), c.label.clone())),

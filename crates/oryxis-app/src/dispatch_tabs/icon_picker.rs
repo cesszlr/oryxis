@@ -36,12 +36,13 @@ impl Oryxis {
         } else if let Some(conn_id) = self.icon_picker.for_id {
             let icon = self.icon_picker.icon.clone();
             let color = self.icon_picker.color.clone();
-            if let Some(conn) = self.connections.iter_mut().find(|c| c.id == conn_id) {
+            let ov = self.vaults.cur_mut();
+            if let Some(conn) = ov.connections.iter_mut().find(|c| c.id == conn_id) {
                 conn.custom_icon = icon.clone();
                 conn.custom_color = color.clone();
                 // Full save so the row persists (and other fields
                 // aren't accidentally overwritten).
-                if let Some(vault) = &self.vaults.cur().store {
+                if let Some(vault) = &ov.store {
                     let _ = vault.save_connection(conn, None);
                 }
             }
@@ -75,10 +76,11 @@ impl Oryxis {
             self.group_edit.icon = String::new();
             self.group_edit.color = String::new();
         } else if let Some(conn_id) = self.icon_picker.for_id
-            && let Some(conn) = self.connections.iter_mut().find(|c| c.id == conn_id) {
+            && let ov = self.vaults.cur_mut()
+            && let Some(conn) = ov.connections.iter_mut().find(|c| c.id == conn_id) {
             conn.custom_icon = None;
             conn.custom_color = None;
-            if let Some(vault) = &self.vaults.cur().store {
+            if let Some(vault) = &ov.store {
                 let _ = vault.save_connection(conn, None);
             }
         }

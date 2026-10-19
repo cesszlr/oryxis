@@ -345,7 +345,7 @@ impl Oryxis {
         profile_id: Uuid,
     ) -> Task<Message> {
         let Some(profile) = self
-            .cloud_profiles
+            .vaults.cur().cloud_profiles
             .iter()
             .find(|p| p.id == profile_id)
             .cloned()
@@ -446,7 +446,7 @@ impl Oryxis {
         profile_id: Uuid,
     ) -> Option<CloudProfile> {
         let mut profile = self
-            .cloud_profiles
+            .vaults.cur().cloud_profiles
             .iter()
             .find(|p| p.id == profile_id)
             .cloned()?;

@@ -98,7 +98,7 @@ impl Oryxis {
                             self.keys_ui.generate_form.error = Some(e.to_string());
                             return Ok(Task::none());
                         }
-                        self.keys = vault.list_keys().unwrap_or_default();
+                        self.vaults.cur_mut().keys = vault.list_keys().unwrap_or_default();
                         self.keys_ui.generate_form.result =
                             Some(crate::state::GeneratedKeyView {
                                 id: generated.key.id,

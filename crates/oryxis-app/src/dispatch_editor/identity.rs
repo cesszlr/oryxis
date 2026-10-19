@@ -93,14 +93,14 @@ impl Oryxis {
                 let still_offerable = match self.editor_form.auth_method {
                     AuthMethod::Certificate => {
                         self.editor_form.selected_key.as_deref().is_none_or(|sel| {
-                            self.keys
+                            self.vaults.cur().keys
                                 .iter()
                                 .any(|k| k.label == sel && k.certificate.is_some())
                         })
                     }
                     AuthMethod::SecurityKey => {
                         self.editor_form.selected_key.as_deref().is_none_or(|sel| {
-                            self.keys.iter().any(|k| {
+                            self.vaults.cur().keys.iter().any(|k| {
                                 k.label == sel
                                     && k.algorithm.is_security_key()
                                     && k.has_private

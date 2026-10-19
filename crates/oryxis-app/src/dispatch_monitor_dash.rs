@@ -183,7 +183,7 @@ impl Oryxis {
                     )));
                 }
                 if let Some(idx) =
-                    self.connections.iter().position(|c| c.id == conn_id)
+                    self.vaults.cur().connections.iter().position(|c| c.id == conn_id)
                 {
                     return Ok(Task::done(Message::Ssh(
                         crate::app::SshMessage::ConnectSsh(idx),
@@ -211,7 +211,7 @@ impl Oryxis {
             .monitor_dash_live_only
             .then(|| self.dash_live_keys());
         let mut hosts: Vec<(String, Uuid)> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .filter(|c| self.monitor_conn_opted_in(c))
             .filter(|c| live.as_ref().is_none_or(|keys| keys.contains(&MonitorKey::new(c))))
@@ -410,7 +410,7 @@ impl Oryxis {
     /// the next one instead of retrying the same credentials forever.
     fn dash_dial(&mut self, key: &MonitorKey, conn_id: Uuid, tried: Vec<Uuid>) -> Task<Message> {
         let Some(mut conn) = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .find(|c| c.id == conn_id)
             .cloned()

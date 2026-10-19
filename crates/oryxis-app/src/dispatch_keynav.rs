@@ -460,7 +460,7 @@ impl Oryxis {
             && self.cur_nav().host_search.trim().is_empty()
             && let NavItem::Dash(DashNavItem::Group(gid)) = cur
             && self
-                .groups
+                .vaults.cur().groups
                 .iter()
                 .any(|g| g.id == gid && g.cloud_query.is_none())
         {
@@ -572,7 +572,7 @@ impl Oryxis {
         // canonical user@host form) always beats quick connect,
         // so typing something that names a saved host connects
         // the saved one, credentials included.
-        let exact = self.connections.iter().position(|c| {
+        let exact = self.vaults.cur().connections.iter().position(|c| {
             c.label.eq_ignore_ascii_case(&input)
                 // The effective login (folder default, identity), the
                 // word the card shows: `deploy@web01` names the saved
@@ -673,7 +673,7 @@ impl Oryxis {
             NavItem::HistoryLog(id) => {
                 // The ring carries the log's id (stable across paging);
                 // the delete message wants its index in the loaded list.
-                let i = self.session_logs.iter().position(|l| l.id == id)?;
+                let i = self.vaults.cur().session_logs.iter().position(|l| l.id == id)?;
                 Message::History(HistoryMessage::RequestDeleteSessionLog(i))
             }
             // Cloud accounts and proxy identities delete OUTRIGHT today,
@@ -684,7 +684,7 @@ impl Oryxis {
             // the mouse.
             NavItem::CloudAccount(id) => {
                 let name = self
-                    .cloud_profiles
+                    .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == id)
                     .map(|p| p.label.clone())
@@ -694,7 +694,7 @@ impl Oryxis {
             }
             NavItem::Proxy(id) => {
                 let name = self
-                    .proxy_identities
+                    .vaults.cur().proxy_identities
                     .iter()
                     .find(|p| p.id == id)
                     .map(|p| p.label.clone())
@@ -744,7 +744,7 @@ impl Oryxis {
             NavItem::Dash(DashNavItem::Group(gid)) => {
                 // Dynamic (cloud-query) folders carry their own menu.
                 let dynamic = self
-                    .groups
+                    .vaults.cur().groups
                     .iter()
                     .any(|g| g.id == gid && g.cloud_query.is_some());
                 if dynamic {
@@ -763,7 +763,7 @@ impl Oryxis {
             // the menu is keyed by the index into `session_logs`, so map
             // one to the other (the same index the view and the menu use).
             NavItem::HistoryLog(id) => {
-                let idx = self.session_logs.iter().position(|e| e.id == id)?;
+                let idx = self.vaults.cur().session_logs.iter().position(|e| e.id == id)?;
                 Message::History(HistoryMessage::ShowSessionLogMenu(idx))
             }
             // Rows without a context menu (proxies, known hosts, port
@@ -782,7 +782,7 @@ impl Oryxis {
     fn keynav_space(&mut self) -> Option<Task<Message>> {
         if self.cur_view() == crate::state::View::Dashboard
             && let Some((FocusZone::Content, NavItem::Dash(DashNavItem::Host(i)))) = self.keynav.focus
-            && let Some(id) = self.connections.get(i).map(|c| c.id)
+            && let Some(id) = self.vaults.cur().connections.get(i).map(|c| c.id)
         {
             self.nav.dash_selection.toggle(id);
             return Some(Task::none());
@@ -843,7 +843,7 @@ impl Oryxis {
         if self.cur_view() == crate::state::View::Dashboard
             && self.cur_nav().dash_multi_select
             && let NavItem::Dash(DashNavItem::Host(i)) = item
-            && let Some(id) = self.connections.get(i).map(|c| c.id)
+            && let Some(id) = self.vaults.cur().connections.get(i).map(|c| c.id)
         {
             self.nav.dash_selection.toggle(id);
             return Task::none();
@@ -854,7 +854,7 @@ impl Oryxis {
             // keep the drill into their cloud screen.
             NavItem::Dash(DashNavItem::Group(gid))
                 if self.prefs.host_view_mode == crate::state::HostViewMode::Tree
-                    && self.groups.iter().any(|g| g.id == gid && g.cloud_query.is_none()) =>
+                    && self.vaults.cur().groups.iter().any(|g| g.id == gid && g.cloud_query.is_none()) =>
             {
                 Message::Ai(crate::app::AiMessage::HostsTreeToggleGroup(gid))
             }

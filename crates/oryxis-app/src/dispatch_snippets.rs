@@ -15,7 +15,7 @@ impl Oryxis {
         let tab = self.cur_active_tab().and_then(|i| self.tabs.get(i))?;
         let tags: Vec<String> = match &tab.active().origin {
             crate::state::PaneOrigin::Host(id) => self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == *id)?
                 .tags
@@ -55,7 +55,7 @@ impl Oryxis {
     /// indices resolve to the same group either way.
     pub(crate) fn snippet_group_names(&self) -> Vec<String> {
         let mut names: Vec<String> = Vec::new();
-        for snip in &self.snippets {
+        for snip in &self.vaults.cur().snippets {
             if let Some(g) = &snip.group
                 && !names.iter().any(|x| x.eq_ignore_ascii_case(g))
             {
@@ -69,7 +69,7 @@ impl Oryxis {
     /// Distinct snippet tags, for the vault tag-filter dropdown.
     pub(crate) fn distinct_snippet_tags(&self) -> Vec<String> {
         let mut tags: Vec<String> = Vec::new();
-        for snip in &self.snippets {
+        for snip in &self.vaults.cur().snippets {
             for tg in &snip.tags {
                 if !tags.iter().any(|x| x.eq_ignore_ascii_case(tg)) {
                     tags.push(tg.clone());
@@ -116,7 +116,7 @@ impl Oryxis {
     /// else sends immediately. Returns the first input's focus task
     /// when the modal opens.
     fn snippet_send_or_prompt(&mut self, idx: usize, run: bool) -> Task<Message> {
-        let Some(snip) = self.snippets.get(idx) else {
+        let Some(snip) = self.vaults.cur().snippets.get(idx) else {
             return Task::none();
         };
         if snip.has_steps() {
@@ -165,7 +165,7 @@ impl Oryxis {
     /// runs (a paste of several actions has no meaning), expanded first,
     /// its variables asked once for every command.
     fn snippet_run_or_prompt(&mut self, idx: usize, run: bool) -> Task<Message> {
-        let Some(snip) = self.snippets.get(idx) else {
+        let Some(snip) = self.vaults.cur().snippets.get(idx) else {
             return Task::none();
         };
         if !run {
@@ -177,7 +177,7 @@ impl Oryxis {
             return self.show_toast(crate::i18n::t("snippet_steps_install_refused").to_string());
         }
         let label = snip.label.clone();
-        let steps = match crate::snippet_run::flatten(&self.snippets, snip) {
+        let steps = match crate::snippet_run::flatten(&self.vaults.cur().snippets, snip) {
             Ok(steps) => steps,
             Err(e) => return self.show_toast(crate::dispatch_snippet_run::plan_error_text(&label, &e)),
         };
@@ -253,7 +253,7 @@ impl Oryxis {
     /// snippet editor opens.
     fn reset_snippet_group_combo(&mut self) {
         let mut labels: Vec<String> = Vec::new();
-        for snip in &self.snippets {
+        for snip in &self.vaults.cur().snippets {
             if let Some(g) = &snip.group
                 && !labels.iter().any(|x| x.eq_ignore_ascii_case(g))
             {
@@ -416,7 +416,7 @@ impl Oryxis {
                 // Reached from the card kebab menu, close the popup.
                 self.snippet_context_menu = None;
                 self.overlay = None;
-                if let Some(snip) = self.snippets.get(idx) {
+                if let Some(snip) = self.vaults.cur().snippets.get(idx) {
                     self.panels.snippet_panel = true;
                     self.snippet_form.label = snip.label.clone();
                     self.snippet_form.steps = snip
@@ -446,7 +446,7 @@ impl Oryxis {
                     }
                 };
                 let mut snip = if let Some(id) = self.snippet_form.editing_id {
-                    self.snippets.iter().find(|s| s.id == id).cloned()
+                    self.vaults.cur().snippets.iter().find(|s| s.id == id).cloned()
                         .unwrap_or_else(|| oryxis_core::models::snippet::Snippet::new("", ""))
                 } else {
                     oryxis_core::models::snippet::Snippet::new("", "")
@@ -472,7 +472,7 @@ impl Oryxis {
                 }
             }
             SnippetMessage::RequestDeleteSnippet(idx) => {
-                if let Some(snip) = self.snippets.get(idx) {
+                if let Some(snip) = self.vaults.cur().snippets.get(idx) {
                     let name = snip.label.clone();
                     self.confirm_remove(name, Message::Snippet(SnippetMessage::DeleteSnippet(idx)));
                 }
@@ -482,7 +482,7 @@ impl Oryxis {
                 // close the popup either way.
                 self.snippet_context_menu = None;
                 self.overlay = None;
-                if let Some(snip) = self.snippets.get(idx) {
+                if let Some(snip) = self.vaults.cur().snippets.get(idx) {
                     let id = snip.id;
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_snippet(&id);

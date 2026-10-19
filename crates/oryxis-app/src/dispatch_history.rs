@@ -39,8 +39,8 @@ impl Oryxis {
                     // "Clear all" clears the whole timeline, and saved
                     // conversations are rows in it.
                     let _ = vault.clear_chat_conversations();
-                    self.logs_page = 0;
-                    self.session_logs_page = 0;
+                    self.vaults.cur_mut().logs_page = 0;
+                    self.vaults.cur_mut().session_logs_page = 0;
                     self.load_data_from_vault();
                 }
                 // The wipe pulled the recording out from under any open
@@ -58,22 +58,22 @@ impl Oryxis {
                 self.history_content_reset();
             }
             HistoryMessage::LogsPageNext => {
-                let max_page = (self.logs_total.saturating_sub(1)) / 50;
-                if self.logs_page < max_page {
-                    self.logs_page += 1;
+                let max_page = (self.vaults.cur().logs_total.saturating_sub(1)) / 50;
+                if self.vaults.cur().logs_page < max_page {
+                    self.vaults.cur_mut().logs_page += 1;
                     if let Some(vault) = &self.vaults.cur().store {
-                        self.logs = vault
-                            .list_logs_page(self.logs_page * 50, 50)
+                        self.vaults.cur_mut().logs = vault
+                            .list_logs_page(self.vaults.cur().logs_page * 50, 50)
                             .unwrap_or_default();
                     }
                 }
             }
             HistoryMessage::LogsPagePrev => {
-                if self.logs_page > 0 {
-                    self.logs_page -= 1;
+                if self.vaults.cur().logs_page > 0 {
+                    self.vaults.cur_mut().logs_page -= 1;
                     if let Some(vault) = &self.vaults.cur().store {
-                        self.logs = vault
-                            .list_logs_page(self.logs_page * 50, 50)
+                        self.vaults.cur_mut().logs = vault
+                            .list_logs_page(self.vaults.cur().logs_page * 50, 50)
                             .unwrap_or_default();
                     }
                 }
@@ -157,7 +157,7 @@ impl Oryxis {
                 self.overlay = None;
                 // Flush first so an in-progress session exports complete.
                 self.flush_session_logs_final();
-                let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
+                let Some(entry) = self.vaults.cur().session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
                 let Some(vault) = &self.vaults.cur().store else {
@@ -178,7 +178,7 @@ impl Oryxis {
                 // The embedded theme resolves like the live pane did:
                 // per-host override first, then the global theme.
                 let conn = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == entry.connection_id);
                 let term = conn
@@ -199,7 +199,7 @@ impl Oryxis {
             HistoryMessage::ExportSessionTranscript(log_id) => {
                 self.overlay = None;
                 self.flush_session_logs_final();
-                let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
+                let Some(entry) = self.vaults.cur().session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
                 let Some(vault) = &self.vaults.cur().store else {
@@ -234,7 +234,7 @@ impl Oryxis {
                 self.overlay = None;
                 // 'c' rows are written at capture time (never buffered),
                 // so no flush is needed here.
-                let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
+                let Some(entry) = self.vaults.cur().session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
                 let Some(vault) = &self.vaults.cur().store else {
@@ -284,7 +284,7 @@ impl Oryxis {
                 // embedded theme is what colors the GIF; agg reads it
                 // from the header, no plumbing across the process).
                 self.flush_session_logs_final();
-                let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
+                let Some(entry) = self.vaults.cur().session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
                 let Some(vault) = &self.vaults.cur().store else {
@@ -300,7 +300,7 @@ impl Oryxis {
                     }
                 };
                 let conn = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == entry.connection_id);
                 let term = conn
@@ -364,7 +364,7 @@ impl Oryxis {
             HistoryMessage::RequestDeleteSessionLog(idx) => {
                 // Reached from the row kebab; drop it before the dialog.
                 self.overlay = None;
-                let Some(entry) = self.session_logs.get(idx) else {
+                let Some(entry) = self.vaults.cur().session_logs.get(idx) else {
                     return Task::none();
                 };
                 let (id, label) = (entry.id, entry.label.clone());
@@ -492,23 +492,24 @@ impl Oryxis {
                 self.nav.hover.leave_log_row(id);
             }
             HistoryMessage::DeleteSessionLog(id) => {
-                if self.session_logs.iter().any(|e| e.id == id) {
-                    if let Some(vault) = &self.vaults.cur().store {
+                if self.vaults.cur().session_logs.iter().any(|e| e.id == id) {
+                    let ov = self.vaults.cur_mut();
+                    if let Some(vault) = &ov.store {
                         let _ = vault.delete_session_log(&id);
-                        self.session_logs_total =
+                        ov.session_logs_total =
                             vault.count_session_logs().unwrap_or(0);
                         // Stepping a page back when the current one is now
                         // empty keeps the prev/next pair from leaving the
                         // user staring at "0 of N" with rows further back.
-                        let max_page = self
+                        let max_page = ov
                             .session_logs_total
                             .saturating_sub(1)
                             / 50;
-                        if self.session_logs_page > max_page {
-                            self.session_logs_page = max_page;
+                        if ov.session_logs_page > max_page {
+                            ov.session_logs_page = max_page;
                         }
-                        self.session_logs = vault
-                            .list_session_logs_page(self.session_logs_page * 50, 50)
+                        ov.session_logs = vault
+                            .list_session_logs_page(ov.session_logs_page * 50, 50)
                             .unwrap_or_default();
                     }
                     // The window reload above dropped any rows the
@@ -527,18 +528,18 @@ impl Oryxis {
                 }
                 // Close viewer / player if we deleted the one being shown
                 if let Some(viewer) = &self.viewing_session_log
-                    && self.session_logs.iter().all(|s| s.id != viewer.log_id) {
+                    && self.vaults.cur().session_logs.iter().all(|s| s.id != viewer.log_id) {
                         self.viewing_session_log = None;
                 }
                 if let Some(p) = &self.session_player
-                    && self.session_logs.iter().all(|s| s.id != p.log_id) {
+                    && self.vaults.cur().session_logs.iter().all(|s| s.id != p.log_id) {
                         self.session_player = None;
                 }
             }
             HistoryMessage::ClearSessionLogs => {
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.clear_session_logs();
-                    self.session_logs_page = 0;
+                    self.vaults.cur_mut().session_logs_page = 0;
                     self.load_data_from_vault();
                 }
                 self.viewing_session_log = None;
@@ -549,22 +550,22 @@ impl Oryxis {
                 self.history_content_reset();
             }
             HistoryMessage::SessionLogsPageNext => {
-                let max_page = self.session_logs_total.saturating_sub(1) / 50;
-                if self.session_logs_page < max_page {
-                    self.session_logs_page += 1;
+                let max_page = self.vaults.cur().session_logs_total.saturating_sub(1) / 50;
+                if self.vaults.cur().session_logs_page < max_page {
+                    self.vaults.cur_mut().session_logs_page += 1;
                     if let Some(vault) = &self.vaults.cur().store {
-                        self.session_logs = vault
-                            .list_session_logs_page(self.session_logs_page * 50, 50)
+                        self.vaults.cur_mut().session_logs = vault
+                            .list_session_logs_page(self.vaults.cur().session_logs_page * 50, 50)
                             .unwrap_or_default();
                     }
                 }
             }
             HistoryMessage::SessionLogsPagePrev => {
-                if self.session_logs_page > 0 {
-                    self.session_logs_page -= 1;
+                if self.vaults.cur().session_logs_page > 0 {
+                    self.vaults.cur_mut().session_logs_page -= 1;
                     if let Some(vault) = &self.vaults.cur().store {
-                        self.session_logs = vault
-                            .list_session_logs_page(self.session_logs_page * 50, 50)
+                        self.vaults.cur_mut().session_logs = vault
+                            .list_session_logs_page(self.vaults.cur().session_logs_page * 50, 50)
                             .unwrap_or_default();
                     }
                 }
@@ -576,7 +577,7 @@ impl Oryxis {
                 // menu state; it is also dispatched from inside overlays).
                 self.card_context_menu = None;
                 self.overlay = None;
-                let Some(conn) = self.connections.get(idx) else {
+                let Some(conn) = self.vaults.cur().connections.get(idx) else {
                     return Task::none();
                 };
                 let url = self.host_ssh_url(conn);
@@ -590,7 +591,7 @@ impl Oryxis {
                 // row; surface it rather than silently doing nothing.
                 self.card_context_menu = None;
                 self.overlay = None;
-                let Some(conn) = self.connections.get(idx) else {
+                let Some(conn) = self.vaults.cur().connections.get(idx) else {
                     return Task::none();
                 };
                 let Some(mac) = conn.mac_address.as_deref().and_then(crate::wol::parse_mac)
@@ -707,7 +708,7 @@ impl Oryxis {
     /// `host_tag_filter_available`.
     pub(crate) fn history_tag_filter_available(&self) -> bool {
         !self.cur_nav().history_filter_tags.is_empty()
-            || self.connections.iter().any(|c| !c.tags.is_empty())
+            || self.vaults.cur().connections.iter().any(|c| !c.tags.is_empty())
     }
 
     /// Drop every content-search result (they hold decrypted session
@@ -734,7 +735,7 @@ impl Oryxis {
             return;
         }
         let extra = std::mem::take(&mut self.history_content.extra_logs);
-        self.session_logs.retain(|e| !extra.contains(&e.id));
+        self.vaults.cur_mut().session_logs.retain(|e| !extra.contains(&e.id));
     }
 
     /// Make sure a matched session has a row in `session_logs` for
@@ -744,7 +745,7 @@ impl Oryxis {
     /// `history_content_reset` drops them with the results. A row
     /// deleted since the queue was built simply stays absent.
     fn history_ensure_log_loaded(&mut self, log_id: uuid::Uuid) {
-        if self.session_logs.iter().any(|e| e.id == log_id) {
+        if self.vaults.cur().session_logs.iter().any(|e| e.id == log_id) {
             return;
         }
         let Some(vault) = &self.vaults.cur().store else {
@@ -753,7 +754,7 @@ impl Oryxis {
         let Ok(Some(entry)) = vault.get_session_log(&log_id) else {
             return;
         };
-        self.session_logs.push(entry);
+        self.vaults.cur_mut().session_logs.push(entry);
         self.history_content.extra_logs.push(log_id);
     }
 
@@ -821,7 +822,7 @@ impl Oryxis {
         // kinds still need their row loaded when they live beyond the
         // page window; everything else queues for the output scan.
         let hostname_by_id: std::collections::HashMap<uuid::Uuid, &str> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .map(|c| (c.id, c.hostname.as_str()))
             .collect();
@@ -954,10 +955,10 @@ impl Oryxis {
         // per-host terminal theme override first, then the global theme
         // (mirrors the player and the `.cast` export).
         let palette = self
-            .session_logs
+            .vaults.cur().session_logs
             .iter()
             .find(|e| e.id == log_id)
-            .and_then(|e| self.connections.iter().find(|c| c.id == e.connection_id))
+            .and_then(|e| self.vaults.cur().connections.iter().find(|c| c.id == e.connection_id))
             .map(|c| self.resolve_terminal_palette_for_connection(c))
             .unwrap_or_else(|| self.resolve_global_terminal_palette());
         let mode = mode.unwrap_or_else(|| {

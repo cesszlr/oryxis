@@ -207,15 +207,15 @@ impl Oryxis {
         // still target the canonical vault index, even though the
         // rendered order changes.
         let search_lower = self.keys_ui.search.to_lowercase();
-        let mut key_order: Vec<usize> = (0..self.keys.len()).collect();
+        let mut key_order: Vec<usize> = (0..self.vaults.cur().keys.len()).collect();
         self.keys_sort.sort_items(
             &mut key_order,
-            |&i| self.keys[i].label.clone(),
-            |&i| self.keys[i].created_at,
+            |&i| self.vaults.cur().keys[i].label.clone(),
+            |&i| self.vaults.cur().keys[i].created_at,
         );
         let filtered_keys: Vec<(usize, &SshKey)> = key_order
             .into_iter()
-            .map(|i| (i, &self.keys[i]))
+            .map(|i| (i, &self.vaults.cur().keys[i]))
             .filter(|(_, k)| {
                 search_lower.is_empty() || k.label.to_lowercase().contains(&search_lower)
             })
@@ -227,7 +227,7 @@ impl Oryxis {
         // is empty: a vault with identities but no SSH keys must still
         // render the identities section below (issue #70, credentials
         // looked "lost" because this early return hid them).
-        if self.keys.is_empty() && self.identities.is_empty() {
+        if self.vaults.cur().keys.is_empty() && self.vaults.cur().identities.is_empty() {
             // No toolbar when empty: search is hidden and the "+ ADD ▾"
             // menu's own entries render as real buttons below instead
             // (avoids an orphaned action button, and a dropdown on an
@@ -288,7 +288,7 @@ impl Oryxis {
                 .width(Length::Fill)
                 .height(Length::Fill);
             return main_content.boxed();
-        } else if filtered_keys.is_empty() && !self.keys.is_empty() {
+        } else if filtered_keys.is_empty() && !self.vaults.cur().keys.is_empty() {
             let no_results = container(
                 text(t("no_keys_match")).size(13).color(OryxisColors::t().text_muted),
             )
@@ -492,15 +492,15 @@ impl Oryxis {
         )
         .padding(Padding { top: 16.0, right: 0.0, bottom: 8.0, left: 0.0 });
 
-        let mut identity_order: Vec<usize> = (0..self.identities.len()).collect();
+        let mut identity_order: Vec<usize> = (0..self.vaults.cur().identities.len()).collect();
         self.keys_sort.sort_items(
             &mut identity_order,
-            |&i| self.identities[i].label.clone(),
-            |&i| self.identities[i].created_at,
+            |&i| self.vaults.cur().identities[i].label.clone(),
+            |&i| self.vaults.cur().identities[i].created_at,
         );
         let filtered_identities: Vec<(usize, &Identity)> = identity_order
             .into_iter()
-            .map(|i| (i, &self.identities[i]))
+            .map(|i| (i, &self.vaults.cur().identities[i]))
             .filter(|(_, i)| {
                 search_lower.is_empty() || i.label.to_lowercase().contains(&search_lower)
             })
@@ -508,7 +508,7 @@ impl Oryxis {
 
         let mut identity_cards: Vec<Element<'_, Message>> = Vec::new();
 
-        if filtered_identities.is_empty() && self.identities.is_empty() {
+        if filtered_identities.is_empty() && self.vaults.cur().identities.is_empty() {
             // Don't show identities section at all when empty
         } else if filtered_identities.is_empty() {
             let no_results = container(
@@ -526,12 +526,12 @@ impl Oryxis {
             if let Some(u) = &identity.username {
                 parts.push(u.clone());
             }
-            let has_pw = self.identities_with_password.contains(&identity.id);
+            let has_pw = self.vaults.cur().identities_with_password.contains(&identity.id);
             if has_pw {
                 parts.push("\u{25CF}\u{25CF}\u{25CF}\u{25CF}".into());
             }
             if let Some(kid) = identity.key_id
-                && let Some(k) = self.keys.iter().find(|k| k.id == kid) {
+                && let Some(k) = self.vaults.cur().keys.iter().find(|k| k.id == kid) {
                     parts.push(k.label.clone());
             }
             let subtitle = if parts.is_empty() { t("no_credentials").to_string() } else { parts.join(", ") };
@@ -678,11 +678,11 @@ impl Oryxis {
         // section hides entirely when its list is empty (the both-empty
         // case never reaches here, it takes the empty-state return above).
         let mut all_rows: Vec<Element<'_, Message>> = Vec::new();
-        if !self.keys.is_empty() {
+        if !self.vaults.cur().keys.is_empty() {
             all_rows.push(section_title.boxed());
             all_rows.push(keys_grid_elem);
         }
-        if !self.identities.is_empty() {
+        if !self.vaults.cur().identities.is_empty() {
             all_rows.push(identity_section_title.boxed());
             all_rows.push(identity_grid_elem);
         }

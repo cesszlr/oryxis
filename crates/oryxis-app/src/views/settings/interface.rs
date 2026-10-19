@@ -814,11 +814,11 @@ impl Oryxis {
         // Resolve custom colors up front (the card only reads Copy
         // values, so this temporary outlives the borrow).
         let custom_colors: Vec<crate::theme::ThemeColors> = self
-            .custom_ui_themes
+            .vaults.cur().custom_ui_themes
             .iter()
             .map(|t| crate::theme::theme_colors_from_hex(&t.colors))
             .collect();
-        for (idx, theme) in self.custom_ui_themes.iter().enumerate() {
+        for (idx, theme) in self.vaults.cur().custom_ui_themes.iter().enumerate() {
             let traits = crate::theme_tags::ui_theme_traits(&custom_colors[idx]);
             if !shows(&theme.name, Some(&traits)) {
                 continue;
@@ -947,7 +947,7 @@ impl Oryxis {
         // returned element's lifetime to the label.
         let name = self.active_app_theme_name.as_str();
         let colors = self
-            .custom_ui_themes
+            .vaults.cur().custom_ui_themes
             .iter()
             .find(|t| t.name == name)
             .map(|t| crate::theme::theme_colors_from_hex(&t.colors))

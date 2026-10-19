@@ -25,7 +25,7 @@ impl Oryxis {
                 self.proxy_identity_form.error = None;
 
                 if let Some(id) = maybe_id
-                    && let Some(pi) = self.proxy_identities.iter().find(|p| p.id == id)
+                    && let Some(pi) = self.vaults.cur().proxy_identities.iter().find(|p| p.id == id)
                 {
                     let has_pw = self
                         .vaults.cur().store
@@ -151,7 +151,7 @@ impl Oryxis {
 
                 let now = chrono::Utc::now();
                 let mut identity = if let Some(id) = self.proxy_identity_form.editing_id {
-                    self.proxy_identities
+                    self.vaults.cur().proxy_identities
                         .iter()
                         .find(|p| p.id == id)
                         .cloned()

@@ -66,7 +66,7 @@ impl Oryxis {
         match self.cur_nav().active_group {
             Some(gid)
                 if self
-                    .groups
+                    .vaults.cur().groups
                     .iter()
                     .any(|g| g.id == gid && g.cloud_query.is_none()) =>
             {
@@ -102,7 +102,7 @@ impl Oryxis {
         // full-vault export in Settings. Pre-scoped to the active
         // folder when one is open. Nothing to share with an empty
         // vault, so the entry only exists once a host does.
-        if !self.connections.is_empty() {
+        if !self.vaults.cur().connections.is_empty() {
             actions.push(AddAction {
                 icon: iced_fonts::lucide::upload().into(),
                 label: crate::i18n::t("export_hosts"),
@@ -114,7 +114,7 @@ impl Oryxis {
         // discovery; hide the rest (they'd fail with a "binary not
         // found" wall) until the plugin is back.
         for cp in self
-            .cloud_profiles
+            .vaults.cur().cloud_profiles
             .iter()
             .filter(|p| self.cloud_provider_installed(&p.provider))
         {

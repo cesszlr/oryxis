@@ -22,7 +22,7 @@ impl Oryxis {
             crate::state::PaneOrigin::Host(id) => id,
             _ => return None,
         };
-        let position = self.connections.iter().position(|c| c.id == conn_id)?;
+        let position = self.vaults.cur().connections.iter().position(|c| c.id == conn_id)?;
         Some(self.update(Message::Sftp(
             crate::messages::SftpMessage::OpenSftpForConnection(position),
         )))
@@ -167,7 +167,7 @@ impl Oryxis {
         // an SFTP channel on it, no second dial. Origin id wins
         // over the label match (rename-proof).
         if let Some(ci) = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .position(|c| {
                 origin_conn == Some(c.id)
@@ -175,7 +175,7 @@ impl Oryxis {
                         == oryxis_core::models::connection::ConnectionProtocol::Ssh
             })
             .or_else(|| {
-                self.connections.iter().position(|c| {
+                self.vaults.cur().connections.iter().position(|c| {
                     c.label == base
                         && c.protocol
                             == oryxis_core::models::connection::ConnectionProtocol::Ssh
@@ -453,7 +453,7 @@ impl Oryxis {
                 None => self.update(Message::Tabs(TabsMessage::SelectTab(first))),
             };
         }
-        let Some(ci) = self.connections.iter().position(|c| {
+        let Some(ci) = self.vaults.cur().connections.iter().position(|c| {
             c.label == host
                 && c.protocol
                     == oryxis_core::models::connection::ConnectionProtocol::Ssh

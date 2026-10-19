@@ -131,12 +131,12 @@ impl Oryxis {
                 // go in (`importers::csv::render` cannot receive
                 // secrets), so no vault access and no password step.
                 let rows: Vec<(&oryxis_core::models::Connection, String)> = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .map(|c| {
                         let group = c
                             .group_id
-                            .map(|gid| oryxis_core::models::Group::path_of(&self.groups, gid))
+                            .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
                             .unwrap_or_default();
                         (c, group)
                     })
@@ -168,7 +168,7 @@ impl Oryxis {
             ShareMessage::ExportHostsCsvCompleted(result) => match result {
                 Ok(path) => {
                     let msg = crate::i18n::t("csv_export_done")
-                        .replace("{count}", &self.connections.len().to_string())
+                        .replace("{count}", &self.vaults.cur().connections.len().to_string())
                         .replace("{path}", &path);
                     self.set_toast(msg);
                 }
@@ -215,7 +215,7 @@ impl Oryxis {
                 // prefill applies): a dynamic group's contents come
                 // from its query.
                 self.import_target_group = self.cur_nav().active_group.filter(|gid| {
-                    self.groups
+                    self.vaults.cur().groups
                         .iter()
                         .any(|g| g.id == *gid && g.cloud_query.is_none())
                 });
@@ -387,7 +387,7 @@ impl Oryxis {
                 // unticked, re-importing the same config shouldn't pile
                 // up duplicates. Lossy de-dup, exact label match.
                 let existing_labels: std::collections::HashSet<String> = self
-                    .connections
+                    .vaults.cur().connections
                     .iter()
                     .map(|c| c.label.clone())
                     .collect();
@@ -480,7 +480,7 @@ impl Oryxis {
                         errors.push(format!("commit: {e}"));
                     }
                     let imported = saved.len();
-                    self.connections.extend(saved);
+                    self.vaults.cur_mut().connections.extend(saved);
                     self.panels.ssh_import_dialog = false;
                     self.ssh_import_selected.clear();
                     self.ssh_import_existing.clear();
@@ -539,7 +539,7 @@ impl Oryxis {
                     errors.push(format!("commit: {e}"));
                 }
                 let imported = saved.len();
-                self.connections.extend(saved);
+                self.vaults.cur_mut().connections.extend(saved);
                 self.panels.ssh_import_dialog = false;
                 self.ssh_import_hosts.clear();
                 self.ssh_import_selected.clear();
@@ -806,7 +806,7 @@ impl Oryxis {
             // ── Share ──
             ShareMessage::ShareConnection(idx) => {
                 self.overlay = None;
-                if let Some(conn) = self.connections.get(idx) {
+                if let Some(conn) = self.vaults.cur().connections.get(idx) {
                     self.share.group_mode = false;
                     self.share.filter = Some(oryxis_vault::ExportFilter::Hosts(vec![conn.id]));
                     self.share.suggested_name = Some(share_file_name(&conn.label));
@@ -828,14 +828,14 @@ impl Oryxis {
                         self.share.groups = self.group_with_descendants(gid);
                         self.share.include_ungrouped = false;
                         self.share.suggested_name = self
-                            .groups
+                            .vaults.cur().groups
                             .iter()
                             .find(|g| g.id == gid)
                             .map(|g| share_file_name(&g.label));
                     }
                     None => {
                         self.share.groups =
-                            self.groups.iter().map(|g| g.id).collect();
+                            self.vaults.cur().groups.iter().map(|g| g.id).collect();
                         self.share.include_ungrouped = true;
                         self.share.suggested_name = Some(share_file_name("hosts"));
                     }
@@ -866,7 +866,7 @@ impl Oryxis {
                 // always reflected.
                 if self.share.group_mode {
                     let ids: Vec<uuid::Uuid> = self
-                        .connections
+                        .vaults.cur().connections
                         .iter()
                         .filter(|c| match c.group_id {
                             Some(g) => self.share.groups.contains(&g),
@@ -1061,7 +1061,7 @@ impl Oryxis {
         // small, so the quadratic walk is cheaper than building an index.
         loop {
             let mut grew = false;
-            for g in &self.groups {
+            for g in &self.vaults.cur().groups {
                 if let Some(parent) = g.parent_id
                     && out.contains(&parent)
                     && out.insert(g.id)
@@ -1088,7 +1088,7 @@ impl Oryxis {
     /// must not promise a folder the rows will not reach.
     pub(crate) fn import_target_folder_path(&self) -> Option<String> {
         let gid = self.live_import_target_group()?;
-        Some(oryxis_core::models::Group::path_of(&self.groups, gid))
+        Some(oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
     }
 
     /// The import's target folder as it stands NOW: the snapshot taken
@@ -1100,7 +1100,7 @@ impl Oryxis {
     /// folder" line and the confirm read the same answer.
     pub(crate) fn live_import_target_group(&self) -> Option<uuid::Uuid> {
         self.import_target_group.filter(|gid| {
-            self.groups
+            self.vaults.cur().groups
                 .iter()
                 .any(|g| g.id == *gid && g.cloud_query.is_none())
         })
@@ -1122,7 +1122,7 @@ impl Oryxis {
         if self.sftp_backup.path.trim().is_empty() {
             self.sftp_backup.path = "vault.oryxis".to_string();
         }
-        if self.sftp_backup.host.is_none() && !self.connections.is_empty() {
+        if self.sftp_backup.host.is_none() && !self.vaults.cur().connections.is_empty() {
             self.sftp_backup.host = Some(0);
         }
     }
@@ -1137,7 +1137,7 @@ impl Oryxis {
         }
         let Some(mut conn) = self
             .sftp_backup.host
-            .and_then(|i| self.connections.get(i))
+            .and_then(|i| self.vaults.cur().connections.get(i))
             .cloned()
         else {
             self.sftp_backup.status =
@@ -1550,7 +1550,7 @@ impl Oryxis {
             return self.show_toast(msg);
         }
         let existing_labels: std::collections::HashSet<String> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .map(|c| c.label.clone())
             .collect();

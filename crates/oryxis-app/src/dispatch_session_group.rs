@@ -79,7 +79,7 @@ impl Oryxis {
                 // the stored leaves (by order).
                 if let Some(existing_id) = tab.session_group_id
                     && let Some(existing) =
-                        self.session_groups.iter().find(|g| g.id == existing_id)
+                        self.vaults.cur().session_groups.iter().find(|g| g.id == existing_id)
                 {
                     form.editing_id = Some(existing.id);
                     form.label = existing.label.clone();
@@ -87,8 +87,8 @@ impl Oryxis {
                     form.icon_style = existing.icon_style.clone();
                     form.group_name = existing
                         .group_id
-                        .filter(|gid| self.groups.iter().any(|g| g.id == *gid))
-                        .map(|gid| oryxis_core::models::Group::path_of(&self.groups, gid))
+                        .filter(|gid| self.vaults.cur().groups.iter().any(|g| g.id == *gid))
+                        .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
                         .unwrap_or_default();
                     let stored = rows_from_layout(&existing.layout, &|_| String::new());
                     for (row, src) in form.pane_rows.iter_mut().zip(stored.iter()) {
@@ -101,10 +101,10 @@ impl Oryxis {
 
             SessionGroupMessage::EditSessionGroup(idx) => {
                 self.overlay = None;
-                let Some(group) = self.session_groups.get(idx) else {
+                let Some(group) = self.vaults.cur().session_groups.get(idx) else {
                     return Task::none();
                 };
-                let connections = &self.connections;
+                let connections = &self.vaults.cur().connections;
                 let resolve = |src: &PaneSource| resolve_pane_label(connections, src);
                 let rows = rows_from_layout(&group.layout, &resolve);
                 let form = SessionGroupForm {
@@ -114,8 +114,8 @@ impl Oryxis {
                     icon_style: group.icon_style.clone(),
                     group_name: group
                         .group_id
-                        .filter(|gid| self.groups.iter().any(|g| g.id == *gid))
-                        .map(|gid| oryxis_core::models::Group::path_of(&self.groups, gid))
+                        .filter(|gid| self.vaults.cur().groups.iter().any(|g| g.id == *gid))
+                        .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
                         .unwrap_or_default(),
                     source_tab: None,
                     layout: Some(group.layout.clone()),
@@ -199,7 +199,7 @@ impl Oryxis {
 
             SessionGroupMessage::DuplicateSessionGroup(idx) => {
                 self.overlay = None;
-                if let Some(src) = self.session_groups.get(idx).cloned() {
+                if let Some(src) = self.vaults.cur().session_groups.get(idx).cloned() {
                     let mut dup = oryxis_core::models::SessionGroup::new(
                         format!("{} (copy)", src.label),
                         src.layout.clone(),
@@ -216,7 +216,7 @@ impl Oryxis {
             }
 
             SessionGroupMessage::RequestDeleteSessionGroup(idx) => {
-                if let Some(group) = self.session_groups.get(idx) {
+                if let Some(group) = self.vaults.cur().session_groups.get(idx) {
                     let name = group.label.clone();
                     self.confirm_remove(name, Message::SessionGroup(SessionGroupMessage::DeleteSessionGroup(idx)));
                 }
@@ -224,7 +224,7 @@ impl Oryxis {
             }
             SessionGroupMessage::DeleteSessionGroup(idx) => {
                 self.overlay = None;
-                if let Some(group) = self.session_groups.get(idx)
+                if let Some(group) = self.vaults.cur().session_groups.get(idx)
                     && let Some(vault) = &self.vaults.cur().store
                 {
                     let _ = vault.delete_session_group(&group.id);
@@ -318,7 +318,7 @@ impl Oryxis {
         let group_id = if !form.group_name.trim().is_empty() {
             let name = form.group_name.trim().to_string();
             let mut created = Vec::new();
-            let gid = Group::resolve_or_create_path(&mut self.groups, &name, &mut created);
+            let gid = Group::resolve_or_create_path(&mut self.vaults.cur_mut().groups, &name, &mut created);
             if let Some(vault) = &self.vaults.cur().store {
                 for g in &created {
                     let _ = vault.save_group(g);
@@ -335,7 +335,7 @@ impl Oryxis {
         // Update in place when editing an existing group, else create.
         let group = match form
             .editing_id
-            .and_then(|id| self.session_groups.iter().find(|g| g.id == id).cloned())
+            .and_then(|id| self.vaults.cur().session_groups.iter().find(|g| g.id == id).cloned())
         {
             Some(mut existing) => {
                 existing.label = form.label.trim().to_string();
@@ -385,7 +385,7 @@ impl Oryxis {
     /// ratios) and connect each pane. Dangling host references are pruned
     /// with a warning; if everything was dangling, nothing opens.
     fn open_session_group(&mut self, idx: usize) -> Task<Message> {
-        let Some(group) = self.session_groups.get(idx).cloned() else {
+        let Some(group) = self.vaults.cur().session_groups.get(idx).cloned() else {
             return Task::none();
         };
 
@@ -395,7 +395,7 @@ impl Oryxis {
         // Same dead-column story as `Connection.last_used`, one field
         // over (`SessionGroup.last_used` had no writer either).
         let now = chrono::Utc::now();
-        if let Some(g) = self.session_groups.get_mut(idx) {
+        if let Some(g) = self.vaults.cur_mut().session_groups.get_mut(idx) {
             g.last_used = Some(now);
         }
         if let Some(vault) = &self.vaults.cur().store
@@ -406,7 +406,7 @@ impl Oryxis {
 
         // Prune leaves whose host reference no longer resolves.
         let conn_ids: std::collections::HashSet<uuid::Uuid> =
-            self.connections.iter().map(|c| c.id).collect();
+            self.vaults.cur().connections.iter().map(|c| c.id).collect();
         let Some(layout) = prune_layout(group.layout.clone(), &|src| match src {
             PaneSource::Host(id) => conn_ids.contains(id),
             PaneSource::LocalShell { .. } => true,
@@ -462,7 +462,7 @@ impl Oryxis {
                 crate::state::PaneOrigin::Host(id) => Some(id),
                 _ => None,
             })
-            .and_then(|id| self.connections.iter().find(|c| c.id == id))
+            .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .map(|c| c.sidebar_auto_open.unwrap_or(self.prefs.sidebar_auto_open))
             .unwrap_or(self.prefs.sidebar_auto_open);
         if auto_open
@@ -520,11 +520,11 @@ impl Oryxis {
                     PaneSource::Host(id) => {
                         // Pruning guarantees the connection exists.
                         let conn_idx = self
-                            .connections
+                            .vaults.cur().connections
                             .iter()
                             .position(|c| c.id == *id)
                             .expect("pruned layout keeps only live hosts");
-                        let conn = &self.connections[conn_idx];
+                        let conn = &self.vaults.cur().connections[conn_idx];
                         let mut term = TerminalState::new_no_pty(cols, rows)
                             .expect("display-only terminal");
                         term.set_palette(self.resolve_terminal_palette_for_connection(conn));

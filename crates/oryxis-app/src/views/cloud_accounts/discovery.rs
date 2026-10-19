@@ -312,7 +312,7 @@ impl Oryxis {
         // we can grey out duplicates instead of letting the user
         // re-import them.
         let already: std::collections::HashSet<String> = self
-            .connections
+            .vaults.cur().connections
             .iter()
             .filter_map(|c| {
                 let cr = c.cloud_ref.as_ref()?;
@@ -376,7 +376,7 @@ impl Oryxis {
             // discovered; default to the generic "Instances".
             let vm_label = match self
                 .cloud_discover.profile_id
-                .and_then(|id| self.cloud_profiles.iter().find(|p| p.id == id))
+                .and_then(|id| self.vaults.cur().cloud_profiles.iter().find(|p| p.id == id))
                 .map(|p| p.provider.as_str())
             {
                 Some("aws") => "EC2",
@@ -497,7 +497,7 @@ impl Oryxis {
         // task IDs are ephemeral. Already-imported services greyed
         // out so the user doesn't dupe them.
         let already_ecs: std::collections::HashSet<String> = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter_map(|g| {
                 let q = g.cloud_query.as_ref()?;
@@ -676,7 +676,7 @@ impl Oryxis {
         // for this profile, keyed by `namespace|labels` so a re-discovery
         // greys them out instead of offering a duplicate import.
         let already_k8s: std::collections::HashSet<String> = self
-            .groups
+            .vaults.cur().groups
             .iter()
             .filter_map(|g| {
                 let q = g.cloud_query.as_ref()?;
@@ -848,7 +848,7 @@ impl Oryxis {
             // context means it's been added; show it greyed instead of
             // minting a duplicate on a second Add.
             let existing_contexts: std::collections::HashSet<String> = self
-                .cloud_profiles
+                .vaults.cur().cloud_profiles
                 .iter()
                 .filter(|p| p.provider == "k8s")
                 .filter_map(|p| {
@@ -964,7 +964,7 @@ impl Oryxis {
             // context means it's been added; show it greyed instead of
             // minting a duplicate on a second Add.
             let existing_contexts: std::collections::HashSet<String> = self
-                .cloud_profiles
+                .vaults.cur().cloud_profiles
                 .iter()
                 .filter(|p| p.provider == "k8s")
                 .filter_map(|p| {
@@ -1090,7 +1090,7 @@ impl Oryxis {
             // which is deterministic per (family, cluster id, cloud
             // account): no context name has to be known before the fetch.
             let existing_kubeconfigs: std::collections::HashSet<String> = self
-                .cloud_profiles
+                .vaults.cur().cloud_profiles
                 .iter()
                 .filter(|p| p.provider == "k8s")
                 .filter_map(|p| {

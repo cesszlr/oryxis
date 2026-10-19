@@ -18,7 +18,7 @@ impl Oryxis {
                 .jump_chain
                 .iter()
                 .map(|id| {
-                    self.connections
+                    self.vaults.cur().connections
                         .iter()
                         .find(|c| c.id == *id)
                         .map(|c| c.label.clone())
@@ -162,7 +162,7 @@ impl Oryxis {
         // own screen, one click away.
         if let Some(id) = self.editor_form.editing_id {
             let mine: Vec<&oryxis_core::models::port_forward_rule::PortForwardRule> = self
-                .port_forward_rules
+                .vaults.cur().port_forward_rules
                 .iter()
                 .filter(|r| r.host_id == id)
                 .collect();
@@ -475,10 +475,10 @@ impl Oryxis {
         let kind = self.editor_form.proxy_kind;
 
         // Compose the picker option list. Identity entries come from
-        // `self.proxy_identities` so the user can pick any saved
+        // `self.vaults.cur().proxy_identities` so the user can pick any saved
         // config without leaving the host editor.
         let mut options: Vec<ProxyKind> = ProxyKind::STATIC.to_vec();
-        for pi in &self.proxy_identities {
+        for pi in &self.vaults.cur().proxy_identities {
             options.push(ProxyKind::Identity(pi.id));
         }
 
@@ -487,7 +487,7 @@ impl Oryxis {
         // the generic Display fallback. The borrow lives as long as
         // `self`, which covers the returned Element, so no clone of
         // the Vec is needed per render.
-        let identities = &self.proxy_identities;
+        let identities = &self.vaults.cur().proxy_identities;
         // Inline row (label left, picker right) mirroring the Auth Method
         // row, so the two pickers read as the same control family. The
         // type-dependent fields still stack below.

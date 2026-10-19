@@ -57,10 +57,10 @@ impl Oryxis {
     ) -> Option<&oryxis_core::models::Connection> {
         match progress.origin {
             crate::state::ProgressOrigin::Saved(id) => self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == id)
-                .or_else(|| self.connections.iter().find(|c| c.label == progress.label)),
+                .or_else(|| self.vaults.cur().connections.iter().find(|c| c.label == progress.label)),
             crate::state::ProgressOrigin::Quick(id) => {
                 self.quick_connects.get(&id).map(|e| &e.conn)
             }
@@ -108,7 +108,7 @@ impl Oryxis {
             // inline config.
             let proxy_host = c
                 .proxy_identity_id
-                .and_then(|pid| self.proxy_identities.iter().find(|p| p.id == pid))
+                .and_then(|pid| self.vaults.cur().proxy_identities.iter().find(|p| p.id == pid))
                 .map(|p| p.host.as_str())
                 .or(c.proxy.as_ref().map(|p| p.host.as_str()));
             if let Some(h) = proxy_host.filter(|h| !h.is_empty()) {
@@ -414,9 +414,9 @@ impl Oryxis {
             // A quick-connect host resolves from the ephemeral store; it
             // also has nothing to persist, so the "always" button hides.
             let is_quick = self.quick_connects.contains_key(&legacy.conn_id)
-                && !self.connections.iter().any(|c| c.id == legacy.conn_id);
+                && !self.vaults.cur().connections.iter().any(|c| c.id == legacy.conn_id);
             let host_label = self
-                .connections
+                .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == legacy.conn_id)
                 .or_else(|| self.quick_connects.get(&legacy.conn_id).map(|e| &e.conn))
@@ -771,8 +771,8 @@ impl Oryxis {
     /// its keyboard row, which picks from the same list.
     pub(crate) fn quick_auth_options(&self) -> Vec<crate::state::QuickAuthOption> {
         let mut options: Vec<crate::state::QuickAuthOption> =
-            Vec::with_capacity(self.identities.len() + self.keys.len());
-        for i in &self.identities {
+            Vec::with_capacity(self.vaults.cur().identities.len() + self.vaults.cur().keys.len());
+        for i in &self.vaults.cur().identities {
             // Surface the identity's username: picking it switches the
             // login user, so the label must say who you'd become.
             let label = match i.username.as_deref().filter(|u| !u.trim().is_empty()) {
@@ -784,7 +784,7 @@ impl Oryxis {
                 label,
             });
         }
-        for k in &self.keys {
+        for k in &self.vaults.cur().keys {
             options.push(crate::state::QuickAuthOption {
                 choice: crate::state::QuickAuthChoice::Key(k.id),
                 label: format!("{}: {}", crate::i18n::t("auth_key"), k.label),

@@ -186,16 +186,17 @@ impl Oryxis {
                 // rows created since boot (a session that just started
                 // recording, fresh connection events) only exist in the
                 // tables, not in the cached page state.
+                let ov = self.vaults.cur_mut();
                 if view == View::History
-                    && let Some(vault) = &self.vaults.cur().store
+                    && let Some(vault) = &ov.store
                 {
-                    self.logs_total = vault.count_logs().unwrap_or(0);
-                    self.logs = vault
-                        .list_logs_page(self.logs_page * 50, 50)
+                    ov.logs_total = vault.count_logs().unwrap_or(0);
+                    ov.logs = vault
+                        .list_logs_page(ov.logs_page * 50, 50)
                         .unwrap_or_default();
-                    self.session_logs_total = vault.count_session_logs().unwrap_or(0);
-                    self.session_logs = vault
-                        .list_session_logs_page(self.session_logs_page * 50, 50)
+                    ov.session_logs_total = vault.count_session_logs().unwrap_or(0);
+                    ov.session_logs = vault
+                        .list_session_logs_page(ov.session_logs_page * 50, 50)
                         .unwrap_or_default();
                 }
                 // Land on the view with its search field focused so the
@@ -409,7 +410,7 @@ impl Oryxis {
                             Some(None)
                         } else {
                             oryxis_core::models::Group::resolve_path_or_label(
-                                &self.groups,
+                                &self.vaults.cur().groups,
                                 &label,
                                 &std::collections::HashSet::new(),
                             )
@@ -652,7 +653,7 @@ impl Oryxis {
     /// first spelling, sorted for the filter dropdown.
     pub(crate) fn distinct_host_tags(&self) -> Vec<String> {
         let mut tags: Vec<String> = Vec::new();
-        for conn in &self.connections {
+        for conn in &self.vaults.cur().connections {
             for tg in &conn.tags {
                 if !tags.iter().any(|x| x.eq_ignore_ascii_case(tg)) {
                     tags.push(tg.clone());
@@ -668,6 +669,6 @@ impl Oryxis {
     /// is active and needs a way to be cleared.
     pub(crate) fn host_tag_filter_available(&self) -> bool {
         !self.cur_nav().host_filter_tags.is_empty()
-            || self.connections.iter().any(|c| !c.tags.is_empty())
+            || self.vaults.cur().connections.iter().any(|c| !c.tags.is_empty())
     }
 }

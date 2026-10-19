@@ -190,7 +190,7 @@ impl DashGridPrePass {
     pub(crate) fn infer_brand(&self, app: &Oryxis, gid: &Uuid) -> Option<&'static str> {
         self.child_query_brand.get(gid).copied().or_else(|| {
             self.first_cloud_profile.get(gid).and_then(|pid| {
-                app.cloud_profiles
+                app.vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == *pid)
                     .map(|p| crate::os_icon::provider_brand_key(&p.provider))
@@ -207,7 +207,7 @@ impl Oryxis {
         } else {
             let mut has_visible_conn: std::collections::HashSet<Uuid> =
                 std::collections::HashSet::new();
-            for c in &self.connections {
+            for c in &self.vaults.cur().connections {
                 if let Some(gid) = c.group_id
                     && !c
                         .cloud_ref
@@ -220,13 +220,13 @@ impl Oryxis {
             let mut memo: std::collections::HashMap<Uuid, bool> =
                 std::collections::HashMap::new();
             let mut set: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
-            for g in &self.groups {
+            for g in &self.vaults.cur().groups {
                 let hide = if let Some(q) = g.cloud_query.as_ref() {
                     hidden_profiles.contains(&q.profile_id)
                 } else {
                     !group_has_visible_content(
                         g.id,
-                        &self.groups,
+                        &self.vaults.cur().groups,
                         &has_visible_conn,
                         &hidden_profiles,
                         &mut memo,
@@ -242,7 +242,7 @@ impl Oryxis {
             std::collections::HashMap::new();
         let mut first_cloud_profile: std::collections::HashMap<Uuid, Uuid> =
             std::collections::HashMap::new();
-        for conn in &self.connections {
+        for conn in &self.vaults.cur().connections {
             if let Some(cgid) = conn.group_id {
                 // Hidden cloud hosts don't count toward the folder's
                 // host total or its brand inference.
@@ -263,7 +263,7 @@ impl Oryxis {
             std::collections::HashMap::new();
         let mut child_query_brand: std::collections::HashMap<Uuid, &'static str> =
             std::collections::HashMap::new();
-        for g in &self.groups {
+        for g in &self.vaults.cur().groups {
             if let Some(pgid) = g.parent_id {
                 // Hidden cloud sub-groups don't count toward the
                 // parent folder's nested-group total.
@@ -320,7 +320,7 @@ impl Oryxis {
         profile_id: Uuid,
     ) -> std::collections::HashSet<Uuid> {
         let parent_of: std::collections::HashMap<Uuid, Option<Uuid>> =
-            self.groups.iter().map(|g| (g.id, g.parent_id)).collect();
+            self.vaults.cur().groups.iter().map(|g| (g.id, g.parent_id)).collect();
         let mut set = std::collections::HashSet::new();
         // Walk up the parent chain marking every ancestor. The insert
         // check doubles as cycle protection should upstream data ever
@@ -335,12 +335,12 @@ impl Oryxis {
                 cur = parent_of.get(&g).copied().flatten();
             }
         };
-        for conn in &self.connections {
+        for conn in &self.vaults.cur().connections {
             if conn.cloud_ref.as_ref().map(|r| r.profile_id) == Some(profile_id) {
                 mark_up(conn.group_id, &mut set);
             }
         }
-        for g in &self.groups {
+        for g in &self.vaults.cur().groups {
             if g.cloud_query.as_ref().is_some_and(|q| q.profile_id == profile_id) {
                 // A matching dynamic group makes its *ancestors*
                 // visible; the dynamic card itself renders through the
@@ -363,9 +363,9 @@ impl Oryxis {
             return None;
         }
         let parent_of: std::collections::HashMap<Uuid, Option<Uuid>> =
-            self.groups.iter().map(|g| (g.id, g.parent_id)).collect();
+            self.vaults.cur().groups.iter().map(|g| (g.id, g.parent_id)).collect();
         let mut set = std::collections::HashSet::new();
-        for conn in &self.connections {
+        for conn in &self.vaults.cur().connections {
             let matches = conn.tags.iter().any(|tg| {
                 self.cur_nav().host_filter_tags.iter().any(|f| f.eq_ignore_ascii_case(tg))
             });
@@ -391,7 +391,7 @@ impl Oryxis {
     /// screen to select, move, dial or delete as a batch.
     pub(crate) fn active_group_is_dynamic(&self) -> bool {
         self.cur_nav().active_group.is_some_and(|gid| {
-            self.groups
+            self.vaults.cur().groups
                 .iter()
                 .any(|g| g.id == gid && g.cloud_query.is_some())
         })
@@ -412,7 +412,7 @@ impl Oryxis {
         if hidden_profiles.is_empty() {
             // Common case: no plugin is missing, so no folder can be
             // phantom; every manual group is pickable.
-            for g in &self.groups {
+            for g in &self.vaults.cur().groups {
                 if g.cloud_query.is_none() {
                     set.insert(g.id);
                 }
@@ -423,7 +423,7 @@ impl Oryxis {
             std::collections::HashSet::new();
         let mut has_hidden_conn: std::collections::HashSet<Uuid> =
             std::collections::HashSet::new();
-        for c in &self.connections {
+        for c in &self.vaults.cur().connections {
             if let Some(gid) = c.group_id {
                 if c.cloud_ref
                     .as_ref()
@@ -439,20 +439,20 @@ impl Oryxis {
             std::collections::HashMap::new();
         let mut hid_memo: std::collections::HashMap<Uuid, bool> =
             std::collections::HashMap::new();
-        for g in &self.groups {
+        for g in &self.vaults.cur().groups {
             if g.cloud_query.is_some() {
                 continue;
             }
             let visible = group_has_visible_content(
                 g.id,
-                &self.groups,
+                &self.vaults.cur().groups,
                 &has_visible_conn,
                 &hidden_profiles,
                 &mut vis_memo,
             );
             let hidden = group_has_hidden_content(
                 g.id,
-                &self.groups,
+                &self.vaults.cur().groups,
                 &has_hidden_conn,
                 &hidden_profiles,
                 &mut hid_memo,
@@ -468,7 +468,7 @@ impl Oryxis {
 
 
     /// The host cards currently shown on the dashboard, as absolute
-    /// indices into `self.connections`, in display order (group + search +
+    /// indices into `self.vaults.cur().connections`, in display order (group + search +
     /// cloud-profile filters applied, then the user's sort). Shared by the
     /// grid renderer and the keyboard-selection navigation so Tab / arrows
     /// move through exactly what's on screen.
@@ -477,9 +477,9 @@ impl Oryxis {
         let flatten = self.flatten_hosts && at_root;
         let search_lower = self.cur_nav().host_search.to_lowercase();
         let hidden_profiles = self.hidden_cloud_profile_ids();
-        let mut host_order: Vec<usize> = (0..self.connections.len())
+        let mut host_order: Vec<usize> = (0..self.vaults.cur().connections.len())
             .filter(|&i| {
-                let conn = &self.connections[i];
+                let conn = &self.vaults.cur().connections[i];
                 if conn
                     .cloud_ref
                     .as_ref()
@@ -518,8 +518,8 @@ impl Oryxis {
             .collect();
         self.hosts_sort.sort_items(
             &mut host_order,
-            |&i| self.connections[i].label.clone(),
-            |&i| self.connections[i].created_at,
+            |&i| self.vaults.cur().connections[i].label.clone(),
+            |&i| self.vaults.cur().connections[i].created_at,
         );
         host_order
     }
@@ -694,7 +694,7 @@ impl Oryxis {
     /// `active_view_search_id`, so the keyboard never tries to focus a
     /// search field this screen doesn't build.
     pub(crate) fn dashboard_is_empty(&self) -> bool {
-        self.connections.is_empty() && self.groups.is_empty() && self.session_groups.is_empty()
+        self.vaults.cur().connections.is_empty() && self.vaults.cur().groups.is_empty() && self.vaults.cur().session_groups.is_empty()
     }
 
     pub(super) fn dashboard_main_content(&self) -> Element<'_, Message> {
@@ -723,7 +723,7 @@ impl Oryxis {
         let flatten = self.flatten_hosts && at_root;
 
         if let Some(gid) = self.cur_nav().active_group
-            && let Some(group) = self.groups.iter().find(|g| g.id == gid)
+            && let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == gid)
             && let Some(query) = group.cloud_query.as_ref()
         {
             // Clear the grid recording first, then let the dynamic
@@ -798,14 +798,14 @@ impl Oryxis {
         };
 
         // Saved session groups that live in the current folder. The
-        // enumerate index is absolute (into `self.session_groups`), which is
+        // enumerate index is absolute (into `self.vaults.cur().session_groups`), which is
         // what Open/Edit/Delete expect. Tree mode emits them inside
         // its own walk, at their folder's level.
         let session_group_cards: Vec<(Element<'_, Message>, Color, DashNavItem)> = if tree_mode
         {
             Vec::new()
         } else {
-            self.session_groups
+            self.vaults.cur().session_groups
                 .iter()
                 .enumerate()
                 .filter(|(_, g)| g.group_id == self.cur_nav().active_group)
@@ -970,7 +970,7 @@ impl Oryxis {
         let filter_chip: Element<'_, Message> = if let Some(filter_pid) =
             self.cur_nav().host_filter_cloud_profile
         {
-            let profile = self.cloud_profiles.iter().find(|p| p.id == filter_pid);
+            let profile = self.vaults.cur().cloud_profiles.iter().find(|p| p.id == filter_pid);
             let profile_label = profile.map(|p| p.label.clone()).unwrap_or_default();
             let provider = profile.map(|p| p.provider.as_str()).unwrap_or("cloud");
             let brand_key = crate::os_icon::provider_brand_key(provider);

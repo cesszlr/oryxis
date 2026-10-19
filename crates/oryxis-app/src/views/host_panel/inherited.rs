@@ -41,7 +41,7 @@ impl Oryxis {
         // The form names its group by breadcrumb path; an empty or
         // unmatched value is the vault root, which inherits nothing.
         let Some(gid) = oryxis_core::models::Group::resolve_path_or_label(
-            &self.groups,
+            &self.vaults.cur().groups,
             &self.editor_form.group_name,
             &Default::default(),
         ) else {
@@ -50,7 +50,7 @@ impl Oryxis {
 
         // The one ancestry walk (`Group::ancestry`, cycle-safe), nearest
         // first, so the hint and the dial read the same chain.
-        for group in oryxis_core::models::Group::ancestry(&self.groups, gid).chain {
+        for group in oryxis_core::models::Group::ancestry(&self.vaults.cur().groups, gid).chain {
             if let Some(defaults) = group.defaults.as_ref() {
                 self.absorb(&mut ctx, defaults, &group.label);
             }
@@ -88,7 +88,7 @@ impl Oryxis {
             // A reference to something deleted names nothing, so it is
             // not shown as inherited: the host will fall through too
             // (`resolve_effective` skips it the same way).
-            && let Some(ident) = self.identities.iter().find(|i| i.id == id)
+            && let Some(ident) = self.vaults.cur().identities.iter().find(|i| i.id == id)
             // Credentials are ONE parameter family (the resolver's
             // rule): a form carrying its own password or key answers
             // it, so the hint must not promise an identity the connect
@@ -99,7 +99,7 @@ impl Oryxis {
         }
         if ctx.proxy.is_none()
             && let Some(id) = defaults.proxy_identity_id
-            && let Some(proxy) = self.proxy_identities.iter().find(|p| p.id == id)
+            && let Some(proxy) = self.vaults.cur().proxy_identities.iter().find(|p| p.id == id)
         {
             ctx.proxy = Some((proxy.label.clone(), label.to_string()));
         }
@@ -110,7 +110,7 @@ impl Oryxis {
         }
         if ctx.startup_snippet.is_none()
             && let Some(id) = defaults.startup_snippet_id
-            && let Some(snippet) = self.snippets.iter().find(|s| s.id == id)
+            && let Some(snippet) = self.vaults.cur().snippets.iter().find(|s| s.id == id)
         {
             ctx.startup_snippet = Some((snippet.label.clone(), label.to_string()));
         }

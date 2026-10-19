@@ -54,7 +54,7 @@ impl Oryxis {
             self.sync.sftp.status = Some(Err(t("sftp_sync_no_host").to_string()));
             return Task::none();
         };
-        let Some(mut conn) = self.connections.iter().find(|c| c.id == host_id).cloned() else {
+        let Some(mut conn) = self.vaults.cur().connections.iter().find(|c| c.id == host_id).cloned() else {
             self.sync.sftp.status = Some(Err(t("sftp_sync_no_host").to_string()));
             return Task::none();
         };

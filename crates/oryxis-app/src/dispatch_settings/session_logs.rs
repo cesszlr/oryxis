@@ -119,15 +119,16 @@ impl Oryxis {
                 // Apply right away, same reason the retention picker
                 // does: picking a smaller cap must have a visible
                 // effect, not wait for the next flush tick.
-                if let (Some(cap), Some(vault)) = (cap, &self.vaults.cur().store) {
+                let ov = self.vaults.cur_mut();
+                if let (Some(cap), Some(vault)) = (cap, &ov.store) {
                     match vault.prune_session_logs_to_fit(cap) {
                         Ok(0) => {}
                         Ok(n) => tracing::info!("session log size cap pruned {n} recordings"),
                         Err(e) => tracing::warn!("session log size-cap prune failed: {e}"),
                     }
-                    self.session_logs_page = 0;
-                    self.session_logs_total = vault.count_session_logs().unwrap_or(0);
-                    self.session_logs = vault
+                    ov.session_logs_page = 0;
+                    ov.session_logs_total = vault.count_session_logs().unwrap_or(0);
+                    ov.session_logs = vault
                         .list_session_logs_page(0, 50)
                         .unwrap_or_default();
                 }
@@ -137,8 +138,9 @@ impl Oryxis {
                 self.persist_setting("logs_retention", code);
                 // Apply right away so picking a shorter window has a
                 // visible effect, then refresh the cached Logs state.
+                let ov = self.vaults.cur_mut();
                 if let Some(days) = Self::retention_days(code)
-                    && let Some(vault) = &self.vaults.cur().store
+                    && let Some(vault) = &ov.store
                 {
                     let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
                     match vault.prune_logs_older_than(cutoff) {
@@ -146,12 +148,12 @@ impl Oryxis {
                         Ok(n) => tracing::info!("logs retention pruned {n} rows"),
                         Err(e) => tracing::warn!("logs retention prune failed: {e}"),
                     }
-                    self.logs_page = 0;
-                    self.session_logs_page = 0;
-                    self.logs_total = vault.count_logs().unwrap_or(0);
-                    self.logs = vault.list_logs_page(0, 50).unwrap_or_default();
-                    self.session_logs_total = vault.count_session_logs().unwrap_or(0);
-                    self.session_logs =
+                    ov.logs_page = 0;
+                    ov.session_logs_page = 0;
+                    ov.logs_total = vault.count_logs().unwrap_or(0);
+                    ov.logs = vault.list_logs_page(0, 50).unwrap_or_default();
+                    ov.session_logs_total = vault.count_session_logs().unwrap_or(0);
+                    ov.session_logs =
                         vault.list_session_logs_page(0, 50).unwrap_or_default();
                 }
             }

@@ -287,7 +287,7 @@ impl Oryxis {
         let Some(host) = host else {
             return;
         };
-        let list = self.files_recent_folders.entry(host).or_default();
+        let list = self.vaults.cur_mut().files_recent_folders.entry(host).or_default();
         if list.first().is_some_and(|p| p == path) {
             // Already on top: the optimistic navigate records the same
             // path twice (mount then listing), so this is the common case
@@ -302,7 +302,7 @@ impl Oryxis {
         // every host. A write while the vault is soft-locked has no key,
         // so it just doesn't persist; the in-memory list still works for
         // the session.
-        if let Ok(json) = serde_json::to_string(&self.files_recent_folders)
+        if let Ok(json) = serde_json::to_string(&self.vaults.cur().files_recent_folders)
             && let Some(vault) = &self.vaults.cur().store
             && let Err(e) = vault.set_files_recent_folders(&json)
         {
@@ -323,7 +323,7 @@ impl Oryxis {
                 crate::state::PaneOrigin::Host(id) => Some(id),
                 _ => None,
             });
-        let Some(stored) = host.and_then(|h| self.files_recent_folders.get(&h)).cloned() else {
+        let Some(stored) = host.and_then(|h| self.vaults.cur().files_recent_folders.get(&h)).cloned() else {
             return;
         };
         if let Some(pane) = self.pane_by_id_any_tab(pane_id)

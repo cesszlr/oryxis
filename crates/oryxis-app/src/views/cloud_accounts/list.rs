@@ -168,7 +168,7 @@ impl Oryxis {
                 .width(Length::Fill)
                 .height(Length::Fill)
         } else if self
-            .cloud_profiles
+            .vaults.cur().cloud_profiles
             .iter()
             .all(|p| !self.cloud_provider_installed(&p.provider))
         {
@@ -208,7 +208,7 @@ impl Oryxis {
             // stay in the vault and reappear when the plugin is back.
             // Also apply the toolbar search needle (label / provider match).
             for cp in self
-                .cloud_profiles
+                .vaults.cur().cloud_profiles
                 .iter()
                 .filter(|p| self.cloud_provider_installed(&p.provider))
                 .filter(|p| {
