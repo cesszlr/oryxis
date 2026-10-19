@@ -2719,6 +2719,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "Nic z sejfu nie jest wczytywane, dopóki go nie wybierzesz.",
         "vault_picker_last_used" => "Ostatnio używany",
         "vault_picker_missing" => "Nie znaleziono pliku",
+        "setting_device_badge_tip" => "Dotyczy wszystkich sejfów na tym urządzeniu",
+        "hotkey_device_note" => "Skróty należą do tego urządzenia: są takie same w każdym sejfie.",
         "vault_status_missing" => "Nie znaleziono pliku. Sejf wróci, gdy wróci jego plik (na przykład pendrive).",
         "vault_status_unlocked" => "Odblokowany",
         "vault_status_locked" => "Zablokowany",

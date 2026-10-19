@@ -393,7 +393,7 @@ pub(crate) fn sftp_session_tab<'a>(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn panel_tab<'a>(
     kind: crate::state::PanelKind,
-    label: &'a str,
+    label: &str,
     is_active: bool,
     // Whether the hovered chip has earned its close X: the reveal waits
     // for a hover dwell so a pointer crossing the strip never finds a

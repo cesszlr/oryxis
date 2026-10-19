@@ -687,7 +687,11 @@ impl Oryxis {
                 OryxisColors::t().accent,
             ),
         );
+        // The folder is the device's (`session_log_file_dir`), the
+        // toggle above it the vault's.
         let mut row = dir_row(vec![
+            crate::widgets::device_badge(),
+            Space::new().width(6).boxed(),
             text(dir)
                 .size(12)
                 .color(OryxisColors::t().text_muted)

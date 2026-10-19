@@ -145,7 +145,7 @@ pub(crate) fn sftp_drag_ghost<'a>(
 /// a generic server glyph for a gear.
 pub(crate) fn panel_drag_ghost<'a>(
     kind: crate::state::PanelKind,
-    label: &'a str,
+    label: &str,
     width: f32,
 ) -> Element<'a, Message> {
     let accent = crate::theme::readable_accent_on(

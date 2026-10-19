@@ -278,7 +278,11 @@ impl Oryxis {
                 crate::theme::OryxisColors::t().accent,
             ),
         );
+        // The folder is the device's (`command_history_file_dir`), the
+        // toggle above it the vault's.
         let mut row = crate::widgets::dir_row(vec![
+            crate::widgets::device_badge(),
+            Space::new().width(6).boxed(),
             text(dir)
                 .size(12)
                 .color(crate::theme::OryxisColors::t().text_muted)
@@ -321,9 +325,7 @@ impl Oryxis {
         );
         let mut row = crate::widgets::dir_row(vec![
             column![
-                text(crate::i18n::t("snippet_output_dir"))
-                    .size(13)
-                    .color(crate::theme::OryxisColors::t().text_primary),
+                crate::widgets::setting_label(crate::i18n::t("snippet_output_dir"), 13.0, crate::theme::OryxisColors::t().text_primary),
                 Space::new().height(2),
                 text(self.snippet_output_dir().display().to_string())
                     .size(11)

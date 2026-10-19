@@ -19,7 +19,7 @@ impl Oryxis {
         // Add actions pinned to the top-right corner.
         let header = dir_row(vec![
             column![
-                text(t("local_terminals")).size(13).color(c.text_primary),
+                crate::widgets::setting_label(t("local_terminals"), 13.0, c.text_primary),
                 Space::new().height(4),
                 text(t("local_terminals_desc")).size(11).color(c.text_muted),
             ]

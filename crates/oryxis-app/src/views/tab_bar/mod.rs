@@ -282,7 +282,7 @@ impl Oryxis {
                     )
                 }
                 StripEntry::Panel(kind) => {
-                    panel_tab_width(crate::i18n::t(kind.label_key()), number_px)
+                    panel_tab_width(&self.panel_tab_label(kind), number_px)
                 }
             };
             widest = widest.max(content);

@@ -1037,7 +1037,7 @@ impl Oryxis {
         );
 
         let device_col = column![
-            text(crate::i18n::t("sync_device_name")).size(12).color(OryxisColors::t().text_muted),
+            crate::widgets::setting_label(crate::i18n::t("sync_device_name"), 12.0, OryxisColors::t().text_muted),
             Space::new().height(4),
             device_name_input,
         ];
@@ -1703,7 +1703,7 @@ impl Oryxis {
             Space::new().height(4),
             relay_input,
             Space::new().height(8),
-            text(crate::i18n::t("sync_listen_port")).size(12).color(OryxisColors::t().text_muted),
+            crate::widgets::setting_label(crate::i18n::t("sync_listen_port"), 12.0, OryxisColors::t().text_muted),
             Space::new().height(4),
             port_input,
             Space::new().height(4),

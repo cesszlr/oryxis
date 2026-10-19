@@ -2729,6 +2729,8 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "vault_picker_body" => "Nothing of a vault loads until you pick it.",
         "vault_picker_last_used" => "Last used",
         "vault_picker_missing" => "File not found",
+        "setting_device_badge_tip" => "Applies to every vault on this device",
+        "hotkey_device_note" => "Shortcuts belong to this device: the same in every vault.",
         "vault_status_missing" => "File not found. The vault comes back when its file does (a USB key, for instance).",
         "vault_status_unlocked" => "Unlocked",
         "vault_status_locked" => "Locked",

@@ -818,7 +818,11 @@ impl crate::app::Oryxis {
             label,
             RowAction::activate(msg.clone()),
             8.0,
-            crate::widgets::toggle_row(label, value, msg),
+            crate::widgets::toggle_row_with(
+                crate::widgets::setting_label(label, 13.0, crate::theme::OryxisColors::t().text_primary),
+                value,
+                msg,
+            ),
         )
     }
 
@@ -861,10 +865,7 @@ impl crate::app::Oryxis {
                 .boxed(),
         );
         crate::widgets::dir_row(vec![
-            iced::widget::text(label)
-                .size(13)
-                .color(crate::theme::OryxisColors::t().text_primary)
-                .boxed(),
+            crate::widgets::setting_label(label, 13.0, crate::theme::OryxisColors::t().text_primary),
             iced::widget::Space::new().width(iced::Length::Fill).boxed(),
             picker,
         ])

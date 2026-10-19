@@ -2687,6 +2687,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "Von einem Tresor wird nichts geladen, bevor du ihn wählst.",
         "vault_picker_last_used" => "Zuletzt benutzt",
         "vault_picker_missing" => "Datei nicht gefunden",
+        "setting_device_badge_tip" => "Gilt für alle Tresore auf diesem Gerät",
+        "hotkey_device_note" => "Tastenkürzel gehören zu diesem Gerät: in jedem Tresor dieselben.",
         "vault_status_missing" => "Datei nicht gefunden. Der Tresor kommt zurück, wenn seine Datei zurückkommt (etwa ein USB-Stick).",
         "vault_status_unlocked" => "Entsperrt",
         "vault_status_locked" => "Gesperrt",

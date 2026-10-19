@@ -332,6 +332,48 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     e(S::Plugins, "plugins_auto_update_global", "plugin auto update all global"),
 ];
 
+/// The rows whose setting belongs to the DEVICE (`oryxis_vault::device`),
+/// label key -> the setting it writes: they apply to every vault, while
+/// the rest of Settings edits the window's vault, so each carries the
+/// "this device" badge (`widgets::setting_label`, drawn by the Settings
+/// row builders). The Vaults section is the device's whole and says so
+/// once in its header; the shortcut table likewise (Shortcuts).
+pub(crate) static DEVICE_ROWS: &[(&str, &str)] = &[
+    ("language", "language"),
+    ("layout_direction", "layout_direction"),
+    ("renderer_backend", "renderer_backend"),
+    ("close_to_tray", "close_to_tray"),
+    ("minimize_to_tray", "minimize_to_tray"),
+    ("snippet_output_dir", "snippet_output_dir"),
+    // A chord of the shortcut table (the middle button), on Terminal.
+    ("middle_click_paste", "middle_click_paste"),
+    // The Ctrl+wheel chord, likewise.
+    ("wheel_zoom", "hotkey_font_zoom_in"),
+    ("local_terminals", "local_terminals"),
+    ("sync_device_name", "sync_device_name"),
+    ("sync_listen_port", "sync_listen_port"),
+    ("setting_default_editor", "sftp_default_editor"),
+    ("default_download_dir", "zmodem_download_dir"),
+    ("agent_server", "agent_server_enabled"),
+    ("agent_server_confirm", "agent_server_confirm"),
+    ("agent_allow_add", "agent_server_allow_add"),
+    ("agent_openssh_pipe", "agent_server_openssh_pipe"),
+    ("offline_mode", "offline_mode"),
+    ("download_mirror", "download_mirror"),
+    ("debug_logging", "debug_logging"),
+    ("perf_overlay", "perf_overlay"),
+    ("plugins_auto_update_global", "plugins_auto_update_global"),
+    ("auto_check_updates", "auto_check_updates"),
+    ("update_channel", "update_channel"),
+];
+
+/// Whether the Settings row labelled `label` (in the active language)
+/// writes a device setting: the same label match the search highlight
+/// makes, over the short [`DEVICE_ROWS`] list.
+pub(crate) fn is_device_row_label(label: &str) -> bool {
+    DEVICE_ROWS.iter().any(|(key, _)| crate::i18n::t(key) == label)
+}
+
 /// The self-update rows, present only in unpackaged builds. Inside an
 /// MSIX package the Microsoft Store services the app and Settings >
 /// About renders no update panel at all, so a search hit here would
@@ -504,6 +546,35 @@ mod tests {
             .iter()
             .chain(platform_entries())
             .chain(update_entries())
+    }
+
+    #[test]
+    fn every_device_row_writes_a_device_setting() {
+        for (label_key, setting) in DEVICE_ROWS {
+            assert!(
+                oryxis_vault::device::is_device_key(setting),
+                "{label_key} is marked as a device row but {setting} is a vault setting",
+            );
+            assert_ne!(crate::i18n::en_lookup(label_key), "???", "missing i18n for {label_key}");
+        }
+    }
+
+    #[test]
+    fn a_row_named_after_a_device_setting_is_marked() {
+        // Most rows are labelled by the key they write: such a row that
+        // is a device setting must carry the badge. Vaults and Shortcuts
+        // (the table's whole-set buttons) say it once in their header.
+        for entry in all_entries() {
+            if oryxis_vault::device::is_device_key(entry.label_key)
+                && !matches!(entry.section, S::Vaults | S::Shortcuts)
+            {
+                assert!(
+                    DEVICE_ROWS.iter().any(|(key, _)| *key == entry.label_key),
+                    "{} writes a device setting but is not in DEVICE_ROWS",
+                    entry.label_key,
+                );
+            }
+        }
     }
 
     #[test]

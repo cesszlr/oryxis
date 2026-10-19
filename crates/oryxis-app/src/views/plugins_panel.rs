@@ -189,6 +189,9 @@ impl Oryxis {
                         Message::Plugin(PluginMessage::PluginToggleGlobalAutoUpdate(!self.plugins_auto_update_global)),
                     ),
                 ),
+                // The plugin cache is the device's (`DEVICE_ROWS`).
+                Space::new().width(6).boxed(),
+                crate::widgets::device_badge(),
             ])
             .align_y(iced::Alignment::Center)
             .width(Length::Fill)
@@ -481,8 +484,7 @@ impl Oryxis {
             crate::i18n::t("agent_server"),
             crate::keynav::RowAction::activate(Message::Agent(AgentMessage::AgentServerToggled(!self.agent.enabled))),
             8.0,
-            toggle_row_desc(
-                crate::i18n::t("agent_server"),
+            crate::widgets::toggle_row_desc_with(crate::widgets::setting_label(crate::i18n::t("agent_server"), 13.0, OryxisColors::t().text_primary),
                 crate::i18n::t("agent_server_desc"),
                 self.agent.enabled,
                 Message::Agent(AgentMessage::AgentServerToggled(!self.agent.enabled)),

@@ -2687,6 +2687,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "Nulla di un vault viene caricato finché non lo scegli.",
         "vault_picker_last_used" => "Ultimo usato",
         "vault_picker_missing" => "File non trovato",
+        "setting_device_badge_tip" => "Vale per tutti i vault di questo dispositivo",
+        "hotkey_device_note" => "Le scorciatoie appartengono a questo dispositivo: le stesse in ogni vault.",
         "vault_status_missing" => "File non trovato. Il vault torna quando torna il suo file (una chiavetta USB, per esempio).",
         "vault_status_unlocked" => "Sbloccato",
         "vault_status_locked" => "Bloccato",

@@ -2724,6 +2724,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "Z trezoru se nic nenačte, dokud ho nevyberete.",
         "vault_picker_last_used" => "Naposledy použitý",
         "vault_picker_missing" => "Soubor nenalezen",
+        "setting_device_badge_tip" => "Platí pro všechny trezory v tomto zařízení",
+        "hotkey_device_note" => "Zkratky patří tomuto zařízení: ve všech trezorech stejné.",
         "vault_status_missing" => "Soubor nenalezen. Trezor se vrátí, až se vrátí jeho soubor (třeba USB disk).",
         "vault_status_unlocked" => "Odemčeno",
         "vault_status_locked" => "Zamčeno",

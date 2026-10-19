@@ -118,9 +118,7 @@ impl Oryxis {
             // the persisted auto-upload grant ("Autosave" in the save
             // dialog) so that choice is never a one-way trap.
             let editor_section = panel_section(column![
-                text(t("setting_default_editor"))
-                    .size(13)
-                    .color(OryxisColors::t().text_primary),
+                crate::widgets::setting_label(t("setting_default_editor"), 13.0, OryxisColors::t().text_primary),
                 Space::new().height(4),
                 text(t("setting_default_editor_desc"))
                     .size(11)
@@ -310,9 +308,7 @@ impl Oryxis {
         );
         let mut row = crate::widgets::dir_row(vec![
             column![
-                text(crate::i18n::t("default_download_dir"))
-                    .size(13)
-                    .color(crate::theme::OryxisColors::t().text_primary),
+                crate::widgets::setting_label(crate::i18n::t("default_download_dir"), 13.0, crate::theme::OryxisColors::t().text_primary),
                 Space::new().height(2),
                 text(shown)
                     .size(11)

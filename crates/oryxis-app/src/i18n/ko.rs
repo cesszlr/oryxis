@@ -2720,6 +2720,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "선택하기 전에는 볼트의 내용을 불러오지 않습니다.",
         "vault_picker_last_used" => "최근 사용",
         "vault_picker_missing" => "파일을 찾을 수 없음",
+        "setting_device_badge_tip" => "이 기기의 모든 볼트에 적용됩니다",
+        "hotkey_device_note" => "단축키는 이 기기에 속합니다. 모든 볼트에서 같습니다.",
         "vault_status_missing" => "파일을 찾을 수 없습니다. 파일이 돌아오면(예: USB 메모리) 볼트도 돌아옵니다.",
         "vault_status_unlocked" => "잠금 해제됨",
         "vault_status_locked" => "잠김",

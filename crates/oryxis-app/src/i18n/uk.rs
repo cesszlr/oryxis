@@ -2719,6 +2719,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "Нічого зі сховища не завантажується, доки ви його не виберете.",
         "vault_picker_last_used" => "Останнє",
         "vault_picker_missing" => "Файл не знайдено",
+        "setting_device_badge_tip" => "Діє для всіх сховищ на цьому пристрої",
+        "hotkey_device_note" => "Комбінації клавіш належать цьому пристрою: однакові в усіх сховищах.",
         "vault_status_missing" => "Файл не знайдено. Сховище повернеться, коли повернеться його файл (наприклад, флешка).",
         "vault_status_unlocked" => "Розблоковано",
         "vault_status_locked" => "Заблоковано",

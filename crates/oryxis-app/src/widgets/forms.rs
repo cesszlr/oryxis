@@ -182,12 +182,38 @@ pub(crate) fn toggle_switch_labeled<'a>(
 /// A full-width settings row: label on the leading edge, [`toggle_switch`]
 /// on the trailing edge.
 pub(crate) fn toggle_row<'a>(label: &'a str, value: bool, msg: Message) -> Element<'a, Message> {
-    dir_row(vec![
-        text(label).size(13).color(OryxisColors::t().text_primary).boxed(),
-        Space::new().width(Length::Fill).boxed(),
-        toggle_switch(value, msg),
-    ]).align_y(iced::Alignment::Center)
-    .boxed()
+    toggle_row_with(text(label).size(13).color(OryxisColors::t().text_primary).boxed(), value, msg)
+}
+
+/// [`toggle_row`] with a label already built ([`setting_label`]).
+pub(crate) fn toggle_row_with<'a>(label: Element<'a, Message>, value: bool, msg: Message) -> Element<'a, Message> {
+    dir_row(vec![label, Space::new().width(Length::Fill).boxed(), toggle_switch(value, msg)])
+        .align_y(iced::Alignment::Center)
+        .boxed()
+}
+
+/// A Settings row's label: the text, then the "this device" badge when
+/// the row writes a device setting (`settings_index::DEVICE_ROWS`) and
+/// so applies to every vault, where the rest of Settings edits the
+/// window's vault. Settings rows only: the same label elsewhere (the
+/// onboarding) asks nothing of the vault.
+pub(crate) fn setting_label<'a>(label: &'a str, size: f32, color: Color) -> Element<'a, Message> {
+    let device = crate::settings_index::is_device_row_label(label);
+    let label = text(label).size(size).color(color);
+    if !device {
+        return label.boxed();
+    }
+    dir_row(vec![label.boxed(), Space::new().width(6).boxed(), device_badge()])
+        .align_y(iced::Alignment::Center)
+        .boxed()
+}
+
+/// The "this device" badge: an icon, its tooltip saying what it means.
+pub(crate) fn device_badge<'a>() -> Element<'a, Message> {
+    crate::views::terminal::icon_tooltip(
+        iced_fonts::lucide::monitor().size(11).color(OryxisColors::t().text_muted).boxed(),
+        crate::i18n::t("setting_device_badge_tip"),
+    )
 }
 
 /// Like [`toggle_row`] but with a muted description line under the
@@ -199,9 +225,19 @@ pub(crate) fn toggle_row_desc<'a>(
     value: bool,
     msg: Message,
 ) -> Element<'a, Message> {
+    toggle_row_desc_with(text(label).size(13).color(OryxisColors::t().text_primary).boxed(), desc, value, msg)
+}
+
+/// [`toggle_row_desc`] with a label already built ([`setting_label`]).
+pub(crate) fn toggle_row_desc_with<'a>(
+    label: Element<'a, Message>,
+    desc: &'a str,
+    value: bool,
+    msg: Message,
+) -> Element<'a, Message> {
     dir_row(vec![
         iced::widget::column![
-            text(label).size(13).color(OryxisColors::t().text_primary),
+            label,
             Space::new().height(2),
             text(desc).size(11).color(OryxisColors::t().text_muted),
         ]

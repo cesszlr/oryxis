@@ -2706,6 +2706,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "لا يُحمَّل شيء من الخزنة حتى تختارها.",
         "vault_picker_last_used" => "آخر استخدام",
         "vault_picker_missing" => "الملف غير موجود",
+        "setting_device_badge_tip" => "ينطبق على كل الخزائن في هذا الجهاز",
+        "hotkey_device_note" => "الاختصارات خاصة بهذا الجهاز: هي نفسها في كل الخزائن.",
         "vault_status_missing" => "الملف غير موجود. تعود الخزنة عندما يعود ملفها (ذاكرة USB مثلًا).",
         "vault_status_unlocked" => "غير مقفلة",
         "vault_status_locked" => "مقفلة",

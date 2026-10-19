@@ -2688,6 +2688,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "Nada de um cofre é carregado até você escolhê-lo.",
         "vault_picker_last_used" => "Último usado",
         "vault_picker_missing" => "Arquivo não encontrado",
+        "setting_device_badge_tip" => "Vale para todos os cofres deste dispositivo",
+        "hotkey_device_note" => "Os atalhos são deste dispositivo: os mesmos em todos os cofres.",
         "vault_status_missing" => "Arquivo não encontrado. O cofre volta quando o arquivo voltar (um pendrive, por exemplo).",
         "vault_status_unlocked" => "Desbloqueado",
         "vault_status_locked" => "Bloqueado",

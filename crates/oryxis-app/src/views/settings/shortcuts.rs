@@ -16,6 +16,18 @@ impl Oryxis {
                                 text(crate::i18n::t("hotkey_edit_hint"))
                 .size(11)
                 .color(OryxisColors::t().text_muted),
+            Space::new().height(6),
+            // The table is the device's (the `hotkey_` keys), said once
+            // here rather than on every row.
+            crate::widgets::dir_row(vec![
+                crate::widgets::device_badge(),
+                Space::new().width(6).boxed(),
+                text(crate::i18n::t("hotkey_device_note"))
+                    .size(11)
+                    .color(OryxisColors::t().text_muted)
+                    .boxed(),
+            ])
+            .align_y(iced::Alignment::Center),
             Space::new().height(10),
             self.hotkey_preset_row(),
             Space::new().height(4),

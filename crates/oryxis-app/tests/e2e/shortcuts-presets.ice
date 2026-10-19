@@ -21,9 +21,9 @@ settle
 expect "Oryxis (default)"
 expect "Export…"
 expect "Import…"
-click (1075.00, 111.00)
+click (1075.00, 132.00)
 settle 300
-click (1075.00, 193.00)
+click (1075.00, 214.00)
 settle 300
 expect "Apply"
 click "Apply"
@@ -32,9 +32,9 @@ settle 300
 expect "Tabby"
 absent "Oryxis (default)"
 # Back to Oryxis's own through the same selector.
-click (1075.00, 111.00)
+click (1075.00, 132.00)
 settle 300
-click (1075.00, 152.00)
+click (1075.00, 173.00)
 settle 300
 expect "Apply"
 click "Apply"

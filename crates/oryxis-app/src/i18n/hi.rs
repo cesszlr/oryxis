@@ -2725,6 +2725,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_body" => "चुनने तक वॉल्ट का कुछ भी लोड नहीं होता।",
         "vault_picker_last_used" => "पिछली बार इस्तेमाल",
         "vault_picker_missing" => "फ़ाइल नहीं मिली",
+        "setting_device_badge_tip" => "इस डिवाइस के सभी वॉल्ट पर लागू होता है",
+        "hotkey_device_note" => "शॉर्टकट इस डिवाइस के हैं: हर वॉल्ट में एक जैसे।",
         "vault_status_missing" => "फ़ाइल नहीं मिली। फ़ाइल वापस आने पर (जैसे USB ड्राइव) वॉल्ट भी लौट आएगा।",
         "vault_status_unlocked" => "अनलॉक",
         "vault_status_locked" => "लॉक",

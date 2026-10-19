@@ -28,8 +28,7 @@ impl Oryxis {
                     !self.agent.confirm,
                 ))),
                 8.0,
-                crate::widgets::toggle_row_desc(
-                    t("agent_server_confirm"),
+                crate::widgets::toggle_row_desc_with(crate::widgets::setting_label(t("agent_server_confirm"), 13.0, OryxisColors::t().text_primary),
                     t("agent_server_confirm_desc"),
                     self.agent.confirm,
                     Message::Agent(AgentMessage::AgentConfirmToggled(!self.agent.confirm)),
@@ -42,8 +41,7 @@ impl Oryxis {
                     !self.agent.allow_add,
                 ))),
                 8.0,
-                crate::widgets::toggle_row_desc(
-                    t("agent_allow_add"),
+                crate::widgets::toggle_row_desc_with(crate::widgets::setting_label(t("agent_allow_add"), 13.0, OryxisColors::t().text_primary),
                     t("agent_allow_add_desc"),
                     self.agent.allow_add,
                     Message::Agent(AgentMessage::AgentAllowAddToggled(!self.agent.allow_add)),
@@ -60,8 +58,7 @@ impl Oryxis {
                         !self.agent.openssh_pipe,
                     ))),
                     8.0,
-                    crate::widgets::toggle_row_desc(
-                        t("agent_openssh_pipe"),
+                    crate::widgets::toggle_row_desc_with(crate::widgets::setting_label(t("agent_openssh_pipe"), 13.0, OryxisColors::t().text_primary),
                         t("agent_openssh_pipe_desc"),
                         self.agent.openssh_pipe,
                         Message::Agent(AgentMessage::AgentOpensshPipeToggled(!self.agent.openssh_pipe)),

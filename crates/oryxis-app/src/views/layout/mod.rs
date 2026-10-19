@@ -96,6 +96,18 @@ impl Oryxis {
         self.registered_vaults().len()
     }
 
+    /// A panel tab's label in the strip. Settings edits the window's
+    /// vault, so with several vaults its tab names it ("Settings · Work");
+    /// the other panels belong to no vault.
+    pub(crate) fn panel_tab_label(&self, kind: crate::state::PanelKind) -> String {
+        let label = crate::i18n::t(kind.label_key());
+        if kind == crate::state::PanelKind::Settings && self.vault_count() > 1 {
+            format!("{label} \u{b7} {}", self.vault_name(self.vaults.cur().id))
+        } else {
+            label.to_string()
+        }
+    }
+
     /// Whether to show the vault switcher (the chip in the sub-nav, the
     /// badge in the rail). Always with several vaults; with one, unless
     /// the user hid it (its menu is also where a second vault is made).

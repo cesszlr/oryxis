@@ -335,7 +335,7 @@ impl Oryxis {
             text(t("setting_update_check_desc"))
                 .size(11).color(OryxisColors::t().text_muted),
             Space::new().height(12),
-            text(t("update_channel")).size(12).color(OryxisColors::t().text_secondary),
+            crate::widgets::setting_label(t("update_channel"), 12.0, OryxisColors::t().text_secondary),
             Space::new().height(4),
             channel_picker,
             channel_note,

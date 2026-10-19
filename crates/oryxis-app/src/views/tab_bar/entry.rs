@@ -170,14 +170,14 @@ impl Oryxis {
             // Same active rule as the SFTP tabs: it owns the strip slot
             // only while its own surface is the one showing.
             let is_active = self.cur_active_tab().is_none() && self.cur_view() == kind.view();
-            let label = crate::i18n::t(kind.label_key());
+            let label = self.panel_tab_label(kind);
             let width = ctx.uniform_w.unwrap_or_else(|| {
                 if ctx.dragging_any {
                     ctx.drag_uniform_w
                 } else if is_active {
                     TAB_NATURAL_WIDTH
                 } else {
-                    panel_tab_width(label, ctx.number_px)
+                    panel_tab_width(&label, ctx.number_px)
                 }
             });
             let is_dragging = self.strip_drag_id() == Some(kind.tab_id());
@@ -186,7 +186,7 @@ impl Oryxis {
             }
             return panel_tab(
                 kind,
-                label,
+                &label,
                 is_active,
                 self.cur_nav().hover.panel_tab == Some(kind) && ctx.close_armed,
                 width,
@@ -687,7 +687,7 @@ impl Oryxis {
                 .find(|k| k.tab_id() == dragged)
                 .map(|kind| {
                     (
-                        panel_drag_ghost(kind, crate::i18n::t(kind.label_key()), drag_uniform_w),
+                        panel_drag_ghost(kind, &self.panel_tab_label(kind), drag_uniform_w),
                         drag_uniform_w,
                     )
                 })
