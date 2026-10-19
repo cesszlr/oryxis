@@ -1191,4 +1191,92 @@ mod tests {
         assert_eq!(peers[0].last_known_ip.as_deref(), Some("192.168.1.51"));
         assert_eq!(peers[0].last_known_port, Some(41234));
     }
+
+    // ── One listener for every vault on a device ──
+
+    /// An engine of one local vault, attached to the device's shared
+    /// listener, with `guard` refusing duplicate pairings.
+    fn attached_engine(
+        listener: &Arc<crate::engine::SyncListener>,
+        vault: VaultStore,
+        guard: crate::engine::PeerGuard,
+    ) -> SyncEngine {
+        let config = SyncConfig { enabled: true, mode: SyncMode::Manual, listen_port: 0, ..SyncConfig::default() };
+        let mut engine = SyncEngine::new(config, DeviceIdentity::generate("this-pc"), Arc::new(Mutex::new(vault)))
+            .with_listener(listener.clone())
+            .with_peer_guard(guard);
+        let _events = engine.take_events();
+        engine.start().unwrap();
+        engine
+    }
+
+    fn vault_with_host(label: &str) -> VaultStore {
+        let vault = test_vault();
+        vault.save_connection(&Connection::new(label, "10.0.0.9"), None).unwrap();
+        vault
+    }
+
+    fn host_labels(engine: &SyncEngine) -> Vec<String> {
+        engine.vault.lock().unwrap().list_connections().unwrap().into_iter().map(|c| c.label).collect()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn one_listener_serves_each_vault_its_own_peers() {
+        let listener = crate::engine::SyncListener::bind(0, None).unwrap();
+        let work = attached_engine(&listener, vault_with_host("work-db"), Default::default());
+        let home = attached_engine(&listener, vault_with_host("home-nas"), Default::default());
+        assert_eq!(work.listen_port(), listener.port());
+        assert_eq!(home.listen_port(), listener.port(), "both vaults advertise the one port");
+
+        // Two other machines, each pairing with one of the vaults by the
+        // code that vault hosts, both dialling the same port.
+        let (x, _) = started_engine("laptop");
+        let (y, _) = started_engine("tablet");
+        let code = work.handle().start_hosting_pairing();
+        x.handle().join_pairing(loopback(listener.port()), code).await.unwrap();
+        let code = home.handle().start_hosting_pairing();
+        y.handle().join_pairing(loopback(listener.port()), code).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let peers = |e: &SyncEngine| -> Vec<Uuid> {
+            e.vault.lock().unwrap().list_sync_peers().unwrap().into_iter().map(|p| p.peer_id).collect()
+        };
+        assert_eq!(peers(&work), vec![x.identity().device_id]);
+        assert_eq!(peers(&home), vec![y.identity().device_id]);
+
+        // A session from each lands in the vault that paired it, and
+        // carries that vault's hosts only.
+        x.handle().sync_now().await.unwrap();
+        y.handle().sync_now().await.unwrap();
+        assert_eq!(host_labels(&x), vec!["work-db".to_string()]);
+        assert_eq!(host_labels(&y), vec!["home-nas".to_string()]);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_remote_identity_pairs_with_one_vault_per_device() {
+        let listener = crate::engine::SyncListener::bind(0, None).unwrap();
+        let work = attached_engine(&listener, test_vault(), Default::default());
+        let (x, x_port) = started_engine("laptop");
+        let code = work.handle().start_hosting_pairing();
+        x.handle().join_pairing(loopback(listener.port()), code).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        // The second vault asks the first whether it knows a peer.
+        let work_vault = work.vault.clone();
+        let guard = crate::engine::PeerGuard::new(move |id| {
+            work_vault.lock().unwrap().list_sync_peers().unwrap().iter().any(|p| p.peer_id == *id && p.is_active)
+        });
+        let home = attached_engine(&listener, test_vault(), guard);
+
+        // Host side: x joins home's code, refused.
+        let code = home.handle().start_hosting_pairing();
+        let refused = x.handle().join_pairing(loopback(listener.port()), code).await;
+        assert!(refused.is_err(), "the host refused a peer another vault paired");
+        // Joiner side: home joins x's code, refused before storing it.
+        let code = x.handle().start_hosting_pairing();
+        let refused = home.handle().join_pairing(loopback(x_port), code).await;
+        assert!(refused.is_err(), "the joiner refused a host another vault paired");
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(home.vault.lock().unwrap().list_sync_peers().unwrap().is_empty());
+    }
+
 }

@@ -265,14 +265,16 @@ fn heartbeat_backoff(consecutive_failures: u32) -> std::time::Duration {
     std::time::Duration::from_secs((base << exp).min(cap))
 }
 
+mod listener;
 mod manifest;
 mod pairing;
 mod relay_glue;
 mod session;
 mod snapshot;
 
+pub use listener::SyncListener;
 pub use pairing::{
-    format_pairing_link, parse_pairing_link, sanitize_device_name, DEVICE_NAME_MAX_CHARS,
+    format_pairing_link, parse_pairing_link, sanitize_device_name, PeerGuard, DEVICE_NAME_MAX_CHARS,
 };
 pub use snapshot::{build_full_snapshot, merge_snapshot, vault_signature};
 
@@ -281,7 +283,7 @@ pub use snapshot::{build_full_snapshot, merge_snapshot, vault_signature};
 #[allow(unused_imports)]
 pub(crate) use manifest::{apply_records, build_manifest, collect_records};
 use relay_glue::run_relay_inbound_session;
-use session::{handle_incoming, sync_all_peers};
+use session::{handle_incoming, sync_all_peers, Route};
 
 /// P2P sync engine.
 pub struct SyncEngine {
@@ -311,9 +313,41 @@ pub struct SyncEngine {
     /// discovery. Cleared in `stop()` to release the daemons.
     mdns_register: Option<mdns_sd::ServiceDaemon>,
     mdns_browse: Option<mdns_sd::ServiceDaemon>,
+    /// The device's shared listener, when this engine is one of several
+    /// (one per open vault): it attaches to it instead of binding a
+    /// port of its own (`listener`). `None` = its own listener, as a
+    /// lone engine (and every engine in the crate's tests) has.
+    listener: Option<Arc<SyncListener>>,
+    /// Refuses pairing an identity another local vault already paired.
+    guard: PeerGuard,
 }
 
 impl SyncEngine {
+    /// Serve on the device's shared listener instead of a port of its
+    /// own. Call before `start()`.
+    pub fn with_listener(mut self, listener: Arc<SyncListener>) -> Self {
+        self.listener = Some(listener);
+        self
+    }
+
+    /// Refuse pairing an identity another local vault already paired
+    /// (`PeerGuard`). Call before `start()`.
+    pub fn with_peer_guard(mut self, guard: PeerGuard) -> Self {
+        self.guard = guard;
+        self
+    }
+
+    /// The route this engine serves incoming sessions as.
+    fn route(&self) -> Route {
+        Route {
+            vault: self.vault.clone(),
+            identity: self.identity.clone(),
+            event_tx: self.event_tx.clone(),
+            hosting_pairing: self.hosting_pairing.clone(),
+            guard: self.guard.clone(),
+        }
+    }
+
     /// Create a new sync engine. Call `start()` to begin background tasks.
     pub fn new(
         config: SyncConfig,
@@ -329,6 +363,8 @@ impl SyncEngine {
             event_rx: Some(event_rx),
             shutdown_tx: None,
             hosting_pairing: Arc::new(std::sync::Mutex::new(None)),
+            listener: None,
+            guard: PeerGuard::default(),
             bound_port: 0,
             mdns_register: None,
             mdns_browse: None,
@@ -360,18 +396,28 @@ impl SyncEngine {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
         self.shutdown_tx = Some(shutdown_tx.clone());
 
-        // Start QUIC server
-        let endpoint = self.bind_server_endpoint()?;
+        // Start QUIC server: the device's shared one when there is one
+        // (the app's, one per device whatever the number of vaults), else
+        // a port of its own with its own accept loop below.
+        let own_endpoint = match &self.listener {
+            Some(listener) => {
+                listener.attach(self.route());
+                None
+            }
+            None => Some(self.bind_server_endpoint()?),
+        };
 
-        let listen_port = endpoint
-            .local_addr()
-            .map(|a| a.port())
-            .unwrap_or(0);
+        let listen_port = match (&self.listener, &own_endpoint) {
+            (Some(listener), _) => listener.port(),
+            (None, Some(endpoint)) => endpoint.local_addr().map(|a| a.port()).unwrap_or(0),
+            (None, None) => 0,
+        };
         // Remember the actually-bound port so `SyncHandle` can advertise
         // it to pairing joiners (the configured port may have been 0),
-        // and, when the port was automatic, keep it for the next start.
+        // and, when the port was automatic, keep it for the next start
+        // (the shared listener's owner remembers its own).
         self.bound_port = listen_port;
-        if self.config.listen_port == 0 {
+        if self.config.listen_port == 0 && own_endpoint.is_some() {
             self.remember_auto_port(listen_port);
         }
 
@@ -418,34 +464,31 @@ impl SyncEngine {
             }
         });
 
-        // QUIC server accept loop
-        let vault = self.vault.clone();
-        let identity = self.identity.clone();
-        let event_tx = self.event_tx.clone();
-        let hosting_pairing = self.hosting_pairing.clone();
-        let mut shutdown_rx = shutdown_tx.subscribe();
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    incoming = endpoint.accept() => {
-                        if let Some(incoming) = incoming {
-                            let vault = vault.clone();
-                            let identity = identity.clone();
-                            let event_tx = event_tx.clone();
-                            let hosting_pairing = hosting_pairing.clone();
-                            tokio::spawn(async move {
-                                if let Err(e) = handle_incoming(incoming, vault, identity, event_tx, hosting_pairing).await {
-                                    tracing::warn!("Incoming connection failed: {}", e);
-                                }
-                            });
-                        } else {
-                            break;
+        // QUIC server accept loop (a port of its own only; the shared
+        // listener runs one for every vault).
+        if let Some(endpoint) = own_endpoint {
+            let route = self.route();
+            let mut shutdown_rx = shutdown_tx.subscribe();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        incoming = endpoint.accept() => {
+                            if let Some(incoming) = incoming {
+                                let route = route.clone();
+                                tokio::spawn(async move {
+                                    if let Err(e) = handle_incoming(incoming, route).await {
+                                        tracing::warn!("Incoming connection failed: {}", e);
+                                    }
+                                });
+                            } else {
+                                break;
+                            }
                         }
+                        _ = shutdown_rx.recv() => break,
                     }
-                    _ = shutdown_rx.recv() => break,
                 }
-            }
-        });
+            });
+        }
 
         // Signaling heartbeat. When a signaling URL is configured, ask
         // a STUN server for our public address once a minute and POST
@@ -639,6 +682,7 @@ impl SyncEngine {
             let identity = self.identity.clone();
             let event_tx = self.event_tx.clone();
             let hosting_pairing = self.hosting_pairing.clone();
+            let guard = self.guard.clone();
             let mut shutdown_rx = shutdown_tx.subscribe();
             // Cloned into the listener so every spawned session can
             // subscribe and die with the engine instead of lingering
@@ -749,6 +793,7 @@ impl SyncEngine {
                             let identity = identity.clone();
                             let event_tx = event_tx.clone();
                             let hosting_pairing = hosting_pairing.clone();
+                            let guard = guard.clone();
                             let sessions = sessions.clone();
                             let mut session_shutdown_rx =
                                 session_shutdown_tx.subscribe();
@@ -763,10 +808,7 @@ impl SyncEngine {
                                         session_client,
                                         from,
                                         rx,
-                                        vault,
-                                        identity,
-                                        hosting_pairing,
-                                        event_tx,
+                                        Route { vault, identity, event_tx, hosting_pairing, guard },
                                     ) => {}
                                     _ = session_shutdown_rx.recv() => {
                                         tracing::debug!(
@@ -793,6 +835,11 @@ impl SyncEngine {
     pub fn stop(&mut self) {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
+        }
+        // Off the shared listener: its next session for this vault's
+        // peers finds no route (and the first remaining one says Bye).
+        if let Some(listener) = &self.listener {
+            listener.detach(&self.identity.device_id);
         }
         // Shut the mDNS daemons down so we deregister from the LAN as
         // soon as the user toggles sync off. Dropping the handle is NOT
@@ -822,6 +869,7 @@ impl SyncEngine {
             vault: self.vault.clone(),
             event_tx: self.event_tx.clone(),
             hosting_pairing: self.hosting_pairing.clone(),
+            guard: self.guard.clone(),
             listen_port: self.bound_port,
         }
     }
@@ -916,6 +964,7 @@ pub struct SyncHandle {
     vault: Arc<std::sync::Mutex<VaultStore>>,
     event_tx: mpsc::UnboundedSender<SyncEvent>,
     hosting_pairing: Arc<std::sync::Mutex<Option<HostingPairing>>>,
+    guard: PeerGuard,
     listen_port: u16,
 }
 
@@ -1138,6 +1187,7 @@ impl SyncHandle {
             &mut transport,
             &self.identity,
             &self.vault,
+            &self.guard,
             self.listen_port,
             code,
             Some((addr.ip(), addr.port())),
@@ -1177,6 +1227,7 @@ impl SyncHandle {
             &mut transport,
             &self.identity,
             &self.vault,
+            &self.guard,
             self.listen_port,
             code,
             None,

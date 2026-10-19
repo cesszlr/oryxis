@@ -16,8 +16,8 @@ pub mod transport;
 pub use config::{SyncConfig, SyncMode, SyncTransport};
 pub use engine::{
     build_full_snapshot, format_pairing_link, merge_snapshot, parse_pairing_link, vault_signature,
-    SyncEngine,
-    SyncEvent, SyncHandle,
+    PeerGuard, SyncEngine,
+    SyncEvent, SyncHandle, SyncListener,
 };
 pub use error::SyncError;
 pub use crypto::DeviceIdentity;

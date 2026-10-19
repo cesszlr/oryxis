@@ -4,19 +4,14 @@
 //! `RelayAuth`) before falling through to the regular sync session
 //! handler in `mod.rs::handle_sync_session`.
 
-use std::sync::Arc;
-
-use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use oryxis_vault::VaultStore;
-
-use crate::crypto::{self, DeviceIdentity};
+use crate::crypto;
 use crate::protocol::{SyncMessage, PROTOCOL_VERSION};
 use crate::transport;
 
-use super::session::handle_sync_session;
-use super::{pairing, HostingPairing, SyncEvent};
+use super::session::{handle_sync_session, Route};
+use super::{pairing, SyncEvent};
 
 /// Server-side dispatcher for a relay-inbound session. The listener
 /// in `start()` has already routed the very first frame from this
@@ -28,11 +23,9 @@ pub(super) async fn run_relay_inbound_session(
     client: crate::relay::RelayClient,
     sender_id: Uuid,
     rx: tokio::sync::mpsc::UnboundedReceiver<SyncMessage>,
-    vault: Arc<std::sync::Mutex<VaultStore>>,
-    identity: DeviceIdentity,
-    hosting_pairing: Arc<std::sync::Mutex<Option<HostingPairing>>>,
-    event_tx: mpsc::UnboundedSender<SyncEvent>,
+    route: Route,
 ) {
+    let Route { vault, identity, event_tx, hosting_pairing, guard } = route;
     let mut transport = transport::SessionTransport::RelayServer {
         client,
         peer_id: sender_id,
@@ -59,6 +52,7 @@ pub(super) async fn run_relay_inbound_session(
                 &vault,
                 &identity,
                 &hosting_pairing,
+                &guard,
                 &event_tx,
                 device_id,
                 device_name,

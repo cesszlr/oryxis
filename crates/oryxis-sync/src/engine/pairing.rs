@@ -26,6 +26,39 @@ use crate::transport;
 
 use super::{HostingPairing, MAX_PAIRING_ATTEMPTS, MAX_PAIRING_SOURCES, SyncEvent};
 
+/// Whether a remote identity is already paired with ANOTHER vault on
+/// this device (the app answers, reading its other vaults). Every vault
+/// has its own device identity, and one listener per device routes an
+/// incoming session by the sender's identity to the vault that paired
+/// it (`listener`), so a remote identity pairs with ONE local vault: a
+/// second pairing would make that route ambiguous. Default: never.
+#[derive(Clone, Default)]
+pub struct PeerGuard(Option<Arc<PairedElsewhere>>);
+
+/// The question a [`PeerGuard`] asks.
+type PairedElsewhere = dyn Fn(&Uuid) -> bool + Send + Sync;
+
+impl PeerGuard {
+    /// A guard asking `paired_elsewhere`.
+    pub fn new(paired_elsewhere: impl Fn(&Uuid) -> bool + Send + Sync + 'static) -> Self {
+        Self(Some(Arc::new(paired_elsewhere)))
+    }
+
+    /// Whether `device_id` is paired with another vault here.
+    pub(crate) fn paired_elsewhere(&self, device_id: &Uuid) -> bool {
+        self.0.as_ref().is_some_and(|f| f(device_id))
+    }
+}
+
+impl std::fmt::Debug for PeerGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.0.is_some() { "PeerGuard(set)" } else { "PeerGuard(none)" })
+    }
+}
+
+/// The refusal both pairing sides give for [`PeerGuard`].
+pub(super) const PAIRED_ELSEWHERE: &str = "This device is already paired with another vault here";
+
 /// URL scheme + path prefix for shareable pairing links.
 pub(super) const PAIRING_LINK_PREFIX: &str = "oryxis://pair/";
 
@@ -57,6 +90,7 @@ pub(super) async fn run_pairing_as_joiner(
     transport: &mut transport::SessionTransport,
     identity: &DeviceIdentity,
     vault: &Arc<std::sync::Mutex<VaultStore>>,
+    guard: &PeerGuard,
     listen_port: u16,
     code: &str,
     peer_endpoint: Option<(std::net::IpAddr, u16)>,
@@ -117,6 +151,12 @@ pub(super) async fn run_pairing_as_joiner(
             }
             _ => return Err(SyncError::Protocol("Expected PairingAccepted".into())),
         };
+    // The host is another vault's peer here already: stored here too,
+    // its sessions would have two vaults to go to.
+    if guard.paired_elsewhere(&device_id) {
+        let _ = transport.send(&SyncMessage::Bye).await;
+        return Err(SyncError::PairingFailed(PAIRED_ELSEWHERE.into()));
+    }
     let device_name = sanitize_device_name(&device_name, &device_id);
     let host_x25519_pub: [u8; 32] = host_x25519_pub
         .as_slice()
@@ -192,6 +232,7 @@ pub(super) async fn handle_pairing_request(
     vault: &Arc<std::sync::Mutex<VaultStore>>,
     identity: &DeviceIdentity,
     hosting_pairing: &Arc<std::sync::Mutex<Option<HostingPairing>>>,
+    guard: &PeerGuard,
     event_tx: &mpsc::UnboundedSender<SyncEvent>,
     device_id: Uuid,
     device_name: String,
@@ -249,6 +290,13 @@ pub(super) async fn handle_pairing_request(
         let over = record_pairing_failure(hosting_pairing, &source);
         let reason = if over { "Rate limited" } else { "Wrong pairing code" };
         return reject_pairing(transport, reason).await;
+    }
+
+    // The joiner is another vault's peer here already (see `PeerGuard`).
+    // Refused without consuming the code: the user picked the wrong
+    // vault to pair into, and may host again from the right one.
+    if guard.paired_elsewhere(&device_id) {
+        return reject_pairing(transport, PAIRED_ELSEWHERE).await;
     }
 
     // Code matches. Challenge the joiner with a fresh nonce so an

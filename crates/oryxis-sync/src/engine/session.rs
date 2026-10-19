@@ -30,14 +30,32 @@ use super::manifest::{
 };
 use super::{pairing, HostingPairing, SyncEvent};
 
-/// Handle an incoming QUIC connection.
-pub(super) async fn handle_incoming(
-    incoming: quinn::Incoming,
-    vault: Arc<std::sync::Mutex<VaultStore>>,
-    identity: DeviceIdentity,
-    event_tx: mpsc::UnboundedSender<SyncEvent>,
-    hosting_pairing: Arc<std::sync::Mutex<Option<HostingPairing>>>,
-) -> Result<(), SyncError> {
+/// The local side an incoming session is served by: one vault's engine
+/// (its vault, its identity, its event sink, its hosted pairing code).
+/// An engine with its own listener has one; the device's shared
+/// listener (`listener`) holds one per attached engine and picks.
+#[derive(Clone)]
+pub(super) struct Route {
+    pub(super) vault: Arc<std::sync::Mutex<VaultStore>>,
+    pub(super) identity: DeviceIdentity,
+    pub(super) event_tx: mpsc::UnboundedSender<SyncEvent>,
+    pub(super) hosting_pairing: Arc<std::sync::Mutex<Option<HostingPairing>>>,
+    pub(super) guard: pairing::PeerGuard,
+}
+
+/// A connection accepted and its first message read, not served yet:
+/// the first message is what says which route serves it.
+pub(super) struct Accepted {
+    connection: quinn::Connection,
+    exporter: [u8; crypto::SESSION_EXPORTER_LEN],
+    send: quinn::SendStream,
+    recv: quinn::RecvStream,
+    pub(super) first: SyncMessage,
+}
+
+/// Accept an incoming QUIC connection and read its first message
+/// (a `Hello` or a `PairingRequest`).
+pub(super) async fn accept_first(incoming: quinn::Incoming) -> Result<Accepted, SyncError> {
     let connection = incoming
         .await
         .map_err(|e| SyncError::Transport(format!("Accept: {}", e)))?;
@@ -48,7 +66,7 @@ pub(super) async fn handle_incoming(
     // derive different exporters.
     let exporter = derive_session_exporter(&connection)?;
 
-    let (mut send, mut recv) = connection
+    let (send, mut recv) = connection
         .accept_bi()
         .await
         .map_err(|e| SyncError::Transport(format!("Accept stream: {}", e)))?;
@@ -57,12 +75,26 @@ pub(super) async fn handle_incoming(
     // identity is verified only AFTER this read returns, so cap the
     // declared frame length tight to keep a hostile dialer from
     // forcing a 16 MiB allocation per connection.
-    let msg = transport::recv_message_capped(
+    let first = transport::recv_message_capped(
         &mut recv,
         transport::MAX_PREAUTH_MESSAGE_BYTES,
     )
     .await?;
-    let (peer_id, peer_auth_sig) = match msg {
+    Ok(Accepted { connection, exporter, send, recv, first })
+}
+
+/// Handle an incoming QUIC connection on an engine's own listener.
+pub(super) async fn handle_incoming(incoming: quinn::Incoming, route: Route) -> Result<(), SyncError> {
+    let accepted = accept_first(incoming).await?;
+    serve_accepted(accepted, &route).await
+}
+
+/// Serve an accepted connection as `route`'s vault: a pairing, or an
+/// authenticated sync session.
+pub(super) async fn serve_accepted(accepted: Accepted, route: &Route) -> Result<(), SyncError> {
+    let Accepted { connection, exporter, mut send, recv, first } = accepted;
+    let Route { vault, identity, event_tx, hosting_pairing, guard } = route;
+    let (peer_id, peer_auth_sig) = match first {
         SyncMessage::Hello {
             device_id,
             protocol_version,
@@ -98,10 +130,11 @@ pub(super) async fn handle_incoming(
             let mut transport = transport::SessionTransport::Quic { send, recv };
             return pairing::handle_pairing_request(
                 &mut transport,
-                &vault,
-                &identity,
-                &hosting_pairing,
-                &event_tx,
+                vault,
+                identity,
+                hosting_pairing,
+                guard,
+                event_tx,
                 device_id,
                 device_name,
                 public_key,
@@ -118,7 +151,7 @@ pub(super) async fn handle_incoming(
     // channel-bound signature BEFORE doing anything else with the peer.
     // Unknown / inactive peers fall through to the "Bye" path below
     // without a verify attempt, so we never leak verify timing.
-    let peer_pubkey = active_peer_pubkey(&vault, &peer_id)?;
+    let peer_pubkey = active_peer_pubkey(vault, &peer_id)?;
 
     let Some(peer_pubkey) = peer_pubkey else {
         tracing::warn!("Unknown peer {} tried to connect", peer_id);
@@ -148,7 +181,7 @@ pub(super) async fn handle_incoming(
     let _ = event_tx.send(SyncEvent::SyncStarted { peer_id });
 
     let mut transport = transport::SessionTransport::Quic { send, recv };
-    match handle_sync_session(&mut transport, &vault, &peer_id, None).await {
+    match handle_sync_session(&mut transport, vault, &peer_id, None).await {
         Ok((pushed, pulled)) => {
             let _ = event_tx.send(SyncEvent::SyncCompleted { peer_id, pushed, pulled });
         }

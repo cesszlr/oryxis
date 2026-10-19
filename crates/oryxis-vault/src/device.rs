@@ -784,6 +784,25 @@ pub fn read_host_address(path: &Path, id: Uuid) -> Option<(String, u16)> {
     probe().ok()
 }
 
+/// Whether the vault file at `path` has an ACTIVE sync peer `peer_id`,
+/// read-only and without its password (the id column is plaintext): a
+/// remote identity pairs with one vault per device.
+pub fn file_holds_sync_peer(path: &Path, peer_id: Uuid) -> bool {
+    let probe = || -> rusqlite::Result<bool> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sync_peers WHERE peer_id = ?1 AND is_active = 1)",
+            [peer_id.to_string()],
+            |row| row.get(0),
+        )
+    };
+    path.is_file() && probe().unwrap_or(false)
+}
+
 /// The device keys of a vault file's `settings` table, read-only.
 fn read_device_rows(path: &Path) -> rusqlite::Result<Vec<(String, String)>> {
     let db = rusqlite::Connection::open_with_flags(

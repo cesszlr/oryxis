@@ -18,10 +18,75 @@ use iced::Task;
 use tokio::sync::mpsc;
 
 use oryxis_sync::crypto::DeviceIdentity;
-use oryxis_sync::{SyncConfig, SyncEngine, SyncError, SyncEvent, SyncHandle, SyncMode};
+use oryxis_sync::{PeerGuard, SyncConfig, SyncEngine, SyncError, SyncEvent, SyncHandle, SyncListener, SyncMode};
 use oryxis_vault::VaultStore;
 
 use crate::app::{SyncMessage, Message, Oryxis};
+
+/// The device's one sync listener, shared by every open vault's engine
+/// (`oryxis_sync::SyncListener`): the first engine to start binds it,
+/// the others attach, and it closes with the last of them (only the
+/// engines hold it). One per process, which is one per device as far
+/// as the port goes.
+static SYNC_LISTENER: Mutex<std::sync::Weak<SyncListener>> = Mutex::new(std::sync::Weak::new());
+
+/// The device setting the listener's automatic port is remembered in.
+const AUTO_PORT_SETTING: &str = "sync_listen_port_auto";
+
+/// The live shared listener, or a new one on `port` (0 = automatic,
+/// the remembered one first). A live listener on another port than a
+/// newly configured one is kept: the change applies once every vault's
+/// engine has restarted (the next start), as a port change always did.
+fn shared_listener(port: u16, vault: &Arc<Mutex<VaultStore>>) -> Result<Arc<SyncListener>, SyncError> {
+    let mut slot = SYNC_LISTENER.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(listener) = slot.upgrade() {
+        if port != 0 && listener.port() != port {
+            tracing::warn!(
+                "sync: the listener stays on port {} until every vault's sync restarts (configured {port})",
+                listener.port()
+            );
+        }
+        return Ok(listener);
+    }
+    let remembered = if port == 0 {
+        vault
+            .lock()
+            .ok()
+            .and_then(|v| v.get_setting(AUTO_PORT_SETTING).ok().flatten())
+            .and_then(|raw| raw.parse::<u16>().ok())
+    } else {
+        None
+    };
+    let listener = SyncListener::bind(port, remembered)?;
+    if port == 0
+        && let Ok(v) = vault.lock()
+        && let Err(e) = v.set_setting(AUTO_PORT_SETTING, &listener.port().to_string())
+    {
+        tracing::warn!("sync: could not remember the listen port: {e}");
+    }
+    *slot = Arc::downgrade(&listener);
+    Ok(listener)
+}
+
+/// Refuses pairing a remote identity another registered vault of this
+/// device already paired (read from its file, open or not), so the
+/// shared listener has one vault to route that peer to.
+fn peer_guard(own_db: std::path::PathBuf) -> PeerGuard {
+    PeerGuard::new(move |peer_id| {
+        let Some(device) = oryxis_vault::device::installed() else {
+            return false;
+        };
+        let same = |a: &std::path::Path, b: &std::path::Path| {
+            std::fs::canonicalize(a).ok().zip(std::fs::canonicalize(b).ok()).is_some_and(|(a, b)| a == b) || a == b
+        };
+        device
+            .vaults()
+            .iter()
+            .map(|v| device.resolve(v))
+            .filter(|path| !same(path, &own_db))
+            .any(|path| oryxis_vault::device::file_holds_sync_peer(&path, *peer_id))
+    })
+}
 
 /// Live sync engine owned by `Oryxis` while sync is enabled.
 pub(crate) struct SyncRuntime {
@@ -57,6 +122,7 @@ impl SyncRuntime {
         db_path: std::path::PathBuf,
         master_password: Option<String>,
     ) -> Result<(Self, mpsc::UnboundedReceiver<SyncEvent>), SyncError> {
+        let guard = peer_guard(db_path.clone());
         // Dedicated handle on the same SQLite file as the app's vault.
         let (vault, identity) = tokio::task::spawn_blocking(move || {
             let mut vault = VaultStore::open(&db_path)
@@ -76,7 +142,12 @@ impl SyncRuntime {
         .await
         .map_err(|e| SyncError::Vault(format!("join: {e}")))??;
 
-        let mut engine = SyncEngine::new(config, identity, vault);
+        // One listener for every vault on this device: this engine
+        // attaches to it rather than binding a port of its own.
+        let listener = shared_listener(config.listen_port, &vault)?;
+        let mut engine = SyncEngine::new(config, identity, vault)
+            .with_listener(listener)
+            .with_peer_guard(guard);
         let event_rx = engine
             .take_events()
             .expect("a freshly created engine always has its event receiver");
