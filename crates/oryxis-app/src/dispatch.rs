@@ -45,10 +45,14 @@ impl Oryxis {
     /// Run one message. Every follow-up its task yields runs on the vault
     /// this update worked on (`Message::on_vault`), the way a window's
     /// follow-ups run in that window: a window switched to another vault
-    /// meanwhile must not receive the first vault's results.
+    /// meanwhile must not receive the first vault's results. The vault is
+    /// read when the update ENDS: a switch of the window starts work for
+    /// the vault it switched to (its first load), never for the one it
+    /// left.
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let task = self.update_here(message);
         let vault = self.vaults.current_id();
-        self.update_here(message).map(move |m| m.on_vault(vault))
+        task.map(move |m| m.on_vault(vault))
     }
 
     fn update_here(&mut self, message: Message) -> Task<Message> {

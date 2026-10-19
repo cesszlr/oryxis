@@ -68,6 +68,9 @@ impl Oryxis {
                 return Task::batch([leave, enter]);
             }
             NavigationMessage::ChangeView(view) => {
+                if view == View::Settings {
+                    self.refresh_vault_presence();
+                }
                 // A gated surface is not reachable while its feature is
                 // off, whatever asked. The menu entry is already hidden;
                 // this is the guard for everything else that can send a

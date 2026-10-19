@@ -14,14 +14,32 @@ pub enum MultiVaultMessage {
     SwitchToVault(Uuid),
     /// A new window working on vault `id`.
     OpenVaultInNewWindow(Uuid),
-    /// "New vault…": the dialog opens.
+    /// "New vault…": the dialog opens in its create mode.
     ShowNewVault,
-    NewVaultNameChanged(String),
+    /// Settings > Vaults: rename vault `id`.
+    ShowRenameVault(Uuid),
+    /// Settings > Vaults: delete vault `id` (its name typed back; the
+    /// vault open and unlocked).
+    ShowDeleteVault(Uuid),
+    VaultDialogNameChanged(String),
     NewVaultCopyFromChanged(Option<Uuid>),
-    /// Create the vault the dialog describes, and switch this window to
-    /// it (its setup screen asks for the master password).
-    CreateVault,
-    CancelNewVault,
+    /// Do what the dialog's mode says: create (and switch this window to
+    /// the new vault), rename, or delete.
+    VaultDialogSubmit,
+    CancelVaultDialog,
+    /// Settings > Vaults: take vault `id` off this device's list (asks
+    /// first); its file is left where it is.
+    RemoveVaultFromList(Uuid),
+    RemoveVaultFromListConfirmed(Uuid),
+    /// Settings > Vaults "Open existing vault…": pick a vault file kept
+    /// elsewhere (a USB key, a synced folder) and register it.
+    OpenExistingVault,
+    ExistingVaultPicked(Option<std::path::PathBuf>),
+    /// Settings > Vaults: lock vault `id`, whichever vault this window is on.
+    LockVaultById(Uuid),
+    /// Settings > Vaults: hide the switcher while this device has a
+    /// single vault.
+    VaultSwitcherHideSingleToggled(bool),
     /// The setup step of a vault just made was abandoned: back to the
     /// vault it was made from, and the empty new one goes away.
     CancelVaultSetup,

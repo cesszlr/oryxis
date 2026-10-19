@@ -157,6 +157,13 @@ pub struct VaultEntry {
 }
 
 impl VaultEntry {
+    /// Whether the file lives outside the `.oryxis` folder (opened from
+    /// where the user keeps it, never made by this install): such a vault
+    /// may be taken off the list with its file left alone.
+    pub fn is_outside(&self) -> bool {
+        self.path.is_absolute()
+    }
+
     /// The entry for the install's `vault.db`.
     pub fn first() -> Self {
         Self {
@@ -371,11 +378,18 @@ impl DeviceStore {
     }
 
     /// The vault a start opens: the last one opened while it is still
-    /// registered, else the first.
+    /// registered and its file is there, else the first in the list whose
+    /// file is there, else the first in the list (a fresh install: its
+    /// first vault is made by this open). A vault whose file went away (a
+    /// USB key) is never opened at a start: the open would make an empty
+    /// vault in its place.
     pub fn boot_vault(&self) -> VaultEntry {
+        let present = |v: &VaultEntry| self.resolve(v).is_file();
         self.with_current(|f| {
             f.last_vault
                 .and_then(|id| f.vaults.iter().find(|v| v.id == id))
+                .filter(|v| present(v))
+                .or_else(|| f.vaults.iter().find(|v| present(v)))
                 .or_else(|| f.vaults.first())
                 .cloned()
                 .unwrap_or_else(VaultEntry::first)
@@ -412,6 +426,34 @@ impl DeviceStore {
             created = Some(entry);
         })?;
         Ok(created.expect("set by the update"))
+    }
+
+    /// Register the vault file at `path` (where the user keeps it), called
+    /// `label`. Stored absolute, as given: the canonical form is only how
+    /// two spellings of one file are told apart (on Windows it is a
+    /// `\\?\` path no one should see). A file already registered is not
+    /// registered twice: answers that entry and `false`.
+    pub fn register_existing(&self, path: &Path, label: &str) -> Result<(VaultEntry, bool), DeviceError> {
+        let canonical = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let wanted = canonical(path);
+        let mut out = None;
+        self.update(|f| {
+            if let Some(known) = f.vaults.iter().find(|v| canonical(&self.resolve(v)) == wanted) {
+                out = Some((known.clone(), false));
+                return;
+            }
+            let taken: Vec<&str> = f.vaults.iter().map(|v| v.slug.as_str()).collect();
+            let entry = VaultEntry {
+                id: Uuid::new_v4(),
+                slug: slug_for(label, &taken),
+                label: Some(label.trim().to_owned()).filter(|l| !l.is_empty()),
+                path: std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf()),
+                extra: serde_json::Map::new(),
+            };
+            f.vaults.push(entry.clone());
+            out = Some((entry, true));
+        })?;
+        Ok(out.expect("set by the update"))
     }
 
     /// Remember `id` as the vault a start opens.
@@ -613,6 +655,25 @@ fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut out = options.open(path)?;
     out.write_all(bytes)?;
     out.sync_all()
+}
+
+/// Whether `path` is an Oryxis vault with a master password set, read
+/// without writing anything (no schema step: a file that is something
+/// else must come out of the check unchanged).
+pub fn is_vault_file(path: &Path) -> bool {
+    let probe = || -> rusqlite::Result<bool> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM vault_meta WHERE key = 'password_check')",
+            [],
+            |row| row.get(0),
+        )
+    };
+    path.is_file() && probe().unwrap_or(false)
 }
 
 /// The device keys of a vault file's `settings` table, read-only.

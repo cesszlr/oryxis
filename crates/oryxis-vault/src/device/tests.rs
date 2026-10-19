@@ -109,10 +109,13 @@ fn a_registry_emptied_by_hand_gets_its_first_vault_back() {
 fn the_boot_vault_is_the_last_opened_while_it_is_registered() {
     let dir = tempfile::tempdir().unwrap();
     let other = Uuid::new_v4();
+    let usb = tempfile::tempdir().unwrap();
+    let work_file = usb.path().join("work.db");
+    std::fs::write(&work_file, b"").unwrap();
     let json = serde_json::json!({
         "vaults": [
             {"id": FIRST_VAULT_ID, "slug": "personal", "path": "vault.db"},
-            {"id": other, "slug": "work", "label": "Work", "path": "/media/usb/work.db"},
+            {"id": other, "slug": "work", "label": "Work", "path": work_file},
         ],
         "last_vault": other,
     });
@@ -120,7 +123,7 @@ fn the_boot_vault_is_the_last_opened_while_it_is_registered() {
     let store = store_in(dir.path());
     let boot = store.boot_vault();
     assert_eq!(boot.id, other);
-    assert_eq!(store.resolve(&boot), PathBuf::from("/media/usb/work.db"));
+    assert_eq!(store.resolve(&boot), work_file);
     // A last vault that is no longer registered falls back to the first.
     let json = serde_json::json!({
         "vaults": [{"id": FIRST_VAULT_ID, "slug": "personal", "path": "vault.db"}],
@@ -290,6 +293,8 @@ fn the_last_opened_vault_is_where_a_start_lands() {
     let dir = tempfile::tempdir().unwrap();
     let store = store_in(dir.path());
     let work = store.create_entry("Work").unwrap();
+    std::fs::create_dir_all(dir.path().join(VAULTS_DIR)).unwrap();
+    std::fs::write(store.resolve(&work), b"").unwrap();
     store.set_last_vault(work.id).unwrap();
     assert_eq!(store_in(dir.path()).boot_vault().id, work.id);
 }
@@ -308,4 +313,69 @@ fn renaming_and_unregistering_keep_one_vault_at_least() {
     assert_eq!(store.boot_vault().id, FIRST_VAULT_ID, "the last-opened pointer goes with it");
     assert!(!store.unregister(FIRST_VAULT_ID).unwrap(), "the only vault left stays");
     assert_eq!(store.vaults().len(), 1);
+}
+
+#[test]
+fn an_existing_file_is_registered_once_where_it_is() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let file = elsewhere.path().join("usb.db");
+    std::fs::write(&file, b"").unwrap();
+    let store = store_in(dir.path());
+    let (usb, new) = store.register_existing(&file, "USB").unwrap();
+    assert!(new);
+    assert!(usb.is_outside(), "kept where the user has it");
+    assert_eq!(usb.slug, "usb");
+    assert_eq!(std::fs::canonicalize(store.resolve(&usb)).unwrap(), std::fs::canonicalize(&file).unwrap());
+    // The same file by another spelling is the same vault.
+    let again = elsewhere.path().join(".").join("usb.db");
+    let (same, new) = store.register_existing(&again, "Other").unwrap();
+    assert!(!new);
+    assert_eq!(same.id, usb.id);
+    assert_eq!(store.vaults().len(), 2);
+    // The install's own vaults are not outside.
+    assert!(!VaultEntry::first().is_outside());
+    assert!(!store.create_entry("Work").unwrap().is_outside());
+}
+
+#[test]
+fn only_a_set_up_vault_passes_the_file_check_and_the_check_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing.db");
+    assert!(!is_vault_file(&missing));
+    assert!(!missing.exists(), "the check never creates the file");
+    let junk = dir.path().join("junk.db");
+    std::fs::write(&junk, b"not a database at all").unwrap();
+    assert!(!is_vault_file(&junk));
+    assert_eq!(std::fs::read(&junk).unwrap(), b"not a database at all");
+    let path = dir.path().join("v.db");
+    let mut vault = VaultStore::open(&path).unwrap();
+    assert!(!is_vault_file(&path), "a vault with no master password yet holds nothing to open");
+    vault.set_master_password("pw").unwrap();
+    drop(vault);
+    assert!(is_vault_file(&path));
+}
+
+#[test]
+fn a_start_never_opens_a_vault_whose_file_went_away() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    // A fresh install: nothing on disk, the first vault is what opens.
+    assert_eq!(store.boot_vault().id, FIRST_VAULT_ID);
+    let usb = tempfile::tempdir().unwrap();
+    let file = usb.path().join("usb.db");
+    std::fs::write(&file, b"").unwrap();
+    let (usb_vault, _) = store.register_existing(&file, "USB").unwrap();
+    store.set_last_vault(usb_vault.id).unwrap();
+    assert_eq!(store.boot_vault().id, usb_vault.id, "the last vault, while its file is there");
+    std::fs::remove_file(&file).unwrap();
+    // The key was pulled: the start goes to a vault that is there, here
+    // the first one (still unmade: the first in the list).
+    assert_eq!(store.boot_vault().id, FIRST_VAULT_ID);
+    std::fs::write(dir.path().join(FIRST_VAULT_FILE), b"").unwrap();
+    let work = store.create_entry("Work").unwrap();
+    std::fs::create_dir_all(dir.path().join(VAULTS_DIR)).unwrap();
+    std::fs::write(store.resolve(&work), b"").unwrap();
+    std::fs::remove_file(dir.path().join(FIRST_VAULT_FILE)).unwrap();
+    assert_eq!(store.boot_vault().id, work.id, "the first one whose file is there");
 }

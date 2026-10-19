@@ -280,6 +280,14 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     e(S::Agent, "agent_allow_add", "ssh agent accept add keys external apps keepassxc"),
     e(S::Agent, "agent_server_copy_path", "ssh agent socket path copy pipe"),
     e(S::Agent, "agent_server_snippet_ssh_config", "ssh agent identityagent config snippet"),
+    // ── Vaults ─────────────────────────────────────────────────────
+    e(S::Vaults, "vault_new", "vault new create add another vault profile workspace"),
+    e(S::Vaults, "vault_open_existing", "vault open existing file usb add register import database"),
+    e(
+        S::Vaults,
+        "vault_switcher_hide_single",
+        "vault switcher chip hide single one toolbar",
+    ),
     // ── Advanced ───────────────────────────────────────────────────
     e(
         S::Advanced,

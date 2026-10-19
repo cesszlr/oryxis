@@ -87,6 +87,9 @@ impl Oryxis {
                 }
             }
             SettingsMessage::ChangeSettingsSection(section) => {
+                if section == crate::state::SettingsSection::Vaults {
+                    self.refresh_vault_presence();
+                }
                 // A secret revealed on the MCP panel is masked again on
                 // any section change: the reveal is for the moment of
                 // copying it, not a state the panel keeps while the user

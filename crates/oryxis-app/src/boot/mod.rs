@@ -404,7 +404,8 @@ impl Oryxis {
                 hybrid_sftp_owner: None,
                 nav: crate::window_ctx::WindowNav::default(),
                 parked_views: crate::window_ctx::ParkedViews::new(),
-                new_vault: None,
+                vault_dialog: None,
+                vault_presence: std::collections::HashMap::new(),
                 vault_chip_bounds: crate::widgets::new_bounds_cell(),
                 vault_badge_bounds: crate::widgets::new_bounds_cell(),
                 tab_order: Vec::new(),
@@ -592,6 +593,7 @@ impl Oryxis {
         );
 
         // If auto-unlocked (no user password), load data immediately
+        app.refresh_vault_presence();
         if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
             app.load_data_from_vault();
         }

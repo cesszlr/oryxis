@@ -163,7 +163,7 @@ impl Oryxis {
                     | Modal::SyncHostPicker
                     // The "New vault" form: its name field, the settings
                     // picker, Create (the default row) and Cancel.
-                    | Modal::NewVault
+                    | Modal::VaultDialog
                     // The host editor's terminal theme picker: its filter,
                     // tone chips, cards and Close are recorded in display
                     // order, Enter picks the ringed card, and the filter
@@ -231,7 +231,7 @@ impl Oryxis {
                     // The theme picker's filter field.
                     | Modal::ThemePicker
                     // The vault's name field.
-                    | Modal::NewVault
+                    | Modal::VaultDialog
             )
         )
     }

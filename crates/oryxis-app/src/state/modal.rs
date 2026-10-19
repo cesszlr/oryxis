@@ -159,10 +159,11 @@ pub(crate) enum Modal {
     /// two never coexist). A search field plus rows, so it blocks
     /// input; Esc closes whichever is up.
     SyncHostPicker,
-    /// The "New vault" dialog (`new_vault`): a name and the vault whose
-    /// settings it starts with. A form with a text field, so it blocks
-    /// input; Esc cancels (nothing exists until Create).
-    NewVault,
+    /// The vault dialog (`vault_dialog`): create (a name and the vault
+    /// whose settings it starts with), rename, or delete (the name typed
+    /// back and the master password). A form with text fields, so it
+    /// blocks input; Esc cancels, which changes nothing.
+    VaultDialog,
 }
 
 impl Modal {
@@ -213,7 +214,7 @@ impl Modal {
         Modal::UpdateOffer,
         Modal::RelayDeployConfirm,
         Modal::SyncHostPicker,
-        Modal::NewVault,
+        Modal::VaultDialog,
     ];
 
     /// Modals Esc dismisses, in topmost-first priority order (the order
@@ -237,7 +238,7 @@ impl Modal {
         Modal::CarefulPaste,
         Modal::SnippetVars,
         // Esc = create nothing.
-        Modal::NewVault,
+        Modal::VaultDialog,
         // A security prompt: Esc rejects the host key (safe default).
         Modal::HostKey,
         // Sibling security prompt: Esc refuses to run the command proxy
@@ -353,7 +354,7 @@ impl Modal {
             | Modal::UpdateOffer
             | Modal::RelayDeployConfirm
             | Modal::SyncHostPicker
-            | Modal::NewVault => true,
+            | Modal::VaultDialog => true,
         }
     }
 }
@@ -412,7 +413,7 @@ mod tests {
                 | Modal::UpdateOffer
                 | Modal::RelayDeployConfirm
                 | Modal::SyncHostPicker
-                | Modal::NewVault => {}
+                | Modal::VaultDialog => {}
             }
         }
         assert_eq!(Modal::ALL.len(), 45, "add the new variant to Modal::ALL");

@@ -40,6 +40,7 @@ mod sftp;
 mod shortcuts;
 mod sync;
 mod terminal;
+mod vaults;
 
 // `host_badge` is shared with the section submodules through the
 // `use super::*` glob (the Sync section renders it in its host picker
@@ -266,6 +267,7 @@ impl Oryxis {
             SettingsSection::Shortcuts => self.view_settings_shortcuts(),
 
             SettingsSection::Security => self.view_settings_security(),
+            SettingsSection::Vaults => self.view_settings_vaults(),
 
             SettingsSection::Sync => self.view_settings_sync(),
 

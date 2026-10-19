@@ -582,8 +582,15 @@ impl Oryxis {
     /// whatever window's values are in the fields, and keep its follow-ups
     /// on that vault. A vault that is not open runs the message as is.
     pub(crate) fn update_on_vault(&mut self, vault: Uuid, message: Message) -> Task<Message> {
-        if self.vaults.current_id() == vault || !self.vaults.is_open(vault) {
+        if self.vaults.current_id() == vault {
             return self.update(message);
+        }
+        // A follow-up of a vault closed since (removed from the list,
+        // deleted, its setup cancelled) belongs to nothing that is left;
+        // run on another vault, it would write into that vault.
+        if !self.vaults.is_open(vault) {
+            tracing::warn!(%vault, "dropped a follow-up of a closed vault");
+            return Task::none();
         }
         let previous = self.vaults.act_on(vault);
         // `update` keeps the follow-ups on `vault`.
@@ -935,8 +942,6 @@ impl Oryxis {
         1 + self.extra_windows.len() + usize::from(self.window_ctx.is_some())
     }
 
-    /// Every window but the current one (`None` is the resident), in a
-    /// stable order.
     /// The vault window `target` works on (`None` = the resident one),
     /// whichever window's values are in the fields.
     pub(crate) fn vault_of_window(&self, target: Option<window::Id>) -> Uuid {
@@ -973,6 +978,35 @@ impl Oryxis {
             })
     }
 
+    /// Every window working on vault `vault` (`None` = the resident one).
+    pub(crate) fn windows_on_vault(&self, vault: Uuid) -> Vec<Option<window::Id>> {
+        let mut out: Vec<Option<window::Id>> = Vec::new();
+        if self.vault_of_window(None) == vault {
+            out.push(None);
+        }
+        if let Some(ctx) = &self.window_ctx
+            && self.vaults.window_id() == vault
+        {
+            out.push(Some(ctx.id));
+        }
+        out.extend(self.extra_windows.iter().filter(|(_, w)| w.vault == vault).map(|(id, _)| Some(*id)));
+        out
+    }
+
+    /// Forget every view of vault `vault` a window parked (the vault is
+    /// going away; its tabs already ended).
+    pub(crate) fn drop_parked_views_of(&mut self, vault: Uuid) {
+        self.parked_views.remove(&vault);
+        if let Some(ctx) = self.window_ctx.as_mut() {
+            ctx.parked.remove(&vault);
+        }
+        for w in self.extra_windows.values_mut() {
+            w.parked.remove(&vault);
+        }
+    }
+
+    /// Every window but the current one (`None` is the resident), in a
+    /// stable order.
     pub(crate) fn other_windows(&self) -> Vec<Option<window::Id>> {
         let current = self.cur_window();
         let mut out = Vec::new();

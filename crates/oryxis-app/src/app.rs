@@ -652,8 +652,14 @@ pub struct Oryxis {
     /// What the window in the fields keeps of the vaults it is not working
     /// on (see `window_ctx::ParkedView`); swapped like `nav`.
     pub(crate) parked_views: crate::window_ctx::ParkedViews,
-    /// The "New vault" dialog, while it is up (`Modal::NewVault`).
-    pub(crate) new_vault: Option<crate::state::NewVaultForm>,
+    /// The vault dialog (create / rename / delete), while it is up
+    /// (`Modal::VaultDialog`).
+    pub(crate) vault_dialog: Option<crate::state::VaultDialog>,
+    /// Whether each registered vault's file is there, as last checked
+    /// (`refresh_vault_presence`: a door opening, a window taking the
+    /// focus, a registry change). Views read this, never the disk: a
+    /// vault on a network share can take seconds to answer a stat.
+    pub(crate) vault_presence: std::collections::HashMap<uuid::Uuid, bool>,
     /// The vault switcher chip on the toolbar and the badge on the nav
     /// rail, as last drawn: the switcher menu opens under the one pressed.
     pub(crate) vault_chip_bounds: crate::widgets::BoundsCell,

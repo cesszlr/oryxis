@@ -190,6 +190,7 @@ impl Oryxis {
             (t("connection"), S::Connection),
             (t("shortcuts"), S::Shortcuts),
             (t("security_privacy"), S::Security),
+            (t("vaults"), S::Vaults),
             (t("features_and_plugins"), S::Plugins),
         ];
         if self.vaults.cur().ai.enabled {

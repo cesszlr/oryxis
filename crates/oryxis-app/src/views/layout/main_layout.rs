@@ -450,12 +450,12 @@ impl Oryxis {
         }
 
         // The "New vault" dialog, raised from the switcher menu.
-        if let Some(form) = &self.new_vault {
+        if let Some(form) = &self.vault_dialog {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
-                    self.build_new_vault_dialog(form),
-                    Some(Message::MultiVault(crate::app::MultiVaultMessage::CancelNewVault)),
+                    self.build_vault_dialog(form),
+                    Some(Message::MultiVault(crate::app::MultiVaultMessage::CancelVaultDialog)),
                     0.0,
                 ),
                 resize_overlay,

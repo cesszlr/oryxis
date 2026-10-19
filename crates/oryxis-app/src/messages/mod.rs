@@ -406,12 +406,39 @@ impl Message {
     /// window it reaches works on by then. Inside an `InWindow` (the
     /// window swap comes first, then the vault), and left alone when it
     /// already names its own route.
+    ///
+    /// A reply about a WINDOW (its place, its size, its state, its close)
+    /// is not a vault's: it runs on whatever vault the window is on when
+    /// it arrives, so it never goes stale with a vault closed meanwhile.
     pub(crate) fn on_vault(self, vault: Uuid) -> Message {
         match self {
             Message::InWindow(window, inner) => Message::InWindow(window, Box::new(inner.on_vault(vault))),
             m @ (Message::ForVault(..) | Message::ForPane(..) | Message::NoOp) => m,
+            m if m.is_about_a_window() => m,
             other => Message::ForVault(vault, Box::new(other)),
         }
+    }
+
+    /// The replies about a window itself (see [`Self::on_vault`]).
+    fn is_about_a_window(&self) -> bool {
+        matches!(
+            self,
+            Message::Tabs(
+                TabsMessage::WindowResized(_)
+                    | TabsMessage::WindowMoved(_)
+                    | TabsMessage::WindowEnsureOnScreen
+                    | TabsMessage::WindowFocusChanged(_)
+                    | TabsMessage::WindowStateSynced { .. }
+                    | TabsMessage::WindowFullscreenSettled(_)
+                    | TabsMessage::WindowClose
+                    | TabsMessage::ConfirmCloseWindow { .. }
+                    | TabsMessage::FullscreenHintHide
+                    | TabsMessage::DetachTabAt(..)
+                    | TabsMessage::ToplevelDragStarted { .. }
+                    | TabsMessage::CarryHovered(_)
+                    | TabsMessage::CarryReleased
+            )
+        )
     }
 
     /// For an SFTP async-continuation message that targets a specific tab,

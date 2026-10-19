@@ -11,7 +11,7 @@ use iced::Task;
 use uuid::Uuid;
 
 use crate::app::{Message, MultiVaultMessage, Oryxis, VaultMessage};
-use crate::state::{NewVaultForm, OverlayContent, OverlayState, VaultState};
+use crate::state::{OverlayContent, OverlayState, VaultDialog, VaultDialogMode, VaultState};
 use crate::vault_slots::OpenVault;
 use oryxis_vault::device::VaultEntry;
 use oryxis_vault::VaultStore;
@@ -59,6 +59,13 @@ pub(crate) fn copies_to_new_vault(key: &str) -> bool {
 
 impl Oryxis {
     pub(crate) fn handle_multi_vault(&mut self, message: MultiVaultMessage) -> Task<Message> {
+        let task = self.handle_multi_vault_inner(message);
+        // Every door here may change the list or what is on disk.
+        self.refresh_vault_presence();
+        task
+    }
+
+    fn handle_multi_vault_inner(&mut self, message: MultiVaultMessage) -> Task<Message> {
         match message {
             MultiVaultMessage::ShowVaultSwitcher(place) => {
                 // Under the chip's real rectangle (last drawn), never a
@@ -84,29 +91,90 @@ impl Oryxis {
             MultiVaultMessage::OpenVaultInNewWindow(id) => {
                 self.overlay = None;
                 if !self.ensure_vault_open(id) {
-                    return Task::none();
+                    return self.show_toast(crate::i18n::t("vault_status_missing").to_string());
                 }
                 return self.open_window_on_vault(id);
             }
             MultiVaultMessage::ShowNewVault => {
                 self.overlay = None;
-                self.new_vault = Some(NewVaultForm::default());
-                return crate::widgets::focus_input(iced::widget::Id::new(NEW_VAULT_NAME_INPUT));
+                self.vault_dialog = Some(VaultDialog::create());
+                return crate::widgets::focus_input(iced::widget::Id::new(VAULT_DIALOG_NAME_INPUT));
             }
-            MultiVaultMessage::NewVaultNameChanged(name) => {
-                if let Some(form) = self.new_vault.as_mut() {
+            MultiVaultMessage::ShowRenameVault(id) => {
+                self.vault_dialog = Some(VaultDialog::rename(id, self.vault_name(id)));
+                return crate::widgets::focus_input(iced::widget::Id::new(VAULT_DIALOG_NAME_INPUT));
+            }
+            MultiVaultMessage::ShowDeleteVault(id) => {
+                // The last vault cannot go (a device always has one), and
+                // only an unlocked vault can: its unlock is the proof.
+                if self.vault_count() <= 1 || !self.vault_deletable(id) {
+                    return Task::none();
+                }
+                self.vault_dialog = Some(VaultDialog::delete(id));
+                return crate::widgets::focus_input(iced::widget::Id::new(VAULT_DIALOG_NAME_INPUT));
+            }
+            MultiVaultMessage::VaultDialogNameChanged(name) => {
+                if let Some(form) = self.vault_dialog.as_mut() {
                     form.name = name;
                     form.error = None;
                 }
             }
             MultiVaultMessage::NewVaultCopyFromChanged(source) => {
-                if let Some(form) = self.new_vault.as_mut() {
+                if let Some(form) = self.vault_dialog.as_mut() {
                     form.copy_from = source;
                 }
             }
-            MultiVaultMessage::CreateVault => return self.create_vault(),
+            MultiVaultMessage::VaultDialogSubmit => {
+                let Some(mode) = self.vault_dialog.as_ref().map(|d| d.mode) else {
+                    return Task::none();
+                };
+                return match mode {
+                    VaultDialogMode::Create => self.create_vault(),
+                    VaultDialogMode::Rename(id) => self.rename_vault(id),
+                    VaultDialogMode::Delete(id) => self.delete_vault(id),
+                };
+            }
             MultiVaultMessage::CancelVaultSetup => return self.cancel_vault_setup(),
-            MultiVaultMessage::CancelNewVault => self.new_vault = None,
+            MultiVaultMessage::CancelVaultDialog => self.vault_dialog = None,
+            MultiVaultMessage::RemoveVaultFromList(id) => {
+                self.error_dialog = Some(crate::state::ErrorDialog {
+                    title: crate::i18n::t("vault_remove_title").replacen("{name}", &self.vault_name(id), 1),
+                    body: crate::i18n::t("vault_remove_body").to_string(),
+                    link: None,
+                    action: Some(crate::state::ErrorDialogAction {
+                        label: crate::i18n::t("vault_remove_from_list").to_string(),
+                        message: Box::new(Message::MultiVault(MultiVaultMessage::RemoveVaultFromListConfirmed(id))),
+                        danger: true,
+                    }),
+                });
+            }
+            MultiVaultMessage::RemoveVaultFromListConfirmed(id) => {
+                return self.forget_vault(id, false).unwrap_or_else(|e| self.show_toast(e));
+            }
+            MultiVaultMessage::OpenExistingVault => {
+                return Task::perform(
+                    async {
+                        rfd::AsyncFileDialog::new()
+                            .add_filter(crate::i18n::t("vault_file_filter"), &["db"])
+                            .pick_file()
+                            .await
+                            .map(|h| h.path().to_path_buf())
+                    },
+                    |picked| Message::MultiVault(MultiVaultMessage::ExistingVaultPicked(picked)),
+                );
+            }
+            // A cancelled dialog is silent.
+            MultiVaultMessage::ExistingVaultPicked(None) => {}
+            MultiVaultMessage::ExistingVaultPicked(Some(path)) => return self.open_existing_vault(path),
+            MultiVaultMessage::LockVaultById(id) => {
+                if self.vaults.is_open(id) {
+                    return Task::done(Message::ForVault(id, Box::new(Message::Vault(VaultMessage::LockVault))));
+                }
+            }
+            MultiVaultMessage::VaultSwitcherHideSingleToggled(hide) => {
+                self.device_prefs.vault_switcher_hide_single = hide;
+                self.persist_setting("vault_switcher_hide_single", if hide { "true" } else { "false" });
+            }
             MultiVaultMessage::LockAllVaults => {
                 self.overlay = None;
                 // Locking ends every session of every vault it locks:
@@ -165,6 +233,10 @@ impl Oryxis {
     /// Make sure vault `id` is open in this process, opening its file
     /// from the registry when it is not. `false` when the registry does
     /// not know it.
+    ///
+    /// A vault whose file is gone (a USB key pulled) is UNAVAILABLE and
+    /// is not opened: the open would make an empty vault in its place.
+    /// It comes back by itself once the file is there again.
     pub(crate) fn ensure_vault_open(&mut self, id: Uuid) -> bool {
         if self.vaults.is_open(id) {
             return true;
@@ -172,8 +244,27 @@ impl Oryxis {
         let Some(entry) = self.registered_vaults().into_iter().find(|v| v.id == id) else {
             return false;
         };
+        if self.vault_file(id).is_none() {
+            return false;
+        }
         self.open_vault(&entry);
         true
+    }
+
+    /// Whether vault `id` can be shown: open in this process, or its file
+    /// was there when last checked (`refresh_vault_presence`).
+    pub(crate) fn vault_available(&self, id: Uuid) -> bool {
+        self.vaults.is_open(id) || self.vault_presence.get(&id).copied().unwrap_or(false)
+    }
+
+    /// Check which registered vault files are there, for the views (see
+    /// `vault_presence`).
+    pub(crate) fn refresh_vault_presence(&mut self) {
+        self.vault_presence = self
+            .registered_vaults()
+            .into_iter()
+            .map(|entry| (entry.id, self.vault_file(entry.id).is_some()))
+            .collect();
     }
 
     /// Open `entry`'s file beside the vaults already open: where it
@@ -235,7 +326,7 @@ impl Oryxis {
     /// next start opens it.
     pub(crate) fn switch_this_window_to_vault(&mut self, id: Uuid) -> Task<Message> {
         if !self.ensure_vault_open(id) {
-            return Task::none();
+            return self.show_toast(crate::i18n::t("vault_status_missing").to_string());
         }
         self.switch_window_vault(id);
         if let Some(device) = oryxis_vault::device::installed()
@@ -275,13 +366,13 @@ impl Oryxis {
     /// window moved to it, where its setup screen asks for the master
     /// password (or none).
     fn create_vault(&mut self) -> Task<Message> {
-        let Some(form) = self.new_vault.as_ref() else {
+        let Some(form) = self.vault_dialog.as_ref() else {
             return Task::none();
         };
         let name = form.name.trim().to_string();
         let copy_from = form.copy_from;
         if name.is_empty() {
-            if let Some(form) = self.new_vault.as_mut() {
+            if let Some(form) = self.vault_dialog.as_mut() {
                 form.error = Some(crate::i18n::t("vault_name_required").to_string());
             }
             return Task::none();
@@ -292,7 +383,7 @@ impl Oryxis {
         let entry = match device.create_entry(&name) {
             Ok(entry) => entry,
             Err(e) => {
-                if let Some(form) = self.new_vault.as_mut() {
+                if let Some(form) = self.vault_dialog.as_mut() {
                     form.error = Some(crate::i18n::t("vault_create_failed").replacen("{error}", &e.to_string(), 1));
                 }
                 return Task::none();
@@ -309,7 +400,7 @@ impl Oryxis {
             Err(e) => {
                 // Nothing usable was made: the registry forgets it.
                 let _ = device.unregister(entry.id);
-                if let Some(form) = self.new_vault.as_mut() {
+                if let Some(form) = self.vault_dialog.as_mut() {
                     form.error = Some(crate::i18n::t("vault_create_failed").replacen("{error}", &e.to_string(), 1));
                 }
                 return Task::none();
@@ -319,11 +410,169 @@ impl Oryxis {
             self.copy_settings_into(source, &store);
         }
         drop(store);
-        self.new_vault = None;
+        self.vault_dialog = None;
         let from = self.vaults.window_id();
         let task = self.switch_this_window_to_vault(entry.id);
         self.vaults.cur_mut().created_from = Some(from);
         task
+    }
+
+    /// Rename vault `id` to the dialog's name (blank goes back to the
+    /// default name of an install's first vault).
+    fn rename_vault(&mut self, id: Uuid) -> Task<Message> {
+        let Some(name) = self.vault_dialog.as_ref().map(|d| d.name.trim().to_string()) else {
+            return Task::none();
+        };
+        if name.is_empty() && id != oryxis_vault::device::FIRST_VAULT_ID {
+            if let Some(form) = self.vault_dialog.as_mut() {
+                form.error = Some(crate::i18n::t("vault_name_required").to_string());
+            }
+            return Task::none();
+        }
+        if let Some(device) = oryxis_vault::device::installed()
+            && let Err(e) = device.rename(id, &name)
+        {
+            if let Some(form) = self.vault_dialog.as_mut() {
+                form.error = Some(e.to_string());
+            }
+            return Task::none();
+        }
+        self.vault_dialog = None;
+        Task::none()
+    }
+
+    /// Delete vault `id` for good, once the dialog proved it: the name
+    /// typed back exactly, the vault open and unlocked. Never the last
+    /// vault.
+    fn delete_vault(&mut self, id: Uuid) -> Task<Message> {
+        let Some(typed) = self.vault_dialog.as_ref().map(|d| d.name.trim().to_string()) else {
+            return Task::none();
+        };
+        let refuse = |s: &mut Self, error: String| {
+            if let Some(form) = s.vault_dialog.as_mut() {
+                form.error = Some(error);
+            }
+            Task::none()
+        };
+        if typed != self.vault_name(id) {
+            return refuse(self, crate::i18n::t("vault_delete_name_mismatch").to_string());
+        }
+        if !self.vault_deletable(id) {
+            return refuse(self, crate::i18n::t("vault_delete_unlock_first").to_string());
+        }
+        match self.forget_vault(id, true) {
+            Ok(task) => {
+                self.vault_dialog = None;
+                task
+            }
+            Err(e) => refuse(self, e),
+        }
+    }
+
+    /// Whether vault `id` may be deleted from here: another vault is
+    /// there to take its windows, and it is open and unlocked (a vault
+    /// without a master password counts as unlocked once open). Its
+    /// unlock is the proof of ownership: the dialog asks only for the
+    /// name.
+    pub(crate) fn vault_deletable(&self, id: Uuid) -> bool {
+        self.registered_vaults().iter().any(|v| v.id != id && self.vault_available(v.id))
+            && self.vault_available(id)
+            && self.vaults.all().any(|v| v.id == id && v.vault_ui.state == VaultState::Unlocked)
+    }
+
+    /// The file of registered vault `id`, when it is there (opening a
+    /// missing one would create an empty vault in its place).
+    pub(crate) fn vault_file(&self, id: Uuid) -> Option<std::path::PathBuf> {
+        let entry = self.registered_vaults().into_iter().find(|v| v.id == id)?;
+        oryxis_vault::device::installed().map(|d| d.resolve(&entry)).filter(|p| p.is_file())
+    }
+
+    /// The vault that takes over the windows of vault `id` while it goes:
+    /// the one this code is on, else another open one, else the first in
+    /// the list that opens.
+    fn heir_of(&mut self, id: Uuid) -> Option<Uuid> {
+        let current = self.vaults.current_id();
+        if current != id {
+            return Some(current);
+        }
+        if let Some(open) = self.vaults.ids().find(|v| *v != id) {
+            return Some(open);
+        }
+        let candidates: Vec<Uuid> = self.registered_vaults().into_iter().map(|v| v.id).filter(|v| *v != id).collect();
+        candidates.into_iter().find(|v| self.ensure_vault_open(*v))
+    }
+
+    /// Take vault `id` off this device: every window on it moves to
+    /// another vault, its sessions end, it closes, and the registry
+    /// forgets it. With `delete`, its file and everything beside it go
+    /// too (the WAL and shared-memory files, the rebuild lock, damaged
+    /// copies, the biometric entry); without, the file stays where it is
+    /// ("Remove from list": a vault on a USB key, or one that is gone).
+    ///
+    /// Nothing is touched on disk unless the vault really closed: a
+    /// window still on it (its heir would not open) refuses the whole
+    /// operation, with the reason as the error.
+    fn forget_vault(&mut self, id: Uuid, delete: bool) -> Result<Task<Message>, String> {
+        if self.vault_count() <= 1 {
+            return Err(crate::i18n::t("vault_last_stays").to_string());
+        }
+        let Some(heir) = self.heir_of(id) else {
+            return Err(crate::i18n::t("vault_no_heir").to_string());
+        };
+        let mut tasks = Vec::new();
+        // Every window on it moves to the heir first (the vault in the
+        // fields cannot close under its own window).
+        for window in self.windows_on_vault(id) {
+            tasks.push(self.run_in_window(window, |s| s.switch_this_window_to_vault(heir)));
+        }
+        if !self.windows_on_vault(id).is_empty() {
+            return Err(crate::i18n::t("vault_no_heir").to_string());
+        }
+        let path = self.vault_file(id);
+        if self.vaults.is_open(id) {
+            let previous = self.vaults.act_on(id);
+            self.sever_vault_sessions();
+            self.vaults.act_back(previous);
+            // Whatever parked view still names it holds tabs that just
+            // ended.
+            self.drop_parked_views_of(id);
+            // Closing the store closes the file before it is removed
+            // (Windows refuses to delete an open file).
+            if self.vaults.remove(id).is_none() {
+                return Err(crate::i18n::t("vault_no_heir").to_string());
+            }
+        }
+        if let Some(device) = oryxis_vault::device::installed()
+            && let Err(e) = device.unregister(id)
+        {
+            tracing::warn!("could not unregister vault {id}: {e}");
+            return Err(e.to_string());
+        }
+        if delete && let Some(path) = path {
+            if self.biometric_available {
+                crate::biometric::forget_account_of(&path);
+            }
+            remove_vault_files(&path);
+        }
+        Ok(Task::batch(tasks))
+    }
+
+    /// Register the vault file the user picked and move this window to it
+    /// (its lock screen asks for its master password). A file that is not
+    /// a set-up Oryxis vault is refused untouched; one already in the list
+    /// is simply shown.
+    fn open_existing_vault(&mut self, path: std::path::PathBuf) -> Task<Message> {
+        if !oryxis_vault::device::is_vault_file(&path) {
+            return self.show_toast(crate::i18n::t("vault_open_not_a_vault").to_string());
+        }
+        let Some(device) = oryxis_vault::device::installed() else {
+            return Task::none();
+        };
+        let label = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        match device.register_existing(&path, &label) {
+            Ok((entry, _)) => self.switch_this_window_to_vault(entry.id),
+            Err(e) => self.show_toast(format!("{}: {e}", crate::i18n::t("vault_open_failed"))),
+        }
     }
 
     /// The setup step of a vault made with "New vault" was abandoned: the
@@ -394,8 +643,40 @@ impl Oryxis {
     }
 }
 
+/// Remove a vault's file and everything that lives beside it under its
+/// name: `-wal`, `-shm`, `.rebuild-lock`, and every `.damaged-<stamp>`
+/// copy (with their own `-wal` / `-shm`). A file already gone is fine;
+/// one that will not go is logged.
+fn remove_vault_files(path: &std::path::Path) {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    let Some(dir) = path.parent() else {
+        return;
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let file = entry.file_name();
+        let Some(file) = file.to_str() else {
+            continue;
+        };
+        let companion = file == name
+            || file.strip_prefix(name).is_some_and(|rest| {
+                matches!(rest, "-wal" | "-shm" | ".rebuild-lock") || rest.starts_with(".damaged-")
+            });
+        if companion
+            && let Err(e) = std::fs::remove_file(entry.path())
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(path = %entry.path().display(), "could not remove a deleted vault's file: {e}");
+        }
+    }
+}
+
 /// The id of the "New vault" dialog's name field.
-pub(crate) const NEW_VAULT_NAME_INPUT: &str = "new-vault-name";
+pub(crate) const VAULT_DIALOG_NAME_INPUT: &str = "new-vault-name";
 
 #[cfg(test)]
 mod tests {

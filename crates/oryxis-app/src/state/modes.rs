@@ -769,6 +769,11 @@ pub(crate) enum SettingsSection {
     Mcp,
     Shortcuts,
     Security,
+    /// Every vault this device knows: state, file, rename / lock /
+    /// remove / delete, "New vault" and "Open existing vault", and the
+    /// switcher's visibility. Device-level as a whole (the registry is
+    /// `device.json`).
+    Vaults,
     Sync,
     /// SSH agent server configuration: per-signature confirm, external
     /// key adds, the OpenSSH pipe alias (Windows) and the socket path +
@@ -808,6 +813,7 @@ impl SettingsSection {
             SettingsSection::Mcp => "settings-mcp-scroll",
             SettingsSection::Shortcuts => "settings-shortcuts-scroll",
             SettingsSection::Security => "settings-security-scroll",
+            SettingsSection::Vaults => "settings-vaults-scroll",
             SettingsSection::Sync => "settings-sync-scroll",
             SettingsSection::Agent => "settings-agent-scroll",
             SettingsSection::Cloud => "settings-cloud-scroll",

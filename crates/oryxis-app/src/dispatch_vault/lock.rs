@@ -333,114 +333,7 @@ impl Oryxis {
                         // What this lock severs is THIS vault's: its tabs,
                         // its SFTP tabs. Another open vault's sessions go on
                         // (each vault locks on its own).
-                        let vault = self.vaults.current_id();
-                        let mine = |owner: Option<uuid::Uuid>| owner.is_none_or(|v| v == vault);
-                        // The window in the fields shows this vault (the
-                        // lock button), or another one ("Lock all", one
-                        // `ForVault` per vault): only the first has its own
-                        // surface reset here.
-                        let in_view = self.vaults.window_id() == vault;
-                        // Close live remote sessions, not just the panes
-                        // referencing them, so locking the vault really
-                        // severs the remote connections.
-                        for tab in self.tabs.iter().filter(|t| mine(t.vault)) {
-                            Self::close_tab_sessions(tab);
-                        }
-                        // Drop RDP/VNC tunnels too (each Arc drop cancels
-                        // the -L forward); locking severs everything. The
-                        // terminal's callback tunnels go the same way, and
-                        // a link waiting on an answer stops waiting.
-                        self.vaults.cur_mut().remote_desktop_forwards.clear();
-                        // And the login staged for mstsc: a client still
-                        // up holds it in memory, the store need not.
-                        crate::remote_desktop::sweep_stale_credentials();
-                        // The panes that stay are the other vaults'.
-                        let staying_panes: std::collections::HashSet<uuid::Uuid> = self
-                            .tabs
-                            .iter()
-                            .filter(|t| !mine(t.vault))
-                            .flat_map(|t| t.pane_grid.panes.values().map(|p| p.id))
-                            .collect();
-                        self.link_forwards.retain(|(pane, _), _| staying_panes.contains(pane));
-                        if self
-                            .link_confirm
-                            .as_ref()
-                            .is_some_and(|c| !c.pane_id.is_some_and(|p| staying_panes.contains(&p)))
-                        {
-                            self.link_confirm = None;
-                        }
-                        // A buffer parked for Save Output is the terminal's
-                        // text, gone with the terminal.
-                        self.save_output = None;
-                        // Standalone SFTP tabs ride their own SSH channels:
-                        // close every mounted session and drop the tabs (plus
-                        // their tab-order entries and the hoisted buffer), mirroring
-                        // the terminal teardown above. Without this an SFTP tab's
-                        // session Arc would outlive the lock screen and reappear
-                        // mounted after unlock.
-                        for tab in self.sftp_tabs.iter().filter(|t| mine(t.vault)) {
-                            if let Some(session) = &tab.state.left.session {
-                                session.close();
-                            }
-                            if let Some(session) = &tab.state.right.session {
-                                session.close();
-                            }
-                        }
-                        // The ACTIVE standalone tab's live state rides the
-                        // swap-on-focus buffer (`self.sftp`), not its parked
-                        // `state` slot (a taken default), so its sessions must
-                        // be closed here too: replacing the buffer below only
-                        // drops the Arc, and a clone held by an in-flight
-                        // transfer would keep the connection alive behind the
-                        // lock screen. A hybrid owner's mounts sit on pane
-                        // sessions already closed above; close() is idempotent.
-                        if let Some(session) = &self.cur_sftp().left.session {
-                            session.close();
-                        }
-                        if let Some(session) = &self.cur_sftp().right.session {
-                            session.close();
-                        }
-                        let gone_sftp: std::collections::HashSet<uuid::Uuid> = self
-                            .sftp_tabs
-                            .iter()
-                            .filter(|t| mine(t.vault))
-                            .map(|t| t.id)
-                            .collect();
-                        self.sftp_tabs.retain(|t| !mine(t.vault));
-                        self.tab_order.retain(|r| {
-                            !matches!(r, crate::state::TabRef::Sftp(id) if gone_sftp.contains(id))
-                        });
-                        if in_view {
-                            self.sftp = crate::state::SftpState::default();
-                            self.active_sftp = None;
-                        }
-                        // The progress card of a dial on one of these tabs
-                        // ends with it; one on a staying tab follows its
-                        // tab to the new index.
-                        let dialing = self
-                            .connecting
-                            .as_ref()
-                            .and_then(|c| self.tabs.get(c.tab_idx))
-                            .map(|t| (t._id, mine(t.vault)));
-                        if dialing.is_some_and(|(_, gone)| gone) {
-                            self.abort_progress_dial();
-                            self.connecting = None;
-                        }
-                        let active_id = self.active_tab.and_then(|i| self.tabs.get(i)).map(|t| t._id);
-                        self.tabs.retain(|t| !mine(t.vault));
-                        if let Some((id, false)) = dialing
-                            && let Some(c) = self.connecting.as_mut()
-                            && let Some(idx) = self.tabs.iter().position(|t| t._id == id)
-                        {
-                            c.tab_idx = idx;
-                        }
-                        // Another vault's window keeps its tab in front, at
-                        // the index it has now.
-                        self.active_tab = if in_view {
-                            None
-                        } else {
-                            active_id.and_then(|id| self.tabs.iter().position(|t| t._id == id))
-                        };
+                        let in_view = self.sever_vault_sessions();
                         // The reopen stack goes with them (issue #186).
                         // A manual lock is an explicit "I'm done" that
                         // severs every session; leaving a chord that
@@ -609,5 +502,129 @@ impl Oryxis {
         self.vaults.cur_mut().sync.passphrase_editing = false;
         self.vaults.cur_mut().sync.passphrase_field_id = None;
         self.vaults.cur_mut().sync.passphrase_sealed = None;
+    }
+
+    /// End every session of the vault the code acts on: its terminal tabs
+    /// and their remote sessions, its SFTP tabs, its desktop tunnels, the
+    /// callback tunnels and prompts of its panes. Every other vault's go
+    /// on. The window in the fields loses its own surface (SFTP buffer,
+    /// tab in front) only when it shows this vault; another window keeps
+    /// its tab in front at the index it has after the removal. Answers
+    /// whether the window in the fields shows the vault. Shared by the
+    /// manual lock and the deletion of a vault.
+    pub(crate) fn sever_vault_sessions(&mut self) -> bool {
+        let vault = self.vaults.current_id();
+        let mine = |owner: Option<uuid::Uuid>| owner.is_none_or(|v| v == vault);
+        // The window in the fields shows this vault (the
+        // lock button), or another one ("Lock all", one
+        // `ForVault` per vault): only the first has its own
+        // surface reset here.
+        let in_view = self.vaults.window_id() == vault;
+        // Close live remote sessions, not just the panes
+        // referencing them, so locking the vault really
+        // severs the remote connections.
+        for tab in self.tabs.iter().filter(|t| mine(t.vault)) {
+            Self::close_tab_sessions(tab);
+        }
+        // Drop RDP/VNC tunnels too (each Arc drop cancels
+        // the -L forward); locking severs everything. The
+        // terminal's callback tunnels go the same way, and
+        // a link waiting on an answer stops waiting.
+        self.vaults.cur_mut().remote_desktop_forwards.clear();
+        // And the login staged for mstsc: a client still
+        // up holds it in memory, the store need not.
+        crate::remote_desktop::sweep_stale_credentials();
+        // The panes that stay are the other vaults'.
+        let staying_panes: std::collections::HashSet<uuid::Uuid> = self
+            .tabs
+            .iter()
+            .filter(|t| !mine(t.vault))
+            .flat_map(|t| t.pane_grid.panes.values().map(|p| p.id))
+            .collect();
+        self.link_forwards.retain(|(pane, _), _| staying_panes.contains(pane));
+        if self
+            .link_confirm
+            .as_ref()
+            .is_some_and(|c| !c.pane_id.is_some_and(|p| staying_panes.contains(&p)))
+        {
+            self.link_confirm = None;
+        }
+        // A buffer parked for Save Output is the terminal's
+        // text, gone with the terminal.
+        self.save_output = None;
+        // Standalone SFTP tabs ride their own SSH channels:
+        // close every mounted session and drop the tabs (plus
+        // their tab-order entries and the hoisted buffer), mirroring
+        // the terminal teardown above. Without this an SFTP tab's
+        // session Arc would outlive the lock screen and reappear
+        // mounted after unlock.
+        for tab in self.sftp_tabs.iter().filter(|t| mine(t.vault)) {
+            if let Some(session) = &tab.state.left.session {
+                session.close();
+            }
+            if let Some(session) = &tab.state.right.session {
+                session.close();
+            }
+        }
+        // The ACTIVE standalone tab's live state rides the
+        // swap-on-focus buffer (`self.sftp`), not its parked
+        // `state` slot (a taken default), so its sessions must
+        // be closed here too: replacing the buffer below only
+        // drops the Arc, and a clone held by an in-flight
+        // transfer would keep the connection alive behind the
+        // lock screen. A hybrid owner's mounts sit on pane
+        // sessions already closed above; close() is idempotent.
+        // Only when the buffer is this vault's: a window on another
+        // vault holds that vault's.
+        if in_view {
+            if let Some(session) = &self.cur_sftp().left.session {
+                session.close();
+            }
+            if let Some(session) = &self.cur_sftp().right.session {
+                session.close();
+            }
+        }
+        let gone_sftp: std::collections::HashSet<uuid::Uuid> = self
+            .sftp_tabs
+            .iter()
+            .filter(|t| mine(t.vault))
+            .map(|t| t.id)
+            .collect();
+        self.sftp_tabs.retain(|t| !mine(t.vault));
+        self.tab_order.retain(|r| {
+            !matches!(r, crate::state::TabRef::Sftp(id) if gone_sftp.contains(id))
+        });
+        if in_view {
+            self.sftp = crate::state::SftpState::default();
+            self.active_sftp = None;
+        }
+        // The progress card of a dial on one of these tabs
+        // ends with it; one on a staying tab follows its
+        // tab to the new index.
+        let dialing = self
+            .connecting
+            .as_ref()
+            .and_then(|c| self.tabs.get(c.tab_idx))
+            .map(|t| (t._id, mine(t.vault)));
+        if dialing.is_some_and(|(_, gone)| gone) {
+            self.abort_progress_dial();
+            self.connecting = None;
+        }
+        let active_id = self.active_tab.and_then(|i| self.tabs.get(i)).map(|t| t._id);
+        self.tabs.retain(|t| !mine(t.vault));
+        if let Some((id, false)) = dialing
+            && let Some(c) = self.connecting.as_mut()
+            && let Some(idx) = self.tabs.iter().position(|t| t._id == id)
+        {
+            c.tab_idx = idx;
+        }
+        // Another vault's window keeps its tab in front, at
+        // the index it has now.
+        self.active_tab = if in_view {
+            None
+        } else {
+            active_id.and_then(|id| self.tabs.iter().position(|t| t._id == id))
+        };
+        in_view
     }
 }

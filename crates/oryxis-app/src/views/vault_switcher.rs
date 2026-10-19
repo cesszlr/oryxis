@@ -1,20 +1,20 @@
 //! The vault doors on screen: the switcher chip (toolbar) and badge (nav
 //! rail) naming the vault the window works on, the menu they open, and
-//! the "New vault" dialog.
+//! the vault dialog (create, rename, delete).
 
 use iced::Widget as _;
 use iced::border::Radius;
 use iced::widget::button::Status as BtnStatus;
-use iced::widget::{button, column, container, pick_list, text, text_input, Space};
+use iced::widget::{button, container, pick_list, text, text_input, Space};
 use iced::{Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{Message, MultiVaultMessage, Oryxis};
-use crate::dispatch_multi_vault::{VaultChipPlace, NEW_VAULT_NAME_INPUT};
+use crate::dispatch_multi_vault::{VaultChipPlace, VAULT_DIALOG_NAME_INPUT};
 use crate::i18n::t;
 use crate::keynav::RowAction;
-use crate::state::{CopySettingsChoice, NewVaultForm, VaultState};
+use crate::state::{CopySettingsChoice, VaultDialog, VaultDialogMode, VaultState};
 use crate::theme::OryxisColors;
-use crate::widgets::{dir_align_x, dir_row, styled_button};
+use crate::widgets::{dir_align_x, dir_row, styled_button, styled_button_opt};
 
 impl Oryxis {
     /// The name of the vault the window being drawn works on.
@@ -137,26 +137,35 @@ impl Oryxis {
                 .all()
                 .find(|v| v.id == id)
                 .is_some_and(|v| v.vault_ui.state == VaultState::Locked);
+            // A vault whose file is gone is listed, inert, until it is back.
+            let available = self.vault_available(id);
             let icon: Element<'_, Message> = if id == here {
                 iced_fonts::lucide::check().size(14).color(c.accent).boxed()
+            } else if !available {
+                iced_fonts::lucide::circle_alert().size(14).color(c.text_muted).boxed()
             } else if locked {
                 iced_fonts::lucide::lock().size(14).color(c.text_muted).boxed()
             } else {
                 iced_fonts::lucide::database().size(14).color(c.text_secondary).boxed()
             };
             let switch = Message::MultiVault(MultiVaultMessage::SwitchToVault(id));
+            let name_color = if available { c.text_primary } else { c.text_muted };
             let row = button(
                 dir_row(vec![
                     icon,
                     Space::new().width(8).boxed(),
-                    text(Self::vault_display_name(&entry)).size(12).color(c.text_primary).boxed(),
+                    text(Self::vault_display_name(&entry)).size(12).color(name_color).boxed(),
                 ])
                 .align_y(iced::Alignment::Center),
             )
-            .on_press(switch.clone())
+            .on_press_maybe(available.then(|| switch.clone()))
             .width(Length::Fill)
             .padding(Padding { top: 6.0, right: 8.0, bottom: 6.0, left: 8.0 })
             .style(menu_row_style);
+            if !available {
+                items = items.push(crate::views::terminal::icon_tooltip(row.boxed(), t("vault_status_missing")));
+                continue;
+            }
             let new_window = Message::MultiVault(MultiVaultMessage::OpenVaultInNewWindow(id));
             let window_button = button(iced_fonts::lucide::app_window().size(13).color(c.text_muted))
                 .on_press(new_window.clone())
@@ -209,76 +218,110 @@ impl Oryxis {
             .any(|v| v.vault_ui.has_user_password && v.vault_ui.state == VaultState::Unlocked)
     }
 
-    /// Content of the "New vault" dialog: its name and the vault whose
-    /// settings it starts with.
-    pub(crate) fn build_new_vault_dialog<'a>(&'a self, form: &'a NewVaultForm) -> Element<'a, Message> {
+    /// The vault dialog: create (a name and the vault whose settings it
+    /// starts with), rename (the name), or delete (the vault's name typed
+    /// back; the button stays inert until it matches).
+    pub(crate) fn build_vault_dialog<'a>(&'a self, form: &'a VaultDialog) -> Element<'a, Message> {
         let c = OryxisColors::t();
         self.modal_nav_reset();
-        let mut choices = vec![CopySettingsChoice { vault: None, label: t("vault_copy_none").to_string() }];
-        choices.extend(self.registered_vaults().into_iter().map(|e| CopySettingsChoice {
-            vault: Some(e.id),
-            label: Self::vault_display_name(&e),
-        }));
-        let selected = choices.iter().find(|c| c.vault == form.copy_from).cloned();
-        let input_id = iced::widget::Id::new(NEW_VAULT_NAME_INPUT);
-        let create = Message::MultiVault(MultiVaultMessage::CreateVault);
-        let cancel = Message::MultiVault(MultiVaultMessage::CancelNewVault);
-        let picker_choices = choices.clone();
-        let mut body = column![
-            text(t("vault_new_title"))
-                .size(16)
-                .color(c.text_primary)
-                .width(Length::Fill)
-                .align_x(dir_align_x()),
-            Space::new().height(4),
-            text(t("vault_new_body"))
-                .size(12)
-                .color(c.text_secondary)
-                .width(Length::Fill)
-                .align_x(dir_align_x()),
-            Space::new().height(14),
-            text(t("vault_new_name")).size(12).color(c.text_secondary),
-            Space::new().height(4),
-            self.modal_nav_slot(
+        let input_id = iced::widget::Id::new(VAULT_DIALOG_NAME_INPUT);
+        let submit = Message::MultiVault(MultiVaultMessage::VaultDialogSubmit);
+        let cancel = Message::MultiVault(MultiVaultMessage::CancelVaultDialog);
+        let (title, intro, field, placeholder, confirm, confirm_color) = match form.mode {
+            VaultDialogMode::Create => (
+                t("vault_new_title").to_string(),
+                t("vault_new_body").to_string(),
+                t("vault_new_name"),
+                t("vault_new_name_placeholder"),
+                t("vault_create"),
+                c.accent,
+            ),
+            VaultDialogMode::Rename(id) => (
+                t("vault_rename_title").replacen("{name}", &self.vault_name(id), 1),
+                String::new(),
+                t("vault_new_name"),
+                t("vault_new_name_placeholder"),
+                t("vault_rename"),
+                c.accent,
+            ),
+            VaultDialogMode::Delete(id) => (
+                t("vault_delete_title").replacen("{name}", &self.vault_name(id), 1),
+                t("vault_delete_body").to_string(),
+                t("vault_delete_type_name"),
+                "",
+                t("vault_delete"),
+                c.error,
+            ),
+        };
+        // Delete arms only on the exact name: the typed name IS the
+        // confirmation, so Enter in the field may submit too.
+        let armed = match form.mode {
+            VaultDialogMode::Delete(id) => form.name.trim() == self.vault_name(id),
+            _ => true,
+        };
+        let mut body = iced::widget::Column::<Element<'a, Message>>::new()
+            .width(Length::Fill)
+            .align_x(dir_align_x())
+            .push(text(title).size(16).color(c.text_primary).width(Length::Fill).align_x(dir_align_x()).boxed());
+        if !intro.is_empty() {
+            body = body.push(Space::new().height(4).boxed()).push(
+                text(intro).size(12).color(c.text_secondary).width(Length::Fill).align_x(dir_align_x()).boxed(),
+            );
+        }
+        body = body
+            .push(Space::new().height(14).boxed())
+            .push(text(field).size(12).color(c.text_secondary).boxed())
+            .push(Space::new().height(4).boxed())
+            .push(self.modal_nav_slot(
                 RowAction::input(input_id.clone()),
                 crate::widgets::INPUT_RADIUS,
                 false,
-                text_input(t("vault_new_name_placeholder"), &form.name)
+                text_input(placeholder, &form.name)
                     .id(input_id)
-                    .on_input(|v| Message::MultiVault(MultiVaultMessage::NewVaultNameChanged(v)))
-                    .on_submit(create.clone())
+                    .on_input(|v| Message::MultiVault(MultiVaultMessage::VaultDialogNameChanged(v)))
+                    .on_submit(submit.clone())
                     .padding(10)
                     .width(Length::Fill)
                     .style(crate::widgets::rounded_input_style)
                     .align_x(dir_align_x())
                     .boxed(),
-            ),
-            Space::new().height(12),
-            text(t("vault_copy_from")).size(12).color(c.text_secondary),
-            Space::new().height(4),
-            self.modal_nav_slot(
-                RowAction::picker(
-                    Some(copy_from_step(&choices, form.copy_from, -1)),
-                    Some(copy_from_step(&choices, form.copy_from, 1)),
-                ),
-                6.0,
-                false,
-                pick_list(selected, picker_choices, |choice: &CopySettingsChoice| choice.to_string())
-                    .on_select(|choice: CopySettingsChoice| {
-                        Message::MultiVault(MultiVaultMessage::NewVaultCopyFromChanged(choice.vault))
-                    })
-                    .width(Length::Fill)
-                    .boxed(),
-            ),
-            Space::new().height(6),
-            text(t("vault_copy_from_hint"))
-                .size(11)
-                .color(c.text_muted)
-                .width(Length::Fill)
-                .align_x(dir_align_x()),
-        ]
-        .width(Length::Fill)
-        .align_x(dir_align_x());
+            ));
+        if form.mode == VaultDialogMode::Create {
+            let mut choices = vec![CopySettingsChoice { vault: None, label: t("vault_copy_none").to_string() }];
+            choices.extend(self.registered_vaults().into_iter().map(|e| CopySettingsChoice {
+                vault: Some(e.id),
+                label: Self::vault_display_name(&e),
+            }));
+            let selected = choices.iter().find(|c| c.vault == form.copy_from).cloned();
+            let (prev, next) = (
+                copy_from_step(&choices, form.copy_from, -1),
+                copy_from_step(&choices, form.copy_from, 1),
+            );
+            body = body
+                .push(Space::new().height(12).boxed())
+                .push(text(t("vault_copy_from")).size(12).color(c.text_secondary).boxed())
+                .push(Space::new().height(4).boxed())
+                .push(self.modal_nav_slot(
+                    RowAction::picker(Some(prev), Some(next)),
+                    6.0,
+                    false,
+                    pick_list(selected, choices, |choice: &CopySettingsChoice| choice.to_string())
+                        .on_select(|choice: CopySettingsChoice| {
+                            Message::MultiVault(MultiVaultMessage::NewVaultCopyFromChanged(choice.vault))
+                        })
+                        .width(Length::Fill)
+                        .boxed(),
+                ))
+                .push(Space::new().height(6).boxed())
+                .push(
+                    text(t("vault_copy_from_hint"))
+                        .size(11)
+                        .color(c.text_muted)
+                        .width(Length::Fill)
+                        .align_x(dir_align_x())
+                        .boxed(),
+                );
+        }
         if let Some(error) = &form.error {
             body = body.push(Space::new().height(10).boxed());
             body = body.push(
@@ -288,10 +331,10 @@ impl Oryxis {
         body = body.push(Space::new().height(16).boxed());
         body = body.push(dir_row(vec![
             self.modal_nav_slot_default(
-                RowAction::activate(create.clone()),
+                RowAction::activate(submit.clone()),
                 6.0,
                 true,
-                styled_button(t("vault_create"), create, c.accent),
+                styled_button_opt(confirm, armed.then_some(submit), confirm_color),
             ),
             Space::new().width(8).boxed(),
             self.modal_nav_slot(

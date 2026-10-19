@@ -896,6 +896,9 @@ impl Oryxis {
                 self.window_focused = focused;
                 if focused {
                     self.input_window = Some(id);
+                    // A USB key may have come back while the app was
+                    // in the background.
+                    self.refresh_vault_presence();
                 }
                 if !focused {
                     self.on_window_blur();

@@ -76,6 +76,15 @@ pub(crate) fn bio_icon<'a>() -> iced::widget::Text<'a> {
     }
 }
 
+/// Forget the biometric secret stored for the vault file at `vault_path`
+/// (a vault being deleted). Idempotent; a backend error is logged.
+pub(crate) fn forget_account_of(vault_path: &std::path::Path) {
+    let bv = BiometricVault::new(account_for(&vault_path.to_string_lossy()));
+    if let Err(e) = bv.disable() {
+        tracing::warn!("biometric disable failed: {e}");
+    }
+}
+
 impl Oryxis {
     /// Build a [`BiometricVault`] bound to the open vault's account, or
     /// `None` when no vault is open. Cheap to construct (it only wraps the
