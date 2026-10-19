@@ -86,57 +86,15 @@ impl Oryxis {
         let footer = container(column![settings_item, rail_toggle_item(expanded)].spacing(4))
             .padding(Padding { top: 8.0, right: 0.0, bottom: 12.0, left: 0.0 });
 
-        // Static "Personal" vault switcher placeholder (non-interactive
-        // until multi-vault lands): glyph only when collapsed, glyph +
-        // name + chevron when expanded.
-        let badge_inner: Element<'_, Message> = if expanded {
-            dir_row(vec![
-                iced_fonts::lucide::lock().size(14).color(OryxisColors::t().accent).boxed(),
-                Space::new().width(8).boxed(),
-                text("Personal").size(13).color(OryxisColors::t().text_primary).boxed(),
-                Space::new().width(Length::Fill).boxed(),
-                iced_fonts::lucide::chevron_down().size(12).color(OryxisColors::t().text_muted).boxed(),
-            ])
-            .align_y(iced::Alignment::Center)
-            .boxed()
-        } else {
-            iced_fonts::lucide::lock().size(16).color(OryxisColors::t().accent).boxed()
-        };
-        let badge_pad = if expanded {
-            Padding { top: 8.0, right: 12.0, bottom: 8.0, left: 12.0 }
-        } else {
-            Padding::ZERO
-        };
-        // Collapsed: center the lock glyph in the badge (it's shrink-fit,
-        // so without this it pins to the leading edge and misaligns with
-        // the centered nav icons below). Expanded: the row owns its layout.
-        let badge_align = if expanded {
-            iced::alignment::Horizontal::Left
-        } else {
-            iced::alignment::Horizontal::Center
-        };
-        let vault_badge = container(
-            container(badge_inner)
-                .center_y(Length::Fixed(40.0))
-                .width(Length::Fill)
-                .align_x(badge_align)
-                .padding(badge_pad)
-                .style(|_| container::Style {
-                    background: Some(Background::Color(OryxisColors::t().bg_surface)),
-                    border: Border {
-                        radius: Radius::from(8.0),
-                        color: OryxisColors::t().border,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
-        )
-        .padding(Padding { top: 8.0, right: 8.0, bottom: 8.0, left: 8.0 });
+        // The vault badge: the vault this window works on, and the
+        // switcher behind it (glyph only while the rail is collapsed).
+        let vault_badge = self.vault_switcher_badge(expanded);
 
-        // Vault badge only when there's more than one vault to switch.
+        // The vault badge, unless a single vault is all there is and the
+        // user hid it for that case.
         let mut col_items: Vec<Element<'_, Message>> = Vec::new();
         if self.show_vault_switcher() {
-            col_items.push(vault_badge.boxed());
+            col_items.push(vault_badge);
         }
         col_items.push(nav.boxed());
         col_items.push(footer.boxed());

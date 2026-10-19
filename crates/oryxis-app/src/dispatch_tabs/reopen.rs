@@ -49,7 +49,7 @@ impl Oryxis {
             // snapshot (`relaunch: None`).
             None => match &tab.active().origin {
                 crate::state::PaneOrigin::QuickHost(qid) => {
-                    let Some(entry) = self.quick_connects.get(qid) else { return };
+                    let Some(entry) = self.vaults.cur().quick_connects.get(qid) else { return };
                     ClosedTabSpec::QuickHost(Box::new(quick_snapshot(entry)))
                 }
                 _ => return,
@@ -84,7 +84,7 @@ impl Oryxis {
     }
 
     fn push_closed_tab(&mut self, entry: ClosedTab) {
-        push_closed(&mut self.closed_tabs, entry);
+        push_closed(&mut self.vaults.cur_mut().closed_tabs, entry);
     }
 
     /// Bring back the most recently closed tab.
@@ -101,7 +101,7 @@ impl Oryxis {
         // it is the last thing they have to say. The hotkey path clears
         // nothing that was open.
         self.overlay = None;
-        while let Some(entry) = self.closed_tabs.pop() {
+        while let Some(entry) = self.vaults.cur_mut().closed_tabs.pop() {
             let spec = match entry.spec {
                 ClosedTabSpec::Pinned(spec) => spec,
                 // An ad-hoc host reopens by putting its `Connection`

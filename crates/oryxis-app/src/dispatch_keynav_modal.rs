@@ -161,6 +161,9 @@ impl Oryxis {
                     // shared builder, Enter picks the ringed host, and
                     // the search field keeps the caret (`has_input`).
                     | Modal::SyncHostPicker
+                    // The "New vault" form: its name field, the settings
+                    // picker, Create (the default row) and Cancel.
+                    | Modal::NewVault
                     // The host editor's terminal theme picker: its filter,
                     // tone chips, cards and Close are recorded in display
                     // order, Enter picks the ringed card, and the filter
@@ -227,6 +230,8 @@ impl Oryxis {
                     | Modal::SyncHostPicker
                     // The theme picker's filter field.
                     | Modal::ThemePicker
+                    // The vault's name field.
+                    | Modal::NewVault
             )
         )
     }

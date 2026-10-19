@@ -142,7 +142,7 @@ impl Oryxis {
                             self.update(Message::Ssh(SshMessage::ConnectSavedHost(id)))
                         }
                         crate::state::ProgressOrigin::Quick(id) => {
-                            match self.quick_connects.get(&id).cloned() {
+                            match self.vaults.cur().quick_connects.get(&id).cloned() {
                                 Some(entry) => self
                                     .update(Message::Ssh(SshMessage::QuickConnect(Box::new(entry)))),
                                 None => Task::none(),

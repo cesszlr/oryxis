@@ -98,71 +98,8 @@ impl Oryxis {
         crate::i18n::Language::set_active(crate::i18n::detect_os_language());
 
         if let Some(v) = &mut vault {
-            if !v.is_initialized() {
-                // Brand new vault, show setup screen
-                vault_state = VaultState::NeedSetup;
-                // Stamp the Ctrl+digit slot migration as already done, so
-                // the boot migration in `load_data_from_vault` leaves this
-                // vault on the new mapping (slot N = tab N). Only vaults
-                // that predate the change reach that migration unstamped
-                // and keep Home in the first slot. This is the one place
-                // that can tell a fresh install from an existing one.
-                let _ = v.set_setting("tab_slots_home_migrated", "true");
-            } else {
-                // Consult the plaintext `has_user_password` flag before
-                // running `open_without_password`. That helper attempts
-                // `unlock("")`, which runs a full Argon2id KDF against
-                // the empty password just to find out the vault is
-                // locked, ~17 ms wasted on every cold boot for users
-                // with a master password. The flag is written by
-                // `set_user_password` / `remove_user_password` /
-                // `set_master_password`, and is backfilled here for
-                // legacy vaults that pre-date the flag.
-                let flag = v.get_setting("has_user_password").ok().flatten();
-                let known_user_pw = matches!(flag.as_deref(), Some("1"));
-                if known_user_pw {
-                    // Skip empty-pw KDF entirely. Try the inherited
-                    // password (from `--inherit-vault` stdin) before
-                    // falling back to the lock screen.
-                    let unlocked = inherited_password
-                        .as_ref()
-                        .is_some_and(|pw| v.unlock(pw).is_ok());
-                    vault_state = if unlocked {
-                        VaultState::Unlocked
-                    } else {
-                        VaultState::Locked
-                    };
-                    vault_has_user_password = true;
-                } else {
-                    // Either the flag says "0" or it's missing (legacy
-                    // vault). Either way we attempt the empty unlock,
-                    // and opportunistically backfill the flag if it
-                    // wasn't there.
-                    match v.open_without_password() {
-                        Ok(()) => {
-                            vault_state = VaultState::Unlocked;
-                            vault_has_user_password = false;
-                            if flag.is_none() {
-                                let _ = v.set_setting("has_user_password", "0");
-                            }
-                        }
-                        Err(_) => {
-                            let unlocked = inherited_password
-                                .as_ref()
-                                .is_some_and(|pw| v.unlock(pw).is_ok());
-                            vault_state = if unlocked {
-                                VaultState::Unlocked
-                            } else {
-                                VaultState::Locked
-                            };
-                            vault_has_user_password = true;
-                            if flag.is_none() {
-                                let _ = v.set_setting("has_user_password", "1");
-                            }
-                        }
-                    }
-                }
-            }
+            (vault_state, vault_has_user_password) =
+                crate::vault_slots::initial_lock_state(v, inherited_password.as_deref());
             // Theme + language live in the plaintext `settings` table,
             // not behind the encryption key, so we can hydrate them
             // *before* the unlock so the lock screen / setup screen
@@ -371,6 +308,7 @@ impl Oryxis {
                     } else {
                         None
                     };
+                    first.path = oryxis_vault::device::boot_vault_path();
                     first
                 }),
                 // Vector logo: rendered through iced's SVG (resvg) path so
@@ -379,17 +317,10 @@ impl Oryxis {
                 // handles share the one asset; the SVG scales to each call
                 // site's box.
                 logo_handle: svg::Handle::from_memory(include_bytes!("../../../../resources/logo.svg").as_slice()),
-                quick_connects: std::collections::HashMap::new(),
                 active_view: View::Dashboard,
                 tabs: Vec::new(),
-                closed_tabs: Vec::new(),
                 inline_edit_anchors: Vec::new(),
                 open_tabs_signature: 0,
-                open_tabs_restored: false,
-                launch_dials: std::collections::VecDeque::new(),
-                batch_dials: std::collections::VecDeque::new(),
-                launch_landing: None,
-                launch_landing_deferred: None,
                 zmodem_swept: false,
                 pending_tab_placement: None,
                 pending_pane_split: None,
@@ -472,6 +403,10 @@ impl Oryxis {
                 active_sftp: None,
                 hybrid_sftp_owner: None,
                 nav: crate::window_ctx::WindowNav::default(),
+                parked_views: crate::window_ctx::ParkedViews::new(),
+                new_vault: None,
+                vault_chip_bounds: crate::widgets::new_bounds_cell(),
+                vault_badge_bounds: crate::widgets::new_bounds_cell(),
                 tab_order: Vec::new(),
                 extra_windows: std::collections::BTreeMap::new(),
                 window_ctx: None,
@@ -512,8 +447,6 @@ impl Oryxis {
                 alt_sides: crate::key_encode::OptionSides::default(),
                 #[cfg(target_os = "windows")]
                 last_printscreen: None,
-                history_search_content: false,
-                history_content: crate::state::HistoryContentSearch::default(),
                 login_script_generation: 0,
                 trigger_confirm: None,
                 host_editor_parent_combo_bounds: crate::widgets::new_bounds_cell(),
@@ -571,7 +504,6 @@ impl Oryxis {
                 active_forwards: std::collections::HashMap::new(),
                 forward_conns: std::collections::HashMap::new(),
                 pf_aborted_pending: std::collections::HashMap::new(),
-                remote_desktop_forwards: std::collections::HashMap::new(),
                 link_forwards: std::collections::HashMap::new(),
                 link_confirm: None,
                 save_output: None,

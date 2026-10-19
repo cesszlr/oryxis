@@ -36,7 +36,7 @@ impl Oryxis {
     /// A queued tab the user selected meanwhile (its spec already
     /// taken) or closed is skipped rather than dialled twice.
     pub(crate) fn advance_launch_dials(&mut self) -> Option<Task<Message>> {
-        if self.launch_dials.is_empty() {
+        if self.vaults.cur().launch_dials.is_empty() {
             return None;
         }
         // Credentials and known hosts are read from the vault at dial
@@ -59,7 +59,7 @@ impl Oryxis {
         // vault that booted locked, so the boot scan saw no hosts) does
         // not have yet. Dialling now would fail the tab for a scan that
         // had not run; the queue starts one and waits for it instead.
-        if let Some(&front) = self.launch_dials.front()
+        if let Some(&front) = self.vaults.cur().launch_dials.front()
             && self.local_terminals.is_none()
             && self.queued_tab_needs_terminal_list(front)
         {
@@ -74,14 +74,14 @@ impl Oryxis {
                 crate::app::SettingsMessage::RescanLocalTerminals,
             )));
         }
-        while let Some(id) = self.launch_dials.pop_front() {
+        while let Some(id) = self.vaults.cur_mut().launch_dials.pop_front() {
             let dial = self.dial_dormant_in_place(id);
             // A landing that waited for the terminal scan lands now,
             // after its dial, whether or not the dial could start (a tab
             // closed meanwhile simply has nothing to select).
-            let landing = (self.launch_landing_deferred == Some(id))
+            let landing = (self.vaults.cur().launch_landing_deferred == Some(id))
                 .then(|| {
-                    self.launch_landing_deferred = None;
+                    self.vaults.cur_mut().launch_landing_deferred = None;
                     self.tabs.iter().position(|t| t._id == id)
                 })
                 .flatten()
@@ -233,7 +233,7 @@ impl Oryxis {
     /// it with every other restored tab behind.
     pub(crate) fn take_launch_landing_task(&mut self, outranked: bool) -> LaunchLanding {
         let mut out = LaunchLanding::default();
-        let Some(target) = self.launch_landing.take() else {
+        let Some(target) = self.vaults.cur_mut().launch_landing.take() else {
             return out;
         };
         if outranked {
@@ -241,8 +241,8 @@ impl Oryxis {
         }
         match target {
             crate::state::TabRef::Terminal(id) => {
-                if self.launch_dials.iter().any(|q| *q == id) {
-                    self.launch_dials.retain(|q| *q != id);
+                if self.vaults.cur().launch_dials.iter().any(|q| *q == id) {
+                    self.vaults.cur_mut().launch_dials.retain(|q| *q != id);
                     if self.local_terminals.is_none() && self.queued_tab_needs_terminal_list(id) {
                         // Its terminal list is not there yet: first in
                         // line instead, dialled by the funnel once the
@@ -250,8 +250,8 @@ impl Oryxis {
                         // then too. Selecting a dormant tab now would
                         // run the foreground reopen against the missing
                         // list and fail it.
-                        self.launch_dials.push_front(id);
-                        self.launch_landing_deferred = Some(id);
+                        self.vaults.cur_mut().launch_dials.push_front(id);
+                        self.vaults.cur_mut().launch_landing_deferred = Some(id);
                         return out;
                     }
                     out.dial = self.dial_dormant_in_place(id);
@@ -279,7 +279,7 @@ impl Oryxis {
     /// the queue starts, without waiting for whatever first event the
     /// window happens to raise.
     pub(crate) fn launch_dial_kick(&self) -> Option<Task<Message>> {
-        (!self.launch_dials.is_empty()).then(|| Task::done(Message::NoOp))
+        (!self.vaults.cur().launch_dials.is_empty()).then(|| Task::done(Message::NoOp))
     }
 }
 

@@ -91,6 +91,7 @@ mod logging;
 mod stall_watchdog;
 mod agent_server;
 mod dispatch_agent;
+mod dispatch_multi_vault;
 mod net_mirror;
 mod offline;
 // The network tools panel's probes (DNS, ping, port, HTTP/TLS, WHOIS,

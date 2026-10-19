@@ -186,7 +186,7 @@ impl crate::app::Oryxis {
                     return Task::none();
                 };
                 let id = conn.id;
-                self.quick_connects
+                self.vaults.cur_mut().quick_connects
                     .insert(id, crate::state::QuickConnectEntry::bare(conn));
                 Task::done(Message::Editor(
                     crate::messages::EditorMessage::EditQuickHost(id),

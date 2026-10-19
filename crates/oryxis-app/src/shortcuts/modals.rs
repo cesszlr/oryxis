@@ -78,6 +78,7 @@ impl Oryxis {
             Modal::SyncHostPicker => {
                 self.vaults.cur().sync.sftp.picker_open || self.vaults.cur().sync.relay_deploy.picker_open
             }
+            Modal::NewVault => self.new_vault.is_some(),
         }
     }
 
@@ -250,6 +251,8 @@ impl Oryxis {
                 self.vaults.cur_mut().sync.relay_deploy.picker_open = false;
                 self.vaults.cur_mut().sync.relay_deploy.picker_search.clear();
             }
+            // Mirrors CancelNewVault: nothing was made.
+            Modal::NewVault => self.new_vault = None,
         }
     }
 

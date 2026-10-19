@@ -166,6 +166,33 @@ pub(crate) struct WindowNav {
     pub(crate) history_filter_tags: Vec<String>,
 }
 
+/// What a window keeps of a vault it is not working on right now: the
+/// tabs of that vault it showed, the one in front, its MRU, the screen it
+/// was on and its place in the vault screens. Restored when the window
+/// switches back (`switch_window_vault`); its tabs keep running hidden
+/// meanwhile. Panel tabs (Settings, network tools) are not parked: they
+/// follow the window to the vault it switches to.
+#[derive(Debug, Clone)]
+pub(crate) struct ParkedView {
+    pub(crate) order: Vec<TabRef>,
+    pub(crate) active: Option<Uuid>,
+    pub(crate) mru: Vec<TabRef>,
+    pub(crate) view: View,
+    pub(crate) nav: WindowNav,
+}
+
+impl ParkedView {
+    fn tab_ids(&self) -> impl Iterator<Item = Uuid> + '_ {
+        self.order.iter().filter_map(|r| match r {
+            TabRef::Terminal(id) | TabRef::Sftp(id) => Some(*id),
+            TabRef::Panel(_) => None,
+        })
+    }
+}
+
+/// A window's parked views, by vault.
+pub(crate) type ParkedViews = std::collections::HashMap<Uuid, ParkedView>;
+
 /// What a window that is not the resident one keeps for itself.
 #[derive(Debug, Clone)]
 pub(crate) struct ExtraWindow {
@@ -195,6 +222,8 @@ pub(crate) struct ExtraWindow {
     pub(crate) nav: WindowNav,
     /// The vault it works on (`vault_slots`).
     pub(crate) vault: Uuid,
+    /// What it keeps of the other vaults it worked on.
+    pub(crate) parked: ParkedViews,
 }
 
 impl ExtraWindow {
@@ -217,15 +246,19 @@ impl ExtraWindow {
             mru: Vec::new(),
             nav: WindowNav::default(),
             vault,
+            parked: ParkedViews::new(),
         }
     }
 
-    /// The strip ids of its tabs, terminal and SFTP.
+    /// The strip ids of its tabs, terminal and SFTP, shown or parked.
     pub(crate) fn tab_ids(&self) -> impl Iterator<Item = Uuid> + '_ {
-        self.order.iter().filter_map(|r| match r {
-            TabRef::Terminal(id) | TabRef::Sftp(id) => Some(*id),
-            TabRef::Panel(_) => None,
-        })
+        self.order
+            .iter()
+            .filter_map(|r| match r {
+                TabRef::Terminal(id) | TabRef::Sftp(id) => Some(*id),
+                TabRef::Panel(_) => None,
+            })
+            .chain(self.parked.values().flat_map(ParkedView::tab_ids))
     }
 }
 
@@ -326,7 +359,8 @@ pub(crate) struct WindowCtx {
     focused: bool,
     mru: Vec<TabRef>,
     nav: WindowNav,
-    vault: Uuid,
+    vault: crate::vault_slots::SlotMark,
+    parked: ParkedViews,
 }
 
 impl Oryxis {
@@ -443,7 +477,7 @@ impl Oryxis {
     /// Whether the terminal tab at `idx` is in the strip of the window
     /// the handler is running for. Always true with a single window.
     pub(crate) fn shows_tab(&self, idx: usize) -> bool {
-        if self.extra_windows.is_empty() && self.window_ctx.is_none() {
+        if self.extra_windows.is_empty() && self.window_ctx.is_none() && self.parked_views.is_empty() {
             return true;
         }
         self.tabs
@@ -494,7 +528,7 @@ impl Oryxis {
     /// window. Reads through `cur_tab_order`, so a menu being drawn and
     /// the handler it fires agree. Always true with a single window.
     pub(crate) fn shows_sftp_tab(&self, idx: usize) -> bool {
-        if self.extra_windows.is_empty() && self.window_ctx.is_none() {
+        if self.extra_windows.is_empty() && self.window_ctx.is_none() && self.parked_views.is_empty() {
             return true;
         }
         self.sftp_tabs
@@ -514,9 +548,113 @@ impl Oryxis {
     /// operations stay there), or as the plain message when the pane is
     /// gone.
     pub(crate) fn update_for_pane(&mut self, pane: Uuid, message: Message) -> Task<Message> {
+        let message = self.on_vault_of_pane(pane, message);
         match self.window_of_pane(pane) {
             Some(target) => self.update_in_window(target, message),
             None => self.update(message),
+        }
+    }
+
+    /// The vault a tab belongs to (`TerminalTab::vault` / `SftpTab::vault`).
+    pub(crate) fn vault_of_tab(&self, id: Uuid) -> Option<Uuid> {
+        self.tabs
+            .iter()
+            .find(|t| t._id == id)
+            .map(|t| t.vault)
+            .or_else(|| self.sftp_tabs.iter().find(|t| t.id == id).map(|t| t.vault))
+            .flatten()
+    }
+
+    /// `message` about `pane`, to run on the vault of the pane's tab: the
+    /// window holding the tab may be working on another vault while the
+    /// tab is parked there (`ParkedView`).
+    fn on_vault_of_pane(&self, pane: Uuid, message: Message) -> Message {
+        let vault = self
+            .pane_tab_index(pane)
+            .and_then(|i| self.tabs[i].vault);
+        match vault {
+            Some(vault) => Message::ForVault(vault, Box::new(message)),
+            None => message,
+        }
+    }
+
+    /// Run `message` with vault `vault` as the one `update` works on,
+    /// whatever window's values are in the fields, and keep its follow-ups
+    /// on that vault. A vault that is not open runs the message as is.
+    pub(crate) fn update_on_vault(&mut self, vault: Uuid, message: Message) -> Task<Message> {
+        if self.vaults.current_id() == vault || !self.vaults.is_open(vault) {
+            return self.update(message);
+        }
+        let previous = self.vaults.act_on(vault);
+        // `update` keeps the follow-ups on `vault`.
+        let task = self.update(message);
+        self.vaults.act_back(previous);
+        task
+    }
+
+    /// Point the window in the fields at vault `target` (the switcher):
+    /// what it shows of the vault it leaves is parked, panels aside (they
+    /// follow it: Settings now edits `target`), and what it kept of
+    /// `target` comes back; the hosts screen the first time. The tabs it
+    /// parks keep running.
+    pub(crate) fn switch_window_vault(&mut self, target: Uuid) {
+        let from = self.vaults.window_id();
+        if from == target || !self.vaults.is_open(target) {
+            return;
+        }
+        let on_panel = crate::state::PanelKind::for_view(self.active_view).is_some();
+        // The SFTP buffer goes home to its tab before the tab is parked.
+        let owner = self.park_sftp_owner();
+        let active = match (self.active_view, owner) {
+            (View::Sftp, SftpOwner::Standalone(id)) => Some(id),
+            _ => self.active_tab.and_then(|i| self.tabs.get(i)).map(|t| t._id),
+        };
+        let is_panel = |r: &TabRef| matches!(r, TabRef::Panel(_));
+        let (panels, tabs): (Vec<TabRef>, Vec<TabRef>) =
+            std::mem::take(&mut self.tab_order).into_iter().partition(is_panel);
+        let (panel_mru, tab_mru): (Vec<TabRef>, Vec<TabRef>) =
+            std::mem::take(&mut self.tab_mru).into_iter().partition(is_panel);
+        let left = ParkedView {
+            order: tabs,
+            active,
+            mru: tab_mru,
+            view: if on_panel { View::Dashboard } else { self.active_view },
+            nav: std::mem::take(&mut self.nav),
+        };
+        self.parked_views.insert(from, left);
+        self.vaults.switch_window_to(target);
+        let back = self.parked_views.remove(&target).unwrap_or(ParkedView {
+            order: Vec::new(),
+            active: None,
+            mru: Vec::new(),
+            view: View::Dashboard,
+            nav: WindowNav::default(),
+        });
+        self.tab_order = back.order;
+        self.tab_order.extend(panels);
+        self.tab_mru = back.mru;
+        self.tab_mru.extend(panel_mru);
+        self.nav = back.nav;
+        self.active_tab = None;
+        let mut view = back.view;
+        match (view, back.active) {
+            (View::Sftp, Some(id)) => {
+                self.hoist_sftp_owner(SftpOwner::Standalone(id));
+                if self.active_sftp.is_none() {
+                    view = View::Dashboard;
+                }
+            }
+            (_, Some(id)) => {
+                self.active_tab = self.tabs.iter().position(|t| t._id == id);
+                if view == View::Terminal && self.active_tab.is_none() {
+                    view = View::Dashboard;
+                }
+            }
+            (View::Terminal | View::Sftp, None) => view = View::Dashboard,
+            _ => {}
+        }
+        if !on_panel {
+            self.active_view = view;
         }
     }
 
@@ -524,7 +662,8 @@ impl Oryxis {
     /// SFTP): `None` is the resident one.
     pub(crate) fn window_of_tab(&self, id: Uuid) -> Option<window::Id> {
         if let Some(ctx) = &self.window_ctx
-            && self.tab_order.iter().any(|r| r.strip_id() == id)
+            && (self.tab_order.iter().any(|r| r.strip_id() == id)
+                || self.tabs_parked_here().contains(&id))
         {
             return Some(ctx.id);
         }
@@ -675,7 +814,8 @@ impl Oryxis {
             focused: std::mem::replace(&mut self.window_focused, w.focused),
             mru: std::mem::replace(&mut self.tab_mru, w.mru),
             nav: std::mem::replace(&mut self.nav, w.nav),
-            vault: self.vaults.switch_to(w.vault),
+            vault: self.vaults.enter_window(w.vault),
+            parked: std::mem::replace(&mut self.parked_views, w.parked),
         });
         self.active_tab = w
             .active
@@ -721,7 +861,8 @@ impl Oryxis {
             focused: std::mem::replace(&mut self.window_focused, ctx.focused),
             mru: std::mem::replace(&mut self.tab_mru, ctx.mru),
             nav: std::mem::replace(&mut self.nav, ctx.nav),
-            vault: self.vaults.switch_to(ctx.vault),
+            vault: self.vaults.leave_window(ctx.vault),
+            parked: std::mem::replace(&mut self.parked_views, ctx.parked),
         };
         self.active_view = ctx.view;
         self.active_tab = ctx
@@ -796,6 +937,42 @@ impl Oryxis {
 
     /// Every window but the current one (`None` is the resident), in a
     /// stable order.
+    /// The vault window `target` works on (`None` = the resident one),
+    /// whichever window's values are in the fields.
+    pub(crate) fn vault_of_window(&self, target: Option<window::Id>) -> Uuid {
+        match target {
+            Some(id) if self.window_ctx.as_ref().is_some_and(|c| c.id == id) => self.vaults.window_id(),
+            Some(id) => match self.extra_windows.get(&id) {
+                Some(w) => w.vault,
+                None => self.vaults.window_id(),
+            },
+            None => match &self.window_ctx {
+                Some(ctx) => ctx.vault.window(),
+                None => self.vaults.window_id(),
+            },
+        }
+    }
+
+    /// A window working on vault `vault`: `Some(None)` for the resident
+    /// one (preferred), `Some(Some(id))` for an extra one, `None` when no
+    /// window shows it.
+    pub(crate) fn window_on_vault(&self, vault: Uuid) -> Option<Option<window::Id>> {
+        if self.vault_of_window(None) == vault {
+            return Some(None);
+        }
+        self.extra_windows
+            .iter()
+            .find(|(_, w)| w.vault == vault)
+            .map(|(id, _)| Some(*id))
+            .or_else(|| {
+                // The window in the fields, when it is an extra one.
+                self.window_ctx
+                    .as_ref()
+                    .filter(|_| self.vaults.window_id() == vault)
+                    .map(|c| Some(c.id))
+            })
+    }
+
     pub(crate) fn other_windows(&self) -> Vec<Option<window::Id>> {
         let current = self.cur_window();
         let mut out = Vec::new();
@@ -942,7 +1119,8 @@ impl Oryxis {
         // entered.
         if let Message::ForPane(pane, inner) = message {
             let target = self.window_of_pane(pane).unwrap_or(id);
-            return self.update_in_window(target, *inner);
+            let inner = self.on_vault_of_pane(pane, *inner);
+            return self.update_in_window(target, inner);
         }
         let current = self.window_ctx.as_ref().map(|c| c.id);
         let target = if current == Some(id) || self.extra_windows.contains_key(&id) {
@@ -989,11 +1167,14 @@ impl Oryxis {
     /// outlives the windows (the restore-on-launch snapshot).
     pub(crate) fn all_strip_refs(&self) -> Vec<TabRef> {
         let mut refs = self.tab_order.clone();
+        refs.extend(self.parked_views.values().flat_map(|p| p.order.iter().copied()));
         if let Some(ctx) = &self.window_ctx {
             refs.extend(ctx.order.iter().copied());
+            refs.extend(ctx.parked.values().flat_map(|p| p.order.iter().copied()));
         }
         for w in self.extra_windows.values() {
             refs.extend(w.order.iter().copied());
+            refs.extend(w.parked.values().flat_map(|p| p.order.iter().copied()));
         }
         refs
     }
@@ -1011,8 +1192,15 @@ impl Oryxis {
                 TabRef::Terminal(id) | TabRef::Sftp(id) => Some(*id),
                 TabRef::Panel(_) => None,
             }));
+            ids.extend(ctx.parked.values().flat_map(ParkedView::tab_ids));
         }
         ids
+    }
+
+    /// The tabs the window in the fields keeps parked under the vaults it
+    /// is not working on: held by it, not shown.
+    pub(crate) fn tabs_parked_here(&self) -> std::collections::HashSet<Uuid> {
+        self.parked_views.values().flat_map(ParkedView::tab_ids).collect()
     }
 
     /// Drop the refs of tabs that no longer exist from every strip that
@@ -1025,7 +1213,25 @@ impl Oryxis {
             .chain(self.sftp_tabs.iter().map(|t| t.id))
             .collect();
         let panels = &self.open_panel_tabs;
+        // Parked views hold tabs only (panels follow the window).
+        let prune_parked = |parked: &mut ParkedViews| {
+            for p in parked.values_mut() {
+                p.order.retain(|r| r.tab_id_in(&alive));
+                p.mru.retain(|r| r.tab_id_in(&alive));
+                if p.active.is_some_and(|a| !alive.contains(&a)) {
+                    p.active = None;
+                    if matches!(p.view, View::Terminal | View::Sftp) {
+                        p.view = View::Dashboard;
+                    }
+                }
+            }
+        };
+        prune_parked(&mut self.parked_views);
+        if let Some(ctx) = self.window_ctx.as_mut() {
+            prune_parked(&mut ctx.parked);
+        }
         for w in self.extra_windows.values_mut() {
+            prune_parked(&mut w.parked);
             w.order.retain(|r| match r {
                 TabRef::Terminal(id) | TabRef::Sftp(id) => alive.contains(id),
                 TabRef::Panel(kind) => panels.contains(kind),

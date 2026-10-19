@@ -145,7 +145,7 @@ impl Oryxis {
                     .vaults.cur().connections
                     .iter()
                     .find(|c| c.id == conn_id)
-                    .or_else(|| self.quick_connects.get(&conn_id).map(|e| &e.conn))
+                    .or_else(|| self.vaults.cur().quick_connects.get(&conn_id).map(|e| &e.conn))
                     .map(|c| match category {
                         oryxis_ssh::NegCategory::Cipher => c.ciphers.is_some(),
                         oryxis_ssh::NegCategory::Kex => c.kex.is_some(),
@@ -225,7 +225,7 @@ impl Oryxis {
                     if remember && let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.save_connection(&self.vaults.cur().connections[idx], None);
                     }
-                } else if let Some(entry) = self.quick_connects.get_mut(&pending.conn_id) {
+                } else if let Some(entry) = self.vaults.cur_mut().quick_connects.get_mut(&pending.conn_id) {
                     // Ad-hoc host: expand the in-memory entry only. There
                     // is nothing to remember (the dialog hides the
                     // checkbox for quick connects); the QuickConnect retry

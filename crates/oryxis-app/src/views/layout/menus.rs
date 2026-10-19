@@ -54,6 +54,8 @@ impl Oryxis {
             // Fits "Import ~/.ssh/config" / "Export all hosts" and the
             // longer translations of both on one line.
             OverlayContent::CloudProviderPicker => 210.0,
+            // A vault name plus its "open in new window" button.
+            OverlayContent::VaultSwitcher => 240.0,
             // "Export transcript (.txt)" + translations on one line,
             // with room for the privacy footer to wrap sanely.
             OverlayContent::SessionLogActions(_) => 240.0,
@@ -201,6 +203,7 @@ impl Oryxis {
             // conditional (`split_menu_rows` / `tab_bar_menu_rows`).
             OverlayContent::SplitMenu => self.split_menu_rows(),
             OverlayContent::TabBarActions => self.tab_bar_menu_rows(),
+            OverlayContent::VaultSwitcher => self.vault_switcher_menu_rows(),
             // Counted next to its builder too, for the same reason as
             // the two above: its rows are conditional.
             OverlayContent::TerminalContextMenu(pane_id, sel) => {
@@ -389,6 +392,7 @@ impl Oryxis {
             OverlayContent::DynamicGroupActions(id) => self.build_menu_dynamic_group_actions(*id),
             OverlayContent::CloudProfileActions(id) => self.build_menu_cloud_profile_actions(*id),
             OverlayContent::CloudProviderPicker => self.build_menu_cloud_provider_picker(),
+            OverlayContent::VaultSwitcher => self.build_menu_vault_switcher(),
             OverlayContent::SidebarFilesRow { path, is_dir } => {
                 self.build_menu_sidebar_files_row(path.clone(), *is_dir)
             }
@@ -528,7 +532,7 @@ impl Oryxis {
         // chip is only present when the vault switcher shows (must match
         // `subnav_pill_split`), otherwise the menu lands ~115 px too far
         // right and clips off the window edge.
-        let chip = if self.show_vault_switcher() { 115.0 + 8.0 } else { 0.0 };
+        let chip = if self.show_vault_switcher() { self.vault_chip_width() + 8.0 } else { 0.0 };
         let inline_w: f32 = inline
             .iter()
             .map(|(k, _)| Self::subnav_pill_width(k))

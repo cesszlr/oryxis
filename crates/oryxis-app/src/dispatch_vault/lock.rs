@@ -271,7 +271,7 @@ impl Oryxis {
                     // matching the soft-lock promise that live tabs survive.
                     // A post-unlock reconnect of a password-based quick host
                     // falls back to the interactive prompt.
-                    for entry in self.quick_connects.values_mut() {
+                    for entry in self.vaults.cur_mut().quick_connects.values_mut() {
                         entry.password = None;
                         entry.totp_secret = None;
                         entry.proxy_password = None;
@@ -313,7 +313,7 @@ impl Oryxis {
                         // Same reset as the soft lock: lead with biometrics.
                         self.vaults.cur_mut().vault_ui.password_fallback = false;
                         self.vaults.cur_mut().connections.clear();
-                        self.quick_connects.clear();
+                        self.vaults.cur_mut().quick_connects.clear();
                         self.vaults.cur_mut().keys.clear();
                         self.vaults.cur_mut().snippets.clear();
                         self.vaults.cur_mut().groups.clear();
@@ -330,22 +330,45 @@ impl Oryxis {
                         // stored value an open edit caches) must not
                         // outlive the key behind the lock screen.
                         self.sweep_sync_passphrase();
+                        // What this lock severs is THIS vault's: its tabs,
+                        // its SFTP tabs. Another open vault's sessions go on
+                        // (each vault locks on its own).
+                        let vault = self.vaults.current_id();
+                        let mine = |owner: Option<uuid::Uuid>| owner.is_none_or(|v| v == vault);
+                        // The window in the fields shows this vault (the
+                        // lock button), or another one ("Lock all", one
+                        // `ForVault` per vault): only the first has its own
+                        // surface reset here.
+                        let in_view = self.vaults.window_id() == vault;
                         // Close live remote sessions, not just the panes
                         // referencing them, so locking the vault really
                         // severs the remote connections.
-                        for tab in &self.tabs {
+                        for tab in self.tabs.iter().filter(|t| mine(t.vault)) {
                             Self::close_tab_sessions(tab);
                         }
                         // Drop RDP/VNC tunnels too (each Arc drop cancels
                         // the -L forward); locking severs everything. The
                         // terminal's callback tunnels go the same way, and
                         // a link waiting on an answer stops waiting.
-                        self.remote_desktop_forwards.clear();
+                        self.vaults.cur_mut().remote_desktop_forwards.clear();
                         // And the login staged for mstsc: a client still
                         // up holds it in memory, the store need not.
                         crate::remote_desktop::sweep_stale_credentials();
-                        self.link_forwards.clear();
-                        self.link_confirm = None;
+                        // The panes that stay are the other vaults'.
+                        let staying_panes: std::collections::HashSet<uuid::Uuid> = self
+                            .tabs
+                            .iter()
+                            .filter(|t| !mine(t.vault))
+                            .flat_map(|t| t.pane_grid.panes.values().map(|p| p.id))
+                            .collect();
+                        self.link_forwards.retain(|(pane, _), _| staying_panes.contains(pane));
+                        if self
+                            .link_confirm
+                            .as_ref()
+                            .is_some_and(|c| !c.pane_id.is_some_and(|p| staying_panes.contains(&p)))
+                        {
+                            self.link_confirm = None;
+                        }
                         // A buffer parked for Save Output is the terminal's
                         // text, gone with the terminal.
                         self.save_output = None;
@@ -355,7 +378,7 @@ impl Oryxis {
                         // the terminal teardown above. Without this an SFTP tab's
                         // session Arc would outlive the lock screen and reappear
                         // mounted after unlock.
-                        for tab in &self.sftp_tabs {
+                        for tab in self.sftp_tabs.iter().filter(|t| mine(t.vault)) {
                             if let Some(session) = &tab.state.left.session {
                                 session.close();
                             }
@@ -377,12 +400,47 @@ impl Oryxis {
                         if let Some(session) = &self.cur_sftp().right.session {
                             session.close();
                         }
-                        self.sftp_tabs.clear();
-                        self.tab_order.retain(|r| !matches!(r, crate::state::TabRef::Sftp(_)));
-                        self.sftp = crate::state::SftpState::default();
-                        self.active_sftp = None;
-                        self.tabs.clear();
-                        self.active_tab = None;
+                        let gone_sftp: std::collections::HashSet<uuid::Uuid> = self
+                            .sftp_tabs
+                            .iter()
+                            .filter(|t| mine(t.vault))
+                            .map(|t| t.id)
+                            .collect();
+                        self.sftp_tabs.retain(|t| !mine(t.vault));
+                        self.tab_order.retain(|r| {
+                            !matches!(r, crate::state::TabRef::Sftp(id) if gone_sftp.contains(id))
+                        });
+                        if in_view {
+                            self.sftp = crate::state::SftpState::default();
+                            self.active_sftp = None;
+                        }
+                        // The progress card of a dial on one of these tabs
+                        // ends with it; one on a staying tab follows its
+                        // tab to the new index.
+                        let dialing = self
+                            .connecting
+                            .as_ref()
+                            .and_then(|c| self.tabs.get(c.tab_idx))
+                            .map(|t| (t._id, mine(t.vault)));
+                        if dialing.is_some_and(|(_, gone)| gone) {
+                            self.abort_progress_dial();
+                            self.connecting = None;
+                        }
+                        let active_id = self.active_tab.and_then(|i| self.tabs.get(i)).map(|t| t._id);
+                        self.tabs.retain(|t| !mine(t.vault));
+                        if let Some((id, false)) = dialing
+                            && let Some(c) = self.connecting.as_mut()
+                            && let Some(idx) = self.tabs.iter().position(|t| t._id == id)
+                        {
+                            c.tab_idx = idx;
+                        }
+                        // Another vault's window keeps its tab in front, at
+                        // the index it has now.
+                        self.active_tab = if in_view {
+                            None
+                        } else {
+                            active_id.and_then(|id| self.tabs.iter().position(|t| t._id == id))
+                        };
                         // The reopen stack goes with them (issue #186).
                         // A manual lock is an explicit "I'm done" that
                         // severs every session; leaving a chord that
@@ -390,7 +448,7 @@ impl Oryxis {
                         // same stale state this sweep exists to clear.
                         // The SOFT lock deliberately keeps it, along with
                         // the tabs and sessions it also keeps.
-                        self.closed_tabs.clear();
+                        self.vaults.cur_mut().closed_tabs.clear();
                         // And so does the restore-on-launch snapshot,
                         // for the same reason and by the same rule
                         // (issue #206): the strip it names is the one
@@ -409,15 +467,17 @@ impl Oryxis {
                         // (issue #229): dials queued for chips this
                         // lock is about to tear down, and a landing
                         // nobody took.
-                        self.launch_dials.clear();
-                        self.launch_landing = None;
-                        self.launch_landing_deferred = None;
+                        self.vaults.cur_mut().launch_dials.clear();
+                        self.vaults.cur_mut().launch_landing = None;
+                        self.vaults.cur_mut().launch_landing_deferred = None;
                         // A batch connect still in progress goes the same
                         // way: the next unlock must not resume dialling a
                         // list the user picked before locking.
-                        self.batch_dials.clear();
+                        self.vaults.cur_mut().batch_dials.clear();
                         self.clear_terminal_tab_memory();
-                        self.active_view = View::Dashboard;
+                        if in_view {
+                            self.active_view = View::Dashboard;
+                        }
                         // Mirror the soft-lock UI sweep: the manual lock
                         // used to leave overlays, side panels, revealed
                         // secrets and pending auth prompts armed behind
@@ -514,9 +574,11 @@ impl Oryxis {
                         self.pending_auth_switch = None;
                         // Same auto-focus as the soft lock: the unlock
                         // field is the only thing to interact with.
-                        return crate::widgets::focus_input(iced::widget::Id::new(
-                            "vault-unlock-password",
-                        ));
+                        if in_view {
+                            return crate::widgets::focus_input(iced::widget::Id::new(
+                                "vault-unlock-password",
+                            ));
+                        }
                     } else {
                         // No user password: re-open immediately
                         if let Some(vault) = self.vaults.cur_mut().store.as_mut() {

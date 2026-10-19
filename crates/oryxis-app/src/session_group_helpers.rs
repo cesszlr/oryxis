@@ -316,6 +316,7 @@ mod tests {
         let tab = TerminalTab {
             _id: Uuid::new_v4(),
             label: "t".into(),
+            vault: None,
             custom_name: None,
             pane_grid: grid,
             focused,

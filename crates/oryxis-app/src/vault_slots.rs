@@ -30,6 +30,17 @@ pub(crate) struct OpenVault {
     pub(crate) id: Uuid,
     /// `None` when the file did not open (the open-failed screen).
     pub(crate) store: Option<VaultStore>,
+    /// The file (`None` only when no home directory resolves): what the
+    /// open-failed screen names and the rebuild works on.
+    pub(crate) path: Option<std::path::PathBuf>,
+    /// Made with "New vault" in this session, from a window on the vault
+    /// named here: its setup screen is the master-password step alone,
+    /// not the first-run carousel, and cancelling that step goes back
+    /// there (the empty new vault goes away).
+    pub(crate) created_from: Option<Uuid>,
+    /// `load_data_from_vault` ran for it in this process (a vault opened
+    /// unlocked by a window switching to it loads on the switch).
+    pub(crate) loaded: bool,
     // Data
     pub(crate) connections: Vec<Connection>,
     pub(crate) groups: Vec<Group>,
@@ -111,6 +122,70 @@ pub(crate) struct OpenVault {
     /// What the user configured in this vault (every preference that is
     /// not the device's, see `state::DevicePrefs`).
     pub(crate) prefs: crate::state::AppPrefs,
+    /// Ad-hoc quick-connect hosts, keyed by connection id. Never touches
+    /// the vault or `connections` (so no grid / sync / export leakage).
+    /// Entries carry the credentials typed in the editor flow so a
+    /// reconnect can reuse them; swept on vault lock, pruned when the
+    /// last pane referencing an entry closes.
+    pub(crate) quick_connects: std::collections::HashMap<Uuid, crate::state::QuickConnectEntry>,
+    /// Tabs the user closed, newest last, capped: the stack
+    /// `ReopenClosedTab` pops (issue #186). Terminal and SFTP tabs share
+    /// it, so the chord always brings back the last chip that left the
+    /// strip whichever kind it was. See [`crate::state::ClosedTab`] for
+    /// why it holds a pin spec and why it is not persisted.
+    pub(crate) closed_tabs: Vec<crate::state::ClosedTab>,
+    /// Restored tabs still owed a dial under "connect at launch" (issue
+    /// #229), in strip order. Drained ONE AT A TIME by
+    /// `advance_launch_dials` from the update funnel, the next only once
+    /// no dial is in flight anywhere, because the host-key, 2FA and
+    /// command-proxy answers ride single staging slots that several
+    /// first-time dials at once would overwrite. Seeded once per process
+    /// next to the restore; a manual lock drops it with the strip.
+    pub(crate) launch_dials: std::collections::VecDeque<uuid::Uuid>,
+    /// Saved hosts still owed a dial by a batch connect from the host
+    /// list (issue #230), in the order the dashboard showed them. Same
+    /// shape and same reason as `launch_dials`: drained ONE AT A TIME by
+    /// `advance_batch_dials` from the update funnel, because the
+    /// host-key, 2FA and command-proxy answers ride single staging slots,
+    /// and a batch of freshly imported hosts is exactly the batch of
+    /// first-time dials that would mis-route them. Host ids, never list
+    /// indices: every dial flushes the editor, which re-sorts the list.
+    pub(crate) batch_dials: std::collections::VecDeque<uuid::Uuid>,
+    /// The chip to land on after the restore, when the user asked to
+    /// open on the tab that was active (issue #229). Resolved to a live
+    /// strip entry at restore time and TAKEN by the boot / unlock site
+    /// that lands, so a later unlock (a soft lock) finds nothing.
+    pub(crate) launch_landing: Option<crate::state::TabRef>,
+    /// The landing tab when its dial had to wait for the local terminal
+    /// scan: the launch queue selects it once it dials it, because
+    /// selecting a dormant tab earlier runs the foreground reopen, which
+    /// would resolve the terminal against a list that does not exist yet.
+    pub(crate) launch_landing_deferred: Option<uuid::Uuid>,
+    /// History view: also search inside recorded session content
+    /// (typed commands + output), the toggle chip inside the search
+    /// field. Session-scoped UI state, not persisted.
+    pub(crate) history_search_content: bool,
+    /// Async results + scan progress for the content search above.
+    pub(crate) history_content: crate::state::HistoryContentSearch,
+    /// Live RDP/VNC-over-SSH tunnels, keyed by the host's connection id.
+    /// A managed `-L` forward paired with its launch generation. The tunnel
+    /// self-closes once the desktop client disconnects and it goes idle (see
+    /// `spawn_autoclose_local_forward_task`); relaunching a host replaces its
+    /// entry (dropping the old `ForwardSession` cancels it), and vault
+    /// lock / app close clears the map. The generation lets a stale
+    /// self-close from a superseded tunnel skip the current entry.
+    pub(crate) remote_desktop_forwards: std::collections::HashMap<
+        Uuid,
+        (u64, std::sync::Arc<oryxis_ssh::ForwardSession>),
+    >,
+    /// Whether this vault's restore-on-launch pass has already run in
+    /// this process (each vault restores its own strip the first time it
+    /// is loaded). `load_data_from_vault` re-runs on connection save, sync
+    /// and vault reload; pins survive that because they dedupe by pin
+    /// identity, and ordinary tabs cannot (two tabs on one host are
+    /// legitimate), so this is what stops a re-run from recreating tabs
+    /// the user has closed since boot.
+    pub(crate) open_tabs_restored: bool,
     /// Its chrome theme. Mirrors the process-wide theme while a window
     /// on this vault is the one `update` works on (`VaultSlots::switch_to`
     /// applies it, the update funnel reads it back); a window on it
@@ -397,6 +472,9 @@ impl OpenVault {
         Self {
             id,
             store,
+            path: None,
+            created_from: None,
+            loaded: false,
             connections: Vec::new(),
             connections_with_password: std::collections::HashSet::new(),
             groups: Vec::new(),
@@ -422,6 +500,16 @@ impl OpenVault {
             custom_ui_themes: Vec::new(),
             files_recent_folders: std::collections::HashMap::new(),
             prefs: crate::state::AppPrefs::default(),
+            quick_connects: std::collections::HashMap::new(),
+            closed_tabs: Vec::new(),
+            launch_dials: std::collections::VecDeque::new(),
+            launch_landing: None,
+            launch_landing_deferred: None,
+            batch_dials: std::collections::VecDeque::new(),
+            remote_desktop_forwards: std::collections::HashMap::new(),
+            history_content: crate::state::HistoryContentSearch::default(),
+            history_search_content: false,
+            open_tabs_restored: false,
             ui_theme: crate::theme::ThemeSelection::current(),
             editor_form: crate::state::ConnectionForm::default(),
             editor_initial_command: iced::widget::text_editor::Content::new(),
@@ -509,18 +597,123 @@ impl OpenVault {
     }
 }
 
+/// Where a vault just opened stands: brand new (`NeedSetup`), locked
+/// behind its master password (`Locked`), or open (`Unlocked`: no
+/// password, or `inherited` was the right one), and whether it has a
+/// master password at all.
+///
+/// The plaintext `has_user_password` flag is read before
+/// `open_without_password`, which runs a full Argon2id KDF against the
+/// empty password just to learn that the vault is locked (~17 ms on every
+/// open of a password vault). Legacy vaults that predate the flag get it
+/// backfilled here.
+pub(crate) fn initial_lock_state(
+    store: &mut VaultStore,
+    inherited: Option<&str>,
+) -> (crate::state::VaultState, bool) {
+    use crate::state::VaultState;
+    if !store.is_initialized() {
+        // Stamp the Ctrl+digit slot migration as already done, so the
+        // boot migration in `load_data_from_vault` leaves this vault on
+        // the new mapping (slot N = tab N). Only vaults that predate the
+        // change reach that migration unstamped and keep Home in the first
+        // slot. This is the one place that can tell a fresh vault from an
+        // existing one.
+        let _ = store.set_setting("tab_slots_home_migrated", "true");
+        return (VaultState::NeedSetup, false);
+    }
+    let unlock_inherited = |store: &mut VaultStore| {
+        let unlocked = inherited.is_some_and(|pw| store.unlock(pw).is_ok());
+        if unlocked { VaultState::Unlocked } else { VaultState::Locked }
+    };
+    let flag = store.get_setting("has_user_password").ok().flatten();
+    if matches!(flag.as_deref(), Some("1")) {
+        // Skip the empty-password KDF entirely; try the inherited password
+        // (`--inherit-vault` stdin) before the lock screen.
+        return (unlock_inherited(store), true);
+    }
+    // The flag says "0" or is missing (legacy vault): try the empty
+    // unlock, and backfill the flag when it was missing.
+    match store.open_without_password() {
+        Ok(()) => {
+            if flag.is_none() {
+                let _ = store.set_setting("has_user_password", "0");
+            }
+            (VaultState::Unlocked, false)
+        }
+        Err(_) => {
+            if flag.is_none() {
+                let _ = store.set_setting("has_user_password", "1");
+            }
+            (unlock_inherited(store), true)
+        }
+    }
+}
+
 /// Every open vault, and the one the window acting now works on.
 pub(crate) struct VaultSlots {
     open: HashMap<Uuid, OpenVault>,
-    /// The vault of the window whose values are in the fields.
+    /// The vault the window whose values are in the fields works on:
+    /// what its strip shows (`reconcile_tab_order`).
+    window: Uuid,
+    /// The vault the running code acts on: the window's, or another one
+    /// for the length of a `ForVault` message or a pass over every vault
+    /// (`act_on`).
     current: Uuid,
+}
+
+/// Where `VaultSlots` stood before a window's values came into the fields,
+/// put back when they leave (`enter_window` / `exit_window`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SlotMark {
+    window: Uuid,
+    current: Uuid,
+}
+
+impl SlotMark {
+    /// The vault of the window whose values were in the fields.
+    pub(crate) fn window(self) -> Uuid {
+        self.window
+    }
 }
 
 impl VaultSlots {
     /// A process with one vault open (or the one it failed to open).
     pub(crate) fn single(vault: OpenVault) -> Self {
         let current = vault.id;
-        Self { open: HashMap::from([(current, vault)]), current }
+        Self { open: HashMap::from([(current, vault)]), window: current, current }
+    }
+
+    /// Every open vault, for the app-wide passes that visit each (the
+    /// persisted strips, the agent's key list). Code about the acting
+    /// window reads [`Self::cur`].
+    pub(crate) fn all(&self) -> impl Iterator<Item = &OpenVault> {
+        self.open.values()
+    }
+
+    /// The ids of every open vault.
+    pub(crate) fn ids(&self) -> impl Iterator<Item = Uuid> + '_ {
+        self.open.keys().copied()
+    }
+
+    /// Add a vault just opened beside the others (`open_vault`).
+    pub(crate) fn insert(&mut self, vault: OpenVault) {
+        self.open.insert(vault.id, vault);
+    }
+
+    /// Take vault `id` out of this process (its store closes with it).
+    /// Never the vault the window in the fields or the running code is
+    /// on: the caller moves away first.
+    pub(crate) fn remove(&mut self, id: Uuid) -> Option<OpenVault> {
+        if id == self.window || id == self.current {
+            return None;
+        }
+        self.open.remove(&id)
+    }
+
+    /// Whether vault `id` is open in this process.
+    pub(crate) fn is_open(&self, id: Uuid) -> bool {
+        self.open.contains_key(&id)
     }
 
     /// The id of the vault the window in the fields works on: what a
@@ -529,21 +722,55 @@ impl VaultSlots {
         self.current
     }
 
-    /// Make `id` the vault of the window in the fields (the window swap
-    /// of `enter_window` / `exit_window`), handing back the one it
-    /// replaces.
-    pub(crate) fn set_current(&mut self, id: Uuid) -> Uuid {
-        std::mem::replace(&mut self.current, id)
+    /// The id of the vault the window in the fields works on.
+    pub(crate) fn window_id(&self) -> Uuid {
+        self.window
     }
 
-    /// Hand the fields to a window on vault `id` (`enter_window` /
-    /// `exit_window`): the outgoing vault keeps the process-wide theme it
-    /// had, the incoming one's becomes it. Returns the outgoing id.
-    pub(crate) fn switch_to(&mut self, id: Uuid) -> Uuid {
+    /// Act on vault `id`: the outgoing vault keeps the process-wide theme
+    /// it had, the incoming one's becomes it. Returns the outgoing one.
+    fn set_acting(&mut self, id: Uuid) -> Uuid {
         self.cur_mut().ui_theme = crate::theme::ThemeSelection::current();
-        let previous = self.set_current(id);
+        let previous = std::mem::replace(&mut self.current, id);
         self.cur().ui_theme.apply();
         previous
+    }
+
+    /// Act on vault `id` for a while (a `ForVault` message, a pass over
+    /// every vault), the window in the fields unchanged. Undo with
+    /// [`Self::act_back`] and the returned id.
+    pub(crate) fn act_on(&mut self, id: Uuid) -> Uuid {
+        self.set_acting(id)
+    }
+
+    /// The end of [`Self::act_on`].
+    pub(crate) fn act_back(&mut self, previous: Uuid) {
+        self.set_acting(previous);
+    }
+
+    /// A window on vault `id` takes the fields (`enter_window`): it is
+    /// what the strip shows and what the code acts on. Undo with
+    /// [`Self::leave_window`] and the returned mark.
+    pub(crate) fn enter_window(&mut self, id: Uuid) -> SlotMark {
+        let mark = SlotMark { window: self.window, current: self.current };
+        self.window = id;
+        self.set_acting(id);
+        mark
+    }
+
+    /// The end of [`Self::enter_window`]: answers the vault the leaving
+    /// window works on (it may have switched meanwhile).
+    pub(crate) fn leave_window(&mut self, mark: SlotMark) -> Uuid {
+        let leaving = self.window;
+        self.window = mark.window;
+        self.set_acting(mark.current);
+        leaving
+    }
+
+    /// The window in the fields now works on vault `id` (the switcher).
+    pub(crate) fn switch_window_to(&mut self, id: Uuid) {
+        self.window = id;
+        self.set_acting(id);
     }
 
     /// The vault the acting window works on.
@@ -564,10 +791,8 @@ impl VaultSlots {
 
 #[cfg(test)]
 impl VaultSlots {
-    /// Open a second vault beside the first (the multi-vault doors that
-    /// open one in the app arrive with the switcher).
     pub(crate) fn insert_for_test(&mut self, vault: OpenVault) {
-        self.open.insert(vault.id, vault);
+        self.insert(vault);
     }
 }
 
@@ -586,13 +811,32 @@ mod tests {
         slots.insert_for_test(bare(b));
         assert_eq!(slots.cur().id, a);
         // `enter_window` of a window on vault `b`.
-        let resident = slots.set_current(b);
-        assert_eq!(resident, a);
+        let mark = slots.enter_window(b);
+        assert_eq!(mark.window(), a);
         assert_eq!(slots.cur().id, b);
         assert_eq!(slots.cur_mut().id, b);
+        assert_eq!(slots.window_id(), b);
         // `exit_window`.
-        slots.set_current(resident);
+        assert_eq!(slots.leave_window(mark), b);
         assert_eq!(slots.cur().id, a);
+        assert_eq!(slots.window_id(), a);
+    }
+
+    #[test]
+    fn acting_on_another_vault_keeps_the_window_where_it_is() {
+        let (a, b, c) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        let mut slots = VaultSlots::single(bare(a));
+        slots.insert_for_test(bare(b));
+        slots.insert_for_test(bare(c));
+        let previous = slots.act_on(b);
+        assert_eq!((slots.current_id(), slots.window_id()), (b, a));
+        // A window on `c` entered while acting on `b` gives both back.
+        let mark = slots.enter_window(c);
+        assert_eq!((slots.current_id(), slots.window_id()), (c, c));
+        slots.leave_window(mark);
+        assert_eq!((slots.current_id(), slots.window_id()), (b, a));
+        slots.act_back(previous);
+        assert_eq!((slots.current_id(), slots.window_id()), (a, a));
     }
 
     #[test]

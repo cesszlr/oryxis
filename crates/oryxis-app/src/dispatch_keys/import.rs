@@ -292,7 +292,7 @@ impl Oryxis {
                 self.nav.history_search = v;
                 // With the content toggle on, every edit re-arms the
                 // debounced command/output search (see dispatch_history).
-                if self.history_search_content {
+                if self.vaults.cur().history_search_content {
                     return Ok(self.history_content_debounce());
                 }
             }

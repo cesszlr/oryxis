@@ -75,7 +75,11 @@ impl Oryxis {
         let logo = svg(self.logo_handle.clone())
             .width(64)
             .height(64);
-        let title = text("Oryxis").size(28).color(OryxisColors::t().accent);
+        // With several vaults the lock screen names the one it opens.
+        let several = self.vault_count() > 1;
+        let title = text(if several { self.vault_name(self.vaults.cur().id) } else { "Oryxis".to_string() })
+            .size(28)
+            .color(OryxisColors::t().accent);
         let subtitle = text(crate::i18n::t(if bio_first {
             "biometric_unlock_subtitle"
         } else {
@@ -182,9 +186,13 @@ impl Oryxis {
         // language (see `views/onboarding.rs`): same card chrome (radius 18,
         // 1px border, soft drop shadow) and the same two-layer diagonal
         // accent gradient (`widgets::accent_gradient`).
-        let card_inner = column![logo, Space::new().height(16), title, Space::new().height(8), subtitle, Space::new().height(24), unlock_area, Space::new().height(8), error, Space::new().height(16), destroy_section]
+        let mut card_inner = column![logo, Space::new().height(16), title, Space::new().height(8), subtitle, Space::new().height(24), unlock_area, Space::new().height(8), error, Space::new().height(16), destroy_section]
             .width(Length::Fill)
             .align_x(iced::Alignment::Center);
+        // A locked vault is no dead end: the window can move to another.
+        if several {
+            card_inner = card_inner.push(Space::new().height(12).boxed()).push(self.other_vault_links());
+        }
 
         let card = container(card_inner)
             .padding(Padding { top: 48.0, right: 48.0, bottom: 40.0, left: 48.0 })
@@ -234,7 +242,11 @@ impl Oryxis {
         // The rows this screen records for the keyboard (the rebuild and
         // the restart), fresh every frame.
         self.modal_nav_reset();
-        let vault_path = oryxis_vault::device::boot_vault_path()
+        let vault_path = self
+            .vaults
+            .cur()
+            .path
+            .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "~/.oryxis/vault.db".to_string());
         let log_path = crate::logging::log_path()

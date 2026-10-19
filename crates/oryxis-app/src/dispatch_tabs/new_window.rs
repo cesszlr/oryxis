@@ -43,6 +43,23 @@ impl Oryxis {
         view: View,
         at: Option<Point>,
     ) -> (window::Id, Task<Message>) {
+        let vault = self.vaults.current_id();
+        self.open_extra_window_on(vault, order, view, at)
+    }
+
+    /// A new window working on vault `vault` (the switcher's "Open in new
+    /// window"), on its hosts screen.
+    pub(crate) fn open_window_for_vault(&mut self, vault: Uuid) -> (window::Id, Task<Message>) {
+        self.open_extra_window_on(vault, Vec::new(), View::Dashboard, None)
+    }
+
+    fn open_extra_window_on(
+        &mut self,
+        vault: Uuid,
+        order: Vec<TabRef>,
+        view: View,
+        at: Option<Point>,
+    ) -> (window::Id, Task<Message>) {
         let mut settings = crate::app::WINDOW_SETTINGS
             .get()
             .cloned()
@@ -64,7 +81,7 @@ impl Oryxis {
         };
         let (id, open) = window::open(settings);
         self.extra_windows
-            .insert(id, ExtraWindow::new(order, view, self.window_size, self.vaults.current_id()));
+            .insert(id, ExtraWindow::new(order, view, self.window_size, vault));
         (id, open.discard())
     }
 
@@ -252,8 +269,8 @@ impl Oryxis {
         self.nav.dash_selection.clear();
         let (win, open) = self.open_extra_window(Vec::new(), View::Dashboard, None);
         for id in ids {
-            if !self.batch_dials.contains(&id) {
-                self.batch_dials.push_back(id);
+            if !self.vaults.cur().batch_dials.contains(&id) {
+                self.vaults.cur_mut().batch_dials.push_back(id);
                 self.batch_dial_windows.insert(id, win);
             }
         }
@@ -266,11 +283,19 @@ impl Oryxis {
     /// Pinned tabs are not counted: they move to another window.
     pub(super) fn request_close_this_window(&mut self) -> Task<Message> {
         self.overlay = None;
+        // Its tabs: the ones it shows and the ones it keeps parked under
+        // the other vaults it worked on.
+        let parked = self.tabs_parked_here();
         let doomed: Vec<usize> = (0..self.tabs.len())
-            .filter(|&i| !self.tabs[i].pinned && self.shows_tab(i))
+            .filter(|&i| {
+                !self.tabs[i].pinned && (self.shows_tab(i) || parked.contains(&self.tabs[i]._id))
+            })
             .collect();
         let sftp: Vec<usize> = (0..self.sftp_tabs.len())
-            .filter(|&i| !self.sftp_tabs[i].pinned && self.shows_sftp_tab(i))
+            .filter(|&i| {
+                !self.sftp_tabs[i].pinned
+                    && (self.shows_sftp_tab(i) || parked.contains(&self.sftp_tabs[i].id))
+            })
             .collect();
         let live = self.live_session_count(&doomed)
             + sftp.iter().filter(|&&i| self.sftp_tab_is_live(i)).count();
@@ -314,14 +339,24 @@ impl Oryxis {
         let Some(heir) = self.other_windows().first().copied() else {
             return Task::none();
         };
-        for r in self.tab_order.clone() {
+        let heir_vault = self.vault_of_window(heir);
+        // The tabs it keeps parked under other vaults go with it too; a
+        // pinned one is simply let go, and the next strip to reconcile
+        // keeps it for its vault.
+        let parked: Vec<TabRef> = std::mem::take(&mut self.parked_views)
+            .into_values()
+            .flat_map(|p| p.order)
+            .collect();
+        for r in self.tab_order.clone().into_iter().chain(parked) {
             match r {
                 TabRef::Terminal(id) => {
                     let Some(idx) = self.tabs.iter().position(|t| t._id == id) else {
                         continue;
                     };
                     if self.tabs[idx].pinned {
-                        if let Some((r, _)) = self.release_tab_ref(id) {
+                        if let Some((r, _)) = self.release_tab_ref(id)
+                            && self.tabs[idx].vault.is_none_or(|v| v == heir_vault)
+                        {
                             self.give_ref_to_window(heir, r, false);
                         }
                     } else {
@@ -334,7 +369,9 @@ impl Oryxis {
                         continue;
                     };
                     if self.sftp_tabs[idx].pinned {
-                        if let Some((r, _)) = self.release_tab_ref(id) {
+                        if let Some((r, _)) = self.release_tab_ref(id)
+                            && self.sftp_tabs[idx].vault.is_none_or(|v| v == heir_vault)
+                        {
                             self.give_ref_to_window(heir, r, false);
                         }
                     } else {

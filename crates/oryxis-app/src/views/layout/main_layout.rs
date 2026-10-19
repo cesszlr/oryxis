@@ -449,6 +449,19 @@ impl Oryxis {
             return self.layer_cloud_import_confirm(base, resize_overlay);
         }
 
+        // The "New vault" dialog, raised from the switcher menu.
+        if let Some(form) = &self.new_vault {
+            return wrap_with_resize(
+                crate::widgets::modal_overlay(
+                    base,
+                    self.build_new_vault_dialog(form),
+                    Some(Message::MultiVault(crate::app::MultiVaultMessage::CancelNewVault)),
+                    0.0,
+                ),
+                resize_overlay,
+            );
+        }
+
         // Snippet-variables prompt: a snippet with `{name}` placeholders
         // parks here so the values are filled before anything reaches
         // the session. Same dialog shell as the careful paste below.

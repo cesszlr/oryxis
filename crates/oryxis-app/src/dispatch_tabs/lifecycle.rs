@@ -588,7 +588,7 @@ impl Oryxis {
             // have no row in `connections`, so resolve them straight
             // from the quick-connect store (always plain SSH).
             if let crate::state::PaneOrigin::QuickHost(qid) = &tab.active().origin
-                && self.quick_connects.contains_key(qid)
+                && self.vaults.cur().quick_connects.contains_key(qid)
             {
                 return Some((ReuseTarget::Quick(*qid), pane_id, base_label));
             }
@@ -722,7 +722,7 @@ impl Oryxis {
             let quick_entry = if conn_idx.is_none() {
                 tab.pane_grid.panes.values().find_map(|p| match &p.origin {
                     crate::state::PaneOrigin::QuickHost(qid) => {
-                        self.quick_connects.get(qid).cloned()
+                        self.vaults.cur().quick_connects.get(qid).cloned()
                     }
                     _ => None,
                 })

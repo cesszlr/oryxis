@@ -520,8 +520,8 @@ impl Oryxis {
                     // Its decrypted excerpt must not outlive the
                     // recording in app state; a queued scan for it is
                     // retired as done (the fetch would only error).
-                    self.history_content.log_matches.remove(&id);
-                    let hc = &mut self.history_content;
+                    self.vaults.cur_mut().history_content.log_matches.remove(&id);
+                    let hc = &mut self.vaults.cur_mut().history_content;
                     let queued = hc.queue.len();
                     hc.queue.retain(|q| *q != id);
                     hc.scan_done += queued - hc.queue.len();
@@ -611,8 +611,8 @@ impl Oryxis {
 
             // -- Content search (commands + recorded output) --
             HistoryMessage::SearchContentToggled => {
-                self.history_search_content = !self.history_search_content;
-                if self.history_search_content {
+                self.vaults.cur_mut().history_search_content = !self.vaults.cur_mut().history_search_content;
+                if self.vaults.cur().history_search_content {
                     return self.history_content_debounce();
                 }
                 // Toggled off: the maps hold decrypted session excerpts,
@@ -621,22 +621,22 @@ impl Oryxis {
             }
             HistoryMessage::SearchContentDebounce(generation) => {
                 // A newer keystroke re-armed the timer; this tick is stale.
-                if generation != self.history_content.generation
-                    || !self.history_search_content
+                if generation != self.vaults.cur().history_content.generation
+                    || !self.vaults.cur().history_search_content
                 {
                     return Task::none();
                 }
                 return self.history_content_search_start();
             }
             HistoryMessage::SearchContentScanned { generation, log_id, snippet } => {
-                if generation != self.history_content.generation {
+                if generation != self.vaults.cur().history_content.generation {
                     // A newer search owns the pump now; drop result AND pump.
                     return Task::none();
                 }
-                self.history_content.scan_done += 1;
-                self.history_content.scanning = false;
+                self.vaults.cur_mut().history_content.scan_done += 1;
+                self.vaults.cur_mut().history_content.scanning = false;
                 if let Some(snippet) = snippet {
-                    self.history_content.log_matches.insert(log_id, snippet);
+                    self.vaults.cur_mut().history_content.log_matches.insert(log_id, snippet);
                     // The scan covers the whole table; a hit beyond
                     // the loaded page window needs its row pulled in
                     // for the timeline to render it.
@@ -720,9 +720,9 @@ impl Oryxis {
         // Timeline rows loaded from beyond the page window ride out
         // with the results that justified them.
         self.history_drop_extra_logs();
-        let generation = self.history_content.generation + 1;
-        self.history_content = Default::default();
-        self.history_content.generation = generation;
+        let generation = self.vaults.cur().history_content.generation + 1;
+        self.vaults.cur_mut().history_content = Default::default();
+        self.vaults.cur_mut().history_content.generation = generation;
     }
 
     /// Remove the timeline rows the content search pulled into
@@ -731,10 +731,10 @@ impl Oryxis {
     /// doesn't necessarily match them) and from
     /// `history_content_reset`.
     fn history_drop_extra_logs(&mut self) {
-        if self.history_content.extra_logs.is_empty() {
+        if self.vaults.cur().history_content.extra_logs.is_empty() {
             return;
         }
-        let extra = std::mem::take(&mut self.history_content.extra_logs);
+        let extra = std::mem::take(&mut self.vaults.cur_mut().history_content.extra_logs);
         self.vaults.cur_mut().session_logs.retain(|e| !extra.contains(&e.id));
     }
 
@@ -755,7 +755,7 @@ impl Oryxis {
             return;
         };
         self.vaults.cur_mut().session_logs.push(entry);
-        self.history_content.extra_logs.push(log_id);
+        self.vaults.cur_mut().history_content.extra_logs.push(log_id);
     }
 
     /// Re-attach the content-search extra rows after `session_logs`
@@ -764,7 +764,7 @@ impl Oryxis {
     /// here; rows the reload happened to pull inside the window stop
     /// being tracked as extras.
     fn history_reattach_extra_logs(&mut self) {
-        let extra = std::mem::take(&mut self.history_content.extra_logs);
+        let extra = std::mem::take(&mut self.vaults.cur_mut().history_content.extra_logs);
         for id in extra {
             self.history_ensure_log_loaded(id);
         }
@@ -783,8 +783,8 @@ impl Oryxis {
             self.history_content_reset();
             return Task::none();
         }
-        self.history_content.generation += 1;
-        let generation = self.history_content.generation;
+        self.vaults.cur_mut().history_content.generation += 1;
+        let generation = self.vaults.cur().history_content.generation;
         Task::perform(
             async move {
                 tokio::time::sleep(std::time::Duration::from_millis(300)).await;
@@ -840,7 +840,7 @@ impl Oryxis {
                 queue.push(*id);
             }
         }
-        let hc = &mut self.history_content;
+        let hc = &mut self.vaults.cur_mut().history_content;
         hc.needle = needle;
         hc.log_matches = log_matches;
         hc.conn_matches = host_hits;
@@ -862,16 +862,16 @@ impl Oryxis {
     /// and lands results incrementally.
     fn history_scan_step(&mut self) -> Task<Message> {
         loop {
-            if self.history_content.queue.is_empty() {
-                self.history_content.scanning = false;
+            if self.vaults.cur().history_content.queue.is_empty() {
+                self.vaults.cur_mut().history_content.scanning = false;
                 return Task::none();
             }
-            let log_id = self.history_content.queue.remove(0);
+            let log_id = self.vaults.cur_mut().history_content.queue.remove(0);
             let Some(vault) = &self.vaults.cur().store else {
                 // Vault gone mid-scan (lock): stop; the lock path also
                 // resets the results.
-                self.history_content.scanning = false;
-                self.history_content.queue.clear();
+                self.vaults.cur_mut().history_content.scanning = false;
+                self.vaults.cur_mut().history_content.queue.clear();
                 return Task::none();
             };
             // Scan-bounded reader: caps how much of one recording is
@@ -882,13 +882,13 @@ impl Oryxis {
                 Ok(sealed) => sealed,
                 Err(_) => {
                     // Row deleted mid-scan: count it done and move on.
-                    self.history_content.scan_done += 1;
+                    self.vaults.cur_mut().history_content.scan_done += 1;
                     continue;
                 }
             };
-            self.history_content.scanning = true;
-            let generation = self.history_content.generation;
-            let needle = self.history_content.needle.clone();
+            self.vaults.cur_mut().history_content.scanning = true;
+            let generation = self.vaults.cur().history_content.generation;
+            let needle = self.vaults.cur().history_content.needle.clone();
             let palette = self.resolve_global_terminal_palette();
             return Task::perform(
                 async move {

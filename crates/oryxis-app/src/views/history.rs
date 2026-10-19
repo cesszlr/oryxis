@@ -94,9 +94,9 @@ impl Oryxis {
         // query: typing is debounced and the output scan is async, so
         // the maps can lag a keystroke behind; a stale needle falls
         // back to the plain label/hostname filter until they catch up.
-        let content_ready = self.history_search_content
+        let content_ready = self.vaults.cur().history_search_content
             && !needle.is_empty()
-            && self.history_content.needle == needle;
+            && self.vaults.cur().history_content.needle == needle;
 
         // Build the unified timeline. Failed log entries (auth fail,
         // transport error) stay as their own rows; everything else
@@ -198,7 +198,7 @@ impl Oryxis {
                 content_ready
                     && match &r.kind {
                         TimelineKind::Session { entry, .. } => {
-                            self.history_content.log_matches.contains_key(&entry.id)
+                            self.vaults.cur().history_content.log_matches.contains_key(&entry.id)
                         }
                         // The content search scans recorded terminal
                         // output; a conversation has none, so it only ever
@@ -320,13 +320,13 @@ impl Oryxis {
         // the recorded-output pass streams in; say where it stands so
         // a still-filling result list reads as "working", not "done".
         if content_ready
-            && (self.history_content.scanning || !self.history_content.queue.is_empty())
+            && (self.vaults.cur().history_content.scanning || !self.vaults.cur().history_content.queue.is_empty())
         {
             row_items.push(
                 text(
                     crate::i18n::t("history_scanning")
-                        .replace("{done}", &self.history_content.scan_done.to_string())
-                        .replace("{total}", &self.history_content.scan_total.to_string()),
+                        .replace("{done}", &self.vaults.cur().history_content.scan_done.to_string())
+                        .replace("{total}", &self.vaults.cur().history_content.scan_total.to_string()),
                 )
                 .size(11)
                 .color(OryxisColors::t().text_muted)
@@ -454,7 +454,7 @@ impl Oryxis {
                 let content_hit = if content_ready {
                     match &row_data.kind {
                         TimelineKind::Session { entry, .. } => self
-                            .history_content
+                            .vaults.cur().history_content
                             .log_matches
                             .get(&entry.id)
                             .map(|s| s.as_str()),
@@ -736,13 +736,13 @@ impl Oryxis {
         // the "which hosts ran this command?" answer complete. Purely
         // informational (the rows below stay the interactive surface).
         let cmd_hosts: Element<'_, Message> = if content_ready
-            && !self.history_content.conn_matches.is_empty()
+            && !self.vaults.cur().history_content.conn_matches.is_empty()
         {
             const MAX_SHOWN: usize = 6;
             let mut lines: Vec<Element<'_, Message>> = Vec::new();
             let mut shown = 0usize;
             let mut hidden = 0usize;
-            for (conn_id, cmd) in &self.history_content.conn_matches {
+            for (conn_id, cmd) in &self.vaults.cur().history_content.conn_matches {
                 // Deleted hosts have nothing to point at; the tag
                 // filter narrows this strip like it narrows the rows.
                 let Some(conn) = conn_by_id.get(conn_id).copied() else {

@@ -55,7 +55,8 @@ impl Oryxis {
                 // auth method stays Auto: the ladder tries the new material
                 // first and still falls back to the interactive prompt if
                 // the server rejects it.
-                let Some(entry) = self.quick_connects.get_mut(&quick_id) else {
+                let ov = self.vaults.cur_mut();
+                let Some(entry) = ov.quick_connects.get_mut(&quick_id) else {
                     return Ok(Task::none());
                 };
                 match choice {
@@ -65,8 +66,8 @@ impl Oryxis {
                         // The identity's username becomes the login user when
                         // it carries one (the selector label shows it); the
                         // typed username stays otherwise.
-                        if let Some(u) = self
-                            .vaults.cur().identities
+                        if let Some(u) = ov
+                            .identities
                             .iter()
                             .find(|i| i.id == iid)
                             .and_then(|i| i.username.clone())

@@ -257,3 +257,55 @@ fn the_first_vault_id_is_stable() {
     // would orphan the first vault of every install.
     assert_eq!(FIRST_VAULT_ID.to_string(), "6f727978-6973-4000-8000-000000000001");
 }
+
+#[test]
+fn a_slug_is_ascii_unique_and_never_empty() {
+    assert_eq!(slug_for("Work", &[]), "work");
+    assert_eq!(slug_for("  Clientes  ACME / 2026 ", &[]), "clientes-acme-2026");
+    assert_eq!(slug_for("Ação Pessoal", &[]), "acao-pessoal");
+    assert_eq!(slug_for("Straße", &[]), "strasse");
+    assert_eq!(slug_for("工作", &[]), "vault");
+    assert_eq!(slug_for("Work", &["work"]), "work-2");
+    assert_eq!(slug_for("Work", &["work", "work-2"]), "work-3");
+    assert_eq!(slug_for("", &["vault"]), "vault-2");
+}
+
+#[test]
+fn a_created_vault_is_registered_under_the_vaults_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    let work = store.create_entry("Work").unwrap();
+    assert_eq!(work.slug, "work");
+    assert_eq!(work.label.as_deref(), Some("Work"));
+    assert_eq!(store.resolve(&work), dir.path().join("vaults").join(format!("{}.db", work.id)));
+    let fresh = store_in(dir.path());
+    assert_eq!(fresh.vaults().len(), 2);
+    assert_eq!(fresh.entry(work.id), Some(work.clone()));
+    // A second "Work" gets its own slug.
+    assert_eq!(store.create_entry("Work").unwrap().slug, "work-2");
+}
+
+#[test]
+fn the_last_opened_vault_is_where_a_start_lands() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    let work = store.create_entry("Work").unwrap();
+    store.set_last_vault(work.id).unwrap();
+    assert_eq!(store_in(dir.path()).boot_vault().id, work.id);
+}
+
+#[test]
+fn renaming_and_unregistering_keep_one_vault_at_least() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    let work = store.create_entry("Work").unwrap();
+    store.rename(work.id, "Clients").unwrap();
+    assert_eq!(store.entry(work.id).unwrap().label.as_deref(), Some("Clients"));
+    store.rename(work.id, "  ").unwrap();
+    assert_eq!(store.entry(work.id).unwrap().label, None, "blank goes back to the default name");
+    store.set_last_vault(work.id).unwrap();
+    assert!(store.unregister(work.id).unwrap());
+    assert_eq!(store.boot_vault().id, FIRST_VAULT_ID, "the last-opened pointer goes with it");
+    assert!(!store.unregister(FIRST_VAULT_ID).unwrap(), "the only vault left stays");
+    assert_eq!(store.vaults().len(), 1);
+}

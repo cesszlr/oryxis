@@ -304,7 +304,7 @@ impl Oryxis {
         // from, so the tab carries the entry that created it, exactly
         // as the Telnet path does.
         if let crate::state::ProgressOrigin::Quick(id) = origin
-            && let Some(entry) = self.quick_connects.get(&id)
+            && let Some(entry) = self.vaults.cur().quick_connects.get(&id)
         {
             new_tab.active_mut().relaunch = Some(Box::new(Message::Ssh(
                 crate::app::SshMessage::QuickConnect(Box::new(entry.clone())),

@@ -421,8 +421,11 @@ impl Oryxis {
     /// Re-paint every open tab's palette. Use after a global theme
     /// change. Tabs whose connection has its own override pick that
     /// override up automatically through `resolve_terminal_palette_for_label`.
+    /// Re-paint every tab of the vault `update` works on (another vault's
+    /// tabs keep that vault's theme).
     pub(crate) fn repaint_all_terminal_palettes(&self) {
-        for tab in &self.tabs {
+        let vault = self.vaults.current_id();
+        for tab in self.tabs.iter().filter(|t| t.vault.is_none_or(|v| v == vault)) {
             let palette = self.resolve_terminal_palette_for_label(&tab.label);
             for pane in tab.pane_grid.panes.values() {
                 if let Ok(mut state) = pane.terminal.lock() {
@@ -442,7 +445,8 @@ impl Oryxis {
                 .unwrap_or_else(|| self.resolve_global_terminal_palette()),
             None => self.resolve_global_terminal_palette(),
         };
-        for tab in &self.tabs {
+        let vault = self.vaults.current_id();
+        for tab in self.tabs.iter().filter(|t| t.vault.is_none_or(|v| v == vault)) {
             for pane in tab.pane_grid.panes.values() {
                 if matches!(pane.origin, crate::state::PaneOrigin::Host(_)) {
                     continue;

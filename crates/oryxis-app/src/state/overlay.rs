@@ -64,6 +64,9 @@ pub(crate) enum OverlayContent {
     /// directly from the Hosts view. Only opened when at least one
     /// profile is configured (otherwise the chevron is hidden).
     CloudProviderPicker,
+    /// The vault switcher's menu, under the chip or the rail badge that
+    /// was pressed: every vault, "New vault", "Lock all vaults".
+    VaultSwitcher,
     /// Dropdown next to the Snippets sort button: multi-select
     /// snippet-tag filter, mirroring `HostTagFilter`.
     SnippetTagFilter,

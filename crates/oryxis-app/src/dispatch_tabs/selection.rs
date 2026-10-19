@@ -142,8 +142,8 @@ impl Oryxis {
                 // ends, the way a plain click ends it.
                 self.nav.dash_selection.clear();
                 for id in ids {
-                    if !self.batch_dials.contains(&id) {
-                        self.batch_dials.push_back(id);
+                    if !self.vaults.cur().batch_dials.contains(&id) {
+                        self.vaults.cur_mut().batch_dials.push_back(id);
                     }
                 }
                 Task::none()
@@ -152,7 +152,7 @@ impl Oryxis {
                 // Only what has not been dialled yet: the dial in flight
                 // (or the failed card holding the queue) is the user's to
                 // finish or close, and the tabs already opened stay.
-                self.batch_dials.clear();
+                self.vaults.cur_mut().batch_dials.clear();
                 Task::none()
             }
             TabsMessage::MoveHostsPick(ids) => {
@@ -194,7 +194,7 @@ impl Oryxis {
     /// shell that spawned at once, a host deleted since the pick) lets
     /// the loop go straight on to the next id in the same update.
     pub(crate) fn advance_batch_dials(&mut self) -> Option<Task<Message>> {
-        if self.batch_dials.is_empty() {
+        if self.vaults.cur().batch_dials.is_empty() {
             return None;
         }
         // Credentials and known hosts are read from the vault at dial
@@ -205,7 +205,7 @@ impl Oryxis {
         }
         let mut tasks: Vec<Task<Message>> = Vec::new();
         while !self.batch_dial_in_flight() {
-            let Some(id) = self.batch_dials.pop_front() else {
+            let Some(id) = self.vaults.cur_mut().batch_dials.pop_front() else {
                 break;
             };
             if !self.vaults.cur().connections.iter().any(|c| c.id == id) {
@@ -219,7 +219,8 @@ impl Oryxis {
             let window = self
                 .batch_dial_windows
                 .remove(&id)
-                .filter(|w| self.extra_windows.contains_key(w));
+                .filter(|w| self.extra_windows.contains_key(w))
+                .or_else(|| self.window_on_vault(self.vaults.current_id()).flatten());
             tasks.push(self.run_in_window(window, |s| {
                 s.update(Message::Ssh(SshMessage::ConnectSavedHost(id)))
             }));

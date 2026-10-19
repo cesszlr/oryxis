@@ -57,6 +57,8 @@ mod plugin;
 pub use plugin::PluginMessage;
 mod agent;
 pub use agent::AgentMessage;
+mod multi_vault;
+pub use multi_vault::MultiVaultMessage;
 mod zmodem;
 pub use zmodem::ZmodemMessage;
 mod known_host;
@@ -206,6 +208,12 @@ pub enum Message {
     /// any window is swapped in; a pane that is gone runs where it was
     /// delivered.
     ForPane(Uuid, Box<Message>),
+    /// A message about one vault (a pane's tab of it, its sync, its
+    /// monitor): runs with that vault as the one `update` works on,
+    /// whatever window it is delivered to (`update_on_vault`). A window
+    /// working on another vault keeps the tabs of this one parked, and
+    /// their streams still have to reach this vault.
+    ForVault(Uuid, Box<Message>),
     // Archive operations (extract / compress / virtual zip browse).
     // Async completions ride the `SftpFor` owner envelope like the
     // transfer queue does.
@@ -324,6 +332,7 @@ pub enum Message {
     // ── SSH-agent server (B1) ──
     // Agent (handle_agent)
     Agent(AgentMessage),
+    MultiVault(MultiVaultMessage),
     // (filename, content, auto-probed `<file>.pub` and `<file>-cert.pub`
     // if present and parseable)
 
@@ -392,6 +401,19 @@ pub enum Message {
 }
 
 impl Message {
+    /// `self` as a follow-up of an update that ran on `vault`: it runs on
+    /// that vault again when it arrives (`ForVault`), whatever vault the
+    /// window it reaches works on by then. Inside an `InWindow` (the
+    /// window swap comes first, then the vault), and left alone when it
+    /// already names its own route.
+    pub(crate) fn on_vault(self, vault: Uuid) -> Message {
+        match self {
+            Message::InWindow(window, inner) => Message::InWindow(window, Box::new(inner.on_vault(vault))),
+            m @ (Message::ForVault(..) | Message::ForPane(..) | Message::NoOp) => m,
+            other => Message::ForVault(vault, Box::new(other)),
+        }
+    }
+
     /// For an SFTP async-continuation message that targets a specific tab,
     /// returns that tab's id. The dispatcher uses this to swap the owning
     /// tab's state into `self.sftp` for the duration so the handler routes

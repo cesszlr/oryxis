@@ -365,7 +365,7 @@ impl Oryxis {
             // button), hover fill + tooltip per the button convention.
             // Ring + Enter come from the toolbar keynav item
             // (`ToolbarItem::SearchContent`, recorded by view_history).
-            let active = self.history_search_content;
+            let active = self.vaults.cur().history_search_content;
             let icon = iced_fonts::lucide::text_search().size(14).color(
                 if active {
                     OryxisColors::t().button_text
@@ -509,41 +509,9 @@ impl Oryxis {
             .align_y(iced::Alignment::Center);
         // Search moved out of this row into each view's toolbar
         // (see `vault_search_field`).
-        // Static "Personal" vault chip on the leading edge: the active
-        // vault's identity. Multi-vault switching isn't wired yet, so
-        // this is a non-interactive placeholder (no dropdown). "Personal"
-        // is the default vault's name (data, not a translated string).
-        let vault_chip: Element<'_, Message> = container(
-            dir_row(vec![
-                iced_fonts::lucide::lock()
-                    .size(13)
-                    .color(OryxisColors::t().accent)
-                    .boxed(),
-                Space::new().width(6).boxed(),
-                text("Personal")
-                    .size(12)
-                    .color(OryxisColors::t().text_primary)
-                    .boxed(),
-                Space::new().width(6).boxed(),
-                iced_fonts::lucide::chevron_down()
-                    .size(12)
-                    .color(OryxisColors::t().text_muted)
-                    .boxed(),
-            ])
-            .align_y(iced::Alignment::Center),
-        )
-        .center_y(Length::Fixed(28.0))
-        .padding(Padding { top: 0.0, right: 9.0, bottom: 0.0, left: 9.0 })
-        .style(|_| container::Style {
-            background: Some(Background::Color(OryxisColors::t().bg_surface)),
-            border: Border {
-                radius: Radius::from(6.0),
-                color: OryxisColors::t().border,
-                width: 1.0,
-            },
-            ..Default::default()
-        })
-        .boxed();
+        // The vault chip on the leading edge: the vault this window works
+        // on, and the switcher behind it.
+        let vault_chip: Element<'_, Message> = self.vault_switcher_chip();
 
         // Settings gear pinned at the trailing edge, outside the
         // scrollable, so it never scrolls out of reach (mirrors how the
@@ -624,7 +592,8 @@ impl Oryxis {
         };
 
         let mut row_items: Vec<Element<'_, Message>> = Vec::new();
-        // Vault switcher chip only when there's more than one vault.
+        // The vault chip, unless a single vault is all there is and the
+        // user hid it for that case.
         if self.show_vault_switcher() {
             row_items.push(vault_chip);
             row_items.push(Space::new().width(8).boxed());
@@ -700,7 +669,7 @@ impl Oryxis {
         // (~28), plus row padding and gaps. Search no longer lives here
         // (it moved to each view's toolbar), so nothing is reserved for
         // it, otherwise the "…" triggered way too early.
-        let chip = if self.show_vault_switcher() { 115.0 } else { 0.0 };
+        let chip = if self.show_vault_switcher() { self.vault_chip_width() } else { 0.0 };
         let flank = chip + 31.0 + 28.0 + 24.0;
         // An open side panel sits over the sub-nav's trailing edge now,
         // so subtract its width from the budget or pills would render

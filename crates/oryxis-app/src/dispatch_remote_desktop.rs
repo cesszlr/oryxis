@@ -53,7 +53,7 @@ impl Oryxis {
                         // entry holds the sole strong `Arc`, so dropping it
                         // here fires its cancellation (and its own stream
                         // emits a now-stale `ClientClosed` we ignore by seq).
-                        self.remote_desktop_forwards
+                        self.vaults.cur_mut().remote_desktop_forwards
                             .insert(conn_id, (seq, session));
                         self.set_toast(
                             crate::i18n::t("remote_desktop_opening")
@@ -69,11 +69,11 @@ impl Oryxis {
                 // still the one this stream owns: a superseded launch (Stop +
                 // relaunch) must not evict the newer tunnel.
                 if self
-                    .remote_desktop_forwards
+                    .vaults.cur().remote_desktop_forwards
                     .get(&conn_id)
                     .is_some_and(|(s, _)| *s == seq)
                 {
-                    self.remote_desktop_forwards.remove(&conn_id);
+                    self.vaults.cur_mut().remote_desktop_forwards.remove(&conn_id);
                 }
                 Task::none()
             }
@@ -85,7 +85,7 @@ impl Oryxis {
                 Task::none()
             }
             RemoteDesktopMessage::StopRemoteDesktop(conn_id) => {
-                if let Some((_, session)) = self.remote_desktop_forwards.remove(&conn_id) {
+                if let Some((_, session)) = self.vaults.cur_mut().remote_desktop_forwards.remove(&conn_id) {
                     return Task::perform(
                         async move { session.cancel().await },
                         |_| Message::NoOp,

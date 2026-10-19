@@ -467,7 +467,7 @@ impl Oryxis {
         // Right under the closes, and only with something to bring back:
         // an entry that is always there and usually does nothing reads as
         // broken the first time it is tried (issue #186).
-        if !self.closed_tabs.is_empty() {
+        if !self.vaults.cur().closed_tabs.is_empty() {
             items.push(self.menu_item(iced_fonts::lucide::rotate_ccw(), crate::i18n::t("reopen_closed_tab"), Message::Tabs(TabsMessage::ReopenClosedTab), OryxisColors::t().text_secondary));
         }
         items.push(self.menu_item(iced_fonts::lucide::x(), crate::i18n::t("close_other_tabs"), Message::Tabs(TabsMessage::CloseOtherTabs(idx)), OryxisColors::t().text_secondary));
@@ -557,7 +557,7 @@ impl Oryxis {
         // One stack for both tab kinds, so this reaches a closed terminal
         // tab too: what the user asks back is the last chip that left the
         // strip, not the last one of this kind.
-        if !self.closed_tabs.is_empty() {
+        if !self.vaults.cur().closed_tabs.is_empty() {
             items = items.push(self.menu_item(iced_fonts::lucide::rotate_ccw(), crate::i18n::t("reopen_closed_tab"), Message::Tabs(TabsMessage::ReopenClosedTab), OryxisColors::t().text_secondary));
         }
         if self.has_other_sftp_tabs(idx) {
@@ -636,7 +636,7 @@ impl Oryxis {
         // places. Reaching the reopen by mouse is what issue #186 asked
         // for after the hotkey: the `+` is where a new tab comes from,
         // so it is where a user looks for one back.
-        if !self.closed_tabs.is_empty() {
+        if !self.vaults.cur().closed_tabs.is_empty() {
             items = items.push(context_menu_item(iced_fonts::lucide::rotate_ccw(), crate::i18n::t("reopen_closed_tab"), Message::Tabs(TabsMessage::ReopenClosedTab), OryxisColors::t().text_secondary));
         }
         // Below the hairline, because they answer a different question
@@ -663,7 +663,7 @@ impl Oryxis {
         if self.cur_active_tab().is_some() {
             rows += 2.0;
         }
-        if !self.closed_tabs.is_empty() {
+        if !self.vaults.cur().closed_tabs.is_empty() {
             rows += 1.0;
         }
         rows + self.recent_host_menu_rows()
@@ -680,7 +680,7 @@ impl Oryxis {
             Message::Tabs(TabsMessage::ShowNewTabPicker),
             OryxisColors::t().text_secondary,
         )];
-        if !self.closed_tabs.is_empty() {
+        if !self.vaults.cur().closed_tabs.is_empty() {
             items = items.push(self.menu_item(iced_fonts::lucide::rotate_ccw(), crate::i18n::t("reopen_closed_tab"), Message::Tabs(TabsMessage::ReopenClosedTab), OryxisColors::t().text_secondary));
         }
         // Same block as the `+` popover's, recorded for keynav here
@@ -694,7 +694,7 @@ impl Oryxis {
     /// Row count of the strip menu, next to its builder for the reason
     /// `split_menu_rows` is.
     pub(crate) fn tab_bar_menu_rows(&self) -> f32 {
-        let base: f32 = if self.closed_tabs.is_empty() { 1.0 } else { 2.0 };
+        let base: f32 = if self.vaults.cur().closed_tabs.is_empty() { 1.0 } else { 2.0 };
         base + self.recent_host_menu_rows()
     }
 
@@ -1541,7 +1541,7 @@ const RECENT_LABEL_MAX: usize = 24;
 /// The coloured fill must sit on the inner 1 px `Space`, not on the
 /// padded container around it, or the breathing room inherits the border
 /// colour and the line reads about nine pixels tall.
-fn menu_divider() -> Element<'static, Message> {
+pub(crate) fn menu_divider() -> Element<'static, Message> {
     container(
         container(Space::new().width(Length::Fill).height(1))
             .width(Length::Fill)

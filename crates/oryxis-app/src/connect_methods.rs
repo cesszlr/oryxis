@@ -408,7 +408,7 @@ impl Oryxis {
             .iter()
             .find(|c| c.label == label)
             .or_else(|| {
-                self.quick_connects
+                self.vaults.cur().quick_connects
                     .values()
                     .map(|e| &e.conn)
                     .find(|c| c.label == label)
@@ -419,7 +419,7 @@ impl Oryxis {
     /// an in-flight connection progress. Called after closing tabs/panes
     /// so typed credentials don't outlive the session that used them.
     pub(crate) fn prune_quick_connects(&mut self) {
-        if self.quick_connects.is_empty() {
+        if self.vaults.cur().quick_connects.is_empty() {
             return;
         }
         let mut live: std::collections::HashSet<uuid::Uuid> = std::collections::HashSet::new();
@@ -435,7 +435,7 @@ impl Oryxis {
         {
             live.insert(id);
         }
-        self.quick_connects.retain(|id, _| live.contains(id));
+        self.vaults.cur_mut().quick_connects.retain(|id, _| live.contains(id));
     }
 
     /// Whether `conn` answers the credential parameter itself: a key of
@@ -555,7 +555,7 @@ impl Oryxis {
         password: &mut Option<String>,
         totp_secret: &mut Option<String>,
     ) {
-        let Some(entry) = self.quick_connects.get(&quick_id) else {
+        let Some(entry) = self.vaults.cur().quick_connects.get(&quick_id) else {
             return;
         };
         if password.is_none() {

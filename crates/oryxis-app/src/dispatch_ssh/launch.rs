@@ -59,7 +59,7 @@ impl Oryxis {
                 // First connects insert the incoming entry.
                 let id = entry.conn.id;
                 let conn = self
-                    .quick_connects
+                    .vaults.cur_mut().quick_connects
                     .entry(id)
                     .or_insert_with(|| *entry)
                     .conn

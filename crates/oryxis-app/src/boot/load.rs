@@ -10,6 +10,7 @@ impl Oryxis {
         self.load_vault_locale_ai_sync();
         self.load_vault_terminal_settings();
         self.load_vault_hotkeys_and_defaults();
+        self.vaults.cur_mut().loaded = true;
         // The load applied the vault's app theme process-wide; the
         // vault's windows draw from its own copy (`OpenVault::ui_theme`),
         // and a boot that unlocks before any message runs never reaches
@@ -904,6 +905,9 @@ impl Oryxis {
                 vault.get_setting("agent_server_enabled"),
                 Ok(Some(ref v)) if v == "true"
             );
+            if let Ok(Some(v)) = vault.get_setting("vault_switcher_hide_single") {
+                self.device_prefs.vault_switcher_hide_single = v == "true";
+            }
             if let Ok(Some(v)) = vault.get_setting("close_to_tray") {
                 self.device_prefs.close_to_tray = v == "true";
             }

@@ -1129,7 +1129,7 @@ impl Oryxis {
                 rows.push(lock_impact_row(iced_fonts::lucide::folder(), tab.label.clone()));
             }
         }
-        let tunnels = self.remote_desktop_forwards.len();
+        let tunnels = self.vaults.cur().remote_desktop_forwards.len();
         if tunnels > 0 {
             rows.push(lock_impact_row(
                 iced_fonts::lucide::monitor(),

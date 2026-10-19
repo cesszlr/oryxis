@@ -52,3 +52,4 @@ pub(crate) mod terminal;
 pub(crate) mod theme_picker;
 pub(crate) mod update_modal;
 pub(crate) mod vault;
+pub(crate) mod vault_switcher;

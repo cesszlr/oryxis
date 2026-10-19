@@ -135,7 +135,7 @@ impl Oryxis {
                 // ordinary path (opening a host from the Dashboard pushes
                 // a tab and leaves the view where it was), so the popover
                 // was dead exactly where splitting is most wanted.
-                if (self.cur_active_tab().is_some() || !self.closed_tabs.is_empty())
+                if (self.cur_active_tab().is_some() || !self.vaults.cur().closed_tabs.is_empty())
                     && !matches!(
                         self.overlay.as_ref().map(|o| &o.content),
                         Some(OverlayContent::SplitMenu)

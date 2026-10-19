@@ -429,6 +429,7 @@ impl Oryxis {
         let mut tab = TerminalTab {
             _id: uuid::Uuid::new_v4(),
             label: group.label.clone(),
+            vault: None,
             custom_name: None,
             pane_grid: grid,
             focused,

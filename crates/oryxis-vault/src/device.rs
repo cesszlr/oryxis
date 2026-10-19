@@ -56,6 +56,10 @@ pub const FILE_NAME: &str = "device.json";
 /// `.oryxis` folder.
 pub const FIRST_VAULT_FILE: &str = "vault.db";
 
+/// The folder, inside `.oryxis`, every vault created after the first one
+/// lives in (`vaults/<id>.db`).
+pub const VAULTS_DIR: &str = "vaults";
+
 /// The id of the vault that existed before the registry did (the
 /// install's `vault.db`). Fixed, so a device store that has not been
 /// written yet (first run, a wiped harness sandbox) names that vault
@@ -111,6 +115,9 @@ pub const DEVICE_KEYS: &[&str] = &[
     "sync_listen_port",
     "sync_listen_port_auto",
     "sync_device_name",
+    // How many vaults this device has decides whether the switcher
+    // shows; hiding it for a single vault is the device's choice.
+    "vault_switcher_hide_single",
     // Binding state of the shortcut table (the table itself is the
     // `hotkey_` prefix).
     "middle_click_paste",
@@ -381,6 +388,66 @@ impl DeviceStore {
         if entry.path.is_absolute() { entry.path.clone() } else { self.dir.join(&entry.path) }
     }
 
+    /// The registered vault `id`.
+    pub fn entry(&self, id: Uuid) -> Option<VaultEntry> {
+        self.with_current(|f| f.vaults.iter().find(|v| v.id == id).cloned())
+    }
+
+    /// Register a new vault called `label`: a fresh id, a slug no other
+    /// vault has, the file `vaults/<id>.db` inside this store's folder
+    /// (created by the first open). Appended to the registry.
+    pub fn create_entry(&self, label: &str) -> Result<VaultEntry, DeviceError> {
+        let mut created = None;
+        self.update(|f| {
+            let id = Uuid::new_v4();
+            let taken: Vec<&str> = f.vaults.iter().map(|v| v.slug.as_str()).collect();
+            let entry = VaultEntry {
+                id,
+                slug: slug_for(label, &taken),
+                label: Some(label.trim().to_owned()).filter(|l| !l.is_empty()),
+                path: PathBuf::from(VAULTS_DIR).join(format!("{id}.db")),
+                extra: serde_json::Map::new(),
+            };
+            f.vaults.push(entry.clone());
+            created = Some(entry);
+        })?;
+        Ok(created.expect("set by the update"))
+    }
+
+    /// Remember `id` as the vault a start opens.
+    pub fn set_last_vault(&self, id: Uuid) -> Result<(), DeviceError> {
+        if self.with_current(|f| f.last_vault == Some(id)) {
+            return Ok(());
+        }
+        self.update(|f| f.last_vault = Some(id))
+    }
+
+    /// Rename vault `id`. An empty label goes back to the default name.
+    pub fn rename(&self, id: Uuid, label: &str) -> Result<(), DeviceError> {
+        self.update(|f| {
+            if let Some(v) = f.vaults.iter_mut().find(|v| v.id == id) {
+                v.label = Some(label.trim().to_owned()).filter(|l| !l.is_empty());
+            }
+        })
+    }
+
+    /// Take vault `id` off the registry; its file is left where it is.
+    /// The last vault cannot go (a device always has one to open):
+    /// answers `false` then, and for an id that is not registered.
+    pub fn unregister(&self, id: Uuid) -> Result<bool, DeviceError> {
+        let mut removed = false;
+        self.update(|f| {
+            if f.vaults.len() > 1 && f.vaults.iter().any(|v| v.id == id) {
+                f.vaults.retain(|v| v.id != id);
+                if f.last_vault == Some(id) {
+                    f.last_vault = None;
+                }
+                removed = true;
+            }
+        })?;
+        Ok(removed)
+    }
+
     // -- migration --------------------------------------------------------
 
     /// Whether the device keys were already copied out of the first
@@ -428,6 +495,61 @@ impl DeviceStore {
             f.seeded = true;
         })?;
         Ok(copied)
+    }
+}
+
+/// A slug for `label` none of `taken` has: lowercase ASCII letters and
+/// digits (Latin accents folded: "Ação" is `acao`), runs of anything
+/// else as one `-`, trimmed; `vault` when nothing is left; `-2`, `-3`..
+/// until it is free. What `--vault` and the per-vault MCP variables
+/// name.
+pub fn slug_for(label: &str, taken: &[&str]) -> String {
+    let mut base = String::new();
+    for c in label.trim().chars().flat_map(char::to_lowercase) {
+        let folded = fold_latin(c);
+        if !folded.is_empty() {
+            base.push_str(folded);
+        } else if c.is_ascii_alphanumeric() {
+            base.push(c);
+        } else if !base.ends_with('-') && !base.is_empty() {
+            base.push('-');
+        }
+    }
+    let base = base.trim_end_matches('-').to_owned();
+    let base = if base.is_empty() { "vault".to_owned() } else { base };
+    if !taken.contains(&base.as_str()) {
+        return base;
+    }
+    (2..)
+        .map(|n| format!("{base}-{n}"))
+        .find(|s| !taken.contains(&s.as_str()))
+        .expect("an unbounded range finds a free suffix")
+}
+
+/// The ASCII letters a lowercase accented Latin letter stands for, empty
+/// for anything else (ASCII included).
+fn fold_latin(c: char) -> &'static str {
+    match c {
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'ā' | 'ă' | 'ą' => "a",
+        'æ' => "ae",
+        'ç' | 'ć' | 'č' => "c",
+        'ď' | 'đ' | 'ð' => "d",
+        'è' | 'é' | 'ê' | 'ë' | 'ē' | 'ė' | 'ę' | 'ě' => "e",
+        'ğ' => "g",
+        'ì' | 'í' | 'î' | 'ï' | 'ī' | 'į' | 'ı' => "i",
+        'ł' => "l",
+        'ñ' | 'ń' | 'ň' => "n",
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' | 'ō' | 'ő' => "o",
+        'œ' => "oe",
+        'ř' => "r",
+        'ś' | 'š' | 'ş' => "s",
+        'ß' => "ss",
+        'ť' | 'ţ' => "t",
+        'ù' | 'ú' | 'û' | 'ü' | 'ū' | 'ů' | 'ű' | 'ų' => "u",
+        'ý' | 'ÿ' => "y",
+        'ź' | 'ż' | 'ž' => "z",
+        'þ' => "th",
+        _ => "",
     }
 }
 

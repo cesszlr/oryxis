@@ -154,7 +154,7 @@ impl Oryxis {
                 .find(|c| c.id == *id)
                 .map(|c| c.label.clone()),
             PaneOrigin::QuickHost(id) => {
-                self.quick_connects.get(id).map(|e| e.conn.label.clone())
+                self.vaults.cur().quick_connects.get(id).map(|e| e.conn.label.clone())
             }
             PaneOrigin::Local(spec) => Some(spec.label.clone()),
             PaneOrigin::Ephemeral => None,

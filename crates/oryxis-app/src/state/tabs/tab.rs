@@ -15,6 +15,11 @@ use crate::messages::CloudMessage;
 pub(crate) struct TerminalTab {
     pub _id: Uuid,
     pub label: String,
+    /// The vault this tab belongs to: its host, its recording, its pins
+    /// are that vault's, and it only ever shows in a window working on
+    /// it. `None` until the strip that first shows it claims it
+    /// (`reconcile_tab_order`, within the update that created it).
+    pub vault: Option<Uuid>,
     /// User-set tab name from "Rename tab". Transient by design: it lives
     /// for this tab's lifetime only, is never written to the host or the
     /// pin spec, and wins over every automatic label source (session
@@ -325,6 +330,14 @@ impl TabRef {
             TabRef::Panel(kind) => kind.tab_id(),
         }
     }
+
+    /// A terminal or SFTP tab whose id is in `ids` (a panel never is).
+    pub(crate) fn tab_id_in(&self, ids: &std::collections::HashSet<Uuid>) -> bool {
+        match self {
+            TabRef::Terminal(id) | TabRef::Sftp(id) => ids.contains(id),
+            TabRef::Panel(_) => false,
+        }
+    }
 }
 
 /// An SFTP browser tab. Unlike terminal tabs, the **active** SFTP tab's
@@ -336,6 +349,8 @@ impl TabRef {
 pub(crate) struct SftpTab {
     pub id: Uuid,
     pub label: String,
+    /// The vault this tab belongs to (see `TerminalTab::vault`).
+    pub vault: Option<Uuid>,
     /// User-set tab name from "Rename tab". Transient, mirrors
     /// `TerminalTab::custom_name`: display-only, never persisted.
     pub custom_name: Option<String>,
@@ -356,6 +371,7 @@ impl SftpTab {
         Self {
             id: Uuid::new_v4(),
             label,
+            vault: None,
             custom_name: None,
             pinned: false,
             pending_reopen: None,
@@ -540,6 +556,7 @@ impl TerminalTab {
         let mut tab = Self {
             _id: Uuid::new_v4(),
             label,
+            vault: None,
             custom_name: None,
             pane_grid,
             focused,

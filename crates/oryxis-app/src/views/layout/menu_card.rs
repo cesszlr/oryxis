@@ -166,7 +166,7 @@ impl Oryxis {
             rows += 1.0; // Wake on LAN
         }
         if protocol == ConnectionProtocol::RemoteDesktop
-            && conn.is_some_and(|c| self.remote_desktop_forwards.contains_key(&c.id))
+            && conn.is_some_and(|c| self.vaults.cur().remote_desktop_forwards.contains_key(&c.id))
         {
             rows += 1.0; // Stop remote desktop
         }
@@ -301,7 +301,7 @@ impl Oryxis {
         // desktop; add an explicit Stop while its tunnel is live.
         if is_rd_host
             && let Some(cid) = conn.map(|c| c.id)
-            && self.remote_desktop_forwards.contains_key(&cid)
+            && self.vaults.cur().remote_desktop_forwards.contains_key(&cid)
         {
             items = items.push(self.menu_item(
                 iced_fonts::lucide::monitor_x(),

@@ -159,7 +159,7 @@ impl Oryxis {
             term.set_osc52_override(w, r);
         }
         if let crate::state::ProgressOrigin::Quick(id) = origin
-            && let Some(entry) = self.quick_connects.get(&id)
+            && let Some(entry) = self.vaults.cur().quick_connects.get(&id)
         {
             new_tab.active_mut().relaunch = Some(Box::new(Message::Ssh(SshMessage::QuickConnect(Box::new(entry.clone())))));
         }

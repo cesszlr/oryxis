@@ -32,6 +32,7 @@ mod menus;
 mod toolbar;
 pub(crate) use chrome::*;
 pub(crate) use main_layout::TAB_RENAME_INPUT_ID;
+pub(crate) use menu_vault::menu_divider;
 // The password popup's geometry, so `dispatch_password_suggest` can
 // drive its scroll from the same numbers the popup is drawn by.
 pub(crate) use menu_password_suggest::{
@@ -89,17 +90,17 @@ impl Oryxis {
         }
     }
 
-    /// Number of vaults the user has. Multi-vault isn't built yet, so
-    /// this is always 1 today; the switcher chrome keys off it.
+    /// Number of vaults this device knows (the registry in
+    /// `device.json`); the switcher chrome keys off it.
     pub(crate) fn vault_count(&self) -> usize {
-        1
+        self.registered_vaults().len()
     }
 
-    /// Whether to show the vault switcher (the "Personal" chip in the
-    /// sub-nav / badge in the rail). Hidden with a single vault, since
-    /// there's nothing to switch between.
+    /// Whether to show the vault switcher (the chip in the sub-nav, the
+    /// badge in the rail). Always with several vaults; with one, unless
+    /// the user hid it (its menu is also where a second vault is made).
     pub(crate) fn show_vault_switcher(&self) -> bool {
-        self.vault_count() > 1
+        self.vault_count() > 1 || !self.device_prefs.vault_switcher_hide_single
     }
 
     /// True when the Home area is active: no connection tab open and the

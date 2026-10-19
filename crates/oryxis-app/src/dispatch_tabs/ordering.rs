@@ -75,19 +75,67 @@ impl Oryxis {
             TabRef::Panel(kind) => self.open_panel_tabs.contains(kind),
         });
         // A tab shown by another window is in that window's strip, not
-        // missing from this one. With a single window the set is empty
-        // and nothing is allocated.
-        let elsewhere = if self.extra_windows.is_empty() && self.window_ctx.is_none() {
+        // missing from this one; one this window keeps parked under
+        // another vault is held here, not shown. With a single window on
+        // a single vault the set is empty and nothing is allocated.
+        let mut elsewhere = if self.extra_windows.is_empty()
+            && self.window_ctx.is_none()
+            && self.parked_views.is_empty()
+        {
             std::collections::HashSet::new()
         } else {
             self.prune_other_window_strips();
             self.tabs_in_other_windows()
         };
+        elsewhere.extend(self.tabs_parked_here());
+        // A tab belongs to the vault this message acted on: every tab it
+        // created is claimed here. The strip shows only the tabs of the
+        // window's vault; a tab of another one (a message for another
+        // vault ran here, `ForVault`) goes to a window on that vault, or
+        // is kept here, parked under it.
+        let acting = self.vaults.current_id();
+        let window_vault = self.vaults.window_id();
+        let mut misplaced = Vec::new();
+        for r in &self.tab_order {
+            let owner = match r {
+                TabRef::Terminal(id) => self
+                    .tabs
+                    .iter_mut()
+                    .find(|t| t._id == *id)
+                    .map(|t| *t.vault.get_or_insert(acting)),
+                TabRef::Sftp(id) => self
+                    .sftp_tabs
+                    .iter_mut()
+                    .find(|t| t.id == *id)
+                    .map(|t| *t.vault.get_or_insert(acting)),
+                TabRef::Panel(_) => None,
+            };
+            if let Some(owner) = owner
+                && owner != window_vault
+            {
+                misplaced.push((owner, *r));
+            }
+        }
+        for (owner, r) in misplaced {
+            self.tab_order.retain(|x| *x != r);
+            self.home_tab_ref(owner, r);
+        }
         for id in self.tabs.iter().map(|t| t._id).collect::<Vec<_>>() {
             if elsewhere.contains(&id) {
                 continue;
             }
             if !self.tab_order.iter().any(|r| matches!(r, TabRef::Terminal(x) if *x == id)) {
+                let owner = self
+                    .tabs
+                    .iter_mut()
+                    .find(|t| t._id == id)
+                    .map(|t| *t.vault.get_or_insert(acting));
+                if let Some(owner) = owner
+                    && owner != window_vault
+                {
+                    self.home_tab_ref(owner, TabRef::Terminal(id));
+                    continue;
+                }
                 self.place_new_tab_ref(TabRef::Terminal(id));
             }
         }
@@ -114,8 +162,47 @@ impl Oryxis {
                 continue;
             }
             if !self.tab_order.iter().any(|r| matches!(r, TabRef::Sftp(x) if *x == id)) {
+                let owner = self
+                    .sftp_tabs
+                    .iter_mut()
+                    .find(|t| t.id == id)
+                    .map(|t| *t.vault.get_or_insert(acting));
+                if let Some(owner) = owner
+                    && owner != window_vault
+                {
+                    self.home_tab_ref(owner, TabRef::Sftp(id));
+                    continue;
+                }
                 self.tab_order.push(TabRef::Sftp(id));
             }
+        }
+    }
+
+    /// Give `r`, a tab of `vault`, to another window working on `vault`;
+    /// with none, the window in the fields keeps it parked under it.
+    fn home_tab_ref(&mut self, vault: uuid::Uuid, r: crate::state::TabRef) {
+        let home = self
+            .other_windows()
+            .into_iter()
+            .find(|w| self.vault_of_window(*w) == vault);
+        match home {
+            Some(window) => self.give_ref_to_window(window, r, false),
+            None => self.park_tab_ref(vault, r),
+        }
+    }
+
+    /// Keep `r` in the window in the fields, parked under `vault` (its
+    /// owner, which is not the vault the window works on).
+    fn park_tab_ref(&mut self, vault: uuid::Uuid, r: crate::state::TabRef) {
+        let parked = self.parked_views.entry(vault).or_insert_with(|| crate::window_ctx::ParkedView {
+            order: Vec::new(),
+            active: None,
+            mru: Vec::new(),
+            view: crate::state::View::Dashboard,
+            nav: crate::window_ctx::WindowNav::default(),
+        });
+        if !parked.order.contains(&r) {
+            parked.order.push(r);
         }
     }
 

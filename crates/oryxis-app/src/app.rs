@@ -97,7 +97,7 @@ use crate::theme::OryxisColors;
 
 // `Message` lives in its own module; re-export so call sites that
 // import `crate::app::Message` keep working.
-pub use crate::messages::{Message, SettingsMessage, TabsMessage, EditorMessage, KeysMessage, SidebarFilesMessage, MonitorMessage, NetToolsMessage, TmuxMessage, TerminalMessage, SshMessage, CloudMessage, HistoryMessage, McpMessage, NavigationMessage, CommandHistoryMessage, UpdateMessage, ProxyIdentityMessage, PluginMessage, AgentMessage, ZmodemMessage, KnownHostMessage, RemoteDesktopMessage, TrayMessage, SessionGroupMessage, PortForwardMessage, VaultMessage, SnippetMessage, AiMessage, OnboardingMessage, PlayerMessage, ShareMessage, SftpMessage, SyncMessage};
+pub use crate::messages::{Message, SettingsMessage, TabsMessage, EditorMessage, KeysMessage, SidebarFilesMessage, MonitorMessage, NetToolsMessage, TmuxMessage, TerminalMessage, SshMessage, CloudMessage, HistoryMessage, McpMessage, NavigationMessage, CommandHistoryMessage, UpdateMessage, ProxyIdentityMessage, PluginMessage, AgentMessage, MultiVaultMessage, ZmodemMessage, KnownHostMessage, RemoteDesktopMessage, TrayMessage, SessionGroupMessage, PortForwardMessage, VaultMessage, SnippetMessage, AiMessage, OnboardingMessage, PlayerMessage, ShareMessage, SftpMessage, SyncMessage};
 
 // Layout constants
 pub(crate) const DEFAULT_TERM_COLS: u32 = 120;
@@ -317,24 +317,12 @@ pub struct Oryxis {
     // clarity even though both now point at the same asset.
     pub(crate) logo_handle: svg::Handle,
 
-    /// Ad-hoc quick-connect hosts, keyed by connection id. Never touches
-    /// the vault or `connections` (so no grid / sync / export leakage).
-    /// Entries carry the credentials typed in the editor flow so a
-    /// reconnect can reuse them; swept on vault lock, pruned when the
-    /// last pane referencing an entry closes.
-    pub(crate) quick_connects: std::collections::HashMap<Uuid, crate::state::QuickConnectEntry>,
 
     // UI state
     pub(crate) active_view: View,
 
     // Tabs
     pub(crate) tabs: Vec<TerminalTab>,
-    /// Tabs the user closed, newest last, capped: the stack
-    /// `ReopenClosedTab` pops (issue #186). Terminal and SFTP tabs share
-    /// it, so the chord always brings back the last chip that left the
-    /// strip whichever kind it was. See [`crate::state::ClosedTab`] for
-    /// why it holds a pin spec and why it is not persisted.
-    pub(crate) closed_tabs: Vec<crate::state::ClosedTab>,
     /// Every inline rename open at the end of the last `update`, with
     /// what was drawn above its row; the funnel re-focuses one whose
     /// row a re-list moved. See `inline_edit_focus`.
@@ -345,40 +333,6 @@ pub struct Oryxis {
     /// work, so a crash or a kill still leaves the last arrangement on
     /// disk instead of only the four orderly exit doors doing.
     pub(crate) open_tabs_signature: u64,
-    /// Whether the restore-on-launch pass has already run in this
-    /// process. `load_data_from_vault` re-runs on connection save, sync
-    /// and vault reload; pins survive that because they dedupe by pin
-    /// identity, and ordinary tabs cannot (two tabs on one host are
-    /// legitimate), so this is what stops a re-run from recreating tabs
-    /// the user has closed since boot.
-    pub(crate) open_tabs_restored: bool,
-    /// Restored tabs still owed a dial under "connect at launch" (issue
-    /// #229), in strip order. Drained ONE AT A TIME by
-    /// `advance_launch_dials` from the update funnel, the next only once
-    /// no dial is in flight anywhere, because the host-key, 2FA and
-    /// command-proxy answers ride single staging slots that several
-    /// first-time dials at once would overwrite. Seeded once per process
-    /// next to the restore; a manual lock drops it with the strip.
-    pub(crate) launch_dials: std::collections::VecDeque<uuid::Uuid>,
-    /// Saved hosts still owed a dial by a batch connect from the host
-    /// list (issue #230), in the order the dashboard showed them. Same
-    /// shape and same reason as `launch_dials`: drained ONE AT A TIME by
-    /// `advance_batch_dials` from the update funnel, because the
-    /// host-key, 2FA and command-proxy answers ride single staging slots,
-    /// and a batch of freshly imported hosts is exactly the batch of
-    /// first-time dials that would mis-route them. Host ids, never list
-    /// indices: every dial flushes the editor, which re-sorts the list.
-    pub(crate) batch_dials: std::collections::VecDeque<uuid::Uuid>,
-    /// The chip to land on after the restore, when the user asked to
-    /// open on the tab that was active (issue #229). Resolved to a live
-    /// strip entry at restore time and TAKEN by the boot / unlock site
-    /// that lands, so a later unlock (a soft lock) finds nothing.
-    pub(crate) launch_landing: Option<crate::state::TabRef>,
-    /// The landing tab when its dial had to wait for the local terminal
-    /// scan: the launch queue selects it once it dials it, because
-    /// selecting a dormant tab earlier runs the foreground reopen, which
-    /// would resolve the terminal against a list that does not exist yet.
-    pub(crate) launch_landing_deferred: Option<uuid::Uuid>,
     /// Whether the ZMODEM staging sweep (`zmodem_sweep_task`) has run
     /// in this process.
     pub(crate) zmodem_swept: bool,
@@ -695,6 +649,15 @@ pub struct Oryxis {
     /// folder, the searches and filters, the host selection. Per window
     /// (see `window_ctx::WindowNav`); views read it through `cur_nav()`.
     pub(crate) nav: crate::window_ctx::WindowNav,
+    /// What the window in the fields keeps of the vaults it is not working
+    /// on (see `window_ctx::ParkedView`); swapped like `nav`.
+    pub(crate) parked_views: crate::window_ctx::ParkedViews,
+    /// The "New vault" dialog, while it is up (`Modal::NewVault`).
+    pub(crate) new_vault: Option<crate::state::NewVaultForm>,
+    /// The vault switcher chip on the toolbar and the badge on the nav
+    /// rail, as last drawn: the switcher menu opens under the one pressed.
+    pub(crate) vault_chip_bounds: crate::widgets::BoundsCell,
+    pub(crate) vault_badge_bounds: crate::widgets::BoundsCell,
     pub(crate) tab_order: Vec<crate::state::TabRef>,
     /// The extra windows (terminal tabs only), by window id. See
     /// `window_ctx`.
@@ -870,12 +833,6 @@ pub struct Oryxis {
     pub(crate) editing_hotkey:
         Option<(crate::hotkeys::HotkeyAction, crate::hotkeys::HotkeySlot)>,
 
-    /// History view: also search inside recorded session content
-    /// (typed commands + output), the toggle chip inside the search
-    /// field. Session-scoped UI state, not persisted.
-    pub(crate) history_search_content: bool,
-    /// Async results + scan progress for the content search above.
-    pub(crate) history_content: crate::state::HistoryContentSearch,
 
     /// Bumped per armed run so a stale timeout tick from a finished
     /// run cannot abort the one that replaced it.
@@ -1025,17 +982,6 @@ pub struct Oryxis {
     /// (`PortForwardHostRetry`) so the whole queue restarts together;
     /// discarded when a fresh dial for the host starts any other way.
     pub(crate) pf_aborted_pending: std::collections::HashMap<Uuid, Vec<Uuid>>,
-    /// Live RDP/VNC-over-SSH tunnels, keyed by the host's connection id.
-    /// A managed `-L` forward paired with its launch generation. The tunnel
-    /// self-closes once the desktop client disconnects and it goes idle (see
-    /// `spawn_autoclose_local_forward_task`); relaunching a host replaces its
-    /// entry (dropping the old `ForwardSession` cancels it), and vault
-    /// lock / app close clears the map. The generation lets a stale
-    /// self-close from a superseded tunnel skip the current entry.
-    pub(crate) remote_desktop_forwards: std::collections::HashMap<
-        Uuid,
-        (u64, std::sync::Arc<oryxis_ssh::ForwardSession>),
-    >,
     /// Callback tunnels opened by Ctrl+clicking a link in a terminal
     /// pane, keyed by `(pane_id, port)`. Each is a `-L` forward riding
     /// that pane's own SSH connection so a CLI login's

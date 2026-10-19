@@ -963,7 +963,7 @@ impl Oryxis {
     fn pane_restartable(&self, pane: &crate::state::Pane) -> bool {
         match &pane.origin {
             crate::state::PaneOrigin::Host(id) => self.vaults.cur().connections.iter().any(|c| c.id == *id),
-            crate::state::PaneOrigin::QuickHost(id) => self.quick_connects.contains_key(id),
+            crate::state::PaneOrigin::QuickHost(id) => self.vaults.cur().quick_connects.contains_key(id),
             crate::state::PaneOrigin::Local(_) => true,
             crate::state::PaneOrigin::Ephemeral => false,
         }

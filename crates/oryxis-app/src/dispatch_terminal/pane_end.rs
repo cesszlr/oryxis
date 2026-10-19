@@ -272,7 +272,7 @@ impl Oryxis {
                 ))
             }
             crate::state::PaneOrigin::QuickHost(qid) => {
-                let entry = self.quick_connects.get(qid)?;
+                let entry = self.vaults.cur().quick_connects.get(qid)?;
                 Some(PaneRestartTarget::Quick(*qid, entry.conn.label.clone()))
             }
             crate::state::PaneOrigin::Local(spec) => {

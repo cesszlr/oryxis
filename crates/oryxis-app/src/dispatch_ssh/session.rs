@@ -237,7 +237,7 @@ impl Oryxis {
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_detected_os(&conn_id, os.as_deref());
                     }
-                } else if let Some(entry) = self.quick_connects.get_mut(&conn_id) {
+                } else if let Some(entry) = self.vaults.cur_mut().quick_connects.get_mut(&conn_id) {
                     entry.conn.detected_os = os.clone();
                 }
                 tracing::info!("OS detected for {}: {:?}", conn_id, os);

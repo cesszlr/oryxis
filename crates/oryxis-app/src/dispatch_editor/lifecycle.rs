@@ -55,7 +55,7 @@ impl Oryxis {
                 self.editor_flush_pending();
                 self.overlay = None;
                 self.card_context_menu = None;
-                let Some(entry) = self.quick_connects.get(&id).cloned() else {
+                let Some(entry) = self.vaults.cur().quick_connects.get(&id).cloned() else {
                     return Task::none();
                 };
                 // Mutually exclusive right-panel slot, and the panel lives

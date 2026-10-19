@@ -303,7 +303,7 @@ impl Oryxis {
                     term.set_osc52_override(w, r);
                 }
                 if let crate::state::ProgressOrigin::Quick(id) = origin
-                    && let Some(entry) = self.quick_connects.get(&id)
+                    && let Some(entry) = self.vaults.cur().quick_connects.get(&id)
                 {
                     // Relaunch message so Duplicate Tab (here or in a new
                     // window) can recreate this ad-hoc session.
@@ -598,7 +598,7 @@ impl Oryxis {
                     }
                     crate::state::ProgressOrigin::Quick(id) => {
                         Message::Ssh(SshMessage::QuickConnect(Box::new(
-                            self.quick_connects.get(&id).cloned().unwrap_or_else(
+                            self.vaults.cur().quick_connects.get(&id).cloned().unwrap_or_else(
                                 || crate::state::QuickConnectEntry::bare(conn.clone()),
                             ),
                         )))
@@ -1141,7 +1141,7 @@ impl Oryxis {
                 self.vaults.cur().connections.iter().find(|c| c.id == *id)
             }
             crate::state::PaneOrigin::QuickHost(id) => {
-                self.quick_connects.get(id).map(|e| &e.conn)
+                self.vaults.cur().quick_connects.get(id).map(|e| &e.conn)
             }
             _ => None,
         }
@@ -1206,7 +1206,7 @@ impl Oryxis {
         target: iced::widget::pane_grid::Pane,
         axis: iced::widget::pane_grid::Axis,
     ) -> Task<Message> {
-        let Some(conn) = self.quick_connects.get(&entry_id).map(|e| e.conn.clone()) else {
+        let Some(conn) = self.vaults.cur().quick_connects.get(&entry_id).map(|e| e.conn.clone()) else {
             return Task::none();
         };
         let Ok(mut term) =
@@ -1256,7 +1256,7 @@ impl Oryxis {
         tab_idx: usize,
         pane_id: Uuid,
     ) -> Task<Message> {
-        let Some(conn) = self.quick_connects.get(&entry_id).map(|e| e.conn.clone()) else {
+        let Some(conn) = self.vaults.cur().quick_connects.get(&entry_id).map(|e| e.conn.clone()) else {
             return Task::none();
         };
         self.spawn_ssh_for_pane_conn(conn, Some(entry_id), tab_idx, pane_id)

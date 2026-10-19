@@ -180,7 +180,7 @@ impl Oryxis {
                             // back. Re-arm the debounced search here so an active
                             // chip reflects live results again instead of rendering
                             // active over nothing until the next keystroke.
-                            if self.history_search_content {
+                            if self.vaults.cur().history_search_content {
                                 unlock_tasks.push(self.history_content_debounce());
                             }
                             // The restored strip's landing (issue #229),

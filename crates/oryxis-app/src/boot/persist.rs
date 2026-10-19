@@ -153,7 +153,13 @@ impl Oryxis {
     /// Snapshot the currently-pinned tabs (those with a reopenable spec) to
     /// the `pinned_tabs` setting so they reappear, dormant, next launch.
     /// Cloud / ephemeral pinned tabs have no spec and are skipped.
-    pub(crate) fn persist_pinned_tabs(&self) {
+    pub(crate) fn persist_pinned_tabs(&mut self) {
+        self.for_each_open_vault(Self::persist_pinned_tabs_here);
+    }
+
+    /// [`Self::persist_pinned_tabs`] for the vault `update` works on: its
+    /// own tabs into its own `pinned_tabs` row.
+    fn persist_pinned_tabs_here(&self, _in_front: bool) {
         // De-duplicate by pin identity: a dormant placeholder and its
         // freshly-reopened live tab can briefly coexist (or a missed
         // replacement can leave both around), and persisting both
@@ -163,9 +169,9 @@ impl Oryxis {
         // restored pinned sequence matches what the user arranged, across both
         // terminal and SFTP tabs.
         let mut specs: Vec<crate::state::PinnedTabSpec> = Vec::new();
-        // Every window's tabs: the next launch has one window, and a tab
-        // that was in an extra one comes back in it.
-        for r in &self.all_strip_refs() {
+        // Every window's tabs of this vault: the next launch has one
+        // window, and a tab that was in an extra one comes back in it.
+        for r in &self.vault_strip_refs() {
             let spec = match r {
                 crate::state::TabRef::Terminal(id) => self
                     .tabs
@@ -212,14 +218,22 @@ impl Oryxis {
     /// Nothing is written while the setting is off, and the toggle
     /// clears the row on its way out, so a user who never asked for this
     /// has no list of their hosts sitting next to a locked vault.
-    pub(crate) fn persist_open_tabs(&self) {
+    pub(crate) fn persist_open_tabs(&mut self) {
+        self.for_each_open_vault(Self::persist_open_tabs_here);
+    }
+
+    /// [`Self::persist_open_tabs`] for the vault `update` works on: its
+    /// own tabs into its own `open_tabs` row, under its own preference.
+    /// `in_front`: the vault is the one of the window in the fields, so
+    /// the chip in front is one of its own.
+    fn persist_open_tabs_here(&self, in_front: bool) {
         if !self.vaults.cur().prefs.restore_tabs_on_launch {
             return;
         }
         let mut specs: Vec<crate::state::PinnedTabSpec> = Vec::new();
-        // Every window's tabs: the next launch has one window, and a tab
-        // that was in an extra one comes back in it.
-        for r in &self.all_strip_refs() {
+        // Every window's tabs of this vault: the next launch has one
+        // window, and a tab that was in an extra one comes back in it.
+        for r in &self.vault_strip_refs() {
             let spec = match r {
                 crate::state::TabRef::Terminal(id) => self
                     .tabs
@@ -243,8 +257,10 @@ impl Oryxis {
         self.persist_setting("open_tabs", &json);
         // The chip to land on, only while the user asked to land there
         // (issue #229): the row is cleared when either preference goes
-        // off, so an absent write here is what keeps it cleared.
-        if self.vaults.cur().prefs.restore_last_active_tab {
+        // off, so an absent write here is what keeps it cleared. The chip
+        // in front is the window's in the fields; a vault written from
+        // another vault's window keeps the row it had.
+        if self.vaults.cur().prefs.restore_last_active_tab && in_front {
             let active = self
                 .active_strip_ref()
                 .and_then(|a| serde_json::to_string(&a).ok())
@@ -360,7 +376,7 @@ impl Oryxis {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        if !self.vaults.cur().prefs.restore_tabs_on_launch {
+        if !self.vaults.all().any(|v| v.prefs.restore_tabs_on_launch) {
             return;
         }
         // One pass over each list, not a search per strip entry: this
@@ -399,6 +415,49 @@ impl Oryxis {
         self.persist_open_tabs();
     }
 
+    /// Every strip entry of every window (shown or parked) whose tab
+    /// belongs to the vault `update` works on. A tab not claimed yet is
+    /// the current vault's (it is claimed by this update's reconcile).
+    pub(crate) fn vault_strip_refs(&self) -> Vec<crate::state::TabRef> {
+        let vault = self.vaults.current_id();
+        self.all_strip_refs()
+            .into_iter()
+            .filter(|r| match r {
+                crate::state::TabRef::Terminal(id) | crate::state::TabRef::Sftp(id) => {
+                    self.vault_of_tab(*id).is_none_or(|v| v == vault)
+                }
+                crate::state::TabRef::Panel(_) => false,
+            })
+            .collect()
+    }
+
+    /// Run `f` once for every open vault, each time with that vault as
+    /// the one `update` works on (the window in the fields stays). The
+    /// flag says whether it is that window's own vault.
+    pub(crate) fn for_each_open_vault(&mut self, f: impl Fn(&Self, bool)) {
+        let current = self.vaults.current_id();
+        f(self, true);
+        for id in self.vaults.ids().filter(|id| *id != current).collect::<Vec<_>>() {
+            let previous = self.vaults.act_on(id);
+            f(self, false);
+            self.vaults.act_back(previous);
+        }
+    }
+
+    /// [`Self::for_each_open_vault`] for a pass that changes the app:
+    /// `f` runs once per open vault, acting on it, and what each run
+    /// answers is collected.
+    pub(crate) fn on_each_open_vault<T>(&mut self, mut f: impl FnMut(&mut Self) -> Option<T>) -> Vec<T> {
+        let current = self.vaults.current_id();
+        let mut out: Vec<T> = f(self).into_iter().collect();
+        for id in self.vaults.ids().filter(|id| *id != current).collect::<Vec<_>>() {
+            let previous = self.vaults.act_on(id);
+            out.extend(f(self));
+            self.vaults.act_back(previous);
+        }
+        out
+    }
+
     /// Recreate last session's non-pinned tabs as dormant placeholders,
     /// once per process (issue #206), and decide what the launch owes
     /// them beyond that (issue #229).
@@ -416,7 +475,7 @@ impl Oryxis {
         // preference on mid-session must not make the next re-run of
         // `load_data_from_vault` (a connection save, a sync round)
         // paste the previous session's strip over the current one.
-        if std::mem::replace(&mut self.open_tabs_restored, true) {
+        if std::mem::replace(&mut self.vaults.cur_mut().open_tabs_restored, true) {
             return;
         }
         if !self.vaults.cur().prefs.restore_tabs_on_launch {
@@ -480,7 +539,7 @@ impl Oryxis {
         // own, so both keep connecting when selected, and the setting's
         // description says so.
         if self.launch_dials_wanted() {
-            self.launch_dials = self
+            self.vaults.cur_mut().launch_dials = self
                 .tab_order
                 .iter()
                 .filter_map(|r| match r {
@@ -495,7 +554,7 @@ impl Oryxis {
                 })
                 .collect();
         }
-        self.launch_landing = active.as_ref().and_then(|a| self.resolve_strip_ref(a));
+        self.vaults.cur_mut().launch_landing = active.as_ref().and_then(|a| self.resolve_strip_ref(a));
     }
 
     /// Whether the restore owes its tabs a dial (issue #229): the
@@ -558,7 +617,7 @@ impl Oryxis {
                 // The queue is seeded once, on the FIRST restore of the
                 // process; a pin recreated by a later re-run is not in
                 // it and connects on select like it always did.
-                let hint = if !self.open_tabs_restored
+                let hint = if !self.vaults.cur().open_tabs_restored
                     && self.launch_dials_wanted()
                     && self.has_in_place_dial(&spec)
                 {

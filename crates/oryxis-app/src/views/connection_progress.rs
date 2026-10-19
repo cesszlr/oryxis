@@ -62,7 +62,7 @@ impl Oryxis {
                 .find(|c| c.id == id)
                 .or_else(|| self.vaults.cur().connections.iter().find(|c| c.label == progress.label)),
             crate::state::ProgressOrigin::Quick(id) => {
-                self.quick_connects.get(&id).map(|e| &e.conn)
+                self.vaults.cur().quick_connects.get(&id).map(|e| &e.conn)
             }
         }
     }
@@ -379,10 +379,10 @@ impl Oryxis {
         // The dial on screen stays the user's to finish or close. Built
         // here, ahead of the action row it sits above, so its keyboard
         // row is recorded in display order.
-        let batch_row: Option<Element<'_, Message>> = (!self.batch_dials.is_empty()).then(|| {
+        let batch_row: Option<Element<'_, Message>> = (!self.vaults.cur().batch_dials.is_empty()).then(|| {
             let queued = text(
                 crate::i18n::t("batch_connect_queued")
-                    .replace("{hosts}", &crate::i18n::host_count(self.batch_dials.len())),
+                    .replace("{hosts}", &crate::i18n::host_count(self.vaults.cur().batch_dials.len())),
             )
             .size(12)
             .color(OryxisColors::t().text_muted);
@@ -413,13 +413,13 @@ impl Oryxis {
             // to enable them (weaker) or cancel.
             // A quick-connect host resolves from the ephemeral store; it
             // also has nothing to persist, so the "always" button hides.
-            let is_quick = self.quick_connects.contains_key(&legacy.conn_id)
+            let is_quick = self.vaults.cur().quick_connects.contains_key(&legacy.conn_id)
                 && !self.vaults.cur().connections.iter().any(|c| c.id == legacy.conn_id);
             let host_label = self
                 .vaults.cur().connections
                 .iter()
                 .find(|c| c.id == legacy.conn_id)
-                .or_else(|| self.quick_connects.get(&legacy.conn_id).map(|e| &e.conn))
+                .or_else(|| self.vaults.cur().quick_connects.get(&legacy.conn_id).map(|e| &e.conn))
                 .map(|c| c.label.clone())
                 .unwrap_or_default();
             let cat_key = match legacy.category {

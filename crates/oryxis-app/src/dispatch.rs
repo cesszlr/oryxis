@@ -42,7 +42,16 @@ enum DragOutStep {
 }
 
 impl Oryxis {
+    /// Run one message. Every follow-up its task yields runs on the vault
+    /// this update worked on (`Message::on_vault`), the way a window's
+    /// follow-ups run in that window: a window switched to another vault
+    /// meanwhile must not receive the first vault's results.
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let vault = self.vaults.current_id();
+        self.update_here(message).map(move |m| m.on_vault(vault))
+    }
+
+    fn update_here(&mut self, message: Message) -> Task<Message> {
         // Stall watchdog (#104): heartbeat + in-flight marker for this
         // message, dropped on every exit path. No-op unless the debug
         // logging toggle is on.
@@ -52,6 +61,7 @@ impl Oryxis {
         let message = match message {
             Message::InWindow(id, inner) => return self.update_in_window(id, *inner),
             Message::ForPane(pane, inner) => return self.update_for_pane(pane, *inner),
+            Message::ForVault(vault, inner) => return self.update_on_vault(vault, *inner),
             other => other,
         };
         // Sync the cursor position from the event listener's atomics.
@@ -272,10 +282,12 @@ impl Oryxis {
         // cannot forget to hand the queue its turn; the queue is empty
         // for the life of an ordinary session, so this costs a length
         // check.
-        extra.extend(self.advance_launch_dials());
+        // Each open vault has its own queue; one dial in flight across
+        // all of them (the prompt slots are the app's).
+        extra.extend(self.on_each_open_vault(Self::advance_launch_dials));
         // A batch connect from the host list (issue #230) drains the same
         // way and under the same in-flight rule, one dial at a time.
-        extra.extend(self.advance_batch_dials());
+        extra.extend(self.on_each_open_vault(Self::advance_batch_dials));
         // A snippet run whose pane went away (closed, its tab torn down)
         // ends with it, whichever path closed the pane; one waiting on
         // the Save Output dialog goes on once it is answered.
@@ -476,6 +488,7 @@ impl Oryxis {
             // message; `update` unwraps the ones iced delivers.
             Message::InWindow(id, inner) => self.update_in_window(id, *inner),
             Message::ForPane(pane, inner) => self.update_for_pane(pane, *inner),
+            Message::ForVault(vault, inner) => self.update_on_vault(vault, *inner),
             Message::KnownHost(m) => self.handle_known_hosts(m),
             Message::RemoteDesktop(m) => self.handle_remote_desktop(m),
             Message::SessionGroup(m) => self.handle_session_group(m),
@@ -483,6 +496,7 @@ impl Oryxis {
             Message::Update(m) => self.handle_update(m),
             Message::PortForward(m) => self.handle_port_forwards(m),
             Message::Agent(m) => self.handle_agent(m),
+            Message::MultiVault(m) => self.handle_multi_vault(m),
             Message::ProxyIdentity(m) => self.handle_proxy_identity(m),
             Message::CommandHistory(m) => self.handle_command_history(m),
             Message::Navigation(m) => self.handle_navigation(m),

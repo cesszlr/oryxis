@@ -25,7 +25,15 @@ impl Oryxis {
     /// it in window chrome). The carousel IS the screen: feature slides
     /// then a final master-password slide that creates the vault.
     pub(crate) fn view_onboarding_page(&self) -> Element<'_, Message> {
-        let slide = self.onboarding_slide.min(ONBOARDING_LAST_SLIDE);
+        // A vault made with "New vault" skips the welcome: its setup is
+        // the master-password step alone, with no way back to slides that
+        // describe the app the user is already in.
+        let setup_only = self.vaults.cur().created_from.is_some();
+        let slide = if setup_only {
+            ONBOARDING_LAST_SLIDE
+        } else {
+            self.onboarding_slide.min(ONBOARDING_LAST_SLIDE)
+        };
 
         let content: Element<'_, Message> = match slide {
             ONBOARDING_LAST_SLIDE => self.onboarding_password_slide(),
@@ -34,13 +42,32 @@ impl Oryxis {
             _ => self.onboarding_feature_slide(slide),
         };
 
-        let card_inner = column![
-            content,
-            Space::new().height(34),
-            // Pagination dots share the action row, centered between Back
-            // (left) and Skip / Next (right).
-            self.onboarding_nav(slide),
-        ]
+        let card_inner = if setup_only {
+            column![
+                content,
+                Space::new().height(10),
+                button(text(t("cancel")).size(12).color(OryxisColors::t().text_muted))
+                    .on_press(Message::MultiVault(crate::app::MultiVaultMessage::CancelVaultSetup))
+                    .padding(Padding { top: 6.0, right: 12.0, bottom: 6.0, left: 12.0 })
+                    .style(|_, status| button::Style {
+                        background: Some(Background::Color(match status {
+                            iced::widget::button::Status::Hovered
+                            | iced::widget::button::Status::Pressed => OryxisColors::t().bg_hover,
+                            _ => Color::TRANSPARENT,
+                        })),
+                        border: Border { radius: Radius::from(6.0), ..Default::default() },
+                        ..Default::default()
+                    }),
+            ]
+        } else {
+            column![
+                content,
+                Space::new().height(34),
+                // Pagination dots share the action row, centered between
+                // Back (left) and Skip / Next (right).
+                self.onboarding_nav(slide),
+            ]
+        }
         .width(Length::Fill)
         .align_x(iced::Alignment::Center);
 
@@ -343,7 +370,13 @@ impl Oryxis {
         let header = column![
             badge,
             Space::new().height(24),
-            text(t("onboarding_password_title")).size(30).font(iced::Font {
+            text(if self.vaults.cur().created_from.is_some() {
+                t("vault_setup_title").replacen("{name}", &self.vault_name(self.vaults.cur().id), 1)
+            } else {
+                t("onboarding_password_title").to_string()
+            })
+            .size(30)
+            .font(iced::Font {
                 weight: iced::font::Weight::Bold,
                 ..iced::Font::new(crate::theme::SYSTEM_UI_FAMILY)
             }).color(OryxisColors::t().text_primary),
