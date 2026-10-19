@@ -8,8 +8,8 @@
 //! Phase 1: the wire protocol ([`protocol`]), the key source
 //! abstraction ([`source`]) and the unix listener ([`listener`]), all
 //! provable against russh's public `AgentClient`. Phase 2 adds the
-//! `AgentRuntime` (a dedicated unlocked vault handle, mirroring
-//! `sync_runtime`), the Settings toggle, the per-signature confirm
+//! `AgentRuntime` (a dedicated unlocked handle per unlocked vault,
+//! their keys merged, mirroring `sync_runtime`), the Settings toggle, the per-signature confirm
 //! modal and the lock wiring. Phase 3 adds the Windows named pipe
 //! (`listener::windows`, a per-user DACL restricting the pipe to the
 //! current user's SID). The DACL is the one part a Linux cross-check
@@ -49,8 +49,9 @@ pub(crate) fn listener_socket_display() -> Option<String> {
     }
 }
 
-/// The live agent: a dedicated unlocked vault handle serving keys over
-/// the socket while the feature is on. Mirrors `SyncRuntime`: its own
+/// The live agent: a dedicated unlocked handle per unlocked vault,
+/// serving their keys merged over the one socket while the feature is
+/// on (the socket is the device's: `agent_server_*` are device keys). Mirrors `SyncRuntime`: its own
 /// `VaultStore` handle on the same DB file, a background accept task,
 /// and an event receiver the app pumps into the update loop. Dropping
 /// it aborts the task and removes the socket.
@@ -84,37 +85,23 @@ impl AgentRuntime {
         self.source.external_add_generation()
     }
 
-    /// Open a dedicated vault handle, bind the socket and start
-    /// serving; returns a receiver of per-signature prompts the app
-    /// surfaces. `confirm` prompts for every signature; even with it
+    /// Bind the socket and start serving (nothing until a vault is
+    /// [`attach`](Self::attach)ed); returns a receiver of per-signature
+    /// prompts the app surfaces. `confirm` prompts for every signature; even with it
     /// off, keys added under a CONFIRM constraint prompt (which is why
     /// the channel always exists). `allow_add` accepts external
     /// ADD/REMOVE into the in-memory roster. `openssh_alias`
     /// additionally serves the standard OpenSSH pipe name when free
-    /// (Windows; ignored elsewhere). `master_password` is `Some` for a
-    /// password-protected vault, `None` for a passwordless one
-    /// (mirrors the sync runtime).
+    /// (Windows; ignored elsewhere).
     ///
     /// Returns the bind error (so the toggle can revert) on failure;
     /// an alias-bind problem is NOT fatal and lands in `alias_error`.
     pub(crate) fn spawn(
-        db_path: &std::path::Path,
-        master_password: Option<&str>,
         confirm: bool,
         allow_add: bool,
         openssh_alias: bool,
     ) -> Result<(Self, tokio::sync::mpsc::UnboundedReceiver<ConfirmAsk>), String> {
-        let mut vault = oryxis_vault::VaultStore::open(db_path)
-            .map_err(|e| format!("open agent vault handle: {e}"))?;
-        match master_password {
-            Some(pw) => vault
-                .unlock(pw)
-                .map_err(|e| format!("unlock agent vault handle: {e}"))?,
-            None => vault
-                .open_without_password()
-                .map_err(|e| format!("open agent vault handle: {e}"))?,
-        }
-        let source = Arc::new(VaultKeySource::new(vault, allow_add));
+        let source = Arc::new(VaultKeySource::new(allow_add));
 
         let (confirm_tx, confirm_rx) = tokio::sync::mpsc::unbounded_channel();
         let confirm_mode = ConfirmMode {
@@ -226,14 +213,34 @@ impl AgentRuntime {
         }
     }
 
-    /// Flip the source's gate + lock the dedicated handle on vault lock.
-    pub(crate) fn lock(&self) {
-        self.source.lock();
+    /// Serve vault `id`'s exposed keys: a dedicated handle on its file
+    /// (`db_path`), unlocked with `master_password` (`None` for a
+    /// passwordless vault, mirroring the sync runtime).
+    pub(crate) fn attach(
+        &self,
+        id: uuid::Uuid,
+        label: String,
+        db_path: &std::path::Path,
+        master_password: Option<&str>,
+    ) -> Result<(), String> {
+        let mut vault = oryxis_vault::VaultStore::open(db_path)
+            .map_err(|e| format!("open agent vault handle: {e}"))?;
+        match master_password {
+            Some(pw) => vault.unlock(pw).map_err(|e| format!("unlock agent vault handle: {e}"))?,
+            None => vault.open_without_password().map_err(|e| format!("open agent vault handle: {e}"))?,
+        }
+        self.source.attach(id, label, vault);
+        Ok(())
     }
 
-    /// Re-unlock the dedicated handle when the app vault unlocks.
-    pub(crate) fn unlock(&self, master_password: Option<&str>) {
-        self.source.unlock(master_password);
+    /// Stop serving vault `id` (its lock, its removal).
+    pub(crate) fn detach(&self, id: uuid::Uuid) {
+        self.source.detach(id);
+    }
+
+    /// Vault `id` was renamed: its keys' comments follow.
+    pub(crate) fn relabel(&self, id: uuid::Uuid, label: String) {
+        self.source.relabel(id, label);
     }
 
     /// Abort the accept task(s) and remove the socket.
@@ -249,12 +256,13 @@ impl Drop for AgentRuntime {
         // `source`; without this they would keep listing and signing
         // with vault keys after the feature is toggled off (or a
         // settings restart drops this runtime), invisibly if `confirm`
-        // is off. Locking the source flips the shared gate every
-        // sign/list/add checks and sweeps ephemeral keys, so those
-        // survivors go dark immediately. Safe across a stop+start
-        // restart: `spawn` always builds a fresh `source`, so the new
-        // runtime is unaffected by locking this old one.
-        self.source.lock();
+        // is off. Closing the source flips the shared gate every
+        // sign/list/add checks, locks every vault handle and sweeps
+        // ephemeral keys, so those survivors go dark immediately. Safe
+        // across a stop+start restart: `spawn` always builds a fresh
+        // `source`, so the new runtime is unaffected by closing this
+        // old one.
+        self.source.close();
         for task in &self.tasks {
             task.abort();
         }

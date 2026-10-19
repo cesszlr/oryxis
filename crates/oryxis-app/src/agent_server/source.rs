@@ -271,28 +271,47 @@ impl EphemeralStore {
     }
 }
 
-/// The production [`AgentKeySource`]: a dedicated unlocked `VaultStore`
-/// handle (its own SQLite handle on the same file, like `sync_runtime`;
-/// WAL keeps concurrent handles safe). Keys are advertised by their
-/// public blob; the private key is decrypted only inside [`sign`] and
-/// dropped immediately. A `locked` gate flips on vault lock so the
-/// agent goes dark without tearing down the listener.
+/// One unlocked vault the agent serves from: its own dedicated
+/// `VaultStore` handle (a second SQLite handle on the same file, like
+/// `sync_runtime`; WAL keeps concurrent handles safe).
+struct AttachedVault {
+    id: uuid::Uuid,
+    /// The vault's name, for the key comment when several are attached
+    /// (`ssh-add -l`, the confirm prompt).
+    label: String,
+    store: oryxis_vault::VaultStore,
+}
+
+/// The production [`AgentKeySource`]: every UNLOCKED vault's exposed
+/// keys, merged (`MULTI_VAULT_SPEC.md` § 11), plus the client-added
+/// ones. A vault is attached on its unlock and detached on its lock, so
+/// its keys leave the roster at once (the next `REQUEST_IDENTITIES`
+/// does not list them, a sign request for one fails). Keys are
+/// advertised by their public blob; a private key is decrypted only
+/// inside [`sign`] and dropped immediately. The same public key in two
+/// vaults is listed once and signed by the first vault holding it.
+/// With no vault attached the agent is dark: it lists nothing, signs
+/// nothing and takes no adds.
 pub(crate) struct VaultKeySource {
-    vault: std::sync::Mutex<oryxis_vault::VaultStore>,
-    locked: std::sync::atomic::AtomicBool,
+    vaults: std::sync::Mutex<Vec<AttachedVault>>,
+    /// The runtime is gone (`AgentRuntime` dropped): per-connection
+    /// tasks that outlive it must go dark for good, whatever attaches.
+    closed: std::sync::atomic::AtomicBool,
     /// The `agent_server_allow_add` setting, baked at spawn (the
     /// runtime restarts on toggle). Off = pure read-only oracle.
     allow_add: bool,
-    /// Client-added keys (Phase 4). Only ever populated when
-    /// `allow_add` is on; swept on lock.
+    /// Client-added keys (Phase 4). Belong to no vault; only ever
+    /// populated when `allow_add` is on; swept when the last vault
+    /// detaches.
     ephemeral: EphemeralStore,
 }
 
 impl VaultKeySource {
-    pub(crate) fn new(vault: oryxis_vault::VaultStore, allow_add: bool) -> Self {
+    /// A source serving nothing yet: vaults come with [`Self::attach`].
+    pub(crate) fn new(allow_add: bool) -> Self {
         Self {
-            vault: std::sync::Mutex::new(vault),
-            locked: std::sync::atomic::AtomicBool::new(false),
+            vaults: std::sync::Mutex::new(Vec::new()),
+            closed: std::sync::atomic::AtomicBool::new(false),
             allow_add,
             ephemeral: EphemeralStore::default(),
         }
@@ -309,37 +328,68 @@ impl VaultKeySource {
         self.ephemeral.add_generation()
     }
 
-    /// Flip the gate and lock the dedicated handle (zeroize its key) so
-    /// nothing can be decrypted while the app vault is locked. Added
-    /// keys are swept too: a locked Oryxis serves nothing (clients like
-    /// KeePassXC re-add after the next unlock).
-    pub(crate) fn lock(&self) {
-        self.locked.store(true, std::sync::atomic::Ordering::SeqCst);
-        self.ephemeral.clear();
-        if let Ok(mut v) = self.vault.lock() {
-            v.lock();
+    /// Serve vault `id` from `store`, an unlocked handle of its own
+    /// (replacing one already attached for it).
+    pub(crate) fn attach(&self, id: uuid::Uuid, label: String, store: oryxis_vault::VaultStore) {
+        let Ok(mut vaults) = self.vaults.lock() else {
+            return;
+        };
+        if vaults.is_empty() {
+            // An `add` that read "something attached" just before the
+            // last detach swept the roster could have inserted its key
+            // AFTER that sweep (the check is outside the ephemeral
+            // mutex). Invisible while dark, it would resurface now;
+            // clear it so "swept when the agent goes dark" holds across
+            // the race.
+            self.ephemeral.clear();
+        }
+        if let Some(mut old) = vaults.iter().position(|v| v.id == id).map(|i| vaults.remove(i)) {
+            old.store.lock();
+        }
+        vaults.push(AttachedVault { id, label, store });
+    }
+
+    /// Stop serving vault `id` (its lock, its removal): its handle is
+    /// locked (the key zeroized) and dropped. The last vault leaving
+    /// sweeps the client-added keys: a locked Oryxis serves nothing
+    /// (clients like KeePassXC re-add after the next unlock).
+    pub(crate) fn detach(&self, id: uuid::Uuid) {
+        let Ok(mut vaults) = self.vaults.lock() else {
+            return;
+        };
+        if let Some(mut gone) = vaults.iter().position(|v| v.id == id).map(|i| vaults.remove(i)) {
+            gone.store.lock();
+        }
+        if vaults.is_empty() {
+            self.ephemeral.clear();
         }
     }
 
-    /// Re-unlock the dedicated handle with the master password and open
-    /// the gate. `None` password re-opens a passwordless vault.
-    pub(crate) fn unlock(&self, master_password: Option<&str>) {
-        if let Ok(mut v) = self.vault.lock() {
-            let ok = match master_password {
-                Some(pw) => v.unlock(pw).is_ok(),
-                None => v.open_without_password().is_ok(),
-            };
-            if ok {
-                // Sweep again before reopening the gate: an `add` that
-                // read `locked == false` just before `lock()` flipped it
-                // could have inserted its key AFTER `lock()`'s clear (the
-                // gate check is outside the ephemeral mutex). That key is
-                // invisible while locked but would resurface here; clear
-                // it so "swept on lock" holds across the race window.
-                self.ephemeral.clear();
-                self.locked.store(false, std::sync::atomic::Ordering::SeqCst);
+    /// The vault's new name, for its keys' comments.
+    pub(crate) fn relabel(&self, id: uuid::Uuid, label: String) {
+        if let Ok(mut vaults) = self.vaults.lock()
+            && let Some(v) = vaults.iter_mut().find(|v| v.id == id)
+        {
+            v.label = label;
+        }
+    }
+
+    /// Go dark for good (the runtime is dropped): every handle locked
+    /// and dropped, the added keys swept, nothing attaches again.
+    pub(crate) fn close(&self) {
+        self.closed.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Ok(mut vaults) = self.vaults.lock() {
+            for mut v in vaults.drain(..) {
+                v.store.lock();
             }
         }
+        self.ephemeral.clear();
+    }
+
+    /// Nothing to serve: closed, or no vault attached.
+    fn dark(&self) -> bool {
+        self.closed.load(std::sync::atomic::Ordering::SeqCst)
+            || self.vaults.lock().map_or(true, |v| v.is_empty())
     }
 
     /// The public blob (KeyData wire encoding) of a stored key's
@@ -351,40 +401,49 @@ impl VaultKeySource {
         pk.key_data().encode(&mut blob).ok()?;
         Some(blob)
     }
+
+    /// The keys a vault serves: exposed, holding private material, and
+    /// never a security-key row, whether or not it holds material. The
+    /// app signs with a token natively (the stored blob is a FIDO2
+    /// credential handle, not a scalar), so a `has_private` row can
+    /// still be one this agent must not advertise: `sign` would hand
+    /// the handle to a software signer. The algorithm check is what
+    /// keeps `list()` symmetric with `sign()`; `has_private`
+    /// additionally covers a plain public-only import.
+    fn served(key: &oryxis_core::models::SshKey) -> bool {
+        key.expose_via_agent && key.has_private && !key.algorithm.is_security_key()
+    }
 }
 
 impl AgentKeySource for VaultKeySource {
     fn list(&self) -> Vec<AgentPublicKey> {
-        if self.locked.load(std::sync::atomic::Ordering::SeqCst) {
+        if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
             return Vec::new();
         }
-        let Ok(vault) = self.vault.lock() else {
+        let Ok(vaults) = self.vaults.lock() else {
             return Vec::new();
         };
-        vault
-            .list_keys()
-            .unwrap_or_default()
-            .into_iter()
-            // Security-key rows are never served here, whether or not
-            // they hold material. The app signs with a token natively
-            // (the stored blob is a FIDO2 credential handle, not a
-            // scalar), so a `has_private` row can still be one this
-            // agent must not advertise: `sign` below would hand the
-            // handle to a software signer. The algorithm check is what
-            // keeps `list()` symmetric with `sign()`; `has_private`
-            // additionally covers a plain public-only import.
-            .filter(|k| {
-                k.expose_via_agent && k.has_private && !k.algorithm.is_security_key()
-            })
-            .filter_map(|k| {
-                Self::blob_of(&k.public_key).map(|blob| AgentPublicKey {
-                    blob,
-                    comment: k.label,
-                    requires_confirm: false,
-                })
-            })
-            .chain(self.ephemeral.list())
-            .collect()
+        if vaults.is_empty() {
+            return Vec::new();
+        }
+        // With several vaults a key's comment names its vault, which is
+        // also how the confirm prompt says where the key came from.
+        let several = vaults.len() > 1;
+        let mut out: Vec<AgentPublicKey> = Vec::new();
+        for vault in vaults.iter() {
+            for key in vault.store.list_keys().unwrap_or_default().into_iter().filter(Self::served) {
+                let Some(blob) = Self::blob_of(&key.public_key) else {
+                    continue;
+                };
+                if out.iter().any(|k| k.blob == blob) {
+                    continue;
+                }
+                let comment = if several { format!("{} \u{b7} {}", key.label, vault.label) } else { key.label };
+                out.push(AgentPublicKey { blob, comment, requires_confirm: false });
+            }
+        }
+        out.extend(self.ephemeral.list());
+        out
     }
 
     fn sign(
@@ -395,7 +454,7 @@ impl AgentKeySource for VaultKeySource {
     ) -> Result<Vec<u8>, AgentSignError> {
         use ssh_key::PrivateKey;
 
-        if self.locked.load(std::sync::atomic::Ordering::SeqCst) {
+        if self.dark() {
             return Err(AgentSignError::Unavailable);
         }
         // Client-added keys sign from memory; the vault path below only
@@ -403,19 +462,19 @@ impl AgentKeySource for VaultKeySource {
         if let Some(result) = self.ephemeral.sign(key_blob, data, hash) {
             return result;
         }
-        let vault = self.vault.lock().map_err(|_| AgentSignError::Unavailable)?;
+        let vaults = self.vaults.lock().map_err(|_| AgentSignError::Unavailable)?;
 
-        // Find the exposed key whose public blob matches, then decrypt
-        // exactly that one private key.
-        let key = vault
-            .list_keys()
-            .map_err(|e| AgentSignError::SignFailed(e.to_string()))?
-            .into_iter()
-            .find(|k| {
-                k.expose_via_agent
-                    && k.has_private
-                    && !k.algorithm.is_security_key()
-                    && Self::blob_of(&k.public_key).as_deref() == Some(key_blob)
+        // The first attached vault whose exposed key matches the blob,
+        // then decrypt exactly that one private key.
+        let (vault, key) = vaults
+            .iter()
+            .find_map(|v| {
+                v.store
+                    .list_keys()
+                    .ok()?
+                    .into_iter()
+                    .find(|k| Self::served(k) && Self::blob_of(&k.public_key).as_deref() == Some(key_blob))
+                    .map(|k| (v, k))
             })
             .ok_or(AgentSignError::UnknownKey)?;
 
@@ -425,6 +484,7 @@ impl AgentKeySource for VaultKeySource {
         // module's decrypt-per-signature / nothing-cached contract.
         let pem = zeroize::Zeroizing::new(
             vault
+                .store
                 .get_key_private(&key.id)
                 .map_err(|e| AgentSignError::SignFailed(e.to_string()))?
                 .ok_or(AgentSignError::Unavailable)?,
@@ -444,23 +504,23 @@ impl AgentKeySource for VaultKeySource {
         requires_confirm: bool,
         expires_at: Option<std::time::Instant>,
     ) -> bool {
-        // Adds are refused while locked (the whole agent is dark) and
-        // when the user has not opted in.
-        if !self.allow_add || self.locked.load(std::sync::atomic::Ordering::SeqCst) {
+        // Adds are refused while dark (no vault unlocked) and when the
+        // user has not opted in.
+        if !self.allow_add || self.dark() {
             return false;
         }
         self.ephemeral.add(private, comment, requires_confirm, expires_at)
     }
 
     fn remove(&self, key_blob: &[u8]) -> bool {
-        if !self.allow_add || self.locked.load(std::sync::atomic::Ordering::SeqCst) {
+        if !self.allow_add || self.dark() {
             return false;
         }
         self.ephemeral.remove(key_blob)
     }
 
     fn remove_all(&self) -> bool {
-        if !self.allow_add || self.locked.load(std::sync::atomic::Ordering::SeqCst) {
+        if !self.allow_add || self.dark() {
             return false;
         }
         // Clearing an already-empty roster is still a success.
@@ -659,9 +719,19 @@ mod vault_source_tests {
     }
 
     fn agent_source_with(path: &std::path::Path, allow_add: bool) -> VaultKeySource {
+        let source = VaultKeySource::new(allow_add);
+        source.attach(VAULT, "Personal".into(), agent_handle(path));
+        source
+    }
+
+    /// The vault id the single-vault tests attach under.
+    const VAULT: uuid::Uuid = uuid::Uuid::from_u128(1);
+
+    /// The agent's own unlocked handle on the file.
+    fn agent_handle(path: &std::path::Path) -> VaultStore {
         let mut agent = VaultStore::open(path).unwrap();
         agent.unlock("master").unwrap();
-        VaultKeySource::new(agent, allow_add)
+        agent
     }
 
     /// A decrypted in-memory key, as an external ADD would deliver it.
@@ -732,14 +802,14 @@ mod vault_source_tests {
         assert_eq!(source.list().len(), 1);
         let blob = source.list()[0].blob.clone();
 
-        source.lock();
+        source.detach(VAULT);
         assert!(source.list().is_empty(), "a locked vault serves no identities");
         assert!(
             matches!(source.sign(&blob, b"x", SignHash::Default), Err(AgentSignError::Unavailable)),
             "a locked vault cannot sign",
         );
 
-        source.unlock(Some("master"));
+        source.attach(VAULT, "Personal".into(), agent_handle(&path));
         assert_eq!(source.list().len(), 1, "unlock restores the roster");
         assert!(source.sign(&blob, b"x", SignHash::Default).is_ok(), "unlock restores signing");
     }
@@ -769,10 +839,10 @@ mod vault_source_tests {
 
         // Lock: everything goes dark, INCLUDING the added key, and it
         // stays gone after unlock (the client re-adds when it wants to).
-        source.lock();
+        source.detach(VAULT);
         assert!(source.list().is_empty());
         assert!(!source.add(external_key("ext2"), "ext2".into(), false, None), "locked refuses adds");
-        source.unlock(Some("master"));
+        source.attach(VAULT, "Personal".into(), agent_handle(&path));
         assert_eq!(source.list().len(), 1, "only the vault key survives the lock");
 
         // REMOVE_ALL sweeps added keys but never the vault roster.
@@ -780,5 +850,55 @@ mod vault_source_tests {
         assert_eq!(source.list().len(), 2);
         assert!(source.remove_all());
         assert_eq!(source.list().len(), 1, "vault key untouched by REMOVE_ALL");
+    }
+
+    #[test]
+    fn every_unlocked_vault_serves_and_a_lock_takes_only_its_own() {
+        use oryxis_vault::{generate_key, GenerateSpec};
+
+        let (_a_dir, a_path, _) = seed_vault();
+        let (_b_dir, b_path, _) = seed_vault();
+        // A key both vaults hold (an import keeps the key): listed once.
+        let shared = generate_key("shared", "", GenerateSpec::Ed25519).unwrap();
+        for path in [&a_path, &b_path] {
+            let mut v = VaultStore::open(path).unwrap();
+            v.unlock("master").unwrap();
+            v.save_key(&shared.key, Some(&shared.private_pem)).unwrap();
+        }
+        let (work, home) = (uuid::Uuid::from_u128(2), uuid::Uuid::from_u128(3));
+        let source = VaultKeySource::new(true);
+        source.attach(work, "Work".into(), agent_handle(&a_path));
+        source.attach(home, "Home".into(), agent_handle(&b_path));
+        let listed = source.list();
+        assert_eq!(listed.len(), 3, "each vault's own key, the shared one once");
+        assert!(listed.iter().all(|k| k.comment.ends_with(" \u{b7} Work") || k.comment.ends_with(" \u{b7} Home")),
+            "with several vaults a key names its vault: {listed:?}");
+        let shared_blob = listed.iter().find(|k| k.comment.starts_with("shared")).unwrap().blob.clone();
+        assert!(source.add(external_key("ext"), "ext".into(), false, None));
+
+        // Work locks: its own key leaves, Home's stay, the shared key
+        // signs from Home, the added key stays while a vault serves.
+        source.detach(work);
+        let left = source.list();
+        assert_eq!(left.len(), 3, "Home's key, the shared key, the added key: {left:?}");
+        assert!(left.iter().all(|k| !k.comment.ends_with("Work")));
+        assert_eq!(left.iter().filter(|k| k.comment.contains("Home")).count(), 0, "one vault left: plain comments");
+        assert!(source.sign(&shared_blob, b"x", SignHash::Default).is_ok(), "the other vault signs it");
+
+        // The last one locks: dark, the added key swept.
+        source.detach(home);
+        assert!(source.list().is_empty());
+        assert!(!source.add(external_key("ext2"), "ext2".into(), false, None));
+        source.attach(home, "Home".into(), agent_handle(&b_path));
+        assert_eq!(source.list().len(), 2, "the added key did not survive the dark");
+    }
+
+    #[test]
+    fn a_closed_source_never_serves_again() {
+        let (_dir, path, _id) = seed_vault();
+        let source = agent_source(&path);
+        source.close();
+        source.attach(VAULT, "Personal".into(), agent_handle(&path));
+        assert!(source.list().is_empty(), "a dropped runtime's survivors stay dark");
     }
 }

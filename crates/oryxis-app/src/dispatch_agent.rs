@@ -112,14 +112,7 @@ impl Oryxis {
             self.agent.enabled = true;
             return Task::none();
         }
-        let Some(vault) = &self.vaults.cur().store else {
-            return Task::none();
-        };
-        let db_path = vault.db_path().to_path_buf();
-        let master_password = self.vaults.cur().master_password.clone();
         match crate::agent_server::AgentRuntime::spawn(
-            &db_path,
-            master_password.as_deref(),
             self.agent.confirm,
             self.agent.allow_add,
             self.agent.openssh_pipe,
@@ -130,6 +123,9 @@ impl Oryxis {
                 // zero-config discovery is not on.
                 self.agent.alias_error = runtime.alias_error.clone();
                 self.agent.runtime = Some(runtime);
+                // Every vault unlocked now serves; the others join on
+                // their unlock (`agent_on_unlock`).
+                self.for_each_open_vault(|app, _| app.agent_attach_current());
                 self.agent.enabled = true;
                 self.agent.error = None;
                 self.persist_setting("agent_server_enabled", "true");
@@ -186,21 +182,42 @@ impl Oryxis {
         self.agent.deny_all_and_clear_grants();
     }
 
-    /// Flip the agent's key gate on a soft/hard vault lock (keys go
-    /// dark, the listener stays up). No-op when the agent is off.
+    /// The acting vault's keys leave the agent on its soft / hard lock
+    /// (or its removal); the listener stays up, the other unlocked
+    /// vaults keep serving. No-op when the agent is off.
     pub(crate) fn agent_on_lock(&mut self) {
         if let Some(runtime) = &self.agent.runtime {
-            runtime.lock();
+            runtime.detach(self.vaults.current_id());
         }
-        // No prompt (on screen or queued) can be answered against a
-        // locked vault: deny them all and drop the grants.
+        // No prompt (on screen or queued) is answered across a lock:
+        // deny them all and drop the grants.
         self.agent.deny_all_and_clear_grants();
     }
 
-    /// Re-unlock the agent's dedicated handle after the vault unlocks.
+    /// The acting vault's keys join the agent after its unlock.
     pub(crate) fn agent_on_unlock(&mut self) {
-        if let Some(runtime) = &self.agent.runtime {
-            runtime.unlock(self.vaults.cur().master_password.as_deref());
+        self.agent_attach_current();
+    }
+
+    /// Attach the acting vault to a running agent when it is unlocked:
+    /// a handle of the agent's own on its file, unlocked with the
+    /// password the app holds. A failure is logged (the other vaults
+    /// keep serving).
+    fn agent_attach_current(&self) {
+        let ov = self.vaults.cur();
+        if ov.vault_ui.state != crate::state::VaultState::Unlocked {
+            return;
+        }
+        let (Some(runtime), Some(store)) = (&self.agent.runtime, &ov.store) else {
+            return;
+        };
+        if let Err(e) = runtime.attach(
+            ov.id,
+            self.vault_name(ov.id),
+            store.db_path(),
+            ov.master_password.as_deref(),
+        ) {
+            tracing::warn!(target = "oryxis::agent", vault = %ov.id, "agent could not serve a vault: {e}");
         }
     }
 

@@ -635,6 +635,10 @@ impl Oryxis {
             }
             return Task::none();
         }
+        // The agent names a key's vault when several serve.
+        if let Some(runtime) = &self.agent.runtime {
+            runtime.relabel(id, self.vault_name(id));
+        }
         self.vault_dialog = None;
         Task::none()
     }
@@ -728,6 +732,12 @@ impl Oryxis {
         }
         let path = self.vault_file(id);
         if self.vaults.is_open(id) {
+            // The agent's own handle on the file goes first: its keys
+            // leave the roster, and the file is no longer held open
+            // (Windows refuses to delete an open file).
+            if let Some(runtime) = &self.agent.runtime {
+                runtime.detach(id);
+            }
             let previous = self.vaults.act_on(id);
             self.sever_vault_sessions();
             self.vaults.act_back(previous);
