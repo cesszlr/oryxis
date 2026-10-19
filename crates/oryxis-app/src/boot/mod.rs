@@ -408,6 +408,7 @@ impl Oryxis {
                 vault_presence: std::collections::HashMap::new(),
                 vault_chords: Vec::new(),
                 editing_vault_hotkey: None,
+                start_picker: false,
                 vault_chip_bounds: crate::widgets::new_bounds_cell(),
                 vault_tab_bounds: crate::widgets::new_bounds_cell(),
                 vault_badge_bounds: crate::widgets::new_bounds_cell(),
@@ -595,9 +596,14 @@ impl Oryxis {
             Task::none(),
         );
 
-        // If auto-unlocked (no user password), load data immediately
+        // If auto-unlocked (no user password), load data immediately;
+        // unless the start asks which vault to open (Settings > Vaults,
+        // several vaults): then nothing of this one loads, runs or lands
+        // until it is the one picked (`pick_start_vault`).
         app.refresh_vault_presence();
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
+        app.start_picker = app.start_picker_wanted();
+        let open_now = !app.start_picker && app.vaults.cur().vault_ui.state == VaultState::Unlocked;
+        if open_now {
             app.load_data_from_vault();
         }
 
@@ -663,7 +669,7 @@ impl Oryxis {
         // below: the restored-strip landing (issue #229) yields to all
         // of them, the way it yields at the unlock site.
         let mut landed = false;
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked
+        if open_now
             && let Some(connect_id) = app.pending_auto_connect.take()
             && let Some(idx) = app
                 .vaults.cur().connections
@@ -698,7 +704,7 @@ impl Oryxis {
         // not park it for a later unlock. A launch argument outranks it
         // whole: no select, and no dial beside the argument's own
         // foreground one (the tab keeps its place in the queue).
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
+        if open_now {
             let landing = app.take_launch_landing_task(landed);
             tasks.extend(landing.dial);
             tasks.extend(landing.select);
@@ -714,7 +720,7 @@ impl Oryxis {
         // Only the P2P transport runs a background engine; every
         // snapshot transport reconciles on the iced cadence
         // subscription instead.
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked
+        if open_now
             && app.vaults.cur().sync.enabled
             && app.sync_uses_p2p()
         {
@@ -724,13 +730,13 @@ impl Oryxis {
         // runs as a task rather than inside `view()`. Fire it whenever
         // the git transport can be on screen (also done on `VaultUnlock`
         // and on `TransportChanged`).
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked && app.vaults.cur().sync.transport == "git" {
+        if open_now && app.vaults.cur().sync.transport == "git" {
             tasks.push(crate::dispatch_git_sync::git_availability_task());
         }
 
         // Auto-start port forward rules marked `auto_start`. Deferred to
         // `VaultUnlock` when the vault is locked, same as sync / --connect.
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
+        if open_now {
             tasks.extend(app.auto_start_port_forwards());
         }
 
@@ -751,7 +757,7 @@ impl Oryxis {
         // the `VaultUnlock` handler, which calls the same method once
         // the user's password opens it (the boot constructor can't
         // re-run). See `spawn_plugin_unlock_tasks`.
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
+        if open_now {
             tasks.extend(app.spawn_plugin_unlock_tasks());
         }
         // One-time performance-mode auto-enable notice, for the
@@ -763,7 +769,7 @@ impl Oryxis {
         // family and weight are vault settings, so for a password vault
         // the heal used to run against the constructor's default font
         // and never against the configured one.
-        if app.vaults.cur().vault_ui.state == VaultState::Unlocked {
+        if open_now {
             tasks.extend(app.unlock_fetch_tasks());
         }
 

@@ -53,6 +53,10 @@ impl Oryxis {
         if self.editing_hotkey.is_some() {
             return None;
         }
+        // The start picker is the whole window until a vault is picked.
+        if self.start_picker_here() {
+            return Some((ModalSurface::VaultStartPicker, SurfaceFamily::Confirm));
+        }
         // No vault could be opened: the error screen is the whole window,
         // and nothing else can be on it.
         if self.vaults.cur().store.is_none() && self.vaults.cur().vault_ui.state == crate::state::VaultState::Loading {

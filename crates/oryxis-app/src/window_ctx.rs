@@ -701,7 +701,12 @@ impl Oryxis {
             // (its emulator owns a single window) and a window on its
             // way out on the ordinary path.
             let _pass = ViewPass::begin(Viewing::Main, None);
-            let theme = self.vaults.cur().ui_theme;
+            // The start picker is in no vault's theme: none is chosen yet.
+            let theme = if self.start_picker {
+                crate::theme::ThemeSelection::named(None)
+            } else {
+                self.vaults.cur().ui_theme
+            };
             let _scope = crate::theme::SelectionScope::enter(theme);
             crate::widgets::theme_scope(self.view(), theme)
         }
@@ -712,6 +717,9 @@ impl Oryxis {
     /// `Oryxis::theme_for`, which iced asks per window.
     pub(crate) fn theme_of_window(&self, id: window::Id) -> crate::theme::ThemeSelection {
         let vault = self.extra_windows.get(&id).map(|w| w.vault);
+        if vault.is_none() && self.start_picker {
+            return crate::theme::ThemeSelection::named(None);
+        }
         let _pass = ViewPass::begin(Viewing::Nothing, vault);
         self.vaults.cur().ui_theme
     }

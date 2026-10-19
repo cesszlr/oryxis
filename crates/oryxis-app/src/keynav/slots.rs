@@ -216,6 +216,9 @@ pub(crate) enum ModalSurface {
     /// the restart after it. No default row, so Enter acts only on a row
     /// the keyboard ringed and never starts a rebuild by itself.
     VaultOpenFailed,
+    /// The start picker (`view_start_picker`), the whole window until a
+    /// vault is picked: one row per vault, the last one used the default.
+    VaultStartPicker,
 }
 
 /// Selection + per-frame row recording for the modal layer.

@@ -899,6 +899,7 @@ impl Oryxis {
                     // A USB key may have come back while the app was
                     // in the background.
                     self.refresh_vault_presence();
+                    self.remember_window_vault();
                 }
                 if !focused {
                     self.on_window_blur();

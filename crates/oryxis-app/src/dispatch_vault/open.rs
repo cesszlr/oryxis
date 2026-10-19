@@ -128,118 +128,7 @@ impl Oryxis {
                             // Next lock screen leads with biometrics again
                             // (a one-time fallback choice shouldn't stick).
                             self.vaults.cur_mut().vault_ui.password_fallback = false;
-                            self.load_data_from_vault();
-                            // What the recordings spooled under a soft
-                            // lock goes into the vault now, ahead of the
-                            // live panes' buffers. Explicit, because the
-                            // flush tick only remounts while some pane
-                            // is still recording, and a session closed
-                            // under the lock left a spool with no pane.
-                            self.flush_session_logs();
-                            // Re-arm the ssh-agent's dedicated handle if a
-                            // runtime survived a soft lock.
-                            self.agent_on_unlock();
-                            // Bring the sync engine up now that the
-                            // vault is open, if the user left it on. Only
-                            // the P2P transport has a background engine;
-                            // the snapshot transports reconcile on the
-                            // cadence subscription.
-                            let sync_task = if self.vaults.cur().sync.enabled && self.sync_uses_p2p() {
-                                self.start_sync_engine()
-                            } else {
-                                Task::none()
-                            };
-                            // Auto-start port forward rules now that the
-                            // vault (and its credentials) is open.
-                            let mut unlock_tasks = vec![sync_task];
-                            unlock_tasks.extend(self.auto_start_port_forwards());
-                            // The git card's availability probe spawns a
-                            // subprocess, so it runs as a task (never in
-                            // `view()`). Same probe the boot path and
-                            // `TransportChanged` fire.
-                            if self.vaults.cur().sync.transport == "git" {
-                                unlock_tasks
-                                    .push(crate::dispatch_git_sync::git_availability_task());
-                            }
-                            // Plugin migrate-install + auto-update: for a
-                            // password vault these are deferred from boot
-                            // to here, now that the plugin rows are loaded
-                            // (boot saw a locked vault with no rows).
-                            unlock_tasks.extend(self.spawn_plugin_unlock_tasks());
-                            // The terminal font pack heal, now that the
-                            // picked family and weight are known.
-                            unlock_tasks.extend(self.unlock_fetch_tasks());
-                            // One-time performance-mode auto-enable notice.
-                            unlock_tasks.push(self.take_perf_mode_toast_task());
-                            // Bring the ssh-agent up if the user left it on.
-                            unlock_tasks.push(self.agent_boot_task());
-                            // The lock sweep dropped the History content-search
-                            // results (decrypted excerpts must not sit behind the
-                            // lock screen) but the chip and the typed query survive,
-                            // consistent with the soft-lock promise that state comes
-                            // back. Re-arm the debounced search here so an active
-                            // chip reflects live results again instead of rendering
-                            // active over nothing until the next keystroke.
-                            if self.vaults.cur().history_search_content {
-                                unlock_tasks.push(self.history_content_debounce());
-                            }
-                            // The restored strip's landing (issue #229),
-                            // TAKEN here whatever wins below, so a later
-                            // unlock (a soft lock's) finds nothing to
-                            // land on. A launch argument outranks it
-                            // entirely (no select AND no dial: the
-                            // argument dials in the foreground, and two
-                            // dials at once would share the prompt
-                            // slots); otherwise its dial runs now and
-                            // its select is the last branch below.
-                            let outranked = self
-                                .pending_auto_connect
-                                .is_some_and(|id| self.vaults.cur().connections.iter().any(|c| c.id == id))
-                                || self.pending_deep_link.is_some()
-                                || self.pending_connect_target.is_some();
-                            let landing = self.take_launch_landing_task(outranked);
-                            unlock_tasks.extend(landing.dial);
-                            // The ZMODEM staging sweep, once, now that the
-                            // download folder setting is known.
-                            unlock_tasks.extend(self.zmodem_sweep_task());
-                            // After a manual unlock, fire any deferred
-                            // `--connect <uuid>` from the launch CLI args.
-                            if let Some(connect_id) = self.pending_auto_connect.take()
-                                && let Some(idx) = self
-                                    .vaults.cur().connections
-                                    .iter()
-                                    .position(|c| c.id == connect_id)
-                            {
-                                unlock_tasks.push(Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))));
-                            } else if let Some(link) = self.pending_deep_link.take() {
-                                // A deep link clicked at the lock screen
-                                // routes now, and its own navigation
-                                // replaces the default landing focus.
-                                let route = self.handle_deep_link(link);
-                                unlock_tasks.push(route);
-                            } else if let Some(target) = self.pending_connect_target.take() {
-                                // `oryxis user@host` launched into a locked
-                                // vault: dial now that credentials and
-                                // known_hosts are readable.
-                                let route = self.handle_connect_target(&target);
-                                unlock_tasks.push(route);
-                            } else if let Some(landing) = landing.select {
-                                // Below every launch argument: an
-                                // argument says where to open, the
-                                // landing only says where the user was.
-                                // The "connect at launch" queue needs no
-                                // kick at this site: the funnel runs at
-                                // the end of this update.
-                                unlock_tasks.push(landing);
-                            } else {
-                                // Land on Home with the host search focused
-                                // so the user can type / keyboard-navigate
-                                // immediately (matches ChangeView behavior).
-                                unlock_tasks.push(crate::widgets::focus_input(
-                                    iced::widget::Id::new("search-dashboard"),
-                                ));
-                            }
-                            return Task::batch(unlock_tasks);
+                            return self.finish_vault_open();
                         }
                         Err(VaultError::InvalidPassword) => {
                             self.vaults.cur_mut().vault_ui.error = Some("Invalid password".into());
@@ -255,5 +144,126 @@ impl Oryxis {
             m => return crate::dispatch::unrouted(m),
         }
         Task::none()
+    }
+
+    /// Everything a vault owes the moment it opens (by its password, or
+    /// shown for the first time without one): its data, the recordings a
+    /// soft lock spooled, the ssh-agent, its sync engine, its auto-start
+    /// forwards, plugin tasks, and the landing of a launch argument or
+    /// of the strip it left. One place, so a vault opened from the
+    /// switcher or the start picker gets what an unlock gives.
+    pub(crate) fn finish_vault_open(&mut self) -> Task<Message> {
+        self.load_data_from_vault();
+        // What the recordings spooled under a soft
+        // lock goes into the vault now, ahead of the
+        // live panes' buffers. Explicit, because the
+        // flush tick only remounts while some pane
+        // is still recording, and a session closed
+        // under the lock left a spool with no pane.
+        self.flush_session_logs();
+        // Re-arm the ssh-agent's dedicated handle if a
+        // runtime survived a soft lock.
+        self.agent_on_unlock();
+        // Bring the sync engine up now that the
+        // vault is open, if the user left it on. Only
+        // the P2P transport has a background engine;
+        // the snapshot transports reconcile on the
+        // cadence subscription.
+        let sync_task = if self.vaults.cur().sync.enabled && self.sync_uses_p2p() {
+            self.start_sync_engine()
+        } else {
+            Task::none()
+        };
+        // Auto-start port forward rules now that the
+        // vault (and its credentials) is open.
+        let mut unlock_tasks = vec![sync_task];
+        unlock_tasks.extend(self.auto_start_port_forwards());
+        // The git card's availability probe spawns a
+        // subprocess, so it runs as a task (never in
+        // `view()`). Same probe the boot path and
+        // `TransportChanged` fire.
+        if self.vaults.cur().sync.transport == "git" {
+            unlock_tasks
+                .push(crate::dispatch_git_sync::git_availability_task());
+        }
+        // Plugin migrate-install + auto-update: for a
+        // password vault these are deferred from boot
+        // to here, now that the plugin rows are loaded
+        // (boot saw a locked vault with no rows).
+        unlock_tasks.extend(self.spawn_plugin_unlock_tasks());
+        // The terminal font pack heal, now that the
+        // picked family and weight are known.
+        unlock_tasks.extend(self.unlock_fetch_tasks());
+        // One-time performance-mode auto-enable notice.
+        unlock_tasks.push(self.take_perf_mode_toast_task());
+        // Bring the ssh-agent up if the user left it on.
+        unlock_tasks.push(self.agent_boot_task());
+        // The lock sweep dropped the History content-search
+        // results (decrypted excerpts must not sit behind the
+        // lock screen) but the chip and the typed query survive,
+        // consistent with the soft-lock promise that state comes
+        // back. Re-arm the debounced search here so an active
+        // chip reflects live results again instead of rendering
+        // active over nothing until the next keystroke.
+        if self.vaults.cur().history_search_content {
+            unlock_tasks.push(self.history_content_debounce());
+        }
+        // The restored strip's landing (issue #229),
+        // TAKEN here whatever wins below, so a later
+        // unlock (a soft lock's) finds nothing to
+        // land on. A launch argument outranks it
+        // entirely (no select AND no dial: the
+        // argument dials in the foreground, and two
+        // dials at once would share the prompt
+        // slots); otherwise its dial runs now and
+        // its select is the last branch below.
+        let outranked = self
+            .pending_auto_connect
+            .is_some_and(|id| self.vaults.cur().connections.iter().any(|c| c.id == id))
+            || self.pending_deep_link.is_some()
+            || self.pending_connect_target.is_some();
+        let landing = self.take_launch_landing_task(outranked);
+        unlock_tasks.extend(landing.dial);
+        // The ZMODEM staging sweep, once, now that the
+        // download folder setting is known.
+        unlock_tasks.extend(self.zmodem_sweep_task());
+        // After a manual unlock, fire any deferred
+        // `--connect <uuid>` from the launch CLI args.
+        if let Some(connect_id) = self.pending_auto_connect.take()
+            && let Some(idx) = self
+                .vaults.cur().connections
+                .iter()
+                .position(|c| c.id == connect_id)
+        {
+            unlock_tasks.push(Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))));
+        } else if let Some(link) = self.pending_deep_link.take() {
+            // A deep link clicked at the lock screen
+            // routes now, and its own navigation
+            // replaces the default landing focus.
+            let route = self.handle_deep_link(link);
+            unlock_tasks.push(route);
+        } else if let Some(target) = self.pending_connect_target.take() {
+            // `oryxis user@host` launched into a locked
+            // vault: dial now that credentials and
+            // known_hosts are readable.
+            let route = self.handle_connect_target(&target);
+            unlock_tasks.push(route);
+        } else if let Some(landing) = landing.select {
+            // Below every launch argument: an
+            // argument says where to open, the
+            // landing only says where the user was.
+            // The "connect at launch" queue needs no
+            // kick at this site: the funnel runs at
+            // the end of this update.
+            unlock_tasks.push(landing);
+        } else {
+            // Land on Home with the host search focused
+            // so the user can type / keyboard-navigate
+            // immediately (matches ChangeView behavior).
+            unlock_tasks.push(crate::widgets::focus_input(
+                iced::widget::Id::new("search-dashboard"),
+            ));
+        }
+        Task::batch(unlock_tasks)
     }
 }

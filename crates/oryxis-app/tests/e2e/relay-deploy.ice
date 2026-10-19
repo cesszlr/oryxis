@@ -42,7 +42,7 @@ click (1338, 207)
 # The engine keeps running from here on: cap the per-instruction wait.
 timeout 5000
 settle
-click (60, 418)
+click (60, 463)
 settle
 expect "Transport"
 click "Set up your own relay"

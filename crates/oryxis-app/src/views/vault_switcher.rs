@@ -5,7 +5,7 @@
 use iced::Widget as _;
 use iced::border::Radius;
 use iced::widget::button::Status as BtnStatus;
-use iced::widget::{button, container, pick_list, text, text_input, Space};
+use iced::widget::{button, column, container, svg, pick_list, text, text_input, Space};
 use iced::{Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{Message, MultiVaultMessage, Oryxis};
@@ -100,6 +100,100 @@ impl Oryxis {
         container(crate::widgets::bounds_reporter(badge, self.vault_badge_bounds.clone()))
             .padding(Padding { top: 8.0, right: 8.0, bottom: 8.0, left: 8.0 })
             .boxed()
+    }
+
+    /// The start picker (Settings > Vaults "Ask which vault to open at
+    /// start"): every vault this device knows, the last one used first
+    /// in the keyboard's eye (its row is the default, Enter opens it).
+    /// In the default theme: no vault is chosen yet.
+    pub(crate) fn view_start_picker(&self) -> Element<'_, Message> {
+        let c = OryxisColors::t();
+        self.modal_nav_reset();
+        let last = self.vaults.window_id();
+        let mut rows = iced::widget::Column::<Element<'_, Message>>::new().spacing(8).width(Length::Fill);
+        for entry in self.registered_vaults() {
+            let id = entry.id;
+            let available = self.vault_available(id);
+            let mut title: Vec<Element<'_, Message>> = vec![
+                iced_fonts::lucide::database()
+                    .size(15)
+                    .color(if available { c.accent } else { c.text_muted })
+                    .boxed(),
+                Space::new().width(10).boxed(),
+                text(Self::vault_display_name(&entry))
+                    .size(14)
+                    .color(if available { c.text_primary } else { c.text_muted })
+                    .boxed(),
+            ];
+            if id == last {
+                title.push(Space::new().width(8).boxed());
+                title.push(
+                    container(text(t("vault_picker_last_used")).size(10).color(c.text_secondary))
+                        .padding(Padding { top: 1.0, right: 6.0, bottom: 1.0, left: 6.0 })
+                        .style(|_| container::Style {
+                            background: Some(Background::Color(OryxisColors::t().bg_selected)),
+                            border: Border { radius: Radius::from(4.0), ..Default::default() },
+                            ..Default::default()
+                        })
+                        .boxed(),
+                );
+            }
+            let detail: Element<'_, Message> = if available {
+                text(
+                    oryxis_vault::device::installed()
+                        .map(|d| d.resolve(&entry).display().to_string())
+                        .unwrap_or_default(),
+                )
+                .size(11)
+                .font(iced::Font::MONOSPACE)
+                .color(c.text_muted)
+                .boxed()
+            } else {
+                text(t("vault_picker_missing")).size(11).color(c.error).boxed()
+            };
+            let pick = Message::MultiVault(MultiVaultMessage::PickStartVault(id));
+            let card = button(
+                column![
+                    dir_row(title).align_y(iced::Alignment::Center),
+                    Space::new().height(4),
+                    detail,
+                ]
+                .width(Length::Fill)
+                .align_x(dir_align_x()),
+            )
+            .on_press_maybe(available.then(|| pick.clone()))
+            .width(Length::Fill)
+            .padding(14)
+            .style(chip_style(10.0));
+            let card = card.boxed();
+            rows = rows.push(if !available {
+                card
+            } else if id == last {
+                self.modal_nav_slot_default(RowAction::activate(pick), 10.0, false, card)
+            } else {
+                self.modal_nav_slot(RowAction::activate(pick), 10.0, false, card)
+            });
+        }
+        let body = column![
+            svg(self.logo_handle.clone()).width(56).height(56),
+            Space::new().height(14),
+            text(t("vault_picker_title")).size(24).color(c.text_primary),
+            Space::new().height(6),
+            text(t("vault_picker_body")).size(13).color(c.text_secondary),
+            Space::new().height(22),
+            rows,
+        ]
+        .width(Length::Fixed(440.0))
+        .align_x(iced::Alignment::Center);
+        let page = container(iced::widget::scrollable(container(body).padding(24).center_x(Length::Fill)))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_y(Length::Fill)
+            .style(|_| container::Style {
+                background: Some(Background::Color(OryxisColors::t().bg_primary)),
+                ..Default::default()
+            });
+        crate::views::vault::with_chrome(page.boxed(), self.cur_maximized())
     }
 
     /// The lock / open-failed screen's way out: the other vaults this

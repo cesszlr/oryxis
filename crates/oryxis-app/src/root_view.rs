@@ -16,6 +16,8 @@ impl Oryxis {
         // presentation, not in our handlers.
         crate::stall_watchdog::beat_view();
         let base = match self.vaults.cur().vault_ui.state {
+            // The start picker comes before any vault's own screen.
+            _ if self.start_picker_here() => self.view_start_picker(),
             VaultState::Loading => self.view_vault_open_failed(),
             // First-run welcome / onboarding carousel, full page.
             VaultState::NeedSetup => crate::views::vault::with_chrome(

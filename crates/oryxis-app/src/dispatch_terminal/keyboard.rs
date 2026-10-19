@@ -143,6 +143,14 @@ impl Oryxis {
                 // exception: an app-level modal rendered over the lock
                 // screen (update / plugin install / KBI / host key) keeps
                 // its keyboard layer, so its Enter / Esc / arrows work.
+                // The start picker likewise: nothing of the vault behind
+                // it is loaded, so its row keys are the only ones.
+                if self.start_picker {
+                    if let Some(task) = self.handle_modal_nav_key(&event) {
+                        return Ok(task);
+                    }
+                    return Ok(Task::none());
+                }
                 if self.vaults.cur().vault_ui.state != crate::state::VaultState::Unlocked {
                     if self.any_modal_blocks_input()
                         && let Some(task) = self.handle_modal_nav_key(&event)

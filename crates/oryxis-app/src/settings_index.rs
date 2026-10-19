@@ -283,6 +283,7 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     // ── Vaults ─────────────────────────────────────────────────────
     e(S::Vaults, "vault_new", "vault new create add another vault profile workspace"),
     e(S::Vaults, "vault_open_existing", "vault open existing file usb add register import database"),
+    e(S::Vaults, "vault_start_picker", "vault start launch open ask choose picker last opened"),
     e(S::Vaults, "vault_hotkey", "vault shortcut hotkey key binding chord switch"),
     e(S::Vaults, "vault_switcher_place", "vault switcher position place tab bar home toolbar chip"),
     e(

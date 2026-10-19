@@ -180,6 +180,11 @@ impl Oryxis {
                 self.editing_vault_hotkey = None;
                 return self.set_vault_hotkey(id, None);
             }
+            MultiVaultMessage::VaultStartPickerToggled(on) => {
+                self.device_prefs.vault_start_picker = on;
+                self.persist_setting("vault_start_picker", if on { "true" } else { "false" });
+            }
+            MultiVaultMessage::PickStartVault(id) => return self.pick_start_vault(id),
             MultiVaultMessage::VaultSwitcherPlaceChanged(place) => {
                 self.device_prefs.vault_switcher_place = place;
                 self.persist_setting("vault_switcher_place", place.code());
@@ -283,6 +288,69 @@ impl Oryxis {
                 Some((entry.id, chord))
             })
             .collect();
+    }
+
+    /// Whether a start shows the vault picker: asked for in Settings >
+    /// Vaults, several vaults registered, and nothing on the command line
+    /// or in a deep link already saying where to go. Read before any
+    /// vault's data loads, straight from the device store.
+    pub(crate) fn start_picker_wanted(&self) -> bool {
+        let asked = oryxis_vault::device::installed()
+            .and_then(|d| d.get("vault_start_picker"))
+            .is_some_and(|v| v == "true");
+        asked
+            && self.vault_count() > 1
+            && self.pending_auto_connect.is_none()
+            && self.pending_deep_link.is_none()
+            && self.pending_connect_target.is_none()
+    }
+
+    /// Whether the window being handled shows the start picker: the
+    /// resident one, while no vault was picked yet (it is the only window
+    /// a start opens).
+    pub(crate) fn start_picker_here(&self) -> bool {
+        self.start_picker && self.cur_window().is_none()
+    }
+
+    /// The start picker's answer. The vault the start opened in the
+    /// background (unloaded: its data, sync and forwards waited for this
+    /// pick) is that vault's first showing; any other vault takes the
+    /// window, and the unused one closes.
+    fn pick_start_vault(&mut self, id: Uuid) -> Task<Message> {
+        if !self.start_picker {
+            return Task::none();
+        }
+        let boot = self.vaults.window_id();
+        if id == boot {
+            self.start_picker = false;
+            if let Some(device) = oryxis_vault::device::installed()
+                && let Err(e) = device.set_last_vault(id)
+            {
+                tracing::warn!("could not remember the last vault: {e}");
+            }
+            return self.vault_shown();
+        }
+        if !self.ensure_vault_open(id) {
+            return self.show_toast(crate::i18n::t("vault_status_missing").to_string());
+        }
+        self.start_picker = false;
+        let task = self.switch_this_window_to_vault(id);
+        // Never shown, nothing of it loaded: closing it drops its key
+        // (a vault without a password was unlocked to read its theme).
+        if !self.vaults.all().any(|v| v.id == boot && v.loaded) {
+            drop(self.vaults.remove(boot));
+        }
+        task
+    }
+
+    /// The window taking the focus is the one in use: its vault is the
+    /// one the next start opens (`set_last_vault` writes only a change).
+    pub(crate) fn remember_window_vault(&self) {
+        if let Some(device) = oryxis_vault::device::installed()
+            && let Err(e) = device.set_last_vault(self.vaults.window_id())
+        {
+            tracing::warn!("could not remember the last vault: {e}");
+        }
     }
 
     /// The vault whose chord this keypress is, if any.
@@ -439,10 +507,9 @@ impl Oryxis {
     /// takes the focus.
     fn vault_shown(&mut self) -> Task<Message> {
         match self.vaults.cur().vault_ui.state {
-            VaultState::Unlocked if !self.vaults.cur().loaded => {
-                self.load_data_from_vault();
-                Task::none()
-            }
+            // Opened without a password and never shown: everything an
+            // unlock gives (data, sync, auto-start forwards, plugins).
+            VaultState::Unlocked if !self.vaults.cur().loaded => self.finish_vault_open(),
             VaultState::Locked => crate::widgets::focus_input(iced::widget::Id::new(
                 "vault-unlock-password",
             )),

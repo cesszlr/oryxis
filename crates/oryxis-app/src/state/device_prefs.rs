@@ -67,6 +67,9 @@ pub(crate) struct DevicePrefs {
     pub(crate) vault_switcher_hide_single: bool,
     /// Where the vault switcher lives (`vault_switcher_place`).
     pub(crate) vault_switcher_place: VaultSwitcherPlace,
+    /// With several vaults, a start asks which one to open instead of
+    /// opening the last one used (`vault_start_picker`).
+    pub(crate) vault_start_picker: bool,
     /// This device's display name in the sync peer lists (`sync_device_name`).
     pub(crate) sync_device_name: String,
     /// The sync listener's port as typed (`sync_listen_port`, `"0"` ==
@@ -93,6 +96,7 @@ impl Default for DevicePrefs {
             update_channel: crate::update::UpdateChannel::default(),
             vault_switcher_hide_single: false,
             vault_switcher_place: VaultSwitcherPlace::default(),
+            vault_start_picker: false,
             sync_device_name: String::new(),
             sync_listen_port: "0".into(),
         }

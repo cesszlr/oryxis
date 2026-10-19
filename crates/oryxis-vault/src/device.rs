@@ -119,6 +119,7 @@ pub const DEVICE_KEYS: &[&str] = &[
     // shows; hiding it for a single vault is the device's choice.
     "vault_switcher_hide_single",
     "vault_switcher_place",
+    "vault_start_picker",
     // Binding state of the shortcut table (the table itself is the
     // `hotkey_` prefix).
     "middle_click_paste",

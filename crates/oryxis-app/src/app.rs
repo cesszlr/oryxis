@@ -667,6 +667,9 @@ pub struct Oryxis {
     /// Settings > Vaults is recording the chord of this vault: the next
     /// keypress becomes it (Esc cancels).
     pub(crate) editing_vault_hotkey: Option<uuid::Uuid>,
+    /// The start picker is the window's screen (several vaults, asked for
+    /// in Settings > Vaults): nothing of a vault loads until one is picked.
+    pub(crate) start_picker: bool,
     /// The vault switcher chip on the toolbar and the badge on the nav
     /// rail, as last drawn: the switcher menu opens under the one pressed.
     pub(crate) vault_chip_bounds: crate::widgets::BoundsCell,

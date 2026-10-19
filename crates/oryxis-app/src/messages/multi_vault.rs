@@ -45,6 +45,10 @@ pub enum MultiVaultMessage {
     VaultHotkeyCaptureStart(Uuid),
     /// Settings > Vaults: vault `id` has no chord any more.
     VaultHotkeyClear(Uuid),
+    /// Settings > Vaults: ask which vault to open at a start.
+    VaultStartPickerToggled(bool),
+    /// The start picker: open this vault in the window.
+    PickStartVault(Uuid),
     /// Settings > Vaults: where the switcher lives.
     VaultSwitcherPlaceChanged(crate::state::VaultSwitcherPlace),
     /// The setup step of a vault just made was abandoned: back to the

@@ -36,8 +36,8 @@ click (1338, 207)
 # default. Measured: 91s -> 30s.
 timeout 5000
 settle
-# The sidebar gained "Sync" under SFTP (fixed-height rows: y 418).
-click (60, 418)
+# The sidebar gained "Sync" under SFTP (fixed-height rows: y 463).
+click (60, 463)
 settle
 expect "Transport"
 # The transport row is the first recorded content row: Tab from the
@@ -76,7 +76,7 @@ click (19, 20)
 settle
 click "Settings"
 settle
-click (60, 418)
+click (60, 463)
 settle
 click "••••••••"
 settle

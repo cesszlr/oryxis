@@ -54,6 +54,15 @@ impl Oryxis {
             },
         );
 
+        let ask = self.device_prefs.vault_start_picker;
+        let ask_msg = Message::MultiVault(MultiVaultMessage::VaultStartPickerToggled(!ask));
+        let picker_row = self.settings_nav_slot_labeled(
+            t("vault_start_picker"),
+            crate::keynav::RowAction::activate(ask_msg.clone()),
+            8.0,
+            crate::widgets::toggle_row_desc(t("vault_start_picker"), t("vault_start_picker_desc"), ask, ask_msg),
+        );
+
         let hide = self.device_prefs.vault_switcher_hide_single;
         let hide_msg = Message::MultiVault(MultiVaultMessage::VaultSwitcherHideSingleToggled(!hide));
         let hide_row = self.settings_nav_slot_labeled(
@@ -83,7 +92,7 @@ impl Oryxis {
             Space::new().height(14),
             panel_section(column![list, Space::new().height(14), doors]),
             Space::new().height(12),
-            panel_section(column![place_row, Space::new().height(12), hide_row]),
+            panel_section(column![place_row, Space::new().height(12), hide_row, Space::new().height(12), picker_row]),
             Space::new().height(24),
         ]
         .width(Length::Fill)
