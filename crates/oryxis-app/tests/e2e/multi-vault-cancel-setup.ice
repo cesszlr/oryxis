@@ -8,7 +8,7 @@ click "Skip"
 click "Continue without password"
 settle 250
 expect "Personal"
-click "Personal"
+click (133, 21)
 settle 250
 click "New vault…"
 settle 250
@@ -21,7 +21,7 @@ click "Cancel"
 settle 250
 expect "Create host"
 expect "Personal"
-click "Personal"
+click (133, 21)
 settle 250
 expect "New vault…"
 absent "Temp"

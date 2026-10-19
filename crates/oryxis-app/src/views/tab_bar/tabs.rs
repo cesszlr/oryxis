@@ -89,6 +89,112 @@ pub(crate) fn area_tab<'a>(
     btn
 }
 
+/// The Home tab when it carries the vault (`VaultSwitcherPlace::Tabs`,
+/// Termius's shape): the house and the vault's name go home, the chevron
+/// beside them opens the switcher. One pill, two buttons, the same
+/// active wash as every other area tab. `compact` (the narrow header of
+/// the side-docked strip) keeps the house and the chevron, the name in
+/// the house's tooltip. `chevron_cell` reports where the chevron was
+/// drawn: the switcher hangs from it.
+pub(crate) fn vault_home_tab<'a>(
+    name: String,
+    is_active: bool,
+    solid_fill: bool,
+    compact: bool,
+    menu_open: bool,
+    chevron_cell: crate::widgets::BoundsCell,
+) -> Element<'a, Message> {
+    let c = OryxisColors::t();
+    let fg = if is_active { c.accent } else { c.text_secondary };
+    let part_style = move |pressed_look: bool| {
+        move |_: &iced::Theme, status: BtnStatus| {
+            let tint = match status {
+                BtnStatus::Pressed => Some(Color::from_rgba(1.0, 1.0, 1.0, 0.10)),
+                BtnStatus::Hovered => Some(Color::from_rgba(1.0, 1.0, 1.0, 0.06)),
+                _ if pressed_look => Some(Color::from_rgba(1.0, 1.0, 1.0, 0.10)),
+                _ => None,
+            };
+            button::Style {
+                background: tint.map(Background::Color),
+                text_color: fg,
+                border: Border { radius: Radius::from(6.0), ..Default::default() },
+                ..Default::default()
+            }
+        }
+    };
+    let home_inner: Element<'a, Message> = if compact {
+        container(iced_fonts::lucide::house().size(16).color(fg))
+            .center_x(Length::Fixed(TAB_ROW_HEIGHT))
+            .center_y(Length::Fixed(TAB_ROW_HEIGHT))
+            .boxed()
+    } else {
+        container(
+            crate::widgets::dir_row(vec![
+                container(iced_fonts::lucide::house().size(15).color(fg))
+                    .center_x(Length::Fixed(TAB_ICON_SLOT))
+                    .center_y(Length::Fixed(TAB_ICON_SLOT))
+                    .boxed(),
+                Space::new().width(6).boxed(),
+                text(name.clone())
+                    .size(12)
+                    .line_height(1.0)
+                    .wrapping(iced::widget::text::Wrapping::None)
+                    .font(SYSTEM_UI_SEMIBOLD)
+                    .color(fg)
+                    .boxed(),
+            ])
+            .align_y(iced::Alignment::Center),
+        )
+        .center_y(Length::Fixed(TAB_ROW_HEIGHT))
+        .padding(Padding { top: 0.0, right: 4.0, bottom: 0.0, left: 8.0 })
+        .boxed()
+    };
+    let home = button(home_inner)
+        .padding(0)
+        .on_press(Message::Navigation(NavigationMessage::GoHome))
+        .style(part_style(false));
+    let home: Element<'a, Message> = if compact {
+        crate::views::terminal::icon_tooltip_owned(home.boxed(), name)
+    } else {
+        home.boxed()
+    };
+    let chevron = button(
+        container(iced_fonts::lucide::chevron_down().size(12).color(fg))
+            .center_x(Length::Fixed(20.0))
+            .center_y(Length::Fixed(TAB_ROW_HEIGHT)),
+    )
+    .padding(0)
+    .on_press(Message::MultiVault(crate::app::MultiVaultMessage::ShowVaultSwitcher(
+        crate::dispatch_multi_vault::VaultChipPlace::Tabs,
+    )))
+    .style(part_style(menu_open));
+    // No tooltip while its own menu is open: it would sit over the
+    // menu's first row.
+    let chevron: Element<'a, Message> = if menu_open {
+        chevron.boxed()
+    } else {
+        crate::views::terminal::icon_tooltip(chevron.boxed(), crate::i18n::t("vault_switcher_tooltip"))
+    };
+    let chevron = crate::widgets::bounds_reporter(chevron, chevron_cell);
+    let bg: Option<Background> = is_active.then(|| active_tab_bg(OryxisColors::t().accent, solid_fill));
+    container(crate::widgets::dir_row(vec![home, chevron]).align_y(iced::Alignment::Center))
+        .style(move |_: &iced::Theme| container::Style {
+            background: bg,
+            border: Border { radius: Radius::from(6.0), ..Default::default() },
+            ..Default::default()
+        })
+        .boxed()
+}
+
+/// What [`vault_home_tab`] takes from the strip, for the strip's width
+/// budget: the house slot, the gaps, the chevron, and the name at 12 px.
+pub(crate) fn vault_home_tab_width(name: &str, compact: bool) -> f32 {
+    if compact {
+        return TAB_ROW_HEIGHT + 20.0;
+    }
+    8.0 + TAB_ICON_SLOT + 6.0 + name.chars().count() as f32 * 7.0 + 4.0 + 20.0
+}
+
 /// The label a numbered tab renders: `"12. foo"` under the prefix style,
 /// untouched under the badge style (there the number replaces the icon)
 /// and when numbering is off. Shared by every strip renderer so the

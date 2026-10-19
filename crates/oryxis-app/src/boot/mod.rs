@@ -407,6 +407,7 @@ impl Oryxis {
                 vault_dialog: None,
                 vault_presence: std::collections::HashMap::new(),
                 vault_chip_bounds: crate::widgets::new_bounds_cell(),
+                vault_tab_bounds: crate::widgets::new_bounds_cell(),
                 vault_badge_bounds: crate::widgets::new_bounds_cell(),
                 tab_order: Vec::new(),
                 extra_windows: std::collections::BTreeMap::new(),

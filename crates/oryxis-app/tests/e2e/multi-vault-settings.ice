@@ -9,7 +9,7 @@ mode: Zen
 click "Skip"
 click "Continue without password"
 settle 250
-click "Personal"
+click (133, 21)
 settle 250
 click "New vault…"
 settle 250
@@ -59,7 +59,7 @@ absent "Work"
 expect "This window"
 expect "Home"
 # One vault left: the chip may go (the row's toggle).
-click (1141, 361)
+click (1141, 414)
 settle 250
 click (56, 20)
 settle 250

@@ -663,6 +663,8 @@ pub struct Oryxis {
     /// The vault switcher chip on the toolbar and the badge on the nav
     /// rail, as last drawn: the switcher menu opens under the one pressed.
     pub(crate) vault_chip_bounds: crate::widgets::BoundsCell,
+    /// Where the Home tab's switcher chevron was last drawn.
+    pub(crate) vault_tab_bounds: crate::widgets::BoundsCell,
     pub(crate) vault_badge_bounds: crate::widgets::BoundsCell,
     pub(crate) tab_order: Vec<crate::state::TabRef>,
     /// The extra windows (terminal tabs only), by window id. See

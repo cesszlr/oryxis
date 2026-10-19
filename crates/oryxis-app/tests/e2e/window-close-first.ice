@@ -16,7 +16,7 @@ expect "Welcome to Oryxis"
 click "Skip"
 click "Continue without password"
 settle 250
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"
@@ -36,7 +36,7 @@ settle 300
 click "New Window"
 settle 700
 absent "first"
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 click "Local Shell"
 settle 900

@@ -51,7 +51,7 @@ type enter
 settle 500
 click (1140, 70)
 settle 400
-click (333, 20)
+click (402, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"

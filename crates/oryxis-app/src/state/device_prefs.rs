@@ -61,9 +61,12 @@ pub(crate) struct DevicePrefs {
     pub(crate) snippet_output_dir: Option<String>,
     pub(crate) auto_check_updates: bool,
     /// Release stream the updater follows (`stable` / `nightly`).
-    pub(crate) update_channel: crate::update::UpdateChannel,    /// The vault switcher chip stays hidden while this device has a
-    /// single vault (`vault_switcher_hide_single`).
+    pub(crate) update_channel: crate::update::UpdateChannel,
+    /// The vault switcher stays hidden while this device has a single
+    /// vault (`vault_switcher_hide_single`).
     pub(crate) vault_switcher_hide_single: bool,
+    /// Where the vault switcher lives (`vault_switcher_place`).
+    pub(crate) vault_switcher_place: VaultSwitcherPlace,
     /// This device's display name in the sync peer lists (`sync_device_name`).
     pub(crate) sync_device_name: String,
     /// The sync listener's port as typed (`sync_listen_port`, `"0"` ==
@@ -89,8 +92,62 @@ impl Default for DevicePrefs {
             auto_check_updates: true,
             update_channel: crate::update::UpdateChannel::default(),
             vault_switcher_hide_single: false,
+            vault_switcher_place: VaultSwitcherPlace::default(),
             sync_device_name: String::new(),
             sync_listen_port: "0".into(),
         }
     }
 }
+
+/// Where the vault switcher lives. Device-level: it is how this person
+/// works the app, whatever vault a window is on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum VaultSwitcherPlace {
+    /// The tab bar's Home tab carries the vault (its name, and a chevron
+    /// that opens the switcher), Termius's shape.
+    #[default]
+    Tabs,
+    /// A chip at the head of the vault toolbar (the badge at the top of
+    /// the nav rail).
+    Toolbar,
+}
+
+impl VaultSwitcherPlace {
+    pub(crate) const ALL: [Self; 2] = [Self::Tabs, Self::Toolbar];
+
+    /// The value persisted as `vault_switcher_place`.
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Tabs => "tabs",
+            Self::Toolbar => "toolbar",
+        }
+    }
+
+    /// The persisted value back; anything else is `None` (the default
+    /// stays).
+    pub(crate) fn from_code(code: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.code() == code)
+    }
+
+    pub(crate) fn label_key(self) -> &'static str {
+        match self {
+            Self::Tabs => "vault_switcher_place_tabs",
+            Self::Toolbar => "vault_switcher_place_toolbar",
+        }
+    }
+}
+
+#[cfg(test)]
+mod vault_switcher_place_tests {
+    use super::VaultSwitcherPlace;
+
+    #[test]
+    fn the_place_code_round_trips_and_defaults_to_the_tab_bar() {
+        for place in VaultSwitcherPlace::ALL {
+            assert_eq!(VaultSwitcherPlace::from_code(place.code()), Some(place));
+        }
+        assert_eq!(VaultSwitcherPlace::from_code(""), None);
+        assert_eq!(VaultSwitcherPlace::default(), VaultSwitcherPlace::Tabs);
+    }
+}
+

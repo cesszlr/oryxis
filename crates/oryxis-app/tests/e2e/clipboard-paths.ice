@@ -19,7 +19,7 @@ expect "Create host"
 # 1. Paste into the SFTP path bar (the crashing gesture). The path input
 #    is a text_input, so the runtime performs the read; the value is not
 #    text-selectable, hence the screenshot.
-click (91, 20)
+click (160, 20)
 expect "SFTP"
 click "SFTP"
 settle
@@ -37,7 +37,7 @@ screenshot sftp-path-paste
 # 2. Terminal copy-on-select: the widget queues the copy and the app
 #    performs it through the runtime, so it lands in the emulated
 #    clipboard (before the fix it went straight to the system clipboard).
-click (333, 20)
+click (402, 20)
 expect "Local Shell"
 click "Local Shell"
 timeout 500

@@ -45,7 +45,12 @@ impl Oryxis {
     /// (the vertical strip carries session tabs only). Settings stays
     /// out on purpose - it lives in the burger menu so it doesn't take
     /// a permanent slot.
-    pub(crate) fn home_area_tab(&self, solid_fill: bool) -> Element<'_, Message> {
+    ///
+    /// With the switcher in the tab bar (`vault_switcher_in_tabs`), the
+    /// Home tab carries the window's vault: its name, and a chevron that
+    /// opens the switcher. `compact` is the side-docked strip's narrow
+    /// header, where the name moves into a tooltip.
+    pub(crate) fn home_area_tab(&self, solid_fill: bool, compact: bool) -> Element<'_, Message> {
         let nav_active = self.cur_active_tab().is_none();
         let in_vault_area = matches!(
             self.cur_view(),
@@ -58,6 +63,19 @@ impl Oryxis {
                 | View::KnownHosts
                 | View::History
         );
+        if self.vault_switcher_in_tabs() {
+            let menu_open = self
+                .cur_overlay()
+                .is_some_and(|o| matches!(o.content, crate::state::OverlayContent::VaultSwitcher));
+            return vault_home_tab(
+                self.vault_name(self.vaults.cur().id),
+                nav_active && in_vault_area,
+                solid_fill,
+                compact,
+                menu_open,
+                self.vault_tab_bounds.clone(),
+            );
+        }
         area_tab(
             "",
             iced_fonts::lucide::house(),
@@ -65,6 +83,15 @@ impl Oryxis {
             nav_active && in_vault_area,
             solid_fill,
         )
+    }
+
+    /// The Home tab's width in the horizontal strip's budget.
+    pub(crate) fn home_area_tab_width(&self) -> f32 {
+        if self.vault_switcher_in_tabs() {
+            vault_home_tab_width(&self.vault_name(self.vaults.cur().id), false)
+        } else {
+            TAB_ROW_HEIGHT
+        }
     }
 
     /// Whether the active tab drag (if any) picked up a pinned tab. In

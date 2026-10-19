@@ -31,9 +31,9 @@ settle 500
 expect "alpha"
 expect "bash (default)"
 
-press (140, 20)
-move (160, 26)
-move (200, 10)
+press (209, 20)
+move (229, 26)
+move (269, 10)
 move (200, -20)
 move (200, -60)
 settle 500

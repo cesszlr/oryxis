@@ -15,7 +15,7 @@ mode: Zen
 click "Skip"
 click "Continue without password"
 settle
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"

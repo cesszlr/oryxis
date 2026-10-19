@@ -21,7 +21,7 @@ expect "Welcome to Oryxis"
 click "Skip"
 click "Continue without password"
 expect "Create host"
-click (92, 20)
+click (161, 20)
 settle 300
 expect "Local Shell"
 timeout 800
@@ -51,10 +51,10 @@ type enter
 settle 500
 click (1142, 70)
 settle
-click (150, 20)
+click (219, 20)
 settle 600
 pinch 0.12 (600, 400)
 settle 400
-click (370, 20)
+click (439, 20)
 settle 400
 expect "Zoomed to 17 for this session"

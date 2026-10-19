@@ -1,8 +1,9 @@
 viewport: 1200x750
 mode: Zen
 -----
-# Several vaults in one window (multi-vault): the chip on the vault
-# toolbar names the vault the window works on, its menu makes a new one
+# Several vaults in one window (multi-vault): the tab bar's Home tab
+# names the vault the window works on, its chevron (the click at the
+# chip's right end) opens the switcher, whose menu makes a new one
 # ("New vault…" asks for a name, then the new vault's own setup step),
 # and switching moves the window between them: each keeps its hosts and
 # its tabs (another vault's tabs are parked, not closed). "Lock all
@@ -13,7 +14,7 @@ click "Continue without password"
 settle 250
 expect "Create host"
 expect "Personal"
-click "Personal"
+click (133, 21)
 settle 250
 expect "New vault…"
 click "New vault…"
@@ -49,7 +50,7 @@ expect "bash (default)"
 # Back on the hosts screen, over to Personal: no Work host, no Work tab.
 click (56, 20)
 settle 250
-click "Work"
+click (114, 21)
 settle 250
 click "Personal"
 settle 250
@@ -57,7 +58,7 @@ expect "Create host"
 absent "work-db"
 absent "bash (default)"
 # And back: Work's host and its tab, still there.
-click "Personal"
+click (133, 21)
 settle 250
 click "Work"
 settle 250
@@ -65,7 +66,7 @@ expect "work-db"
 expect "bash (default)"
 # Lock every vault that has a password: Work locks and says so; Personal
 # (no password) is one click away from its lock screen.
-click "Work"
+click (114, 21)
 settle 250
 click "Lock all vaults"
 settle 250

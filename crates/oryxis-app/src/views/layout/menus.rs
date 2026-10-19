@@ -532,7 +532,7 @@ impl Oryxis {
         // chip is only present when the vault switcher shows (must match
         // `subnav_pill_split`), otherwise the menu lands ~115 px too far
         // right and clips off the window edge.
-        let chip = if self.show_vault_switcher() { self.vault_chip_width() + 8.0 } else { 0.0 };
+        let chip = if self.vault_switcher_in_toolbar() { self.vault_chip_width() + 8.0 } else { 0.0 };
         let inline_w: f32 = inline
             .iter()
             .map(|(k, _)| Self::subnav_pill_width(k))

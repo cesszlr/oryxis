@@ -70,7 +70,7 @@ pub(crate) use cloud_discover::CloudDiscoverUi;
 pub(crate) use snippet_form::{SnippetForm, StepForm, StepKind};
 pub(crate) use keys_ui::KeysUi;
 pub(crate) use sftp_chrome::SftpChrome;
-pub(crate) use device_prefs::DevicePrefs;
+pub(crate) use device_prefs::{DevicePrefs, VaultSwitcherPlace};
 pub(crate) use multi_vault::{CopySettingsChoice, VaultDialog, VaultDialogMode};
 pub(crate) use prefs::{resolve_download_dir, AppPrefs};
 pub(crate) use sftp::*;

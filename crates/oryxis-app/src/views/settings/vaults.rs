@@ -38,6 +38,22 @@ impl Oryxis {
             ),
         ]);
 
+        use crate::state::VaultSwitcherPlace;
+        let place_row = self.nav_pick_row(
+            t("vault_switcher_place"),
+            VaultSwitcherPlace::ALL.iter().map(|p| p.code().to_string()).collect(),
+            self.device_prefs.vault_switcher_place.code().to_string(),
+            |code: &String| {
+                VaultSwitcherPlace::from_code(code).map(|p| t(p.label_key())).unwrap_or_default().to_string()
+            },
+            220.0,
+            |code| {
+                Message::MultiVault(MultiVaultMessage::VaultSwitcherPlaceChanged(
+                    VaultSwitcherPlace::from_code(&code).unwrap_or_default(),
+                ))
+            },
+        );
+
         let hide = self.device_prefs.vault_switcher_hide_single;
         let hide_msg = Message::MultiVault(MultiVaultMessage::VaultSwitcherHideSingleToggled(!hide));
         let hide_row = self.settings_nav_slot_labeled(
@@ -67,7 +83,7 @@ impl Oryxis {
             Space::new().height(14),
             panel_section(column![list, Space::new().height(14), doors]),
             Space::new().height(12),
-            panel_section(column![hide_row]),
+            panel_section(column![place_row, Space::new().height(12), hide_row]),
             Space::new().height(24),
         ]
         .width(Length::Fill)

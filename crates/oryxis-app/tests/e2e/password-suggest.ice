@@ -50,7 +50,7 @@ screenshot pwsuggest-identity
 
 # A local shell: the popup's identity rows are origin-independent, so
 # this covers the whole path without a server.
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 click "Local Shell"
 settle 500

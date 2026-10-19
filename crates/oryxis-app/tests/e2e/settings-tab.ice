@@ -35,6 +35,6 @@ expect "Interface"
 # the tab is active. Closing it drops the tab AND leaves Settings, because
 # a close that left you staring at the screen you just closed would be a
 # dead end.
-click (96, 20)
+click (165, 20)
 settle
 expect "Create host"

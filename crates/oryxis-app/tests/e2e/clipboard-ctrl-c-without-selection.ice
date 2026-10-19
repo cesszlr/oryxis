@@ -15,7 +15,7 @@ clipboard is "kept on the hosts screen"
 
 # A local shell: copy a selection with Ctrl+Shift+C, then interrupt the
 # shell. The copied text survives the Ctrl+C.
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 click "Local Shell"
 timeout 500

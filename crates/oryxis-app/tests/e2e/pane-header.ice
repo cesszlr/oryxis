@@ -30,7 +30,7 @@ settle 500
 click (1140, 70)
 settle 400
 # A second tab, leaving Settings open so the `+` keeps its position.
-click (333, 20)
+click (402, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"

@@ -153,7 +153,7 @@ impl Oryxis {
             Space::new().width(1).height(TAB_HEIGHT).boxed(),
         ];
         if side {
-            leading.push(self.home_area_tab(solid_fill));
+            leading.push(self.home_area_tab(solid_fill, false));
         }
         // The middle Fill slot: the pinned-tab strip (which keeps the
         // window-drag / double-click contract on its empty area) or the
@@ -473,8 +473,10 @@ impl Oryxis {
         // roughly icon(16) + gap(6) + label(~50) + padding(20) ~= 90 px.
         let area_tab_count = 1 + (self.vaults.cur().sftp_enabled as u32);
         const AREA_TAB_APPROX_WIDTH: f32 = 100.0;
-        let area_tabs_total =
-            area_tab_count as f32 * (AREA_TAB_APPROX_WIDTH + TAB_SPACING);
+        // The Home tab carrying a long vault name can outgrow the flat
+        // estimate; the budget takes whichever is wider.
+        let area_tabs_total = area_tab_count as f32 * (AREA_TAB_APPROX_WIDTH + TAB_SPACING)
+            + (self.home_area_tab_width() - AREA_TAB_APPROX_WIDTH).max(0.0);
         let reserved = strip_reserved_width(
             bottom,
             toggle_count,
@@ -738,7 +740,7 @@ impl Oryxis {
         // scrollable connection strip (see `home_area_tab` for the
         // selection family and why Settings stays out), so Home stays
         // reachable no matter how far the strip overflows.
-        leading.push(self.home_area_tab(solid_fill));
+        leading.push(self.home_area_tab(solid_fill, false));
         leading.push(Space::new().width(TAB_SPACING).height(TAB_HEIGHT).boxed());
         leading.push(tab_strip);
         if let Some(plus) = docked_plus {

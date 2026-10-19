@@ -39,7 +39,7 @@ settle 300
 click "New Window"
 settle 700
 window 2 at (300, 500)
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 click "Local Shell"
 settle 900
@@ -56,9 +56,9 @@ absent "alpha"
 # Drag "alpha" out of the first window.
 window 1
 expect "alpha"
-press (140, 20)
-move (160, 26)
-move (200, 10)
+press (209, 20)
+move (229, 26)
+move (269, 10)
 move (200, -60)
 settle 500
 expect "alpha"

@@ -62,7 +62,7 @@ settle
 expect "dc-marker.txt"
 # The sidebar Files tab of a local shell lists the same home. The new-tab
 # button sits after the SFTP chip; a coordinate, as it carries no text.
-click (333, 20)
+click (402, 20)
 settle
 click "Local Shell"
 settle 800

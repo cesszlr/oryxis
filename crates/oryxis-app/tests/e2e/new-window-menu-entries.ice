@@ -28,7 +28,7 @@ type escape
 settle 250
 absent "Connect in New Window"
 # A local shell from the `+` popover, then its chip's menu.
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"

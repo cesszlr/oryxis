@@ -26,8 +26,8 @@ settle 500
 
 # Grab the FIRST chip. The second one is active, so the content area
 # below is showing it, and it is the destination.
-press (140, 20)
-move (160, 26)
+press (209, 20)
+move (229, 26)
 move (600, 300)
 # Right third of the pane, clear of the grid's own outer band: this is a
 # per-pane anchor, so the preview is the right HALF of that pane.
@@ -45,7 +45,7 @@ settle 600
 
 # One chip left, and it is a group: the close X now has to ask, which is
 # only true when the tab really owns both sessions.
-click (95, 20)
+click (164, 20)
 settle 300
 expect "Close this group?"
 expect "Close group"

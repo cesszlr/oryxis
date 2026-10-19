@@ -15,7 +15,7 @@ expect "Welcome to Oryxis"
 click "Skip"
 click "Continue without password"
 expect "Create host"
-click (91, 20)
+click (160, 20)
 expect "Local Shell"
 timeout 500
 click "Local Shell"

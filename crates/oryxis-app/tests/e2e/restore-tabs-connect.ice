@@ -41,7 +41,7 @@ expect "Open on the tab that was active"
 click (1140, 187)
 settle 400
 screenshot restore-tabs-connect-landing-on
-click (333, 20)
+click (402, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"

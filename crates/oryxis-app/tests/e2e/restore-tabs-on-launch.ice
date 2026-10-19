@@ -37,7 +37,7 @@ click (1140, 70)
 settle 400
 screenshot restore-tabs-setting-on
 # A local shell tab, leaving Settings open so the `+` keeps its position.
-click (333, 20)
+click (402, 20)
 expect "Local Shell"
 timeout 800
 click "Local Shell"

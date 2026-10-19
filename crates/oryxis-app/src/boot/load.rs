@@ -908,6 +908,11 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("vault_switcher_hide_single") {
                 self.device_prefs.vault_switcher_hide_single = v == "true";
             }
+            if let Ok(Some(v)) = vault.get_setting("vault_switcher_place")
+                && let Some(place) = crate::state::VaultSwitcherPlace::from_code(&v)
+            {
+                self.device_prefs.vault_switcher_place = place;
+            }
             if let Ok(Some(v)) = vault.get_setting("close_to_tray") {
                 self.device_prefs.close_to_tray = v == "true";
             }

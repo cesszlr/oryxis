@@ -39,7 +39,7 @@ settle 300
 click "New Window"
 settle 700
 window 2 at (300, 500)
-click (92, 20)
+click (161, 20)
 expect "Local Shell"
 click "Local Shell"
 settle 900
@@ -54,8 +54,8 @@ settle 300
 expect "other"
 absent "alpha"
 # Drag the window by its only tab, then over window 1's strip.
-press (140, 20)
-move (150, 24)
+press (209, 20)
+move (219, 24)
 settle 300
 move (140, -200)
 settle 300

@@ -93,7 +93,7 @@ impl Oryxis {
         // The vault badge, unless a single vault is all there is and the
         // user hid it for that case.
         let mut col_items: Vec<Element<'_, Message>> = Vec::new();
-        if self.show_vault_switcher() {
+        if self.vault_switcher_in_toolbar() {
             col_items.push(vault_badge);
         }
         col_items.push(nav.boxed());

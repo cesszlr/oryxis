@@ -22,6 +22,8 @@ use oryxis_vault::VaultStore;
 pub(crate) enum VaultChipPlace {
     Toolbar,
     Rail,
+    /// The chevron of the tab bar's Home tab.
+    Tabs,
 }
 
 /// Whether a settings row of one vault is copied into a vault being
@@ -73,11 +75,11 @@ impl Oryxis {
                 let b = match place {
                     VaultChipPlace::Toolbar => self.vault_chip_bounds.get(),
                     VaultChipPlace::Rail => self.vault_badge_bounds.get(),
+                    VaultChipPlace::Tabs => self.vault_tab_bounds.get(),
                 };
-                let (x, y) = match place {
-                    VaultChipPlace::Toolbar => (b.x, b.y + b.height + 4.0),
-                    VaultChipPlace::Rail => (b.x, b.y + b.height + 4.0),
-                };
+                // Under the control; a strip docked at the bottom is
+                // kept inside the window by the overlay's own clamp.
+                let (x, y) = (b.x, b.y + b.height + 4.0);
                 self.overlay = Some(OverlayState {
                     content: OverlayContent::VaultSwitcher,
                     x,
@@ -170,6 +172,10 @@ impl Oryxis {
                 if self.vaults.is_open(id) {
                     return Task::done(Message::ForVault(id, Box::new(Message::Vault(VaultMessage::LockVault))));
                 }
+            }
+            MultiVaultMessage::VaultSwitcherPlaceChanged(place) => {
+                self.device_prefs.vault_switcher_place = place;
+                self.persist_setting("vault_switcher_place", place.code());
             }
             MultiVaultMessage::VaultSwitcherHideSingleToggled(hide) => {
                 self.device_prefs.vault_switcher_hide_single = hide;

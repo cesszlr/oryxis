@@ -594,7 +594,7 @@ impl Oryxis {
         let mut row_items: Vec<Element<'_, Message>> = Vec::new();
         // The vault chip, unless a single vault is all there is and the
         // user hid it for that case.
-        if self.show_vault_switcher() {
+        if self.vault_switcher_in_toolbar() {
             row_items.push(vault_chip);
             row_items.push(Space::new().width(8).boxed());
         }
@@ -669,7 +669,7 @@ impl Oryxis {
         // (~28), plus row padding and gaps. Search no longer lives here
         // (it moved to each view's toolbar), so nothing is reserved for
         // it, otherwise the "…" triggered way too early.
-        let chip = if self.show_vault_switcher() { self.vault_chip_width() } else { 0.0 };
+        let chip = if self.vault_switcher_in_toolbar() { self.vault_chip_width() } else { 0.0 };
         let flank = chip + 31.0 + 28.0 + 24.0;
         // An open side panel sits over the sub-nav's trailing edge now,
         // so subtract its width from the budget or pills would render

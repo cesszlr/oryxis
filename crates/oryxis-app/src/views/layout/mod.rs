@@ -103,6 +103,17 @@ impl Oryxis {
         self.vault_count() > 1 || !self.device_prefs.vault_switcher_hide_single
     }
 
+    /// The switcher rides the tab bar's Home tab.
+    pub(crate) fn vault_switcher_in_tabs(&self) -> bool {
+        self.show_vault_switcher() && self.device_prefs.vault_switcher_place == crate::state::VaultSwitcherPlace::Tabs
+    }
+
+    /// The switcher is the chip on the vault toolbar (the badge at the
+    /// top of the nav rail).
+    pub(crate) fn vault_switcher_in_toolbar(&self) -> bool {
+        self.show_vault_switcher() && self.device_prefs.vault_switcher_place == crate::state::VaultSwitcherPlace::Toolbar
+    }
+
     /// True when the Home area is active: no connection tab open and the
     /// current view is one of the vault sub-sections. Gates the vault nav
     /// (horizontal sub-nav strip or vertical rail).

@@ -85,7 +85,7 @@ impl Oryxis {
             }
             let mut header: Vec<Element<'_, Message>> = vec![
                 burger_menu_btn(self.cur_burger_open()),
-                self.home_area_tab(solid_fill),
+                self.home_area_tab(solid_fill, true),
                 Space::new().width(Length::Fill).boxed(),
             ];
             if self.cur_active_tab().is_some() {
