@@ -10,6 +10,11 @@ impl Oryxis {
         self.load_vault_locale_ai_sync();
         self.load_vault_terminal_settings();
         self.load_vault_hotkeys_and_defaults();
+        // The load applied the vault's app theme process-wide; the
+        // vault's windows draw from its own copy (`OpenVault::ui_theme`),
+        // and a boot that unlocks before any message runs never reaches
+        // the update funnel that keeps it in step.
+        self.vaults.cur_mut().ui_theme = crate::theme::ThemeSelection::current();
         // An edited host's terminal quirks reach its open sessions now,
         // not at the next connect.
         self.refresh_live_pane_quirks();

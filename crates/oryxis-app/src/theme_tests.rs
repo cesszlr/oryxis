@@ -199,3 +199,49 @@ fn terminal_alpha_needs_both_a_transparent_window_and_a_reduced_setting() {
     set_window_transparent(false);
     set_terminal_opacity(100);
 }
+
+// Per-window themes: a window on another vault draws in its vault's
+// theme while the process-wide one stays the vault `update` works on.
+// Scope only (thread-local): these never touch the process-wide theme,
+// which other tests of the binary read.
+
+#[test]
+fn a_scoped_theme_answers_inside_and_the_global_one_after() {
+    let outside_colors = OryxisColors::t() as *const ThemeColors;
+    let outside_theme = AppTheme::active();
+    let other = AppTheme::ALL
+        .iter()
+        .copied()
+        .find(|t| *t != outside_theme)
+        .expect("more than one built-in theme");
+    with_selection(ThemeSelection::builtin(other), || {
+        assert_eq!(AppTheme::active(), other);
+        assert!(std::ptr::eq(OryxisColors::t(), other.colors_ref()));
+    });
+    assert_eq!(AppTheme::active(), outside_theme);
+    assert!(std::ptr::eq(OryxisColors::t(), outside_colors));
+}
+
+#[test]
+fn custom_colors_in_scope_win_over_their_builtin() {
+    let colors: &'static ThemeColors = Box::leak(Box::new(*AppTheme::Nord.colors_ref()));
+    with_selection(ThemeSelection::custom(AppTheme::OryxisDark, colors), || {
+        assert!(std::ptr::eq(OryxisColors::t(), colors));
+        assert_eq!(AppTheme::active(), AppTheme::OryxisDark);
+    });
+}
+
+#[test]
+fn nested_scopes_restore_the_outer_one() {
+    with_selection(ThemeSelection::builtin(AppTheme::Dracula), || {
+        with_selection(ThemeSelection::builtin(AppTheme::Nord), || {
+            assert_eq!(AppTheme::active(), AppTheme::Nord);
+        });
+        assert_eq!(AppTheme::active(), AppTheme::Dracula);
+        {
+            let _scope = SelectionScope::enter(ThemeSelection::builtin(AppTheme::Monokai));
+            assert_eq!(AppTheme::active(), AppTheme::Monokai);
+        }
+        assert_eq!(AppTheme::active(), AppTheme::Dracula);
+    });
+}

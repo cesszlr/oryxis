@@ -26,9 +26,11 @@ mod inputs;
 mod layout;
 mod overlay;
 mod privacy;
+mod theme_scope;
 mod toolbar;
 
 pub(crate) use buttons::*;
+pub(crate) use theme_scope::theme_scope;
 pub(crate) use cards::*;
 pub(crate) use forms::*;
 pub(crate) use host_icon::*;

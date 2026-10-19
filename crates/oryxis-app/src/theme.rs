@@ -123,6 +123,96 @@ pub fn clear_active_custom_ui() {
     ACTIVE_CUSTOM.store(std::ptr::null_mut(), Ordering::Relaxed);
 }
 
+/// A vault's chrome theme: a built-in, or a custom UI theme's resolved
+/// colors (which win). Copied around freely; the custom colors are a
+/// `Box::leak`'d table (see `ACTIVE_CUSTOM`), so the reference is
+/// `'static`.
+#[derive(Debug, Clone, Copy)]
+pub struct ThemeSelection {
+    builtin: AppTheme,
+    custom: Option<&'static ThemeColors>,
+}
+
+impl ThemeSelection {
+    /// What the process-wide theme is right now (the vault the code in
+    /// `update` works on keeps it there).
+    pub fn current() -> Self {
+        let custom = ACTIVE_CUSTOM.load(Ordering::Relaxed);
+        Self {
+            builtin: AppTheme::global(),
+            // SAFETY: see `OryxisColors::t`.
+            custom: (!custom.is_null()).then(|| unsafe { &*custom }),
+        }
+    }
+
+    /// Make this the process-wide theme (a window on this vault is the
+    /// one `update` now works on).
+    pub fn apply(self) {
+        let idx = AppTheme::ALL.iter().position(|t| *t == self.builtin).unwrap_or(0);
+        ACTIVE_THEME.store(idx, Ordering::Relaxed);
+        let ptr = self.custom.map_or(std::ptr::null_mut(), |c| {
+            c as *const ThemeColors as *mut ThemeColors
+        });
+        ACTIVE_CUSTOM.store(ptr, Ordering::Relaxed);
+    }
+
+    fn colors(self) -> &'static ThemeColors {
+        self.custom.unwrap_or_else(|| self.builtin.colors_ref())
+    }
+}
+
+#[cfg(test)]
+impl ThemeSelection {
+    pub fn builtin(theme: AppTheme) -> Self {
+        Self { builtin: theme, custom: None }
+    }
+
+    pub fn custom(builtin: AppTheme, colors: &'static ThemeColors) -> Self {
+        Self { builtin, custom: Some(colors) }
+    }
+}
+
+thread_local! {
+    /// The theme of the window being drawn, while a view is built or a
+    /// window's widgets draw (`with_selection`). Several windows on
+    /// several vaults share the process-wide theme; this is how each
+    /// one draws in its own.
+    static SCOPE: std::cell::Cell<Option<ThemeSelection>> = const { std::cell::Cell::new(None) };
+}
+
+/// Run `f` with `selection` as the theme `OryxisColors::t()` and
+/// `AppTheme::active()` answer, restoring whatever was in scope before.
+pub fn with_selection<R>(selection: ThemeSelection, f: impl FnOnce() -> R) -> R {
+    let previous = SCOPE.with(|s| s.replace(Some(selection)));
+    struct Restore(Option<ThemeSelection>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SCOPE.with(|s| s.set(self.0));
+        }
+    }
+    let _restore = Restore(previous);
+    f()
+}
+
+/// [`with_selection`] for the length of a scope (a view pass).
+pub struct SelectionScope(Option<ThemeSelection>);
+
+impl SelectionScope {
+    pub fn enter(selection: ThemeSelection) -> Self {
+        Self(SCOPE.with(|s| s.replace(Some(selection))))
+    }
+}
+
+impl Drop for SelectionScope {
+    fn drop(&mut self) {
+        SCOPE.with(|s| s.set(self.0));
+    }
+}
+
+fn scoped() -> Option<ThemeSelection> {
+    SCOPE.with(std::cell::Cell::get)
+}
+
 /// Available app themes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppTheme {
@@ -206,7 +296,13 @@ impl AppTheme {
         }
     }
 
+    /// The built-in theme in force: the one of the window being drawn
+    /// when a view or a draw is in progress, else the process-wide one.
     pub fn active() -> AppTheme {
+        scoped().map_or_else(Self::global, |s| s.builtin)
+    }
+
+    fn global() -> AppTheme {
         let idx = ACTIVE_THEME.load(Ordering::Relaxed);
         Self::ALL.get(idx).copied().unwrap_or(AppTheme::OryxisDark)
     }
@@ -232,6 +328,9 @@ pub struct OryxisColors;
 impl OryxisColors {
     // ── Theme-aware accessors ──
     pub fn t() -> &'static ThemeColors {
+        if let Some(selection) = scoped() {
+            return selection.colors();
+        }
         let custom = ACTIVE_CUSTOM.load(Ordering::Relaxed);
         if !custom.is_null() {
             // SAFETY: `ACTIVE_CUSTOM` is only ever set to a `Box::leak`'d

@@ -205,6 +205,10 @@ impl Oryxis {
         if !side_panel_before && self.side_panel_wanted_on(self.active_view) {
             self.panel_window = self.window_ctx.as_ref().map(|c| c.id);
         }
+        // The theme this message left in force is the vault's it ran for
+        // (a theme change, a vault unlock): every window on that vault
+        // draws in it.
+        self.vaults.cur_mut().ui_theme = crate::theme::ThemeSelection::current();
         if self.window_ctx.is_some() {
             self.reconcile_tab_order();
             self.reconcile_hybrid_sftp();

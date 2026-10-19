@@ -543,15 +543,31 @@ impl Oryxis {
     pub(crate) fn view_for_window(&self, id: window::Id) -> iced::Element<'_, Message> {
         if let Some(window) = self.extra_windows.get(&id) {
             let _pass = ViewPass::begin(Viewing::Extra(id), Some(window.vault));
-            self.view()
-                .map(move |m| Message::InWindow(id, Box::new(m))).boxed()
+            // The window builds and draws in its own vault's theme.
+            let theme = self.vaults.cur().ui_theme;
+            let _scope = crate::theme::SelectionScope::enter(theme);
+            crate::widgets::theme_scope(
+                self.view().map(move |m| Message::InWindow(id, Box::new(m))).boxed(),
+                theme,
+            )
         } else {
             // Any other id is the resident window, which keeps the harness
             // (its emulator owns a single window) and a window on its
             // way out on the ordinary path.
             let _pass = ViewPass::begin(Viewing::Main, None);
-            self.view()
+            let theme = self.vaults.cur().ui_theme;
+            let _scope = crate::theme::SelectionScope::enter(theme);
+            crate::widgets::theme_scope(self.view(), theme)
         }
+    }
+
+    /// The theme window `id` draws in: its vault's (the resident window's
+    /// for any id that is not an extra window). Read by
+    /// `Oryxis::theme_for`, which iced asks per window.
+    pub(crate) fn theme_of_window(&self, id: window::Id) -> crate::theme::ThemeSelection {
+        let vault = self.extra_windows.get(&id).map(|w| w.vault);
+        let _pass = ViewPass::begin(Viewing::Nothing, vault);
+        self.vaults.cur().ui_theme
     }
 
     /// The window the user is working in (the focused one), when it is
@@ -659,7 +675,7 @@ impl Oryxis {
             focused: std::mem::replace(&mut self.window_focused, w.focused),
             mru: std::mem::replace(&mut self.tab_mru, w.mru),
             nav: std::mem::replace(&mut self.nav, w.nav),
-            vault: self.vaults.set_current(w.vault),
+            vault: self.vaults.switch_to(w.vault),
         });
         self.active_tab = w
             .active
@@ -705,7 +721,7 @@ impl Oryxis {
             focused: std::mem::replace(&mut self.window_focused, ctx.focused),
             mru: std::mem::replace(&mut self.tab_mru, ctx.mru),
             nav: std::mem::replace(&mut self.nav, ctx.nav),
-            vault: self.vaults.set_current(ctx.vault),
+            vault: self.vaults.switch_to(ctx.vault),
         };
         self.active_view = ctx.view;
         self.active_tab = ctx

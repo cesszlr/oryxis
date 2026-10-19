@@ -1558,8 +1558,11 @@ impl Oryxis {
         format!("{} - {}", self.window_label(target), self.title())
     }
 
-    pub fn theme_for(&self, _window: iced::window::Id) -> Theme {
-        self.theme()
+    /// The iced theme of one window: built from its vault's chrome
+    /// theme, so the defaults iced itself draws (text colour, built-in
+    /// widget styles) follow the vault too.
+    pub fn theme_for(&self, window: iced::window::Id) -> Theme {
+        crate::theme::with_selection(self.theme_of_window(window), || self.theme())
     }
 
     pub fn view_window(&self, window: iced::window::Id) -> iced::Element<'_, Message> {

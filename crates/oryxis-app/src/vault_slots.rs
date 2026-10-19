@@ -111,6 +111,11 @@ pub(crate) struct OpenVault {
     /// What the user configured in this vault (every preference that is
     /// not the device's, see `state::DevicePrefs`).
     pub(crate) prefs: crate::state::AppPrefs,
+    /// Its chrome theme. Mirrors the process-wide theme while a window
+    /// on this vault is the one `update` works on (`VaultSlots::switch_to`
+    /// applies it, the update funnel reads it back); a window on it
+    /// draws in it (`theme::with_selection`, `view_for_window`).
+    pub(crate) ui_theme: crate::theme::ThemeSelection,
     /// Icon + color picker state (target routing, current selection,
     /// search). The open flag (`show_icon_picker`) and the HSV popover
     /// anchor (`icon_color_popover`) stay alongside it on `Oryxis`.
@@ -417,6 +422,7 @@ impl OpenVault {
             custom_ui_themes: Vec::new(),
             files_recent_folders: std::collections::HashMap::new(),
             prefs: crate::state::AppPrefs::default(),
+            ui_theme: crate::theme::ThemeSelection::current(),
             editor_form: crate::state::ConnectionForm::default(),
             editor_initial_command: iced::widget::text_editor::Content::new(),
             host_panel_error: None,
@@ -528,6 +534,16 @@ impl VaultSlots {
     /// replaces.
     pub(crate) fn set_current(&mut self, id: Uuid) -> Uuid {
         std::mem::replace(&mut self.current, id)
+    }
+
+    /// Hand the fields to a window on vault `id` (`enter_window` /
+    /// `exit_window`): the outgoing vault keeps the process-wide theme it
+    /// had, the incoming one's becomes it. Returns the outgoing id.
+    pub(crate) fn switch_to(&mut self, id: Uuid) -> Uuid {
+        self.cur_mut().ui_theme = crate::theme::ThemeSelection::current();
+        let previous = self.set_current(id);
+        self.cur().ui_theme.apply();
+        previous
     }
 
     /// The vault the acting window works on.
