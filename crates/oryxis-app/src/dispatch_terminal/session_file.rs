@@ -131,7 +131,7 @@ impl Oryxis {
     /// `command_history_dir`, and deliberately a different folder: one
     /// holds command lines, the other whole sessions.
     pub(crate) fn session_log_file_dir(&self) -> PathBuf {
-        match &self.prefs.session_log_file_dir {
+        match &self.device_prefs.session_log_file_dir {
             Some(dir) => PathBuf::from(dir),
             None => oryxis_core::paths::oryxis_dir()
                 .unwrap_or_else(|| PathBuf::from(".").join(".oryxis"))

@@ -122,8 +122,8 @@ impl Oryxis {
             // is older than the configured threshold. Runs before the
             // in-memory load so the deleted rows don't briefly appear
             // and then vanish.
-            if self.prefs.cloud_auto_archive_orphans {
-                let days = self
+            if ov.prefs.cloud_auto_archive_orphans {
+                let days = ov
                     .prefs.cloud_orphan_archive_days
                     .parse::<i64>()
                     .ok()
@@ -270,7 +270,7 @@ impl Oryxis {
                     Language::from_code(&choice)
                 };
                 Language::set_active(lang);
-                self.prefs.language_choice = choice;
+                self.device_prefs.language_choice = choice;
             }
 
             // Layout direction (Auto / LTR / RTL). Re-hydrated after
@@ -546,7 +546,7 @@ impl Oryxis {
             // ICED_BACKEND before the runtime starts); keep this in sync
             // so the picker shows the persisted choice, not the default.
             if let Ok(Some(v)) = vault.get_setting("renderer_backend") {
-                self.prefs.renderer_backend = v;
+                self.device_prefs.renderer_backend = v;
             }
             // Same row `main` read before the window existed: it decided
             // there whether the surface is transparent at all, this only
@@ -554,31 +554,31 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("terminal_opacity")
                 && let Ok(percent) = v.parse::<u8>()
             {
-                self.prefs.terminal_opacity =
+                ov.prefs.terminal_opacity =
                     percent.clamp(crate::theme::MIN_TERMINAL_OPACITY, 100);
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_bg_image") {
-                self.prefs.terminal_bg_image = v;
+                ov.prefs.terminal_bg_image = v;
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_bg_fit") {
                 // Normalized through the enum so a hand-edited row can
                 // only ever produce a fit the renderer knows.
-                self.prefs.terminal_bg_fit =
+                ov.prefs.terminal_bg_fit =
                     oryxis_terminal::BgFit::from_str_or_default(&v).as_str().to_string();
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_bg_dim")
                 && let Ok(percent) = v.parse::<u8>()
             {
-                self.prefs.terminal_bg_dim = percent.min(100);
+                ov.prefs.terminal_bg_dim = percent.min(100);
             }
             if let Ok(Some(v)) = vault.get_setting("copy_on_select") {
-                self.prefs.copy_on_select = v == "true";
+                ov.prefs.copy_on_select = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("careful_paste") {
-                self.prefs.careful_paste = v == "true";
+                ov.prefs.careful_paste = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("paste_guard") {
-                self.prefs.paste_guard = v == "true";
+                ov.prefs.paste_guard = v == "true";
             }
             // Auto-title (OSC 0/2) lives in a process-wide gate (read at tab
             // render time); default-on, only override when explicitly stored.
@@ -586,38 +586,38 @@ impl Oryxis {
                 crate::state::set_auto_title(v == "true");
             }
             if let Ok(Some(v)) = vault.get_setting("right_click_copy") {
-                self.prefs.right_click_copy = v == "true";
+                ov.prefs.right_click_copy = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_right_click") {
-                self.prefs.terminal_right_click =
+                ov.prefs.terminal_right_click =
                     crate::util::RightClickMode::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("scrollback_reset_keypress") {
-                self.prefs.scrollback_reset_keypress = v == "true";
+                ov.prefs.scrollback_reset_keypress = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("scrollback_reset_output") {
-                self.prefs.scrollback_reset_output = v == "true";
+                ov.prefs.scrollback_reset_output = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_password_autofill") {
-                self.prefs.terminal_password_autofill = v == "true";
+                ov.prefs.terminal_password_autofill = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_link_confirm") {
-                self.prefs.terminal_link_confirm = v == "true";
+                ov.prefs.terminal_link_confirm = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_link_tunnel") {
-                self.prefs.terminal_link_tunnel = v == "true";
+                ov.prefs.terminal_link_tunnel = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("bold_is_bright") {
-                self.prefs.bold_is_bright = v == "true";
+                ov.prefs.bold_is_bright = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("pane_border_inactive") {
-                self.prefs.pane_border_inactive = v == "true";
+                ov.prefs.pane_border_inactive = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("pane_headers") {
-                self.prefs.pane_headers = v == "true";
+                ov.prefs.pane_headers = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("pane_gap") {
-                self.prefs.pane_gap = v;
+                ov.prefs.pane_gap = v;
             }
             // Files-sidebar folder history, keyed by host. A malformed or
             // stale blob is dropped rather than failing the boot: it is a
@@ -630,18 +630,18 @@ impl Oryxis {
                 ov.files_recent_folders = map;
             }
             if let Ok(Some(v)) = vault.get_setting("keyword_highlight") {
-                self.prefs.keyword_highlight = v == "true";
+                ov.prefs.keyword_highlight = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting(crate::highlight_rules::SETTING_KEY) {
-                self.prefs.highlight_rules = crate::highlight_rules::parse_setting(&v);
+                ov.prefs.highlight_rules = crate::highlight_rules::parse_setting(&v);
                 // Compiled here rather than lazily on the first frame:
                 // the first pane must be able to paint (and watch) from
                 // the moment it opens.
-                self.prefs.compiled_highlight_rules =
-                    crate::highlight_rules::compile(&self.prefs.highlight_rules).0;
+                ov.prefs.compiled_highlight_rules =
+                    crate::highlight_rules::compile(&ov.prefs.highlight_rules).0;
             }
             if let Ok(Some(v)) = vault.get_setting("command_history") {
-                self.prefs.command_history = v == "true";
+                ov.prefs.command_history = v == "true";
             }
             // The shell-integration key, minted on first boot and stable
             // afterwards (the user has it pasted into dotfiles on real
@@ -667,17 +667,17 @@ impl Oryxis {
             oryxis_terminal::osc::set_global_command_nonce(Some(nonce.clone()));
             self.shell_integration_nonce = nonce;
             if let Ok(Some(v)) = vault.get_setting("command_history_file") {
-                self.prefs.command_history_file = v == "true";
+                ov.prefs.command_history_file = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("snippet_tag_filter") {
-                self.prefs.snippet_tag_filter = v == "true";
+                ov.prefs.snippet_tag_filter = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("command_history_file_dir") {
-                self.prefs.command_history_file_dir =
+                self.device_prefs.command_history_file_dir =
                     (!v.trim().is_empty()).then(|| v.trim().to_string());
             }
             if let Ok(Some(v)) = vault.get_setting("zmodem_download_dir") {
-                self.prefs.zmodem_download_dir = v.trim().to_string();
+                self.device_prefs.zmodem_download_dir = v.trim().to_string();
             }
             // Performance mode. An explicit stored choice always wins. When
             // the key is absent (first boot on this machine) and the render
@@ -686,49 +686,49 @@ impl Oryxis {
             // can later turn off, and arm the explaining toast. Guarded so
             // it fires exactly once and never overrides a user who set it.
             match vault.get_setting("performance_mode") {
-                Ok(Some(v)) => self.prefs.performance_mode = v == "true",
+                Ok(Some(v)) => ov.prefs.performance_mode = v == "true",
                 _ => {
                     if crate::renderer_probe::probe_redirected() {
-                        self.prefs.performance_mode = true;
+                        ov.prefs.performance_mode = true;
                         self.pending_perf_mode_toast = true;
                         let _ = vault.set_setting("performance_mode", "true");
                     }
                 }
             }
             if let Ok(Some(v)) = vault.get_setting("perf_overlay") {
-                self.prefs.perf_overlay = v == "true";
+                self.device_prefs.perf_overlay = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("network_tools_enabled") {
-                self.prefs.network_tools = v == "true";
+                ov.prefs.network_tools = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("smart_contrast") {
-                self.prefs.smart_contrast = v == "true";
+                ov.prefs.smart_contrast = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_bell_mode") {
-                self.prefs.bell_mode = crate::util::BellMode::from_code(&v);
+                ov.prefs.bell_mode = crate::util::BellMode::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_clipboard_access") {
-                self.prefs.clipboard_access = crate::util::ClipboardAccess::from_code(&v);
+                ov.prefs.clipboard_access = crate::util::ClipboardAccess::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_notification") {
-                self.prefs.notification_mode = crate::util::NotificationMode::from_code(&v);
+                ov.prefs.notification_mode = crate::util::NotificationMode::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("smart_tabs") {
-                self.prefs.smart_tabs = v == "true";
+                ov.prefs.smart_tabs = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("smart_tabs_long_seconds")
                 && let Ok(n) = v.parse()
             {
-                self.prefs.smart_long_secs = n;
+                ov.prefs.smart_long_secs = n;
             }
             if let Ok(Some(v)) = vault.get_setting("confirm_close_session_tab") {
-                self.prefs.confirm_close_session_tab = v == "true";
+                ov.prefs.confirm_close_session_tab = v == "true";
             }
             // Apply the OSC 52 gate to the terminal backend (process-wide).
-            let (cw, cr) = self.prefs.clipboard_access.flags();
+            let (cw, cr) = ov.prefs.clipboard_access.flags();
             oryxis_terminal::set_clipboard_access(cw, cr);
             if let Ok(Some(v)) = vault.get_setting("show_status_bar") {
-                self.prefs.show_status_bar = v == "true";
+                ov.prefs.show_status_bar = v == "true";
             }
             for (key, field) in [
                 ("status_show_version", 0usize),
@@ -740,19 +740,19 @@ impl Oryxis {
                 if let Ok(Some(v)) = vault.get_setting(key) {
                     let on = v == "true";
                     match field {
-                        0 => self.prefs.status_show_version = on,
-                        1 => self.prefs.status_show_connection = on,
-                        2 => self.prefs.status_show_latency = on,
-                        3 => self.prefs.status_show_dimensions = on,
-                        _ => self.prefs.status_show_cwd = on,
+                        0 => ov.prefs.status_show_version = on,
+                        1 => ov.prefs.status_show_connection = on,
+                        2 => ov.prefs.status_show_latency = on,
+                        3 => ov.prefs.status_show_dimensions = on,
+                        _ => ov.prefs.status_show_cwd = on,
                     }
                 }
             }
             if let Ok(Some(v)) = vault.get_setting("status_bar_align_left") {
-                self.prefs.status_bar_align_left = v == "true";
+                ov.prefs.status_bar_align_left = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sidebar_tab_sides") {
-                self.prefs.sidebar_tab_sides = crate::state::AppPrefs::parse_sidebar_tab_sides(&v);
+                ov.prefs.sidebar_tab_sides = crate::state::AppPrefs::parse_sidebar_tab_sides(&v);
             } else if let Ok(Some(v)) = vault.get_setting("terminal_sidebar_side") {
                 // Pre-#102 whole-sidebar dock (issue #85): "left" moved
                 // every tab at once, so the migration moves every tab
@@ -762,50 +762,50 @@ impl Oryxis {
                 // location picker.
                 if v == "left" {
                     for tab in crate::state::TerminalSidebarTab::ALL {
-                        self.prefs
+                        ov.prefs
                             .sidebar_tab_sides
                             .insert(tab, crate::state::SidebarPlacement::Left);
                     }
                 }
             }
             if let Ok(Some(v)) = vault.get_setting("sidebar_auto_open") {
-                self.prefs.sidebar_auto_open = v == "true";
+                ov.prefs.sidebar_auto_open = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sidebar_default_tab") {
                 // Empty / "last" / any unknown code = keep the last opened
                 // tab (the default); a known code pins that tab.
-                self.prefs.sidebar_default_tab =
+                ov.prefs.sidebar_default_tab =
                     crate::state::TerminalSidebarTab::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("monitor_status_bar") {
-                self.prefs.monitor_status_bar = v == "true";
+                ov.prefs.monitor_status_bar = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("monitor_interval_seconds") {
-                self.prefs.monitor_interval = v;
+                ov.prefs.monitor_interval = v;
             }
             if let Ok(Some(v)) = vault.get_setting("monitor_dash_list_view") {
-                self.prefs.monitor_dash_list_view = v == "true";
+                ov.prefs.monitor_dash_list_view = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("host_view_mode") {
                 if let Some(mode) = crate::state::HostViewMode::from_code(&v) {
-                    self.prefs.host_view_mode = mode;
+                    ov.prefs.host_view_mode = mode;
                 }
             } else if let Ok(Some(v)) = vault.get_setting("host_list_view") {
                 // Pre-tree bool (grid/list). Read-only migration: the
                 // new key is only written when the user next cycles
                 // the view.
                 if v == "true" {
-                    self.prefs.host_view_mode = crate::state::HostViewMode::List;
+                    ov.prefs.host_view_mode = crate::state::HostViewMode::List;
                 }
             }
             if let Ok(Some(v)) = vault.get_setting("card_accent_glass") {
-                self.prefs.card_accent_glass = v == "true";
+                ov.prefs.card_accent_glass = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("show_host_address") {
-                self.prefs.show_host_address = v == "true";
+                ov.prefs.show_host_address = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("show_tab_host_address") {
-                self.prefs.show_tab_host_address = v == "true";
+                ov.prefs.show_tab_host_address = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("privacy_mode") {
                 self.privacy.mode = v == "true";
@@ -858,7 +858,7 @@ impl Oryxis {
                 // Normally already armed by main.rs before the tracing
                 // subscriber was built; retrying here covers an earlier
                 // failure so the toggle reflects the sink's real state.
-                self.prefs.debug_logging = crate::logging::is_enabled()
+                self.device_prefs.debug_logging = crate::logging::is_enabled()
                     || match crate::logging::enable() {
                         Ok(_) => true,
                         Err(e) => {
@@ -893,25 +893,25 @@ impl Oryxis {
                 Ok(Some(ref v)) if v == "true"
             );
             if let Ok(Some(v)) = vault.get_setting("close_to_tray") {
-                self.prefs.close_to_tray = v == "true";
+                self.device_prefs.close_to_tray = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("minimize_to_tray") {
-                self.prefs.minimize_to_tray = v == "true";
+                self.device_prefs.minimize_to_tray = v == "true";
             }
             // Mirror it down to the Win32 subclass proc that handles the
             // OS minimize verbs; it can't reach app state. Unconditional
             // (not inside the `if let`) so a vault without the row still
             // pushes the default.
-            crate::tray::set_minimize_to_tray(self.prefs.minimize_to_tray);
+            crate::tray::set_minimize_to_tray(self.device_prefs.minimize_to_tray);
             if let Ok(Some(v)) = vault.get_setting("tab_close_button_side")
                 && (v == "left" || v == "right")
             {
-                self.prefs.tab_close_button_side = v;
+                ov.prefs.tab_close_button_side = v;
             }
             if let Ok(Some(v)) = vault.get_setting("pinned_tab_style")
                 && (v == "compact" || v == "full")
             {
-                self.prefs.pinned_tab_style = v;
+                ov.prefs.pinned_tab_style = v;
             }
             // Ctrl+digit slots: the Home area tab used to own the first
             // one, so the Nth tab answered to Ctrl+N+1. New vaults are
@@ -926,54 +926,54 @@ impl Oryxis {
                 .flatten()
                 .is_none()
             {
-                self.prefs.tab_slot_includes_home = true;
+                ov.prefs.tab_slot_includes_home = true;
                 let _ = vault.set_setting("tab_slot_includes_home", "true");
                 let _ = vault.set_setting("tab_slots_home_migrated", "true");
             } else if let Ok(Some(v)) = vault.get_setting("tab_slot_includes_home") {
-                self.prefs.tab_slot_includes_home = v == "true";
+                ov.prefs.tab_slot_includes_home = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("duplicate_tab_position")
                 && (v == "next" || v == "end" || v == "start")
             {
-                self.prefs.duplicate_tab_position = v;
+                ov.prefs.duplicate_tab_position = v;
             }
             if let Ok(Some(v)) = vault.get_setting("tab_number_style")
                 && (v == "off" || v == "prefix" || v == "icon")
             {
-                self.prefs.tab_number_style = v;
+                ov.prefs.tab_number_style = v;
             }
             if let Ok(Some(v)) = vault.get_setting("restore_tabs_on_launch") {
-                self.prefs.restore_tabs_on_launch = v == "true";
+                ov.prefs.restore_tabs_on_launch = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("restore_tabs_connect")
                 && (v == "selected" || v == "launch")
             {
-                self.prefs.restore_tabs_connect = v;
+                ov.prefs.restore_tabs_connect = v;
             }
             if let Ok(Some(v)) = vault.get_setting("restore_last_active_tab") {
-                self.prefs.restore_last_active_tab = v == "true";
+                ov.prefs.restore_last_active_tab = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("show_tab_status_dot") {
-                self.prefs.show_tab_status_dot = v == "true";
+                ov.prefs.show_tab_status_dot = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("tab_accent_line") {
-                self.prefs.tab_accent_line = v == "true";
+                ov.prefs.tab_accent_line = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("tab_accent_wash") {
-                self.prefs.tab_accent_wash = v == "true";
+                ov.prefs.tab_accent_wash = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("tab_accent_text") {
-                self.prefs.tab_accent_text = v == "true";
+                ov.prefs.tab_accent_text = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("tab_accent_color")
                 && (v == "host" || v == "app")
             {
-                self.prefs.tab_accent_color = v;
+                ov.prefs.tab_accent_color = v;
             }
             if let Ok(Some(v)) = vault.get_setting("tab_fill_style")
                 && (v == "gradient" || v == "solid")
             {
-                self.prefs.tab_fill_style = v;
+                ov.prefs.tab_fill_style = v;
             }
             if let Ok(Some(v)) = vault.get_setting("tab_bar_position")
                 && (v == "top" || v == "bottom" || v == "left" || v == "right")
@@ -981,7 +981,7 @@ impl Oryxis {
                 crate::views::tab_bar::set_tab_bar_pos(
                     crate::views::tab_bar::TabBarPos::from_setting(&v),
                 );
-                self.prefs.tab_bar_position = v;
+                ov.prefs.tab_bar_position = v;
             }
             if let Ok(Some(v)) = vault.get_setting("inactive_tab_style")
                 && (v == "none" || v == "border" || v == "underline")
@@ -989,45 +989,45 @@ impl Oryxis {
                 crate::views::tab_bar::set_inactive_tab_style(
                     crate::views::tab_bar::InactiveTabStyle::from_setting(&v),
                 );
-                self.prefs.inactive_tab_style = v;
+                ov.prefs.inactive_tab_style = v;
             }
             if let Ok(Some(v)) = vault.get_setting("tab_width_mode")
                 && (v == "adaptive" || v == "uniform")
             {
-                self.prefs.tab_width_mode = v;
+                ov.prefs.tab_width_mode = v;
             }
             if let Ok(Some(v)) = vault.get_setting("tab_uniform_size") {
-                self.prefs.tab_uniform_size = v;
+                ov.prefs.tab_uniform_size = v;
             }
             if let Ok(Some(v)) = vault.get_setting("pinned_tabs_top_bar") {
-                self.prefs.pinned_tabs_top_bar = v == "true";
+                ov.prefs.pinned_tabs_top_bar = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("side_hide_top_bar") {
-                self.prefs.side_hide_top_bar = v == "true";
+                ov.prefs.side_hide_top_bar = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("side_full_height") {
-                self.prefs.side_full_height = v == "true";
+                ov.prefs.side_full_height = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_enabled") {
                 self.sftp_enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("host_monitoring_enabled") {
-                self.prefs.host_monitoring = v == "true";
+                ov.prefs.host_monitoring = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("host_monitoring_seeded") {
-                self.prefs.host_monitoring_seeded = v == "true";
+                ov.prefs.host_monitoring_seeded = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("monitor_all_hosts") {
-                self.prefs.monitor_all_hosts = v == "true";
+                ov.prefs.monitor_all_hosts = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("monitor_dash_live_only") {
-                self.prefs.monitor_dash_live_only = v == "true";
+                ov.prefs.monitor_dash_live_only = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("tmux_manager_enabled") {
-                self.prefs.tmux_manager = v == "true";
+                ov.prefs.tmux_manager = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("ssh_connection_reuse") {
-                self.prefs.ssh_connection_reuse = v == "true";
+                ov.prefs.ssh_connection_reuse = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sync_folder_path") {
                 self.sync.folder.path = v;
@@ -1072,16 +1072,16 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("nav_orientation")
                 && (v == "horizontal" || v == "vertical")
             {
-                self.prefs.nav_orientation = v;
+                ov.prefs.nav_orientation = v;
             } else if let Ok(Some(v)) = vault.get_setting("layout_mode") {
-                self.prefs.nav_orientation = if v == "classic" {
+                ov.prefs.nav_orientation = if v == "classic" {
                     "vertical".into()
                 } else {
                     "horizontal".into()
                 };
             }
             if let Ok(Some(v)) = vault.get_setting("nav_rail_expanded") {
-                self.prefs.nav_rail_expanded = v == "true";
+                ov.prefs.nav_rail_expanded = v == "true";
             }
         }
     }
@@ -1089,7 +1089,8 @@ impl Oryxis {
     /// Hotkey overrides (with factory-conflict resolution) and the
     /// new-connection defaults, including the one-shot setting migrations.
     fn load_vault_hotkeys_and_defaults(&mut self) {
-        if let Some(vault) = &self.vaults.cur().store {
+        let ov = self.vaults.cur_mut();
+        if let Some(vault) = &ov.store {
             // Hotkey overrides: each action persists under
             // `hotkey_<id>` with the canonical serialized form, chords
             // space-separated (`"ctrl+shift+v shift+ins"`). Defaults
@@ -1150,7 +1151,7 @@ impl Oryxis {
             // load earlier in the boot sequence (`load_data_from_vault`
             // order), so the list is already populated.
             user_chords.extend(
-                self.vaults.cur().snippets
+                ov.snippets
                     .iter()
                     .filter_map(|sn| sn.hotkey.as_deref())
                     .filter_map(crate::hotkeys::HotkeyBinding::parse)
@@ -1260,7 +1261,7 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("default_host_icon")
                 && matches!(v.as_str(), "circular" | "square" | "rounded" | "outline" | "initials")
             {
-                self.prefs.default_host_icon = v;
+                ov.prefs.default_host_icon = v;
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_font_size")
                 && let Ok(parsed) = v.parse::<f32>()
@@ -1295,53 +1296,53 @@ impl Oryxis {
                     crate::fonts::TerminalFontWeight::from_setting(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("keepalive_interval") {
-                self.prefs.keepalive_interval = v;
+                ov.prefs.keepalive_interval = v;
             }
             if let Ok(Some(v)) = vault.get_setting("ssh_session_timeout") {
-                self.prefs.ssh_session_timeout = v;
+                ov.prefs.ssh_session_timeout = v;
             }
             // New-connection defaults (pre-filled into a fresh host form).
             if let Ok(Some(v)) = vault.get_setting("default_agent_forwarding") {
-                self.prefs.default_agent_forwarding = v == "true";
+                ov.prefs.default_agent_forwarding = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("default_port") {
-                self.prefs.default_port = v;
+                ov.prefs.default_port = v;
             }
             if let Ok(Some(v)) = vault.get_setting("default_keepalive") {
-                self.prefs.default_keepalive = v;
+                ov.prefs.default_keepalive = v;
             }
             if let Ok(Some(v)) = vault.get_setting("default_terminal_type") {
-                self.prefs.default_terminal_type = v;
+                ov.prefs.default_terminal_type = v;
             }
             if let Ok(Some(v)) = vault.get_setting("default_username") {
-                self.prefs.default_username = v;
+                ov.prefs.default_username = v;
             }
             if let Ok(Some(v)) = vault.get_setting("default_auth_method") {
-                self.prefs.default_auth_method = crate::util::auth_method_from_setting(&v);
+                ov.prefs.default_auth_method = crate::util::auth_method_from_setting(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("default_identity_id") {
-                self.prefs.default_identity_id = uuid::Uuid::parse_str(&v).ok();
+                ov.prefs.default_identity_id = uuid::Uuid::parse_str(&v).ok();
             }
             if let Ok(Some(v)) = vault.get_setting("default_key_id") {
-                self.prefs.default_key_id = uuid::Uuid::parse_str(&v).ok();
+                ov.prefs.default_key_id = uuid::Uuid::parse_str(&v).ok();
             }
             if let Ok(Some(v)) = vault.get_setting("default_group_id") {
-                self.prefs.default_group_id = uuid::Uuid::parse_str(&v).ok();
+                ov.prefs.default_group_id = uuid::Uuid::parse_str(&v).ok();
             }
             if let Ok(Some(v)) = vault.get_setting("default_proxy_identity_id") {
-                self.prefs.default_proxy_identity_id = uuid::Uuid::parse_str(&v).ok();
+                ov.prefs.default_proxy_identity_id = uuid::Uuid::parse_str(&v).ok();
             }
             if let Ok(Some(v)) = vault.get_setting("default_mcp_enabled") {
-                self.prefs.default_mcp_enabled = v == "true";
+                ov.prefs.default_mcp_enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("default_encoding") {
-                self.prefs.default_encoding = if v.is_empty() { None } else { Some(v) };
+                ov.prefs.default_encoding = if v.is_empty() { None } else { Some(v) };
             }
             if let Ok(Some(v)) = vault.get_setting("default_env_vars") {
-                self.prefs.default_env_vars = crate::util::env_vars_from_setting(&v);
+                ov.prefs.default_env_vars = crate::util::env_vars_from_setting(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("defaults_collapsed") {
-                self.prefs.defaults_collapsed = v == "true";
+                ov.prefs.defaults_collapsed = v == "true";
             }
             // One-shot migration: 30s is the new default in this version,
             // up from the previous "0" (off). Users sitting at the old
@@ -1351,112 +1352,112 @@ impl Oryxis {
             // this idempotent so a user who reverts to 0 after the
             // migration isn't bumped again on next boot.
             if let Ok(None) = vault.get_setting("keepalive_default_v2_applied") {
-                if self.prefs.keepalive_interval == "0"
-                    || self.prefs.keepalive_interval.is_empty()
+                if ov.prefs.keepalive_interval == "0"
+                    || ov.prefs.keepalive_interval.is_empty()
                 {
-                    self.prefs.keepalive_interval = "30".into();
+                    ov.prefs.keepalive_interval = "30".into();
                     let _ = vault.set_setting("keepalive_interval", "30");
                 }
                 let _ = vault.set_setting("keepalive_default_v2_applied", "true");
             }
             if let Ok(Some(v)) = vault.get_setting("scrollback_rows") {
-                self.prefs.scrollback_rows = v;
+                ov.prefs.scrollback_rows = v;
             }
             oryxis_terminal::set_default_scrollback(
-                crate::dispatch_settings::resolve_scrollback_rows(&self.prefs.scrollback_rows),
+                crate::dispatch_settings::resolve_scrollback_rows(&ov.prefs.scrollback_rows),
             );
             if let Ok(Some(v)) = vault.get_setting("word_delimiters") {
-                self.prefs.word_delimiters = v;
+                ov.prefs.word_delimiters = v;
             }
             if let Ok(Some(v)) = vault.get_setting("terminal_hint_mode") {
-                self.prefs.hint_mode = crate::util::HintMode::from_code(&v);
+                ov.prefs.hint_mode = crate::util::HintMode::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("pane_end_action") {
-                self.prefs.pane_end_action = crate::util::PaneEndAction::from_code(&v);
+                ov.prefs.pane_end_action = crate::util::PaneEndAction::from_code(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("cloud_auto_refresh_enabled") {
-                self.prefs.cloud_auto_refresh_enabled = v == "true";
+                ov.prefs.cloud_auto_refresh_enabled = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("cloud_auto_refresh_interval_minutes") {
-                self.prefs.cloud_auto_refresh_interval_minutes = v;
+                ov.prefs.cloud_auto_refresh_interval_minutes = v;
             }
             if let Ok(Some(v)) = vault.get_setting("cloud_auto_archive_orphans") {
-                self.prefs.cloud_auto_archive_orphans = v == "true";
+                ov.prefs.cloud_auto_archive_orphans = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("cloud_orphan_archive_days") {
-                self.prefs.cloud_orphan_archive_days = v;
+                ov.prefs.cloud_orphan_archive_days = v;
             }
             if let Ok(Some(v)) = vault.get_setting("auto_reconnect") {
-                self.prefs.auto_reconnect = v == "true";
+                ov.prefs.auto_reconnect = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("max_reconnect_attempts") {
-                self.prefs.max_reconnect_attempts = v;
+                ov.prefs.max_reconnect_attempts = v;
             }
             if let Ok(Some(v)) = vault.get_setting("auto_lock_minutes") {
-                self.prefs.auto_lock_minutes = v;
+                ov.prefs.auto_lock_minutes = v;
             }
             // Unknown tokens fall back to "ask" so a corrupted row can't
             // silently make the Lock button skip its confirm.
             if let Ok(Some(v)) = vault.get_setting("manual_lock_action") {
-                self.prefs.manual_lock_action = match v.as_str() {
+                ov.prefs.manual_lock_action = match v.as_str() {
                     "sleep" | "lock" => v,
                     _ => "ask".into(),
                 };
             }
             if let Ok(Some(v)) = vault.get_setting("biometric_unlock_enabled") {
-                self.prefs.biometric_unlock_enabled = v == "true";
+                ov.prefs.biometric_unlock_enabled = v == "true";
             }
             // Availability is probed once at boot (pre-unlock, provider
             // level) and stays stable for the session, so no re-probe here.
             if let Ok(Some(v)) = vault.get_setting("os_detection") {
-                self.prefs.os_detection = v == "true";
+                ov.prefs.os_detection = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("session_logging") {
-                self.prefs.session_logging = v == "true";
+                ov.prefs.session_logging = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("session_log_full") {
-                self.prefs.session_log_full = v == "true";
+                ov.prefs.session_log_full = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("session_log_compress") {
-                self.prefs.session_log_compress = v == "true";
+                ov.prefs.session_log_compress = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("session_log_file") {
-                self.prefs.session_log_file = v == "true";
+                ov.prefs.session_log_file = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("session_log_file_dir") {
-                self.prefs.session_log_file_dir =
+                self.device_prefs.session_log_file_dir =
                     (!v.trim().is_empty()).then(|| v.trim().to_string());
             }
             if let Ok(Some(v)) = vault.get_setting("snippet_output_dir") {
-                self.prefs.snippet_output_dir =
+                self.device_prefs.snippet_output_dir =
                     (!v.trim().is_empty()).then(|| v.trim().to_string());
             }
             if let Ok(Some(v)) = vault.get_setting("connection_history") {
-                self.prefs.connection_history = v == "true";
+                ov.prefs.connection_history = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("logs_retention") {
-                self.prefs.logs_retention = v;
+                ov.prefs.logs_retention = v;
             }
             if let Ok(Some(v)) = vault.get_setting("session_log_max_bytes") {
                 // Anything unparseable reads as "no cap", the same
                 // permissive answer a missing row gives: a bad value
                 // must not silently start deleting recordings.
-                self.prefs.session_log_max_bytes = v.parse::<u64>().ok().filter(|n| *n > 0);
+                ov.prefs.session_log_max_bytes = v.parse::<u64>().ok().filter(|n| *n > 0);
             }
             if let Ok(Some(v)) = vault.get_setting("auto_check_updates") {
-                self.prefs.auto_check_updates = v == "true";
+                self.device_prefs.auto_check_updates = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("update_channel") {
-                self.prefs.update_channel = crate::update::UpdateChannel::from_setting(&v);
+                self.device_prefs.update_channel = crate::update::UpdateChannel::from_setting(&v);
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_concurrency") {
-                self.prefs.sftp_concurrency = v;
+                ov.prefs.sftp_concurrency = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_upload_temp_name") {
-                self.prefs.sftp_upload_temp_name = v == "true";
+                ov.prefs.sftp_upload_temp_name = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_ask_download_dir") {
-                self.prefs.sftp_ask_download_dir = v == "true";
+                ov.prefs.sftp_ask_download_dir = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_console_layout")
                 && let Some(layout) = crate::state::SftpConsoleLayout::from_code(&v)
@@ -1464,37 +1465,37 @@ impl Oryxis {
                 // An unknown code keeps the default placement: a stored
                 // value nobody can read must not decide where a console
                 // lands.
-                self.prefs.sftp_console_layout = layout;
+                ov.prefs.sftp_console_layout = layout;
             }
             // Same rule for the two double-click actions: a code this
             // build cannot read leaves FileZilla's default in place.
             if let Ok(Some(v)) = vault.get_setting("sftp_dir_double_click")
                 && let Some(action) = crate::state::SftpDirDoubleClick::from_code(&v)
             {
-                self.prefs.sftp_dir_double_click = action;
+                ov.prefs.sftp_dir_double_click = action;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_file_double_click")
                 && let Some(action) = crate::state::SftpFileDoubleClick::from_code(&v)
             {
-                self.prefs.sftp_file_double_click = action;
+                ov.prefs.sftp_file_double_click = action;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_default_editor") {
-                self.prefs.sftp_default_editor = v;
+                self.device_prefs.sftp_default_editor = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_edit_autosave") {
-                self.prefs.sftp_edit_autosave = v == "true";
+                ov.prefs.sftp_edit_autosave = v == "true";
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_connect_timeout") {
-                self.prefs.sftp_connect_timeout = v;
+                ov.prefs.sftp_connect_timeout = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_auth_timeout") {
-                self.prefs.sftp_auth_timeout = v;
+                ov.prefs.sftp_auth_timeout = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_session_timeout") {
-                self.prefs.sftp_session_timeout = v;
+                ov.prefs.sftp_session_timeout = v;
             }
             if let Ok(Some(v)) = vault.get_setting("sftp_op_timeout") {
-                self.prefs.sftp_op_timeout = v;
+                ov.prefs.sftp_op_timeout = v;
             }
         }
     }

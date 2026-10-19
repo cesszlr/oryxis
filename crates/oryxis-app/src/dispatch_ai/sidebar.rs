@@ -30,8 +30,8 @@ impl Oryxis {
                     // default docked to the other region) keeps the
                     // remembered tab, which `sidebar_region_tab` already
                     // re-resolves against the region's gates per frame.
-                    if let Some(default) = self.prefs.sidebar_default_tab
-                        && self.prefs.sidebar_tab_side(default) == Some(side)
+                    if let Some(default) = self.vaults.cur().prefs.sidebar_default_tab
+                        && self.vaults.cur().prefs.sidebar_tab_side(default) == Some(side)
                         && self.sidebar_tab_available(default)
                     {
                         self.set_sidebar_region_tab(default);
@@ -58,7 +58,7 @@ impl Oryxis {
                     // live chat work so it doesn't keep executing commands
                     // in the background. Only when Chat lived here: closing
                     // the other region must not kill a visible chat.
-                    if self.prefs.sidebar_tab_side(crate::state::TerminalSidebarTab::Chat)
+                    if self.vaults.cur().prefs.sidebar_tab_side(crate::state::TerminalSidebarTab::Chat)
                         == Some(side)
                     {
                         self.abort_active_chat_task();
@@ -75,7 +75,7 @@ impl Oryxis {
                     if self
                         .keynav
                         .sidebar_selected
-                        .is_some_and(|(t, _)| self.prefs.sidebar_tab_side(t) == Some(side))
+                        .is_some_and(|(t, _)| self.vaults.cur().prefs.sidebar_tab_side(t) == Some(side))
                     {
                         self.keynav.sidebar_selected = None;
                     }
@@ -95,7 +95,7 @@ impl Oryxis {
                 // its next Enter/Esc.
                 let host_config = crate::state::TerminalSidebarTab::HostConfig;
                 if tab != host_config
-                    && let Some(region) = self.prefs.sidebar_tab_side(tab)
+                    && let Some(region) = self.vaults.cur().prefs.sidebar_tab_side(tab)
                     && self.sidebar_region_tab(region) == Some(host_config)
                 {
                     self.keynav.pick_open = false;

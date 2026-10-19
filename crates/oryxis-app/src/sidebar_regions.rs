@@ -51,8 +51,8 @@ impl Oryxis {
         match tab {
             TerminalSidebarTab::Chat => self.ai.enabled,
             TerminalSidebarTab::Files => self.sftp_enabled,
-            TerminalSidebarTab::Monitor => self.prefs.host_monitoring,
-            TerminalSidebarTab::Tmux => self.prefs.tmux_manager,
+            TerminalSidebarTab::Monitor => self.vaults.cur().prefs.host_monitoring,
+            TerminalSidebarTab::Tmux => self.vaults.cur().prefs.tmux_manager,
             TerminalSidebarTab::Snippets
             | TerminalSidebarTab::History
             | TerminalSidebarTab::HostConfig
@@ -131,12 +131,12 @@ impl Oryxis {
     pub(crate) fn sidebar_auto_open_side(&self) -> Option<SidebarSide> {
         let possible = |side: SidebarSide| {
             TerminalSidebarTab::ALL.into_iter().any(|t| {
-                self.prefs.sidebar_tab_side(t) == Some(side) && self.sidebar_tab_possible(t)
+                self.vaults.cur().prefs.sidebar_tab_side(t) == Some(side) && self.sidebar_tab_possible(t)
             })
         };
-        self.prefs
+        self.vaults.cur().prefs
             .sidebar_default_tab
-            .and_then(|t| self.prefs.sidebar_tab_side(t))
+            .and_then(|t| self.vaults.cur().prefs.sidebar_tab_side(t))
             .filter(|s| possible(*s))
             .or_else(|| [SidebarSide::Right, SidebarSide::Left].into_iter().find(|s| possible(*s)))
     }
@@ -147,7 +147,7 @@ impl Oryxis {
         TerminalSidebarTab::ALL
             .into_iter()
             .filter(|t| {
-                self.prefs.sidebar_tab_side(*t) == Some(side) && self.sidebar_tab_available(*t)
+                self.vaults.cur().prefs.sidebar_tab_side(*t) == Some(side) && self.sidebar_tab_available(*t)
             })
             .collect()
     }
@@ -157,7 +157,7 @@ impl Oryxis {
     pub(crate) fn sidebar_region_has_tabs(&self, side: SidebarSide) -> bool {
         TerminalSidebarTab::ALL
             .into_iter()
-            .any(|t| self.prefs.sidebar_tab_side(t) == Some(side) && self.sidebar_tab_available(t))
+            .any(|t| self.vaults.cur().prefs.sidebar_tab_side(t) == Some(side) && self.sidebar_tab_available(t))
     }
 
     /// The tab a region shows: the remembered active tab when it still
@@ -165,7 +165,7 @@ impl Oryxis {
     /// first offer, else `None` (empty region, nothing renders).
     pub(crate) fn sidebar_region_tab(&self, side: SidebarSide) -> Option<TerminalSidebarTab> {
         let want = self.terminal_sidebar_tab[side.idx()];
-        if self.prefs.sidebar_tab_side(want) == Some(side) && self.sidebar_tab_available(want) {
+        if self.vaults.cur().prefs.sidebar_tab_side(want) == Some(side) && self.sidebar_tab_available(want) {
             return Some(want);
         }
         self.sidebar_region_tabs(side).into_iter().next()
@@ -204,7 +204,7 @@ impl Oryxis {
     /// The "should I refresh what this tab shows" gate (History
     /// follows the focused pane, etc.). Hidden tabs are never shown.
     pub(crate) fn sidebar_tab_shown(&self, tab: TerminalSidebarTab) -> bool {
-        let Some(side) = self.prefs.sidebar_tab_side(tab) else {
+        let Some(side) = self.vaults.cur().prefs.sidebar_tab_side(tab) else {
             return false;
         };
         self.active_sidebar_shown(side) && self.sidebar_region_tab(side) == Some(tab)
@@ -214,7 +214,7 @@ impl Oryxis {
     /// looked up, never passed, so a caller can't desync them). A
     /// hidden tab has no region, so it is never remembered as active.
     pub(crate) fn set_sidebar_region_tab(&mut self, tab: TerminalSidebarTab) {
-        if let Some(side) = self.prefs.sidebar_tab_side(tab) {
+        if let Some(side) = self.vaults.cur().prefs.sidebar_tab_side(tab) {
             self.terminal_sidebar_tab[side.idx()] = tab;
         }
     }

@@ -218,24 +218,24 @@ impl Oryxis {
                 .with_font_name(&self.terminal_font_name)
                 .with_font_weight(self.terminal_font_weight.font_weight())
                 .with_text_dilation(self.terminal_text_thickness.px())
-                .with_copy_on_select(self.prefs.copy_on_select)
-                .with_right_click_copy(self.prefs.right_click_copy)
+                .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
+                .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
                 // Same right-click scheme as a live pane. Without it the
                 // replay fell back to the widget default, so a user who
                 // had picked "paste" or "extend selection" got a
                 // different gesture here than everywhere else.
-                .with_right_click_action(self.prefs.terminal_right_click.to_widget())
-                .with_bold_is_bright(self.prefs.bold_is_bright)
-                .with_keyword_highlight(self.prefs.keyword_highlight)
+                .with_right_click_action(self.vaults.cur().prefs.terminal_right_click.to_widget())
+                .with_bold_is_bright(self.vaults.cur().prefs.bold_is_bright)
+                .with_keyword_highlight(self.vaults.cur().prefs.keyword_highlight)
                 // Same as the history viewer: the replay is painted by
                 // the rules, never watched by them.
-                .with_highlight_rules(self.prefs.compiled_highlight_rules.clone())
-                .with_performance(self.prefs.performance_mode)
+                .with_highlight_rules(self.vaults.cur().prefs.compiled_highlight_rules.clone())
+                .with_performance(self.vaults.cur().prefs.performance_mode)
                 .with_privacy(mask)
                 .with_privacy_terms(&self.privacy_terms())
                 .with_privacy_classes(self.privacy_classes())
-                .with_smart_contrast(self.prefs.smart_contrast)
-                .with_word_delimiters(&self.prefs.word_delimiters)
+                .with_smart_contrast(self.vaults.cur().prefs.smart_contrast)
+                .with_word_delimiters(&self.vaults.cur().prefs.word_delimiters)
                 // A link in a replay is remote text like a link in a live
                 // pane, so it takes the same confirmation on the way out
                 // instead of the widget's own opener.

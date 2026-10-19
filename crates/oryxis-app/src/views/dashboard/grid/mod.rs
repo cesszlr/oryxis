@@ -530,7 +530,7 @@ impl Oryxis {
     /// Every selection verb reads the hosts through this, so a batch
     /// acts on exactly the rows the user can see and pick.
     pub(crate) fn dashboard_visible_host_order(&self) -> Vec<usize> {
-        if self.prefs.host_view_mode == crate::state::HostViewMode::Tree {
+        if self.vaults.cur().prefs.host_view_mode == crate::state::HostViewMode::Tree {
             self.dashboard_tree_host_order()
         } else {
             self.dashboard_host_order()
@@ -740,7 +740,7 @@ impl Oryxis {
         // Tree mode builds its own depth-aware walk (grid/tree.rs);
         // the flat collectors stay empty so nothing below double
         // renders.
-        let tree_mode = self.prefs.host_view_mode == crate::state::HostViewMode::Tree;
+        let tree_mode = self.vaults.cur().prefs.host_view_mode == crate::state::HostViewMode::Tree;
         let (group_cards, host_cards) = if tree_mode {
             (Vec::new(), Vec::new())
         } else {
@@ -765,7 +765,7 @@ impl Oryxis {
             .max(0.0);
         // List and tree modes force a single column; otherwise the
         // grid reflows responsively to the available width.
-        let cols = if self.prefs.host_view_mode == crate::state::HostViewMode::Grid {
+        let cols = if self.vaults.cur().prefs.host_view_mode == crate::state::HostViewMode::Grid {
             card_grid_columns(available, CARD_WIDTH, 12.0)
         } else {
             1
@@ -819,7 +819,7 @@ impl Oryxis {
         // Per the `card_accent_glass` setting: glass on → each card gets
         // the soft per-colour wash; off → cards stay pure (just the
         // element, no overlay).
-        let glass = self.prefs.card_accent_glass;
+        let glass = self.vaults.cur().prefs.card_accent_glass;
         let selected = match self.kn().selected_in(crate::keynav::FocusZone::Content) {
             Some(crate::keynav::NavItem::Dash(d)) => Some(d),
             _ => None,
@@ -829,7 +829,7 @@ impl Oryxis {
         // rounded cards with a small gap. Grid mode keeps the roomier
         // 12px gutters. Tree mode is dense on purpose - a hairline gap
         // keeps its indent guide lines reading as near-continuous.
-        let gap = match self.prefs.host_view_mode {
+        let gap = match self.vaults.cur().prefs.host_view_mode {
             crate::state::HostViewMode::Grid => 12.0,
             crate::state::HostViewMode::List => 8.0,
             crate::state::HostViewMode::Tree => 2.0,

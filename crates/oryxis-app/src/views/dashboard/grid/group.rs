@@ -242,7 +242,7 @@ impl Oryxis {
                 // manual-folder card above.
                 let host_style = crate::widgets::resolve_host_icon_style(
                     None,
-                    &self.prefs.default_host_icon,
+                    &self.vaults.cur().prefs.default_host_icon,
                 );
                 let icon_box = crate::widgets::host_icon(
                     host_style,
@@ -449,7 +449,7 @@ impl Oryxis {
                     });
                 let host_style = crate::widgets::resolve_host_icon_style(
                     None,
-                    &self.prefs.default_host_icon,
+                    &self.vaults.cur().prefs.default_host_icon,
                 );
                 let icon_box = crate::widgets::host_icon(
                     host_style,
@@ -607,7 +607,7 @@ impl Oryxis {
         // Initials) the user picked in Settings -> Interface.
         let host_style = crate::widgets::resolve_host_icon_style(
             None,
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         let icon_box = crate::widgets::host_icon(
             host_style,

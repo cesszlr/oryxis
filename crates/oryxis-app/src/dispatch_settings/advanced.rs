@@ -51,10 +51,10 @@ impl Oryxis {
             SettingsMessage::SettingRendererBackendChanged(mode) => {
                 // No-op if the pick didn't change (re-selecting the same
                 // option shouldn't nag about a restart).
-                if mode == self.prefs.renderer_backend {
+                if mode == self.device_prefs.renderer_backend {
                     return Ok(Task::none());
                 }
-                self.prefs.renderer_backend = mode.clone();
+                self.device_prefs.renderer_backend = mode.clone();
                 self.persist_setting("renderer_backend", &mode);
                 // The backend is read once at process start, so the change
                 // only takes effect on the next launch. Offer to restart
@@ -89,16 +89,16 @@ impl Oryxis {
                     self.set_toast(crate::i18n::t("debug_logging_forced").to_string());
                     return Ok(toast_clear_task());
                 }
-                if self.prefs.debug_logging {
+                if self.device_prefs.debug_logging {
                     // Emitted before the sink closes so the file records
                     // its own switch-off.
                     tracing::info!("debug logging disabled from Settings");
                     crate::logging::disable();
-                    self.prefs.debug_logging = false;
+                    self.device_prefs.debug_logging = false;
                 } else {
                     match crate::logging::enable() {
                         Ok(path) => {
-                            self.prefs.debug_logging = true;
+                            self.device_prefs.debug_logging = true;
                             tracing::info!("debug logging enabled -> {}", path.display());
                         }
                         Err(e) => {
@@ -113,7 +113,7 @@ impl Oryxis {
                 }
                 self.persist_setting(
                     "debug_logging",
-                    if self.prefs.debug_logging { "true" } else { "false" },
+                    if self.device_prefs.debug_logging { "true" } else { "false" },
                 );
             }
             SettingsMessage::DownloadMirrorPicked(which) => {
@@ -168,7 +168,7 @@ impl Oryxis {
                 use crate::net_mirror::MirrorChoice;
                 // The block is hidden while offline mode is on; a stale
                 // keyboard row still lands here, and answers in place.
-                if self.prefs.offline_mode {
+                if self.device_prefs.offline_mode {
                     self.download_mirror.test_result =
                         Some(Err(crate::i18n::t("offline_mode").to_string()));
                     return Ok(Task::none());

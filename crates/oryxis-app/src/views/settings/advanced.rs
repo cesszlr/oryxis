@@ -22,7 +22,7 @@ impl Oryxis {
         let debug_col = column![
             self.nav_toggle_row(
                 t("debug_logging"),
-                self.prefs.debug_logging || forced,
+                self.device_prefs.debug_logging || forced,
                 Message::Settings(SettingsMessage::SettingToggleDebugLogging),
             ),
             Space::new().height(4),
@@ -55,7 +55,7 @@ impl Oryxis {
             Space::new().height(16),
             self.nav_toggle_row(
                 t("perf_overlay"),
-                self.prefs.perf_overlay,
+                self.device_prefs.perf_overlay,
                 Message::Settings(SettingsMessage::SettingTogglePerfOverlay),
             ),
             Space::new().height(4),
@@ -143,14 +143,14 @@ impl Oryxis {
         let mut rows = column![
             self.nav_toggle_row(
                 t("offline_mode"),
-                self.prefs.offline_mode,
+                self.device_prefs.offline_mode,
                 Message::Settings(SettingsMessage::SettingToggleOfflineMode),
             ),
             Space::new().height(4),
             text(t("offline_mode_desc")).size(11).color(OryxisColors::t().text_muted),
             Space::new().height(16),
         ];
-        if self.prefs.offline_mode {
+        if self.device_prefs.offline_mode {
             rows = rows.push(
                 text(t("offline_mode_mirror_superseded"))
                     .size(11)

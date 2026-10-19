@@ -19,7 +19,7 @@ impl Oryxis {
     pub(crate) fn highlight_rules_section(&self) -> Element<'_, Message> {
         panel_section(self.highlight_rules_block(
             RuleScope::Global,
-            &self.prefs.highlight_rules,
+            &self.vaults.cur().prefs.highlight_rules,
         ))
     }
 

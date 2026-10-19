@@ -12,67 +12,67 @@ impl Oryxis {
     ) -> Result<Task<Message>, SettingsMessage> {
         match message {
             SettingsMessage::ToggleDefaultAgentForwarding => {
-                self.prefs.default_agent_forwarding = !self.prefs.default_agent_forwarding;
+                self.vaults.cur_mut().prefs.default_agent_forwarding = !self.vaults.cur_mut().prefs.default_agent_forwarding;
                 self.persist_setting(
                     "default_agent_forwarding",
-                    if self.prefs.default_agent_forwarding { "true" } else { "false" },
+                    if self.vaults.cur().prefs.default_agent_forwarding { "true" } else { "false" },
                 );
             }
             SettingsMessage::DefaultPortChanged(val) => {
-                self.prefs.default_port = sanitize_uint(&val, 65_535);
-                self.persist_setting("default_port", &self.prefs.default_port);
+                self.vaults.cur_mut().prefs.default_port = sanitize_uint(&val, 65_535);
+                self.persist_setting("default_port", &self.vaults.cur().prefs.default_port);
             }
             SettingsMessage::DefaultKeepaliveChanged(val) => {
                 // Empty stays empty (= inherit the global keepalive); otherwise
                 // digits capped at 1 day.
-                self.prefs.default_keepalive = if val.trim().is_empty() {
+                self.vaults.cur_mut().prefs.default_keepalive = if val.trim().is_empty() {
                     String::new()
                 } else {
                     sanitize_uint(&val, 86_400)
                 };
-                self.persist_setting("default_keepalive", &self.prefs.default_keepalive);
+                self.persist_setting("default_keepalive", &self.vaults.cur().prefs.default_keepalive);
             }
             SettingsMessage::DefaultTerminalTypeChanged(val) => {
-                self.prefs.default_terminal_type = val;
-                self.persist_setting("default_terminal_type", &self.prefs.default_terminal_type);
+                self.vaults.cur_mut().prefs.default_terminal_type = val;
+                self.persist_setting("default_terminal_type", &self.vaults.cur().prefs.default_terminal_type);
             }
             SettingsMessage::DefaultUsernameChanged(val) => {
-                self.prefs.default_username = val;
-                self.persist_setting("default_username", &self.prefs.default_username);
+                self.vaults.cur_mut().prefs.default_username = val;
+                self.persist_setting("default_username", &self.vaults.cur().prefs.default_username);
             }
             SettingsMessage::DefaultAuthMethodChanged(val) => {
-                self.prefs.default_auth_method = crate::util::auth_method_from_label(&val);
+                self.vaults.cur_mut().prefs.default_auth_method = crate::util::auth_method_from_label(&val);
                 self.persist_setting(
                     "default_auth_method",
-                    &crate::util::auth_method_to_setting(&self.prefs.default_auth_method),
+                    &crate::util::auth_method_to_setting(&self.vaults.cur().prefs.default_auth_method),
                 );
             }
             SettingsMessage::DefaultIdentityChanged(val) => {
                 // The picker emits a saved identity's label or the localized
                 // "(none)" sentinel; map back to the stable UUID.
-                self.prefs.default_identity_id = if val == crate::i18n::t("new_default_none") {
+                self.vaults.cur_mut().prefs.default_identity_id = if val == crate::i18n::t("new_default_none") {
                     None
                 } else {
                     self.vaults.cur().identities.iter().find(|i| i.label == val).map(|i| i.id)
                 };
                 self.persist_setting(
                     "default_identity_id",
-                    &self.prefs.default_identity_id.map(|id| id.to_string()).unwrap_or_default(),
+                    &self.vaults.cur().prefs.default_identity_id.map(|id| id.to_string()).unwrap_or_default(),
                 );
             }
             SettingsMessage::DefaultKeyChanged(val) => {
-                self.prefs.default_key_id = if val == crate::i18n::t("new_default_none") {
+                self.vaults.cur_mut().prefs.default_key_id = if val == crate::i18n::t("new_default_none") {
                     None
                 } else {
                     self.vaults.cur().keys.iter().find(|k| k.label == val).map(|k| k.id)
                 };
                 self.persist_setting(
                     "default_key_id",
-                    &self.prefs.default_key_id.map(|id| id.to_string()).unwrap_or_default(),
+                    &self.vaults.cur().prefs.default_key_id.map(|id| id.to_string()).unwrap_or_default(),
                 );
             }
             SettingsMessage::DefaultGroupChanged(val) => {
-                self.prefs.default_group_id = if val == crate::i18n::t("new_default_none") {
+                self.vaults.cur_mut().prefs.default_group_id = if val == crate::i18n::t("new_default_none") {
                     None
                 } else {
                     // The picker lists breadcrumb paths (subgroups are
@@ -86,13 +86,13 @@ impl Oryxis {
                 };
                 self.persist_setting(
                     "default_group_id",
-                    &self.prefs.default_group_id.map(|id| id.to_string()).unwrap_or_default(),
+                    &self.vaults.cur().prefs.default_group_id.map(|id| id.to_string()).unwrap_or_default(),
                 );
             }
             SettingsMessage::DefaultProxyChanged(val) => {
                 // Default proxy is a saved Proxy Identity reference; inline
                 // proxies are per-host by nature and aren't defaulted.
-                self.prefs.default_proxy_identity_id =
+                self.vaults.cur_mut().prefs.default_proxy_identity_id =
                     if val == crate::i18n::t("new_default_none") {
                         None
                     } else {
@@ -101,63 +101,63 @@ impl Oryxis {
                 self.persist_setting(
                     "default_proxy_identity_id",
                     &self
-                        .prefs.default_proxy_identity_id
+                        .vaults.cur().prefs.default_proxy_identity_id
                         .map(|id| id.to_string())
                         .unwrap_or_default(),
                 );
             }
             SettingsMessage::ToggleDefaultMcpEnabled => {
-                self.prefs.default_mcp_enabled = !self.prefs.default_mcp_enabled;
+                self.vaults.cur_mut().prefs.default_mcp_enabled = !self.vaults.cur_mut().prefs.default_mcp_enabled;
                 self.persist_setting(
                     "default_mcp_enabled",
-                    if self.prefs.default_mcp_enabled { "true" } else { "false" },
+                    if self.vaults.cur().prefs.default_mcp_enabled { "true" } else { "false" },
                 );
             }
             SettingsMessage::DefaultEncodingChanged(val) => {
                 // "UTF-8" maps to None (no override), like the host editor.
-                self.prefs.default_encoding = if val == "UTF-8" { None } else { Some(val) };
+                self.vaults.cur_mut().prefs.default_encoding = if val == "UTF-8" { None } else { Some(val) };
                 self.persist_setting(
                     "default_encoding",
-                    self.prefs.default_encoding.as_deref().unwrap_or(""),
+                    self.vaults.cur().prefs.default_encoding.as_deref().unwrap_or(""),
                 );
             }
             SettingsMessage::DefaultAddEnvVar => {
                 // A fresh blank row, persisted on the first keystroke (a
                 // blank-key row is dropped by `env_vars_to_setting`).
-                self.prefs.default_env_vars.push(crate::state::EnvVarForm::default());
+                self.vaults.cur_mut().prefs.default_env_vars.push(crate::state::EnvVarForm::default());
             }
             SettingsMessage::DefaultRemoveEnvVar(idx) => {
-                if idx < self.prefs.default_env_vars.len() {
-                    self.prefs.default_env_vars.remove(idx);
+                if idx < self.vaults.cur().prefs.default_env_vars.len() {
+                    self.vaults.cur_mut().prefs.default_env_vars.remove(idx);
                 }
                 self.persist_setting(
                     "default_env_vars",
-                    &crate::util::env_vars_to_setting(&self.prefs.default_env_vars),
+                    &crate::util::env_vars_to_setting(&self.vaults.cur().prefs.default_env_vars),
                 );
             }
             SettingsMessage::DefaultEnvVarKeyChanged(idx, val) => {
-                if let Some(e) = self.prefs.default_env_vars.get_mut(idx) {
+                if let Some(e) = self.vaults.cur_mut().prefs.default_env_vars.get_mut(idx) {
                     e.key = val;
                 }
                 self.persist_setting(
                     "default_env_vars",
-                    &crate::util::env_vars_to_setting(&self.prefs.default_env_vars),
+                    &crate::util::env_vars_to_setting(&self.vaults.cur().prefs.default_env_vars),
                 );
             }
             SettingsMessage::DefaultEnvVarValueChanged(idx, val) => {
-                if let Some(e) = self.prefs.default_env_vars.get_mut(idx) {
+                if let Some(e) = self.vaults.cur_mut().prefs.default_env_vars.get_mut(idx) {
                     e.value = val;
                 }
                 self.persist_setting(
                     "default_env_vars",
-                    &crate::util::env_vars_to_setting(&self.prefs.default_env_vars),
+                    &crate::util::env_vars_to_setting(&self.vaults.cur().prefs.default_env_vars),
                 );
             }
             SettingsMessage::ToggleDefaultsCollapsed => {
-                self.prefs.defaults_collapsed = !self.prefs.defaults_collapsed;
+                self.vaults.cur_mut().prefs.defaults_collapsed = !self.vaults.cur_mut().prefs.defaults_collapsed;
                 self.persist_setting(
                     "defaults_collapsed",
-                    if self.prefs.defaults_collapsed { "true" } else { "false" },
+                    if self.vaults.cur().prefs.defaults_collapsed { "true" } else { "false" },
                 );
             }
             m => return Err(m),

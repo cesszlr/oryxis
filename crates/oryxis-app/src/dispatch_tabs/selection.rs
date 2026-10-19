@@ -245,7 +245,7 @@ impl Oryxis {
         crate::state::SelectionScope {
             group: self.cur_nav().active_group,
             search: self.cur_nav().host_search.trim().to_string(),
-            view_mode: self.prefs.host_view_mode,
+            view_mode: self.vaults.cur().prefs.host_view_mode,
             cloud_profile: self.cur_nav().host_filter_cloud_profile,
             tags: self.cur_nav().host_filter_tags.clone(),
         }
@@ -269,7 +269,7 @@ impl Oryxis {
         // every selected host and the bar says how many the search hides.
         let current = &self.cur_nav().dash_selection.scope;
         if current.group == self.cur_nav().active_group
-            && current.view_mode == self.prefs.host_view_mode
+            && current.view_mode == self.vaults.cur().prefs.host_view_mode
             && current.cloud_profile == self.cur_nav().host_filter_cloud_profile
             && (self.cur_nav().dash_multi_select || current.search == self.cur_nav().host_search.trim())
             && current.tags == self.cur_nav().host_filter_tags

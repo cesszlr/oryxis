@@ -1151,7 +1151,7 @@ impl Oryxis {
             // picker row matches the dashboard card for the same host.
             let badge_style = crate::widgets::resolve_host_icon_style(
                 conn.icon_style.as_deref(),
-                &self.prefs.default_host_icon,
+                &self.vaults.cur().prefs.default_host_icon,
             );
             let badge_color = conn.custom_color.as_deref()
                 .or(conn.color.as_deref())

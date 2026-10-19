@@ -1096,7 +1096,7 @@ impl Oryxis {
         // The side strips run down, except for the pins when they live
         // in the top bar.
         let across = !crate::views::tab_bar::tab_bar_pos().is_side()
-            || (pinned && self.prefs.pinned_tabs_top_bar);
+            || (pinned && self.vaults.cur().prefs.pinned_tabs_top_bar);
         let before = order
             .iter()
             .filter(|r| r.strip_id() != tab && self.ref_pinned(r) == pinned)

@@ -290,7 +290,7 @@ impl Oryxis {
                 // surface that isn't visible still raises the dialog, which
                 // layers globally. With an autosave grant the upload starts
                 // right here instead of asking.
-                let auto = self.prefs.sftp_edit_autosave || self.sftp_edit_upload_all;
+                let auto = self.vaults.cur().prefs.sftp_edit_autosave || self.sftp_edit_upload_all;
                 let mut tasks: Vec<Task<Message>> = Vec::new();
                 let mut scan = |st: &mut crate::state::SftpState| {
                     for w in st.edit_watches.iter_mut() {
@@ -305,7 +305,7 @@ impl Oryxis {
                                 if auto {
                                     w.uploading = true;
                                     w.dirty = false;
-                                    tasks.push(watch_upload_task(w.clone(), self.prefs.sftp_upload_temp_name));
+                                    tasks.push(watch_upload_task(w.clone(), self.vaults.cur().prefs.sftp_upload_temp_name));
                                 } else {
                                     w.dirty = true;
                                 }
@@ -338,7 +338,7 @@ impl Oryxis {
                 self.sftp.close_menus();
                 // Seeded at the configured editor's folder when there is
                 // one, so "the other one next to it" is one click away.
-                let start = std::path::PathBuf::from(self.prefs.sftp_default_editor.trim())
+                let start = std::path::PathBuf::from(self.device_prefs.sftp_default_editor.trim())
                     .parent()
                     .filter(|p| !p.as_os_str().is_empty())
                     .map(|p| p.to_path_buf());
@@ -395,14 +395,14 @@ impl Oryxis {
                         {
                             w.uploading = true;
                             w.dirty = false;
-                            return Ok(watch_upload_task(w.clone(), self.prefs.sftp_upload_temp_name));
+                            return Ok(watch_upload_task(w.clone(), self.vaults.cur().prefs.sftp_upload_temp_name));
                         }
                     }
                     C::YesToAll | C::Autosave => {
                         if choice == C::Autosave {
                             // Persisted; Settings > SFTP has the toggle to
                             // turn it back off (never a one-way trap).
-                            self.prefs.sftp_edit_autosave = true;
+                            self.vaults.cur_mut().prefs.sftp_edit_autosave = true;
                             self.persist_setting("sftp_edit_autosave", "true");
                         } else {
                             self.sftp_edit_upload_all = true;
@@ -415,7 +415,7 @@ impl Oryxis {
                                 if w.dirty && !w.uploading {
                                     w.uploading = true;
                                     w.dirty = false;
-                                    tasks.push(watch_upload_task(w.clone(), self.prefs.sftp_upload_temp_name));
+                                    tasks.push(watch_upload_task(w.clone(), self.vaults.cur().prefs.sftp_upload_temp_name));
                                 }
                             }
                         };
@@ -458,7 +458,7 @@ impl Oryxis {
                         // for an answer) is left exactly as it was.
                         let editor = match &prompt.watch_opener {
                             crate::state::SftpEditOpener::ConfiguredEditor => {
-                                Some(self.prefs.sftp_default_editor.trim().to_string())
+                                Some(self.device_prefs.sftp_default_editor.trim().to_string())
                             }
                             // The application the watch was launched with,
                             // replayed verbatim: reopening must land back
@@ -559,7 +559,7 @@ impl Oryxis {
         // guidance instead of a broken spawn later.
         let editor = match &opener {
             crate::state::SftpEditOpener::ConfiguredEditor => {
-                let e = self.prefs.sftp_default_editor.trim().to_string();
+                let e = self.device_prefs.sftp_default_editor.trim().to_string();
                 if e.is_empty() {
                     return self.show_toast_secs(
                         crate::i18n::t("sftp_no_editor_configured").to_string(),

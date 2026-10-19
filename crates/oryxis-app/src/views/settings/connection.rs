@@ -27,7 +27,7 @@ impl Oryxis {
         // Auth method picker, options + current selection mirror the host
         // editor's auth picker so the labels match.
         let offer_security_key =
-            crate::util::security_key_method_offered(&self.prefs.default_auth_method);
+            crate::util::security_key_method_offered(&self.vaults.cur().prefs.default_auth_method);
         let auth_options: Vec<String> = [
             Some(crate::i18n::t("auth_auto")), Some(crate::i18n::t("auth_password")),
             Some(crate::i18n::t("auth_key")),
@@ -39,19 +39,19 @@ impl Oryxis {
         .flatten()
         .map(|s| s.to_string())
         .collect();
-        let auth_selected = crate::util::auth_method_label(&self.prefs.default_auth_method);
+        let auth_selected = crate::util::auth_method_label(&self.vaults.cur().prefs.default_auth_method);
 
         let mut identity_options = vec![none_label.clone()];
         identity_options.extend(self.vaults.cur().identities.iter().map(|i| i.label.clone()));
         let identity_selected = self
-            .prefs.default_identity_id
+            .vaults.cur().prefs.default_identity_id
             .and_then(|id| self.vaults.cur().identities.iter().find(|i| i.id == id).map(|i| i.label.clone()))
             .unwrap_or_else(|| none_label.clone());
 
         let mut key_options = vec![none_label.clone()];
         key_options.extend(self.vaults.cur().keys.iter().map(|k| k.label.clone()));
         let key_selected = self
-            .prefs.default_key_id
+            .vaults.cur().prefs.default_key_id
             .and_then(|id| self.vaults.cur().keys.iter().find(|k| k.id == id).map(|k| k.label.clone()))
             .unwrap_or_else(|| none_label.clone());
 
@@ -67,7 +67,7 @@ impl Oryxis {
                 .map(|g| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, g.id)),
         );
         let group_selected = self
-            .prefs.default_group_id
+            .vaults.cur().prefs.default_group_id
             .filter(|id| self.vaults.cur().groups.iter().any(|g| g.id == *id))
             .map(|id| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, id))
             .unwrap_or_else(|| none_label.clone());
@@ -75,7 +75,7 @@ impl Oryxis {
         let mut proxy_options = vec![none_label.clone()];
         proxy_options.extend(self.vaults.cur().proxy_identities.iter().map(|p| p.label.clone()));
         let proxy_selected = self
-            .prefs.default_proxy_identity_id
+            .vaults.cur().prefs.default_proxy_identity_id
             .and_then(|id| {
                 self.vaults.cur().proxy_identities.iter().find(|p| p.id == id).map(|p| p.label.clone())
             })
@@ -89,7 +89,7 @@ impl Oryxis {
         .map(|s| s.to_string())
         .collect();
         let encoding_selected =
-            self.prefs.default_encoding.clone().unwrap_or_else(|| "UTF-8".to_string());
+            self.vaults.cur().prefs.default_encoding.clone().unwrap_or_else(|| "UTF-8".to_string());
 
         // A labeled pick_list row (label on the leading edge, picker
         // trailing). `label_key` is an i18n key resolved here. Recording
@@ -112,7 +112,7 @@ impl Oryxis {
         // The card is long once every default field is shown, so the header
         // doubles as a collapse toggle (chevron points down when open, into
         // the leading edge when collapsed). Hidden fields keep their state.
-        let collapsed = self.prefs.defaults_collapsed;
+        let collapsed = self.vaults.cur().prefs.defaults_collapsed;
         let chevron = if collapsed {
             if crate::i18n::is_rtl_layout() {
                 iced_fonts::lucide::chevron_left()
@@ -168,7 +168,7 @@ impl Oryxis {
         if !collapsed {
             new_conn_defaults_col = new_conn_defaults_col
                 .push(Space::new().height(10).boxed())
-                .push(self.nav_toggle_row(crate::i18n::t("forward_ssh_agent"), self.prefs.default_agent_forwarding, Message::Settings(SettingsMessage::ToggleDefaultAgentForwarding)))
+                .push(self.nav_toggle_row(crate::i18n::t("forward_ssh_agent"), self.vaults.cur().prefs.default_agent_forwarding, Message::Settings(SettingsMessage::ToggleDefaultAgentForwarding)))
                 .push(Space::new().height(10).boxed())
                 .push(dir_row(vec![
                     text(crate::i18n::t("port")).size(13).color(OryxisColors::t().text_secondary).boxed(),
@@ -177,7 +177,7 @@ impl Oryxis {
                         t("port"),
                         crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-default-port")),
                         10.0,
-                        text_input("22", &self.prefs.default_port)
+                        text_input("22", &self.vaults.cur().prefs.default_port)
                             .id(iced::widget::Id::new("set-connection-default-port"))
                             .on_input(|v| Message::Settings(SettingsMessage::DefaultPortChanged(v)))
                             .padding(10).width(120)
@@ -192,7 +192,7 @@ impl Oryxis {
                         t("host_keepalive"),
                         crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-default-keepalive")),
                         10.0,
-                        text_input(&self.prefs.keepalive_interval, &self.prefs.default_keepalive)
+                        text_input(&self.vaults.cur().prefs.keepalive_interval, &self.vaults.cur().prefs.default_keepalive)
                             .id(iced::widget::Id::new("set-connection-default-keepalive"))
                             .on_input(|v| Message::Settings(SettingsMessage::DefaultKeepaliveChanged(v)))
                             .padding(10).width(120)
@@ -203,7 +203,7 @@ impl Oryxis {
                 .push(self.nav_pick_row(
                     crate::i18n::t("host_terminal_type"),
                     term_default_options,
-                    self.prefs.default_terminal_type.clone(),
+                    self.vaults.cur().prefs.default_terminal_type.clone(),
                     |s: &String| s.clone(),
                     200.0,
                     |v| Message::Settings(SettingsMessage::DefaultTerminalTypeChanged(v)),
@@ -216,7 +216,7 @@ impl Oryxis {
                         t("username"),
                         crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-default-username")),
                         10.0,
-                        text_input("", &self.prefs.default_username)
+                        text_input("", &self.vaults.cur().prefs.default_username)
                             .id(iced::widget::Id::new("set-connection-default-username"))
                             .on_input(|v| Message::Settings(SettingsMessage::DefaultUsernameChanged(v)))
                             .padding(10).width(220)
@@ -234,7 +234,7 @@ impl Oryxis {
                 .push(Space::new().height(10).boxed())
                 .push(pick_row("default_proxy", proxy_options, proxy_selected, |v| Message::Settings(SettingsMessage::DefaultProxyChanged(v))))
                 .push(Space::new().height(10).boxed())
-                .push(self.nav_toggle_row(t("expose_to_mcp"), self.prefs.default_mcp_enabled, Message::Settings(SettingsMessage::ToggleDefaultMcpEnabled)))
+                .push(self.nav_toggle_row(t("expose_to_mcp"), self.vaults.cur().prefs.default_mcp_enabled, Message::Settings(SettingsMessage::ToggleDefaultMcpEnabled)))
                 .push(Space::new().height(10).boxed())
                 .push(pick_row("host_encoding", encoding_options, encoding_selected, |v| Message::Settings(SettingsMessage::DefaultEncodingChanged(v))));
 
@@ -270,7 +270,7 @@ impl Oryxis {
                 ),
             ])
             .align_y(iced::Alignment::Center)];
-            for (i, e) in self.prefs.default_env_vars.iter().enumerate() {
+            for (i, e) in self.vaults.cur().prefs.default_env_vars.iter().enumerate() {
                 let idx = i;
                 env_block = env_block.push(Space::new().height(8).boxed());
                 env_block = env_block.push(
@@ -325,7 +325,7 @@ impl Oryxis {
                 t("keepalive_interval"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-keepalive")),
                 10.0,
-                text_input("30", &self.prefs.keepalive_interval)
+                text_input("30", &self.vaults.cur().prefs.keepalive_interval)
                     .id(iced::widget::Id::new("set-connection-keepalive"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingKeepaliveChanged(v)))
                     .padding(10)
@@ -343,7 +343,7 @@ impl Oryxis {
                 t("session_open_timeout"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-session-timeout")),
                 10.0,
-                text_input("30", &self.prefs.ssh_session_timeout)
+                text_input("30", &self.vaults.cur().prefs.ssh_session_timeout)
                     .id(iced::widget::Id::new("set-connection-session-timeout"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingSshSessionTimeoutChanged(v)))
                     .padding(10)
@@ -357,7 +357,7 @@ impl Oryxis {
             // every repeat open, and the failover makes it safe.
             self.nav_toggle_row(
                 crate::i18n::t("setting_connection_reuse"),
-                self.prefs.ssh_connection_reuse,
+                self.vaults.cur().prefs.ssh_connection_reuse,
                 Message::Settings(SettingsMessage::SettingToggleConnectionReuse),
             ),
             Space::new().height(4),
@@ -366,7 +366,7 @@ impl Oryxis {
             Space::new().height(16),
             self.nav_toggle_row(
                 crate::i18n::t("auto_reconnect"),
-                self.prefs.auto_reconnect,
+                self.vaults.cur().prefs.auto_reconnect,
                 Message::Settings(SettingsMessage::SettingToggleAutoReconnect),
             ),
             Space::new().height(4),
@@ -379,7 +379,7 @@ impl Oryxis {
                 t("max_reconnect_attempts"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-connection-max-reconnect")),
                 10.0,
-                text_input("5", &self.prefs.max_reconnect_attempts)
+                text_input("5", &self.vaults.cur().prefs.max_reconnect_attempts)
                     .id(iced::widget::Id::new("set-connection-max-reconnect"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingMaxReconnectChanged(v)))
                     .padding(10)
@@ -390,7 +390,7 @@ impl Oryxis {
             Space::new().height(16),
             self.nav_toggle_row(
                 crate::i18n::t("os_detection"),
-                self.prefs.os_detection,
+                self.vaults.cur().prefs.os_detection,
                 Message::Settings(SettingsMessage::SettingToggleOsDetection),
             ),
             Space::new().height(4),

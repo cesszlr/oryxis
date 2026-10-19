@@ -21,7 +21,7 @@ impl Oryxis {
                 } else {
                     Language::from_code(&token)
                 };
-                self.prefs.language_choice = if token == "auto" {
+                self.device_prefs.language_choice = if token == "auto" {
                     token
                 } else {
                     // Persist the canonical code (`from_code` may have
@@ -31,7 +31,7 @@ impl Oryxis {
                 Language::set_active(lang);
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault
-                        .set_setting("language", &self.prefs.language_choice);
+                        .set_setting("language", &self.device_prefs.language_choice);
                 }
                 // Switching to a CJK language pulls its font on
                 // demand (once per session). Show a hint while it

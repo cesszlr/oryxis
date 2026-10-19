@@ -319,7 +319,7 @@ impl Oryxis {
         if self.tabs.get(tab_idx).is_some_and(|t| t.files_mode) {
             return false;
         }
-        let snap = self.prefs.scrollback_reset_keypress && self.cur_active_tab() == Some(tab_idx);
+        let snap = self.vaults.cur().prefs.scrollback_reset_keypress && self.cur_active_tab() == Some(tab_idx);
         // A typed command ends whatever a login script was waiting for,
         // like the user's own keystroke would.
         self.abort_login_script(pane_id);
@@ -384,7 +384,7 @@ impl Oryxis {
     /// Where save steps write: the setting, else `<Documents>/Oryxis`,
     /// else `<home>/Oryxis`.
     pub(crate) fn snippet_output_dir(&self) -> std::path::PathBuf {
-        match &self.prefs.snippet_output_dir {
+        match &self.device_prefs.snippet_output_dir {
             Some(dir) => std::path::PathBuf::from(dir),
             None => dirs::document_dir()
                 .or_else(dirs::home_dir)
@@ -585,7 +585,7 @@ impl Oryxis {
                 // Off, the step pastes as a hand-made paste would: the
                 // user's careful paste and paste guard still stop it.
                 let ask = confirm
-                    || crate::paste_guard::needs_confirmation(&text, self.prefs.careful_paste, self.prefs.paste_guard);
+                    || crate::paste_guard::needs_confirmation(&text, self.vaults.cur().prefs.careful_paste, self.vaults.cur().prefs.paste_guard);
                 if !ask {
                     crate::dispatch_terminal::paste_trace("snippet", "to run pane", &text, None);
                     return Ok(self.send_snippet_paste(run_id, &text));

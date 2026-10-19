@@ -22,17 +22,9 @@ pub(crate) struct AppPrefs {
     /// (and floored) by `monitor_interval_secs`; kept as a string so a
     /// half-typed value doesn't reset the field under the user.
     pub(crate) monitor_interval: String,
-    pub(crate) sftp_default_editor: String,
     /// Persisted "Autosave" grant from the save-confirmation dialog:
     /// edited remote files upload on every save without asking.
     pub(crate) sftp_edit_autosave: bool,
-    /// Renderer backend selection: "auto" (default), "opengl" (force
-    /// wgpu's GL backend, still GPU), or "software" (tiny-skia / CPU).
-    /// `main` translates this into `WGPU_BACKEND` / `ICED_BACKEND` at
-    /// startup, an escape hatch for GPU/driver stacks that corrupt the
-    /// wgpu surface. Read at boot only (the env vars are resolved before
-    /// the runtime starts), so changing it asks the user to restart.
-    pub(crate) renderer_backend: String,
     pub(crate) copy_on_select: bool,
     /// Careful paste (default on): a clipboard paste that contains a line
     /// break is parked in `pending_paste` and confirmed via a dialog with
@@ -97,13 +89,6 @@ pub(crate) struct AppPrefs {
     /// (offline reference / support sharing), on top of the vault
     /// capture. Persisted as `command_history_file`. Default off.
     pub(crate) command_history_file: bool,
-    /// Folder for the per-host command logs. `None` = the default
-    /// `~/.oryxis/command-history/`. Persisted as
-    /// `command_history_file_dir` (empty string = default).
-    pub(crate) command_history_file_dir: Option<String>,
-    /// Destination folder for ZMODEM downloads. Empty = the OS Downloads
-    /// dir (or `~/.oryxis/downloads`). Persisted as `zmodem_download_dir`.
-    pub(crate) zmodem_download_dir: String,
     /// Snippets sidebar: only show snippets sharing at least one tag
     /// with the focused host's tags. Persisted as `snippet_tag_filter`.
     pub(crate) snippet_tag_filter: bool,
@@ -160,21 +145,11 @@ pub(crate) struct AppPrefs {
     /// probe redirects to software (see `renderer_probe`); the user can
     /// still toggle it. `"performance_mode"` setting.
     pub(crate) performance_mode: bool,
-    /// Renders the terminal perf HUD (per-phase frame timing + fps) in
-    /// the top-right of every pane. Off by default; the `ORYXIS_TERM_PERF`
-    /// env var forces it on too. `"perf_overlay"` setting.
-    pub(crate) perf_overlay: bool,
     /// The network tools panel (DNS, ping, traceroute, port test,
     /// HTTP/TLS, WHOIS, DNSBL). Off by default and, while off, its whole
     /// UI is hidden: no burger entry, no tab, no way in (the
     /// optional-features rule). `"network_tools_enabled"` setting.
     pub(crate) network_tools: bool,
-    /// Offline mode: the app makes no request of its own (update checks,
-    /// font and plugin downloads). Mirror of the process-wide gate in
-    /// `crate::offline`, which is what the fetch functions read; this
-    /// field is what the toggles render. Hydrated pre-unlock like the
-    /// update settings. `"offline_mode"` setting.
-    pub(crate) offline_mode: bool,
     /// When the foreground and background of a cell render too close
     /// to each other (LS_COLORS' `ow` over a green palette,
     /// PowerShell's `$PSStyle.FileInfo.Directory` blue-on-blue, …),
@@ -276,18 +251,6 @@ pub(crate) struct AppPrefs {
     /// subtitle (`host_address_label`). Off by default, for the same
     /// screenshot / screen-share reason as `setting_show_host_address`.
     pub(crate) show_tab_host_address: bool,
-    /// Settings > Advanced debug logging: mirror of the `debug_logging`
-    /// setting, true while tracing events are also written to the
-    /// exportable `~/.oryxis/oryxis-debug.log` file (see `logging.rs`).
-    pub(crate) debug_logging: bool,
-    /// When on, clicking the window's close button hides to the
-    /// system tray instead of quitting. Only honoured on Windows
-    /// (the tray module is a no-op everywhere else). Default off
-    /// so we don't surprise users who never knew there was a tray.
-    pub(crate) close_to_tray: bool,
-    /// When on, minimizing the window hides it from the taskbar and
-    /// leaves only the tray icon visible. Windows-only. Default off.
-    pub(crate) minimize_to_tray: bool,
     /// `"left"` (default, Termius-style: X replaces the OS badge on
     /// hover/active) or `"right"` (badge stays left, X gets its own
     /// slot at the trailing edge of the tab). Anything else is treated
@@ -451,13 +414,6 @@ pub(crate) struct AppPrefs {
     /// both. Replaces the old classic/workspace `layout_mode` duality
     /// (classic users migrate to `"vertical"` on first load).
     pub(crate) nav_orientation: String,
-    /// Language picker choice as persisted in the `language` setting:
-    /// `"auto"` (default, follow the OS locale) or a concrete language
-    /// code ("en", "pt-BR", ...). The *resolved* language always lives
-    /// in `i18n::Language::active()`; this field only drives the
-    /// Settings picker selection so "Auto (OS)" survives restarts as a
-    /// choice instead of collapsing into the detected language.
-    pub(crate) language_choice: String,
     /// When the vertical nav rail is showing, expand it to show section
     /// labels (wide rail) instead of the icon-only rail. Persisted so the
     /// choice sticks.
@@ -611,14 +567,6 @@ pub(crate) struct AppPrefs {
     /// whole point of the option and what its description says.
     /// Persisted as `session_log_file`.
     pub(crate) session_log_file: bool,
-    /// Folder those files live in; `None` = `~/.oryxis/session-logs/`.
-    /// Persisted as `session_log_file_dir` (a set value only).
-    pub(crate) session_log_file_dir: Option<String>,
-    /// Folder a snippet's save steps write into; `None` =
-    /// `<Documents>/Oryxis` (`<home>/Oryxis` without one). Persisted as
-    /// `snippet_output_dir` (a set value only). Device-local: a snippet
-    /// names a file, never where it goes.
-    pub(crate) snippet_output_dir: Option<String>,
     /// Whether connection events (connect / disconnect / auth failure /
     /// error) are recorded to the vault log. Gates every `add_log` site.
     pub(crate) connection_history: bool,
@@ -636,18 +584,13 @@ pub(crate) struct AppPrefs {
     /// Persisted as `session_log_max_bytes` ("off" or a byte count), so
     /// a future picker can offer other sizes without a migration.
     pub(crate) session_log_max_bytes: Option<u64>,
-    pub(crate) auto_check_updates: bool,
-    /// Release stream the updater follows (`stable` / `nightly`).
-    pub(crate) update_channel: crate::update::UpdateChannel,
 }
 
 impl Default for AppPrefs {
     fn default() -> Self {
         Self {
             monitor_interval: "5".to_string(),
-            sftp_default_editor: String::new(),
             sftp_edit_autosave: false,
-            renderer_backend: "auto".to_string(),
             copy_on_select: true,
             careful_paste: true,
             right_click_copy: false,
@@ -660,8 +603,6 @@ impl Default for AppPrefs {
             terminal_link_tunnel: true,
             command_history: true,
             command_history_file: false,
-            command_history_file_dir: None,
-            zmodem_download_dir: String::new(),
             snippet_tag_filter: false,
             bold_is_bright: true,
             terminal_opacity: 100,
@@ -675,9 +616,7 @@ impl Default for AppPrefs {
             highlight_rules: Vec::new(),
             compiled_highlight_rules: std::sync::Arc::default(),
             performance_mode: false,
-            perf_overlay: false,
             network_tools: false,
-            offline_mode: false,
             smart_contrast: true,
             bell_mode: crate::util::BellMode::default(),
             clipboard_access: crate::util::ClipboardAccess::default(),
@@ -701,9 +640,6 @@ impl Default for AppPrefs {
             card_accent_glass: true,
             show_host_address: false,
             show_tab_host_address: false,
-            debug_logging: false,
-            close_to_tray: false,
-            minimize_to_tray: false,
             tab_close_button_side: "left".into(),
             pinned_tab_style: "compact".into(),
             restore_tabs_on_launch: false,
@@ -732,7 +668,6 @@ impl Default for AppPrefs {
             tmux_manager: false,
             ssh_connection_reuse: true,
             nav_orientation: "horizontal".into(),
-            language_choice: "auto".into(),
             nav_rail_expanded: false,
             default_host_icon: "circular".into(),
             keepalive_interval: "30".into(),
@@ -780,15 +715,11 @@ impl Default for AppPrefs {
             session_log_full: true,
             session_log_compress: true,
             session_log_file: false,
-            session_log_file_dir: None,
-            snippet_output_dir: None,
             connection_history: false,
             logs_retention: "off".into(),
             session_log_max_bytes: None,
             // Overwritten by `boot` right after this, which read pre-unlock: the boot check runs while the vault can still be locked.
-            auto_check_updates: true,
             // Overwritten by `boot` right after this, which same pre-unlock read as `auto_check_updates`.
-            update_channel: crate::update::UpdateChannel::default(),
         }
     }
 }

@@ -24,7 +24,7 @@ impl Oryxis {
                 t("transfer_parallelism"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-sftp-concurrency")),
                 10.0,
-                text_input("2", &self.prefs.sftp_concurrency)
+                text_input("2", &self.vaults.cur().prefs.sftp_concurrency)
                     .id(iced::widget::Id::new("set-sftp-concurrency"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingSftpConcurrencyChanged(v)))
                     .padding(10)
@@ -84,7 +84,7 @@ impl Oryxis {
                     .push(timeout_input(
                         t("connect_timeout"),
                         t("connect_timeout_desc"),
-                        &self.prefs.sftp_connect_timeout,
+                        &self.vaults.cur().prefs.sftp_connect_timeout,
                         "set-sftp-connect-timeout",
                         |v| Message::Settings(SettingsMessage::SettingSftpConnectTimeoutChanged(v)),
                     ).boxed())
@@ -92,7 +92,7 @@ impl Oryxis {
                     .push(timeout_input(
                         t("auth_timeout"),
                         t("auth_timeout_desc"),
-                        &self.prefs.sftp_auth_timeout,
+                        &self.vaults.cur().prefs.sftp_auth_timeout,
                         "set-sftp-auth-timeout",
                         |v| Message::Settings(SettingsMessage::SettingSftpAuthTimeoutChanged(v)),
                     ).boxed())
@@ -100,7 +100,7 @@ impl Oryxis {
                     .push(timeout_input(
                         t("channel_open_timeout"),
                         t("channel_open_timeout_desc"),
-                        &self.prefs.sftp_session_timeout,
+                        &self.vaults.cur().prefs.sftp_session_timeout,
                         "set-sftp-session-timeout",
                         |v| Message::Settings(SettingsMessage::SettingSftpSessionTimeoutChanged(v)),
                     ).boxed())
@@ -108,7 +108,7 @@ impl Oryxis {
                     .push(timeout_input(
                         t("operation_timeout"),
                         t("operation_timeout_desc"),
-                        &self.prefs.sftp_op_timeout,
+                        &self.vaults.cur().prefs.sftp_op_timeout,
                         "set-sftp-op-timeout",
                         |v| Message::Settings(SettingsMessage::SettingSftpOpTimeoutChanged(v)),
                     ).boxed()),
@@ -131,7 +131,7 @@ impl Oryxis {
                         t("setting_default_editor"),
                         crate::keynav::RowAction::input(iced::widget::Id::new("set-sftp-editor")),
                         10.0,
-                        text_input(t("setting_default_editor_placeholder"), &self.prefs.sftp_default_editor)
+                        text_input(t("setting_default_editor_placeholder"), &self.device_prefs.sftp_default_editor)
                             .id(iced::widget::Id::new("set-sftp-editor"))
                             .on_input(|v| Message::Settings(SettingsMessage::SettingSftpDefaultEditorChanged(v)))
                             .padding(10)
@@ -157,7 +157,7 @@ impl Oryxis {
                 Space::new().height(16),
                 self.nav_toggle_row(
                     t("setting_edit_autosave_toggle"),
-                    self.prefs.sftp_edit_autosave,
+                    self.vaults.cur().prefs.sftp_edit_autosave,
                     Message::Settings(SettingsMessage::ToggleSftpEditAutosave),
                 ),
                 Space::new().height(4),
@@ -180,7 +180,7 @@ impl Oryxis {
                 Space::new().height(8),
                 self.nav_toggle_row(
                     t("setting_sftp_ask_download_dir_toggle"),
-                    self.prefs.sftp_ask_download_dir,
+                    self.vaults.cur().prefs.sftp_ask_download_dir,
                     Message::Settings(SettingsMessage::ToggleSftpAskDownloadDir),
                 ),
                 Space::new().height(14),
@@ -194,7 +194,7 @@ impl Oryxis {
                 Space::new().height(8),
                 self.nav_toggle_row(
                     t("setting_sftp_upload_temp_name_toggle"),
-                    self.prefs.sftp_upload_temp_name,
+                    self.vaults.cur().prefs.sftp_upload_temp_name,
                     Message::Settings(SettingsMessage::ToggleSftpUploadTempName),
                 ),
                 Space::new().height(14),
@@ -222,7 +222,7 @@ impl Oryxis {
                         .into_iter()
                         .map(|l| t(l.label_key()).to_string())
                         .collect::<Vec<String>>(),
-                    t(self.prefs.sftp_console_layout.label_key()).to_string(),
+                    t(self.vaults.cur().prefs.sftp_console_layout.label_key()).to_string(),
                     |s: &String| s.clone(),
                     220.0,
                     |v| Message::Settings(SettingsMessage::SftpConsoleLayoutChanged(v)),
@@ -246,7 +246,7 @@ impl Oryxis {
                         .into_iter()
                         .map(|a| t(a.label_key()).to_string())
                         .collect::<Vec<String>>(),
-                    t(self.prefs.sftp_dir_double_click.label_key()).to_string(),
+                    t(self.vaults.cur().prefs.sftp_dir_double_click.label_key()).to_string(),
                     |s: &String| s.clone(),
                     260.0,
                     |v| Message::Settings(SettingsMessage::SftpDirDoubleClickChanged(v)),
@@ -258,7 +258,7 @@ impl Oryxis {
                         .into_iter()
                         .map(|a| t(a.label_key()).to_string())
                         .collect::<Vec<String>>(),
-                    t(self.prefs.sftp_file_double_click.label_key()).to_string(),
+                    t(self.vaults.cur().prefs.sftp_file_double_click.label_key()).to_string(),
                     |s: &String| s.clone(),
                     260.0,
                     |v| Message::Settings(SettingsMessage::SftpFileDoubleClickChanged(v)),
@@ -290,7 +290,7 @@ impl Oryxis {
     }
 
     pub(super) fn default_download_dir_row(&self) -> Element<'_, Message> {
-        let configured = self.prefs.zmodem_download_dir.trim();
+        let configured = self.device_prefs.zmodem_download_dir.trim();
         let shown = if configured.is_empty() {
             dirs::download_dir()
                 .map(|p| p.display().to_string())

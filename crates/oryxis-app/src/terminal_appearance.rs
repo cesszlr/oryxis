@@ -52,15 +52,15 @@ impl Oryxis {
         // says "no picture here" against a global one. `None` inherits.
         let path = match host.and_then(|a| a.image.as_deref()) {
             Some(p) => p.trim(),
-            None => self.prefs.terminal_bg_image.trim(),
+            None => self.vaults.cur().prefs.terminal_bg_image.trim(),
         };
         let image = (!path.is_empty()).then(|| {
             let fit = host
                 .and_then(|a| a.fit.as_deref())
-                .unwrap_or(&self.prefs.terminal_bg_fit);
+                .unwrap_or(&self.vaults.cur().prefs.terminal_bg_fit);
             let dim = host
                 .and_then(|a| a.dim)
-                .unwrap_or(self.prefs.terminal_bg_dim);
+                .unwrap_or(self.vaults.cur().prefs.terminal_bg_dim);
             BackgroundImage {
                 handle: iced::advanced::image::Handle::from_path(path),
                 fit: BgFit::from_str_or_default(fit),

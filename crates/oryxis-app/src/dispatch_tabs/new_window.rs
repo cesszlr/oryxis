@@ -601,8 +601,8 @@ impl Oryxis {
         // by the adaptive sizing; a compact pin and the uniform sizing
         // keep the width it has here.
         let width = if across
-            && !(pinned && self.prefs.pinned_tab_style == "compact")
-            && self.prefs.tab_width_mode != "uniform"
+            && !(pinned && self.vaults.cur().prefs.pinned_tab_style == "compact")
+            && self.vaults.cur().prefs.tab_width_mode != "uniform"
         {
             crate::views::tab_bar::TAB_NATURAL_WIDTH
         } else {
@@ -645,7 +645,7 @@ impl Oryxis {
                     crate::views::tab_bar::tab_bar_pos(),
                     *p,
                     self.window_size,
-                    self.prefs.pinned_tabs_top_bar && !self.top_bar_hidden(),
+                    self.vaults.cur().prefs.pinned_tabs_top_bar && !self.top_bar_hidden(),
                 )
         });
         let hover = over_strip.map(|cursor| crate::window_ctx::CarryHover {
@@ -710,7 +710,7 @@ impl Oryxis {
         );
         // A geometry test, like the file drag-out's: a window lying over
         // another one is not told apart from it.
-        let pins_top = self.prefs.pinned_tabs_top_bar && !self.top_bar_hidden();
+        let pins_top = self.vaults.cur().prefs.pinned_tabs_top_bar && !self.top_bar_hidden();
         let over = carry.docks.iter().find_map(|(target, rect)| {
             let local = Point::new(screen.x - rect.x, screen.y - rect.y);
             (rect.contains(screen)

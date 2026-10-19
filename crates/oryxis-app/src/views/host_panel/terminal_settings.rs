@@ -279,7 +279,7 @@ impl Oryxis {
         // Opacity: inherit + the same steps Settings offers.
         let mut opacity_options = vec![format!(
             "{inherit} ({}%)",
-            self.prefs.terminal_opacity
+            self.vaults.cur().prefs.terminal_opacity
         )];
         opacity_options.extend(crate::theme::OPACITY_STEPS.iter().map(|p| format!("{p}%")));
         let opacity_selected = match app.opacity {
@@ -295,7 +295,7 @@ impl Oryxis {
         ));
 
         // Picture: inherit / none / this host's own file.
-        let global_name = picture_name(&self.prefs.terminal_bg_image);
+        let global_name = picture_name(&self.vaults.cur().prefs.terminal_bg_image);
         let custom = crate::i18n::t("appearance_custom_image");
         let image_options = vec![
             format!("{inherit} ({global_name})"),
@@ -350,11 +350,11 @@ impl Oryxis {
         let picture_applies = match app.image.as_deref() {
             Some("") => false,
             Some(_) => true,
-            None => !self.prefs.terminal_bg_image.trim().is_empty(),
+            None => !self.vaults.cur().prefs.terminal_bg_image.trim().is_empty(),
         };
         if picture_applies {
             let global_fit = oryxis_terminal::BgFit::from_str_or_default(
-                &self.prefs.terminal_bg_fit,
+                &self.vaults.cur().prefs.terminal_bg_fit,
             );
             let mut fit_options = vec![format!(
                 "{inherit} ({})",
@@ -379,7 +379,7 @@ impl Oryxis {
             ));
 
             let mut dim_options =
-                vec![format!("{inherit} ({}%)", self.prefs.terminal_bg_dim)];
+                vec![format!("{inherit} ({}%)", self.vaults.cur().prefs.terminal_bg_dim)];
             dim_options.extend(
                 crate::terminal_appearance::DIM_STEPS
                     .iter()

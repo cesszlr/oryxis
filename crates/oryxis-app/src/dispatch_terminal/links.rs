@@ -123,7 +123,7 @@ impl Oryxis {
         // A callback with nowhere to be tunnelled (telnet, serial, mosh,
         // a dropped connection) opens no port, so it has nothing of its
         // own to consent to and follows the setting like any other link.
-        if !self.prefs.terminal_link_confirm && !(callback.is_some() && tunnelable) {
+        if !self.vaults.cur().prefs.terminal_link_confirm && !(callback.is_some() && tunnelable) {
             return self.open_terminal_link(Some(pane_id), url);
         }
         self.link_confirm = Some(LinkConfirmCard {
@@ -146,7 +146,7 @@ impl Oryxis {
     /// recording cannot have is a session, so nothing is tunnelled and
     /// the setting's off position is honoured like any other link's.
     pub(crate) fn activate_recorded_link(&mut self, url: String) -> Task<Message> {
-        if !self.prefs.terminal_link_confirm {
+        if !self.vaults.cur().prefs.terminal_link_confirm {
             return self.launch_link(url);
         }
         let label = self
@@ -199,7 +199,7 @@ impl Oryxis {
 
     /// The callback a link carries, or `None` when the feature is off.
     fn link_callback(&self, url: &str) -> Option<LoopbackCallback> {
-        self.prefs
+        self.vaults.cur().prefs
             .terminal_link_tunnel
             .then(|| loopback_callback(url))
             .flatten()

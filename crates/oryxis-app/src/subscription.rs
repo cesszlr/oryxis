@@ -343,9 +343,9 @@ impl Oryxis {
         // command already runs past the long-command threshold (drives
         // the marching dots); slow while one runs below it (only has to
         // catch the crossing so the dots appear); idle otherwise.
-        if self.prefs.smart_tabs && self.prefs.smart_long_secs > 0 {
+        if self.vaults.cur().prefs.smart_tabs && self.vaults.cur().prefs.smart_long_secs > 0 {
             let threshold =
-                std::time::Duration::from_secs(u64::from(self.prefs.smart_long_secs));
+                std::time::Duration::from_secs(u64::from(self.vaults.cur().prefs.smart_long_secs));
             let mut any_running = false;
             let mut any_busy = false;
             for pane in self.tabs.iter().flat_map(|t| t.pane_grid.panes.values()) {
@@ -388,10 +388,10 @@ impl Oryxis {
         // lock keeps live sessions but must stop reading the host, or
         // the locked screen would still be gathering (and discarding)
         // telemetry behind the lock screen.
-        if self.prefs.host_monitoring
+        if self.vaults.cur().prefs.host_monitoring
             && self.vault_ui.state == crate::state::VaultState::Unlocked
             && (self.monitor_tab_visible()
-                || (self.prefs.monitor_status_bar && self.prefs.show_status_bar))
+                || (self.vaults.cur().prefs.monitor_status_bar && self.vaults.cur().prefs.show_status_bar))
             && self.monitor_target().is_some()
         {
             subs.push(
@@ -406,7 +406,7 @@ impl Oryxis {
         // staggers the per-host probes, mounted only while the view is
         // actually up. Same Unlocked gate as the sidebar monitor: a
         // soft lock must stop reading the fleet behind the lock screen.
-        if self.prefs.host_monitoring
+        if self.vaults.cur().prefs.host_monitoring
             && self.vault_ui.state == crate::state::VaultState::Unlocked
             && self.cur_view() == crate::state::View::Monitoring
             && self.cur_active_tab().is_none()
@@ -421,8 +421,8 @@ impl Oryxis {
         // updates WITHOUT emitting a Message, so on an idle terminal the
         // bar would freeze on the last value forever. A light tick
         // matching the probe cadence re-renders it while visible.
-        if self.prefs.show_status_bar
-            && self.prefs.status_show_latency
+        if self.vaults.cur().prefs.show_status_bar
+            && self.vaults.cur().prefs.status_show_latency
             && self.vault_ui.state == crate::state::VaultState::Unlocked
             && self
                 .active_tab
@@ -613,9 +613,9 @@ impl Oryxis {
         // background API calls. Interval reads the persisted setting
         // and falls back to 30 min on any parse failure so a malformed
         // value doesn't pin the ticker at 1 ms.
-        if self.prefs.cloud_auto_refresh_enabled && !self.vaults.cur().cloud_profiles.is_empty() {
+        if self.vaults.cur().prefs.cloud_auto_refresh_enabled && !self.vaults.cur().cloud_profiles.is_empty() {
             let minutes = self
-                .prefs.cloud_auto_refresh_interval_minutes
+                .vaults.cur().prefs.cloud_auto_refresh_interval_minutes
                 .parse::<u64>()
                 .ok()
                 .filter(|m| *m > 0)
@@ -696,7 +696,7 @@ impl Oryxis {
         // elapsed-time comparison against `last_user_activity`.
         if self.vault_ui.state == crate::state::VaultState::Unlocked
             && self
-                .prefs.auto_lock_minutes
+                .vaults.cur().prefs.auto_lock_minutes
                 .parse::<u64>()
                 .ok()
                 .filter(|m| *m > 0)

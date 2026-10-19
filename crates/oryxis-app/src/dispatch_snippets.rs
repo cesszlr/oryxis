@@ -320,10 +320,10 @@ impl Oryxis {
                 self.handle_snippet_step_edit(m);
             }
             SnippetMessage::ToggleSnippetTagFilter => {
-                self.prefs.snippet_tag_filter = !self.prefs.snippet_tag_filter;
+                self.vaults.cur_mut().prefs.snippet_tag_filter = !self.vaults.cur_mut().prefs.snippet_tag_filter;
                 self.persist_setting(
                     "snippet_tag_filter",
-                    if self.prefs.snippet_tag_filter { "true" } else { "false" },
+                    if self.vaults.cur().prefs.snippet_tag_filter { "true" } else { "false" },
                 );
             }
             SnippetMessage::ShowSnippetTagFilterMenu => {

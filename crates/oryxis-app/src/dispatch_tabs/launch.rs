@@ -152,7 +152,7 @@ impl Oryxis {
                 let palette = self.resolve_terminal_palette_for_connection(&conn);
                 let auto_open = conn
                     .sidebar_auto_open
-                    .unwrap_or(self.prefs.sidebar_auto_open);
+                    .unwrap_or(self.vaults.cur().prefs.sidebar_auto_open);
                 if auto_open && let Some(side) = self.sidebar_auto_open_side() {
                     self.tabs[tab_idx].sidebar_open[side.idx()] = true;
                 }

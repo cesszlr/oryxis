@@ -381,7 +381,7 @@ impl Oryxis {
                 // window is hidden to the tray, so leaving it unguarded
                 // would let the path that always drops every live
                 // session skip the very protection the user asked for.
-                if self.prefs.confirm_close_session_tab {
+                if self.vaults.cur().prefs.confirm_close_session_tab {
                     let live = self.live_session_tab_count();
                     if live > 0 {
                         // Show the window first: a dialog on a hidden

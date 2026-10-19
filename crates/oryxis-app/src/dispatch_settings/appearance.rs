@@ -20,44 +20,44 @@ impl Oryxis {
                 );
             }
             SettingsMessage::SettingToggleShowStatusBar => {
-                self.prefs.show_status_bar = !self.prefs.show_status_bar;
+                self.vaults.cur_mut().prefs.show_status_bar = !self.vaults.cur_mut().prefs.show_status_bar;
                 self.persist_setting(
                     "show_status_bar",
-                    if self.prefs.show_status_bar { "true" } else { "false" },
+                    if self.vaults.cur().prefs.show_status_bar { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleStatusVersion => {
-                self.prefs.status_show_version = !self.prefs.status_show_version;
-                self.persist_setting("status_show_version", if self.prefs.status_show_version { "true" } else { "false" });
+                self.vaults.cur_mut().prefs.status_show_version = !self.vaults.cur_mut().prefs.status_show_version;
+                self.persist_setting("status_show_version", if self.vaults.cur().prefs.status_show_version { "true" } else { "false" });
             }
             SettingsMessage::SettingToggleStatusConnection => {
-                self.prefs.status_show_connection = !self.prefs.status_show_connection;
-                self.persist_setting("status_show_connection", if self.prefs.status_show_connection { "true" } else { "false" });
+                self.vaults.cur_mut().prefs.status_show_connection = !self.vaults.cur_mut().prefs.status_show_connection;
+                self.persist_setting("status_show_connection", if self.vaults.cur().prefs.status_show_connection { "true" } else { "false" });
             }
             SettingsMessage::SettingToggleStatusLatency => {
-                self.prefs.status_show_latency = !self.prefs.status_show_latency;
-                self.persist_setting("status_show_latency", if self.prefs.status_show_latency { "true" } else { "false" });
+                self.vaults.cur_mut().prefs.status_show_latency = !self.vaults.cur_mut().prefs.status_show_latency;
+                self.persist_setting("status_show_latency", if self.vaults.cur().prefs.status_show_latency { "true" } else { "false" });
             }
             SettingsMessage::SettingToggleStatusDimensions => {
-                self.prefs.status_show_dimensions = !self.prefs.status_show_dimensions;
-                self.persist_setting("status_show_dimensions", if self.prefs.status_show_dimensions { "true" } else { "false" });
+                self.vaults.cur_mut().prefs.status_show_dimensions = !self.vaults.cur_mut().prefs.status_show_dimensions;
+                self.persist_setting("status_show_dimensions", if self.vaults.cur().prefs.status_show_dimensions { "true" } else { "false" });
             }
             SettingsMessage::SettingToggleStatusAlignLeft => {
-                self.prefs.status_bar_align_left = !self.prefs.status_bar_align_left;
+                self.vaults.cur_mut().prefs.status_bar_align_left = !self.vaults.cur_mut().prefs.status_bar_align_left;
                 self.persist_setting(
                     "status_bar_align_left",
-                    if self.prefs.status_bar_align_left { "true" } else { "false" },
+                    if self.vaults.cur().prefs.status_bar_align_left { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleStatusCwd => {
-                self.prefs.status_show_cwd = !self.prefs.status_show_cwd;
-                self.persist_setting("status_show_cwd", if self.prefs.status_show_cwd { "true" } else { "false" });
+                self.vaults.cur_mut().prefs.status_show_cwd = !self.vaults.cur_mut().prefs.status_show_cwd;
+                self.persist_setting("status_show_cwd", if self.vaults.cur().prefs.status_show_cwd { "true" } else { "false" });
             }
             SettingsMessage::SettingToggleMonitorStatusBar => {
-                self.prefs.monitor_status_bar = !self.prefs.monitor_status_bar;
+                self.vaults.cur_mut().prefs.monitor_status_bar = !self.vaults.cur_mut().prefs.monitor_status_bar;
                 self.persist_setting(
                     "monitor_status_bar",
-                    if self.prefs.monitor_status_bar { "true" } else { "false" },
+                    if self.vaults.cur().prefs.monitor_status_bar { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingMonitorIntervalChanged(v) => {
@@ -65,27 +65,27 @@ impl Oryxis {
                 // the value is validated on read, not on every keystroke.
                 // Cap at an hour: anything longer is indistinguishable
                 // from turning the tab off, and the field stays narrow.
-                self.prefs.monitor_interval = crate::util::sanitize_uint(&v, 3_600);
+                self.vaults.cur_mut().prefs.monitor_interval = crate::util::sanitize_uint(&v, 3_600);
                 self.persist_setting(
                     "monitor_interval_seconds",
-                    &self.prefs.monitor_interval.clone(),
+                    &self.vaults.cur().prefs.monitor_interval.clone(),
                 );
             }
             SettingsMessage::SettingToggleHostMonitoring => {
-                self.prefs.host_monitoring = !self.prefs.host_monitoring;
+                self.vaults.cur_mut().prefs.host_monitoring = !self.vaults.cur_mut().prefs.host_monitoring;
                 self.persist_setting(
                     "host_monitoring_enabled",
-                    if self.prefs.host_monitoring { "true" } else { "false" },
+                    if self.vaults.cur().prefs.host_monitoring { "true" } else { "false" },
                 );
-                if self.prefs.host_monitoring {
+                if self.vaults.cur().prefs.host_monitoring {
                     // First enable ever: seed the internal defaults ON so
                     // the feature shows immediate value instead of being
                     // "enabled but invisible". Guarded by a marker so a
                     // later off/on never clobbers the user's own choices.
-                    if !self.prefs.host_monitoring_seeded {
-                        self.prefs.host_monitoring_seeded = true;
+                    if !self.vaults.cur().prefs.host_monitoring_seeded {
+                        self.vaults.cur_mut().prefs.host_monitoring_seeded = true;
                         self.persist_setting("host_monitoring_seeded", "true");
-                        self.prefs.monitor_status_bar = true;
+                        self.vaults.cur_mut().prefs.monitor_status_bar = true;
                         self.persist_setting("monitor_status_bar", "true");
                     }
                 } else {
@@ -101,12 +101,12 @@ impl Oryxis {
                 }
             }
             SettingsMessage::SettingToggleConnectionReuse => {
-                self.prefs.ssh_connection_reuse = !self.prefs.ssh_connection_reuse;
+                self.vaults.cur_mut().prefs.ssh_connection_reuse = !self.vaults.cur_mut().prefs.ssh_connection_reuse;
                 self.persist_setting(
                     "ssh_connection_reuse",
-                    if self.prefs.ssh_connection_reuse { "true" } else { "false" },
+                    if self.vaults.cur().prefs.ssh_connection_reuse { "true" } else { "false" },
                 );
-                if !self.prefs.ssh_connection_reuse {
+                if !self.vaults.cur().prefs.ssh_connection_reuse {
                     // Stop offering the pooled connections. Live
                     // sessions already sharing one are untouched: the
                     // setting governs what the NEXT tab does, and
@@ -116,12 +116,12 @@ impl Oryxis {
                 }
             }
             SettingsMessage::SettingToggleTmuxManager => {
-                self.prefs.tmux_manager = !self.prefs.tmux_manager;
+                self.vaults.cur_mut().prefs.tmux_manager = !self.vaults.cur_mut().prefs.tmux_manager;
                 self.persist_setting(
                     "tmux_manager_enabled",
-                    if self.prefs.tmux_manager { "true" } else { "false" },
+                    if self.vaults.cur().prefs.tmux_manager { "true" } else { "false" },
                 );
-                if !self.prefs.tmux_manager {
+                if !self.vaults.cur().prefs.tmux_manager {
                     // Off hides every surface the feature owns, so a
                     // kept listing could only leak. Nothing here needs a
                     // stamp: `tmux_session_for_pane` re-reads the toggle,
@@ -132,17 +132,17 @@ impl Oryxis {
                 }
             }
             SettingsMessage::SettingToggleMonitorAllHosts => {
-                self.prefs.monitor_all_hosts = !self.prefs.monitor_all_hosts;
+                self.vaults.cur_mut().prefs.monitor_all_hosts = !self.vaults.cur_mut().prefs.monitor_all_hosts;
                 self.persist_setting(
                     "monitor_all_hosts",
-                    if self.prefs.monitor_all_hosts { "true" } else { "false" },
+                    if self.vaults.cur().prefs.monitor_all_hosts { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleMonitorDashLiveOnly => {
-                self.prefs.monitor_dash_live_only = !self.prefs.monitor_dash_live_only;
+                self.vaults.cur_mut().prefs.monitor_dash_live_only = !self.vaults.cur_mut().prefs.monitor_dash_live_only;
                 self.persist_setting(
                     "monitor_dash_live_only",
-                    if self.prefs.monitor_dash_live_only { "true" } else { "false" },
+                    if self.vaults.cur().prefs.monitor_dash_live_only { "true" } else { "false" },
                 );
                 // Turning it on closes what the dashboard dialled for
                 // itself, here rather than on the next heartbeat: that
@@ -155,7 +155,7 @@ impl Oryxis {
                 // stamp instead of reopening what it just closed; the
                 // links riding a tab's session cost nothing and are
                 // rebuilt on the next entry into the view.
-                if self.prefs.monitor_dash_live_only {
+                if self.vaults.cur().prefs.monitor_dash_live_only {
                     self.monitor_dash.sweep();
                 }
             }
@@ -164,61 +164,61 @@ impl Oryxis {
                     // Resolved BEFORE the write (the resolver applies the
                     // per-tab defaults a raw map read would miss), so the
                     // move handler knows which side the tab actually left.
-                    let came_from = self.prefs.sidebar_tab_side(tab);
-                    self.prefs.sidebar_tab_sides.insert(tab, placement);
-                    let encoded = self.prefs.encode_sidebar_tab_sides();
+                    let came_from = self.vaults.cur().prefs.sidebar_tab_side(tab);
+                    self.vaults.cur_mut().prefs.sidebar_tab_sides.insert(tab, placement);
+                    let encoded = self.vaults.cur().prefs.encode_sidebar_tab_sides();
                     self.persist_setting("sidebar_tab_sides", &encoded);
                     self.sidebar_tab_moved(tab, came_from, placement);
                 }
             }
             SettingsMessage::SettingToggleSidebarAutoOpen => {
-                self.prefs.sidebar_auto_open = !self.prefs.sidebar_auto_open;
+                self.vaults.cur_mut().prefs.sidebar_auto_open = !self.vaults.cur_mut().prefs.sidebar_auto_open;
                 self.persist_setting(
                     "sidebar_auto_open",
-                    if self.prefs.sidebar_auto_open { "true" } else { "false" },
+                    if self.vaults.cur().prefs.sidebar_auto_open { "true" } else { "false" },
                 );
             }
             SettingsMessage::CycleHostViewMode => {
                 // Dismiss the `…` overflow menu when cycled from there
                 // (no-op for the inline toolbar button).
                 self.overlay = None;
-                self.prefs.host_view_mode = self.prefs.host_view_mode.next();
-                self.persist_setting("host_view_mode", self.prefs.host_view_mode.code());
+                self.vaults.cur_mut().prefs.host_view_mode = self.vaults.cur_mut().prefs.host_view_mode.next();
+                self.persist_setting("host_view_mode", self.vaults.cur().prefs.host_view_mode.code());
                 // Tree mode shows every level in place, so a pending
                 // drill-down cursor would only confuse the walk once
                 // the user cycles back to grid/list from inside it.
-                if self.prefs.host_view_mode == crate::state::HostViewMode::Tree {
+                if self.vaults.cur().prefs.host_view_mode == crate::state::HostViewMode::Tree {
                     self.nav.active_group = None;
                 }
             }
             SettingsMessage::ToggleCardAccentGlass => {
-                self.prefs.card_accent_glass = !self.prefs.card_accent_glass;
+                self.vaults.cur_mut().prefs.card_accent_glass = !self.vaults.cur_mut().prefs.card_accent_glass;
                 self.persist_setting(
                     "card_accent_glass",
-                    if self.prefs.card_accent_glass { "true" } else { "false" },
+                    if self.vaults.cur().prefs.card_accent_glass { "true" } else { "false" },
                 );
             }
             SettingsMessage::ToggleShowHostAddress => {
-                self.prefs.show_host_address = !self.prefs.show_host_address;
+                self.vaults.cur_mut().prefs.show_host_address = !self.vaults.cur_mut().prefs.show_host_address;
                 self.persist_setting(
                     "show_host_address",
-                    if self.prefs.show_host_address { "true" } else { "false" },
+                    if self.vaults.cur().prefs.show_host_address { "true" } else { "false" },
                 );
             }
             SettingsMessage::ToggleShowTabHostAddress => {
-                self.prefs.show_tab_host_address = !self.prefs.show_tab_host_address;
+                self.vaults.cur_mut().prefs.show_tab_host_address = !self.vaults.cur_mut().prefs.show_tab_host_address;
                 self.persist_setting(
                     "show_tab_host_address",
-                    if self.prefs.show_tab_host_address { "true" } else { "false" },
+                    if self.vaults.cur().prefs.show_tab_host_address { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleRestoreTabsOnLaunch => {
-                self.prefs.restore_tabs_on_launch = !self.prefs.restore_tabs_on_launch;
+                self.vaults.cur_mut().prefs.restore_tabs_on_launch = !self.vaults.cur_mut().prefs.restore_tabs_on_launch;
                 self.persist_setting(
                     "restore_tabs_on_launch",
-                    if self.prefs.restore_tabs_on_launch { "true" } else { "false" },
+                    if self.vaults.cur().prefs.restore_tabs_on_launch { "true" } else { "false" },
                 );
-                if self.prefs.restore_tabs_on_launch {
+                if self.vaults.cur().prefs.restore_tabs_on_launch {
                     // Take the first snapshot from the strip on screen,
                     // so turning it on and quitting right away restores
                     // what is open NOW rather than nothing.
@@ -239,18 +239,18 @@ impl Oryxis {
                     "launch" => "launch",
                     _ => "selected",
                 };
-                self.prefs.restore_tabs_connect = normalized.into();
+                self.vaults.cur_mut().prefs.restore_tabs_connect = normalized.into();
                 self.persist_setting("restore_tabs_connect", normalized);
             }
             SettingsMessage::SettingToggleRestoreLastActiveTab => {
-                self.prefs.restore_last_active_tab = !self.prefs.restore_last_active_tab;
+                self.vaults.cur_mut().prefs.restore_last_active_tab = !self.vaults.cur_mut().prefs.restore_last_active_tab;
                 self.persist_setting(
                     "restore_last_active_tab",
-                    if self.prefs.restore_last_active_tab { "true" } else { "false" },
+                    if self.vaults.cur().prefs.restore_last_active_tab { "true" } else { "false" },
                 );
                 // Same pair of moves as the restore toggle above: on
                 // writes the chip that is active NOW, off drops the row.
-                if self.prefs.restore_last_active_tab {
+                if self.vaults.cur().prefs.restore_last_active_tab {
                     self.persist_open_tabs();
                 } else {
                     self.persist_setting("open_tabs_active", "");
@@ -258,31 +258,31 @@ impl Oryxis {
                 }
             }
             SettingsMessage::SettingToggleShowTabStatusDot => {
-                self.prefs.show_tab_status_dot = !self.prefs.show_tab_status_dot;
+                self.vaults.cur_mut().prefs.show_tab_status_dot = !self.vaults.cur_mut().prefs.show_tab_status_dot;
                 self.persist_setting(
                     "show_tab_status_dot",
-                    if self.prefs.show_tab_status_dot { "true" } else { "false" },
+                    if self.vaults.cur().prefs.show_tab_status_dot { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleTabAccentLine => {
-                self.prefs.tab_accent_line = !self.prefs.tab_accent_line;
+                self.vaults.cur_mut().prefs.tab_accent_line = !self.vaults.cur_mut().prefs.tab_accent_line;
                 self.persist_setting(
                     "tab_accent_line",
-                    if self.prefs.tab_accent_line { "true" } else { "false" },
+                    if self.vaults.cur().prefs.tab_accent_line { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleTabAccentWash => {
-                self.prefs.tab_accent_wash = !self.prefs.tab_accent_wash;
+                self.vaults.cur_mut().prefs.tab_accent_wash = !self.vaults.cur_mut().prefs.tab_accent_wash;
                 self.persist_setting(
                     "tab_accent_wash",
-                    if self.prefs.tab_accent_wash { "true" } else { "false" },
+                    if self.vaults.cur().prefs.tab_accent_wash { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleTabAccentText => {
-                self.prefs.tab_accent_text = !self.prefs.tab_accent_text;
+                self.vaults.cur_mut().prefs.tab_accent_text = !self.vaults.cur_mut().prefs.tab_accent_text;
                 self.persist_setting(
                     "tab_accent_text",
-                    if self.prefs.tab_accent_text { "true" } else { "false" },
+                    if self.vaults.cur().prefs.tab_accent_text { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingNavOrientationChanged(val) => {
@@ -290,14 +290,14 @@ impl Oryxis {
                     "vertical" => "vertical",
                     _ => "horizontal",
                 };
-                self.prefs.nav_orientation = normalized.into();
+                self.vaults.cur_mut().prefs.nav_orientation = normalized.into();
                 self.persist_setting("nav_orientation", normalized);
             }
             SettingsMessage::ToggleNavRailExpanded => {
-                self.prefs.nav_rail_expanded = !self.prefs.nav_rail_expanded;
+                self.vaults.cur_mut().prefs.nav_rail_expanded = !self.vaults.cur_mut().prefs.nav_rail_expanded;
                 self.persist_setting(
                     "nav_rail_expanded",
-                    if self.prefs.nav_rail_expanded { "true" } else { "false" },
+                    if self.vaults.cur().prefs.nav_rail_expanded { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingDefaultHostIconChanged(val) => {
@@ -308,7 +308,7 @@ impl Oryxis {
                     "initials" => "initials",
                     _ => "circular",
                 };
-                self.prefs.default_host_icon = normalized.into();
+                self.vaults.cur_mut().prefs.default_host_icon = normalized.into();
                 self.persist_setting("default_host_icon", normalized);
             }
             SettingsMessage::SettingTabCloseButtonSideChanged(val) => {
@@ -319,7 +319,7 @@ impl Oryxis {
                     "right" => "right",
                     _ => "left",
                 };
-                self.prefs.tab_close_button_side = normalized.into();
+                self.vaults.cur_mut().prefs.tab_close_button_side = normalized.into();
                 self.persist_setting("tab_close_button_side", normalized);
             }
             SettingsMessage::SettingPinnedTabStyleChanged(val) => {
@@ -327,7 +327,7 @@ impl Oryxis {
                     "full" => "full",
                     _ => "compact",
                 };
-                self.prefs.pinned_tab_style = normalized.into();
+                self.vaults.cur_mut().prefs.pinned_tab_style = normalized.into();
                 self.persist_setting("pinned_tab_style", normalized);
             }
             SettingsMessage::SettingDuplicateTabPositionChanged(val) => {
@@ -336,7 +336,7 @@ impl Oryxis {
                     "start" => "start",
                     _ => "next",
                 };
-                self.prefs.duplicate_tab_position = normalized.into();
+                self.vaults.cur_mut().prefs.duplicate_tab_position = normalized.into();
                 self.persist_setting("duplicate_tab_position", normalized);
             }
             SettingsMessage::SettingTabNumberStyleChanged(val) => {
@@ -345,14 +345,14 @@ impl Oryxis {
                     "icon" => "icon",
                     _ => "off",
                 };
-                self.prefs.tab_number_style = normalized.into();
+                self.vaults.cur_mut().prefs.tab_number_style = normalized.into();
                 self.persist_setting("tab_number_style", normalized);
             }
             SettingsMessage::SettingToggleTabSlotIncludesHome => {
-                self.prefs.tab_slot_includes_home = !self.prefs.tab_slot_includes_home;
+                self.vaults.cur_mut().prefs.tab_slot_includes_home = !self.vaults.cur_mut().prefs.tab_slot_includes_home;
                 self.persist_setting(
                     "tab_slot_includes_home",
-                    if self.prefs.tab_slot_includes_home { "true" } else { "false" },
+                    if self.vaults.cur().prefs.tab_slot_includes_home { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingTabFillStyleChanged(val) => {
@@ -360,7 +360,7 @@ impl Oryxis {
                     "solid" => "solid",
                     _ => "gradient",
                 };
-                self.prefs.tab_fill_style = normalized.into();
+                self.vaults.cur_mut().prefs.tab_fill_style = normalized.into();
                 self.persist_setting("tab_fill_style", normalized);
             }
             SettingsMessage::SettingTabAccentColorChanged(val) => {
@@ -368,7 +368,7 @@ impl Oryxis {
                     "app" => "app",
                     _ => "host",
                 };
-                self.prefs.tab_accent_color = normalized.into();
+                self.vaults.cur_mut().prefs.tab_accent_color = normalized.into();
                 self.persist_setting("tab_accent_color", normalized);
             }
             SettingsMessage::SettingTabBarPositionChanged(val) => {
@@ -386,7 +386,7 @@ impl Oryxis {
                 crate::views::tab_bar::set_tab_bar_pos(
                     crate::views::tab_bar::TabBarPos::from_setting(normalized),
                 );
-                self.prefs.tab_bar_position = normalized.into();
+                self.vaults.cur_mut().prefs.tab_bar_position = normalized.into();
                 self.persist_setting("tab_bar_position", normalized);
             }
             SettingsMessage::SettingInactiveTabStyleChanged(val) => {
@@ -400,12 +400,12 @@ impl Oryxis {
                 crate::views::tab_bar::set_inactive_tab_style(
                     crate::views::tab_bar::InactiveTabStyle::from_setting(normalized),
                 );
-                self.prefs.inactive_tab_style = normalized.into();
+                self.vaults.cur_mut().prefs.inactive_tab_style = normalized.into();
                 self.persist_setting("inactive_tab_style", normalized);
             }
             SettingsMessage::SettingTabWidthModeChanged(val) => {
                 let normalized = if val == "uniform" { "uniform" } else { "adaptive" };
-                self.prefs.tab_width_mode = normalized.into();
+                self.vaults.cur_mut().prefs.tab_width_mode = normalized.into();
                 self.persist_setting("tab_width_mode", normalized);
             }
             SettingsMessage::SettingTabUniformSizeChanged(val) => {
@@ -414,28 +414,28 @@ impl Oryxis {
                     "large" => "large",
                     _ => "medium",
                 };
-                self.prefs.tab_uniform_size = normalized.into();
+                self.vaults.cur_mut().prefs.tab_uniform_size = normalized.into();
                 self.persist_setting("tab_uniform_size", normalized);
             }
             SettingsMessage::SettingTogglePinnedTabsTopBar => {
-                self.prefs.pinned_tabs_top_bar = !self.prefs.pinned_tabs_top_bar;
+                self.vaults.cur_mut().prefs.pinned_tabs_top_bar = !self.vaults.cur_mut().prefs.pinned_tabs_top_bar;
                 self.persist_setting(
                     "pinned_tabs_top_bar",
-                    if self.prefs.pinned_tabs_top_bar { "true" } else { "false" },
+                    if self.vaults.cur().prefs.pinned_tabs_top_bar { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleSideHideTopBar => {
-                self.prefs.side_hide_top_bar = !self.prefs.side_hide_top_bar;
+                self.vaults.cur_mut().prefs.side_hide_top_bar = !self.vaults.cur_mut().prefs.side_hide_top_bar;
                 self.persist_setting(
                     "side_hide_top_bar",
-                    if self.prefs.side_hide_top_bar { "true" } else { "false" },
+                    if self.vaults.cur().prefs.side_hide_top_bar { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingToggleSideFullHeight => {
-                self.prefs.side_full_height = !self.prefs.side_full_height;
+                self.vaults.cur_mut().prefs.side_full_height = !self.vaults.cur_mut().prefs.side_full_height;
                 self.persist_setting(
                     "side_full_height",
-                    if self.prefs.side_full_height { "true" } else { "false" },
+                    if self.vaults.cur().prefs.side_full_height { "true" } else { "false" },
                 );
             }
             m => return Err(m),

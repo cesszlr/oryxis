@@ -47,7 +47,7 @@ impl Oryxis {
         // Address shown only when the (off-by-default) setting is on,
         // so addresses stay out of screenshots / screen shares by
         // default. Port 22 is the SSH default, so it's always omitted.
-        let subtitle = if self.prefs.show_host_address {
+        let subtitle = if self.vaults.cur().prefs.show_host_address {
             use oryxis_core::models::connection::ConnectionProtocol;
             // Shared with the tab strip's second line, so the two
             // surfaces render the same address for the same host.
@@ -102,7 +102,7 @@ impl Oryxis {
         // the leading letters of the label instead.
         let host_style = crate::widgets::resolve_host_icon_style(
             conn.icon_style.as_deref(),
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         let badge_color = conn.custom_color.as_deref()
             .or(conn.color.as_deref())

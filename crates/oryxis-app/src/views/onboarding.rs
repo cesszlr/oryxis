@@ -193,7 +193,7 @@ impl Oryxis {
             (
                 t("offline_mode"),
                 t("offline_mode_desc"),
-                self.prefs.offline_mode,
+                self.device_prefs.offline_mode,
                 Message::Settings(SettingsMessage::SettingToggleOfflineMode),
             ),
             (
@@ -223,19 +223,19 @@ impl Oryxis {
             (
                 t("feature_monitoring"),
                 t("feature_monitoring_desc"),
-                self.prefs.host_monitoring,
+                self.vaults.cur().prefs.host_monitoring,
                 Message::Settings(SettingsMessage::SettingToggleHostMonitoring),
             ),
             (
                 t("feature_tmux"),
                 t("feature_tmux_desc"),
-                self.prefs.tmux_manager,
+                self.vaults.cur().prefs.tmux_manager,
                 Message::Settings(SettingsMessage::SettingToggleTmuxManager),
             ),
             (
                 t("setting_network_tools"),
                 t("setting_network_tools_hint"),
-                self.prefs.network_tools,
+                self.vaults.cur().prefs.network_tools,
                 Message::Settings(SettingsMessage::SettingToggleNetworkTools),
             ),
         ];

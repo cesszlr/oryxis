@@ -54,14 +54,14 @@ impl Oryxis {
         conn: Option<&oryxis_core::models::connection::Connection>,
     ) -> bool {
         conn.and_then(|c| c.session_logging)
-            .unwrap_or(self.prefs.session_logging)
+            .unwrap_or(self.vaults.cur().prefs.session_logging)
     }
 
     /// Whether connection events (connect / disconnect / auth failure /
     /// error) should be written to the vault log. Gated by the global
     /// `connection_history` setting (off by default).
     pub(crate) fn should_record_history(&self) -> bool {
-        self.prefs.connection_history
+        self.vaults.cur().prefs.connection_history
     }
 
     /// Route one SSH-lifecycle message to the submodule that owns it.

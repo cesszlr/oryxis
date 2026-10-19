@@ -44,7 +44,7 @@ impl Oryxis {
         let slot_row = column![
             self.nav_toggle_row(
                 crate::i18n::t("tab_slot_includes_home"),
-                self.prefs.tab_slot_includes_home,
+                self.vaults.cur().prefs.tab_slot_includes_home,
                 Message::Settings(SettingsMessage::SettingToggleTabSlotIncludesHome),
             ),
             Space::new().height(4),

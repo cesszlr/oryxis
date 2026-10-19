@@ -374,12 +374,12 @@ impl Oryxis {
         // hiding the button would strand a user who cycled into tree
         // with no way back (issue #102).
         let show_view_toggle = responsive_cols > 1
-            || self.prefs.host_view_mode != crate::state::HostViewMode::Grid;
+            || self.vaults.cur().prefs.host_view_mode != crate::state::HostViewMode::Grid;
         let view_toggle: Element<'_, Message> = if show_view_toggle {
             dir_row(vec![
                 self.keynav_toolbar_ring(
                     crate::keynav::ToolbarItem::ViewToggle,
-                    crate::widgets::host_view_toggle_button(self.prefs.host_view_mode),
+                    crate::widgets::host_view_toggle_button(self.vaults.cur().prefs.host_view_mode),
                 ),
                 Space::new().width(6).boxed(),
             ])

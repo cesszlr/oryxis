@@ -236,7 +236,7 @@ impl Oryxis {
         // oldest FINISHED recordings first (retention by size) and
         // recording continues. Only when there is nothing left to drop,
         // i.e. one live session is the whole total, does it stop.
-        if let Some(cap) = self.prefs.session_log_max_bytes {
+        if let Some(cap) = self.vaults.cur().prefs.session_log_max_bytes {
             match vault.prune_session_logs_to_fit(cap) {
                 Ok(n) => {
                     if n > 0 {
@@ -354,14 +354,14 @@ impl Oryxis {
         }
         // Full detail = timed segments + resize events (.cast export);
         // simple = one untimed chunk per flush, the plain log of old.
-        let full = self.prefs.session_log_full;
-        let compress = self.prefs.session_log_compress;
+        let full = self.vaults.cur().prefs.session_log_full;
+        let compress = self.vaults.cur().prefs.session_log_compress;
         // The plain-text mirror (issue #187): the path each recording
         // writes to, resolved once and parked on the pane, so a name
         // carrying the start time cannot move mid-session. Empty while
         // the mirror is off, which is what keeps the write below to a
         // map lookup on the ordinary path.
-        let mirror = self.prefs.session_log_file;
+        let mirror = self.vaults.cur().prefs.session_log_file;
         let mut mirror_paths: std::collections::HashMap<uuid::Uuid, std::path::PathBuf> =
             std::collections::HashMap::new();
         if mirror {
@@ -798,7 +798,7 @@ impl Oryxis {
                 let mut schedule_flush: Option<std::time::Duration> = None;
                 // Snapshot the (Copy) bell mode before borrowing self.tabs; the
                 // bell action runs while the pane is borrowed.
-                let bell_mode = self.prefs.bell_mode;
+                let bell_mode = self.vaults.cur().prefs.bell_mode;
                 // The compiled highlight rules, installed on the pane's
                 // backend just before it processes the batch. Handing
                 // them over HERE rather than at pane creation is what
@@ -837,7 +837,7 @@ impl Oryxis {
                 // normal case and keeps this a no-op allocation.
                 let trigger_actions: std::collections::HashMap<String, TriggerAction> =
                     if highlight_rules.any_triggers() {
-                        self.prefs
+                        self.vaults.cur().prefs
                             .highlight_rules
                             .iter()
                             .filter(|r| r.enabled && r.action.is_trigger())
@@ -850,18 +850,18 @@ impl Oryxis {
                 // cooldown: (rule id, rule name, the matching line).
                 let mut fired_triggers: Vec<(String, String, String)> = Vec::new();
                 // Notification policy + focus snapshot before the tabs borrow.
-                let notif_mode = self.prefs.notification_mode;
+                let notif_mode = self.vaults.cur().prefs.notification_mode;
                 let win_focused = self.cur_focused();
                 let mut flash_pane: Option<uuid::Uuid> = None;
                 // (pane label, OSC 9 body). The label rides along so the
                 // body can be redacted under Privacy Mode at delivery time
                 // (resolved after the tabs borrow ends, like smart tabs).
                 let mut pending_notification: Option<(String, String)> = None;
-                let capture_enabled = self.prefs.command_history;
-                let log_full = self.prefs.session_log_full;
+                let capture_enabled = self.vaults.cur().prefs.command_history;
+                let log_full = self.vaults.cur().prefs.session_log_full;
                 // Smart tabs: policy snapshots taken before the tabs borrow.
-                let smart_enabled = self.prefs.smart_tabs;
-                let smart_long = self.prefs.smart_long_secs;
+                let smart_enabled = self.vaults.cur().prefs.smart_tabs;
+                let smart_long = self.vaults.cur().prefs.smart_long_secs;
                 let active_tab = self.cur_active_tab();
                 // "Watched" needs the terminal on screen: an active tab is
                 // invisible while the user sits in the Dashboard /

@@ -247,7 +247,7 @@ impl Oryxis {
                     crate::keynav::RowAction::input(iced::widget::Id::new("editor-keepalive")),
                     10.0,
                     text_input(
-                        &self.prefs.keepalive_interval,
+                        &self.vaults.cur().prefs.keepalive_interval,
                         &self.editor_form.keepalive_interval,
                     )
                         .id(iced::widget::Id::new("editor-keepalive"))

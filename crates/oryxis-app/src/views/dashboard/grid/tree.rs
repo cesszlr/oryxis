@@ -486,7 +486,7 @@ impl Oryxis {
         // The login the dial will use (folder default, identity), not
         // the raw field: it names the row and hints the OS badge.
         let username = self.effective_username(conn);
-        let subtitle = if self.prefs.show_host_address {
+        let subtitle = if self.vaults.cur().prefs.show_host_address {
             use oryxis_core::models::connection::ConnectionProtocol;
             let address = crate::util::host_address_label(conn, username.as_deref());
             let address = if self.privacy_active(conn) && self.cur_nav().hover.card != Some(idx) {
@@ -523,7 +523,7 @@ impl Oryxis {
         );
         let host_style = crate::widgets::resolve_host_icon_style(
             conn.icon_style.as_deref(),
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         let badge_color = conn
             .custom_color
@@ -763,7 +763,7 @@ impl Oryxis {
         glyph: BrandIcon,
     ) -> Element<'a, Message> {
         let host_style =
-            crate::widgets::resolve_host_icon_style(None, &self.prefs.default_host_icon);
+            crate::widgets::resolve_host_icon_style(None, &self.vaults.cur().prefs.default_host_icon);
         crate::widgets::host_icon(
             host_style,
             bg,

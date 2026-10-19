@@ -684,7 +684,7 @@ impl Oryxis {
         // Multi-host monitor dashboard (issue #95), a pill by owner
         // call; hidden with the master monitoring toggle like every
         // other trace of the feature (optional-features rule).
-        if self.prefs.host_monitoring {
+        if self.vaults.cur().prefs.host_monitoring {
             defs.push(("monitor_dash_pill", View::Monitoring));
         }
         defs

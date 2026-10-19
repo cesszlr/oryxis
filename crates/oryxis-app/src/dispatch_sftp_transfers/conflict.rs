@@ -40,7 +40,7 @@ impl Oryxis {
                     return Ok(Task::none());
                 }
                 let apply_to_all = prompt.apply_to_all;
-                let temp_name = self.prefs.sftp_upload_temp_name;
+                let temp_name = self.vaults.cur().prefs.sftp_upload_temp_name;
                 let downloading =
                     prompt.direction == crate::state::OverwriteDirection::Download;
                 // The dual-pane navigation client is only a fallback

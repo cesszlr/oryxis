@@ -36,7 +36,7 @@ impl Oryxis {
             crate::views::tab_bar::tab_bar_pos(),
             self.strip_cursor(),
             self.cur_window_size(),
-            self.prefs.pinned_tabs_top_bar && !self.top_bar_hidden(),
+            self.vaults.cur().prefs.pinned_tabs_top_bar && !self.top_bar_hidden(),
         )
     }
 
@@ -89,7 +89,7 @@ impl Oryxis {
         // Header included, like the OS-drop router: a reported rect is
         // the pane's body, so aiming at the header strip would miss the
         // pane it belongs to.
-        let headers = dest.panes_have_headers(self.prefs.pane_headers);
+        let headers = dest.panes_have_headers(self.vaults.cur().prefs.pane_headers);
         let rects: Vec<(PaneHandle, Rectangle)> = dest
             .pane_grid
             .panes

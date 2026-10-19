@@ -108,6 +108,9 @@ pub(crate) struct OpenVault {
     /// Only `PaneOrigin::Host` panes qualify: a quick-connect id is
     /// in-memory and a local shell has no host to key on.
     pub(crate) files_recent_folders: std::collections::HashMap<uuid::Uuid, Vec<String>>,
+    /// What the user configured in this vault (every preference that is
+    /// not the device's, see `state::DevicePrefs`).
+    pub(crate) prefs: crate::state::AppPrefs,
 }
 
 impl OpenVault {
@@ -141,6 +144,7 @@ impl OpenVault {
             custom_terminal_themes: Vec::new(),
             custom_ui_themes: Vec::new(),
             files_recent_folders: std::collections::HashMap::new(),
+            prefs: crate::state::AppPrefs::default(),
         }
     }
 }

@@ -131,11 +131,11 @@ impl Oryxis {
     /// funnel), which is the one place every pane passes through no
     /// matter which of the half-dozen creation paths made it.
     pub(crate) fn apply_highlight_rules(&mut self) {
-        let (compiled, errors) = compile(&self.prefs.highlight_rules);
+        let (compiled, errors) = compile(&self.vaults.cur().prefs.highlight_rules);
         for (id, err) in &errors {
             tracing::warn!("highlight rule {id} did not compile: {err}");
         }
-        self.prefs.compiled_highlight_rules = compiled;
+        self.vaults.cur_mut().prefs.compiled_highlight_rules = compiled;
     }
 
     /// The compiled rules a pane on `conn_id` should paint and watch
@@ -150,7 +150,7 @@ impl Oryxis {
     /// one, or receives one over sync, and one of them would eventually
     /// be missed.
     pub(crate) fn highlight_rules_for(&self, conn_id: Option<uuid::Uuid>) -> Arc<CompiledRules> {
-        let global = self.prefs.compiled_highlight_rules.clone();
+        let global = self.vaults.cur().prefs.compiled_highlight_rules.clone();
         let Some(id) = conn_id else {
             return global;
         };
@@ -183,7 +183,7 @@ impl Oryxis {
         if let Some(rules) = cached {
             return rules;
         }
-        let effective = effective_rules(&self.prefs.highlight_rules, Some(host));
+        let effective = effective_rules(&self.vaults.cur().prefs.highlight_rules, Some(host));
         let (compiled, errors) = compile(&effective);
         for (rule_id, err) in &errors {
             tracing::warn!("highlight rule {rule_id} did not compile: {err}");
@@ -200,7 +200,7 @@ impl Oryxis {
 
     /// Persist the current rule list and apply it.
     pub(crate) fn save_highlight_rules(&mut self) {
-        let json = serde_json::to_string(&self.prefs.highlight_rules).unwrap_or_default();
+        let json = serde_json::to_string(&self.vaults.cur().prefs.highlight_rules).unwrap_or_default();
         self.persist_setting(SETTING_KEY, &json);
         self.apply_highlight_rules();
     }

@@ -184,26 +184,26 @@ impl Oryxis {
     }
 
     pub(crate) fn new_connection_form(&self) -> crate::state::ConnectionForm {
-        let term = &self.prefs.default_terminal_type;
+        let term = &self.vaults.cur().prefs.default_terminal_type;
         // Resolve the entity-reference defaults (identity / key / group /
         // proxy) to the label the form uses, dropping any that point at a
         // deleted entity so a stale default never blocks a new host.
-        let default_identity = self.prefs.default_identity_id.and_then(|id| {
+        let default_identity = self.vaults.cur().prefs.default_identity_id.and_then(|id| {
             self.vaults.cur().identities.iter().find(|i| i.id == id).map(|i| i.label.clone())
         });
         let default_key = self
-            .prefs.default_key_id
+            .vaults.cur().prefs.default_key_id
             .and_then(|id| self.vaults.cur().keys.iter().find(|k| k.id == id))
             // A Certificate default only accepts cert-carrying keys (the
             // combo filters them out, so a bare default would be stuck).
             .filter(|k| {
-                self.prefs.default_auth_method
+                self.vaults.cur().prefs.default_auth_method
                     != oryxis_core::models::connection::AuthMethod::Certificate
                     || k.certificate.is_some()
             })
             .map(|k| k.label.clone());
         let default_group = self
-            .prefs.default_group_id
+            .vaults.cur().prefs.default_group_id
             .filter(|id| self.vaults.cur().groups.iter().any(|g| g.id == *id))
             .map(|id| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, id))
             .unwrap_or_default();
@@ -211,33 +211,33 @@ impl Oryxis {
         // proxies are per-host by nature and aren't defaulted. Drop a
         // dangling reference (identity deleted) back to no proxy.
         let proxy_kind = self
-            .prefs.default_proxy_identity_id
+            .vaults.cur().prefs.default_proxy_identity_id
             .filter(|id| self.vaults.cur().proxy_identities.iter().any(|p| p.id == *id))
             .map(crate::state::ProxyKind::Identity)
             .unwrap_or(crate::state::ProxyKind::None);
         crate::state::ConnectionForm {
-            agent_forwarding: self.prefs.default_agent_forwarding,
-            port: if self.prefs.default_port.is_empty() || self.prefs.default_port == "0" {
+            agent_forwarding: self.vaults.cur().prefs.default_agent_forwarding,
+            port: if self.vaults.cur().prefs.default_port.is_empty() || self.vaults.cur().prefs.default_port == "0" {
                 "22".to_string()
             } else {
-                self.prefs.default_port.clone()
+                self.vaults.cur().prefs.default_port.clone()
             },
-            keepalive_interval: self.prefs.default_keepalive.clone(),
+            keepalive_interval: self.vaults.cur().prefs.default_keepalive.clone(),
             terminal_type: if term.is_empty() || term == "xterm-256color" {
                 None
             } else {
                 Some(term.clone())
             },
-            username: self.prefs.default_username.clone(),
-            auth_method: self.prefs.default_auth_method.clone(),
+            username: self.vaults.cur().prefs.default_username.clone(),
+            auth_method: self.vaults.cur().prefs.default_auth_method.clone(),
             selected_identity: default_identity,
             selected_key: default_key,
             group_name: default_group,
             proxy_kind,
-            mcp_enabled: self.prefs.default_mcp_enabled,
+            mcp_enabled: self.vaults.cur().prefs.default_mcp_enabled,
             monitor_enabled: false,
-            encoding: self.prefs.default_encoding.clone(),
-            env_vars: self.prefs.default_env_vars.clone(),
+            encoding: self.vaults.cur().prefs.default_encoding.clone(),
+            env_vars: self.vaults.cur().prefs.default_env_vars.clone(),
             ..crate::state::ConnectionForm::default()
         }
     }

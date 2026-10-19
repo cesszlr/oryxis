@@ -758,7 +758,7 @@ impl Oryxis {
                 Message::Navigation(NavigationMessage::ChangeView(View::KnownHosts)),
                 self.hotkey_label_for_vault_slot(8)
             )),
-            if self.prefs.host_monitoring {
+            if self.vaults.cur().prefs.host_monitoring {
                 indent(item(
                     "monitor_dash_pill",
                     Message::Navigation(NavigationMessage::ChangeView(View::Monitoring)),
@@ -788,7 +788,7 @@ impl Oryxis {
             // The network tools panel's only door, and it exists only
             // while the feature is on (the optional-features rule: off
             // means no UI at all, not a disabled row).
-            if self.prefs.network_tools {
+            if self.vaults.cur().prefs.network_tools {
                 item(
                     "network_tools",
                     Message::Navigation(NavigationMessage::ChangeView(View::NetworkTools)),

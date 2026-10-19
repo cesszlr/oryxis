@@ -243,7 +243,7 @@ impl Oryxis {
                 width,
                 badge_accent,
                 host_accent,
-                self.prefs.tab_accent_text,
+                self.vaults.cur().prefs.tab_accent_text,
                 tab.pinned,
                 ctx.solid_fill,
                 number,
@@ -354,7 +354,7 @@ impl Oryxis {
         // its keep. The mapping itself is `TabConnState::dot_color`,
         // shared with the per-pane header so the two cannot drift.
         let status_dot: Option<Color> = self
-            .prefs
+            .vaults.cur().prefs
             .show_tab_status_dot
             .then(|| self.tab_conn_state(idx).dot_color())
             .flatten();
@@ -366,7 +366,7 @@ impl Oryxis {
         // visible from the strip, not just once you switch back to it.
         let attention_dot: Option<Color> = if tab.broadcast && !is_active {
             Some(OryxisColors::t().warning)
-        } else if self.prefs.smart_tabs {
+        } else if self.vaults.cur().prefs.smart_tabs {
             tab.pane_grid
                 .panes
                 .values()
@@ -393,12 +393,12 @@ impl Oryxis {
         // as the finished-command notification (toggle + threshold);
         // the frame advances on `BusyAnimTick`, whose subscription only
         // exists while a command is in flight.
-        let busy_frame: Option<u8> = (self.prefs.smart_tabs
-            && self.prefs.smart_long_secs > 0
+        let busy_frame: Option<u8> = (self.vaults.cur().prefs.smart_tabs
+            && self.vaults.cur().prefs.smart_long_secs > 0
             && tab.pane_grid.panes.values().any(|p| {
                 p.running_cmd.as_ref().is_some_and(|run| {
                     run.started.elapsed().as_secs()
-                        >= u64::from(self.prefs.smart_long_secs)
+                        >= u64::from(self.vaults.cur().prefs.smart_long_secs)
                 })
             }))
         .then_some((self.busy_anim_tick % 3) as u8);
@@ -440,7 +440,7 @@ impl Oryxis {
         //
         // Privacy Mode masks it in blocks and reveals on hover, exactly
         // like the card address, rather than redacting it as a label.
-        let tab_address: Option<String> = if self.prefs.show_tab_host_address
+        let tab_address: Option<String> = if self.vaults.cur().prefs.show_tab_host_address
             && tab.custom_name.is_none()
         {
             self.pane_origin_connection(tab.active().id).map(|c| {
@@ -502,7 +502,7 @@ impl Oryxis {
                 status_dot,
                 attention_dot,
                 busy_frame,
-                self.prefs.tab_accent_text,
+                self.vaults.cur().prefs.tab_accent_text,
                 ctx.solid_fill,
                 mode,
                 number,
@@ -553,7 +553,7 @@ impl Oryxis {
                 attention_dot,
                 busy_frame,
                 tab_accent,
-                self.prefs.tab_accent_text,
+                self.vaults.cur().prefs.tab_accent_text,
                 host_icon_style,
                 tab_icon,
                 tab_badge_color,
@@ -610,7 +610,7 @@ impl Oryxis {
                 .unwrap_or_else(|| OryxisColors::t().accent);
             let ghost_w = if compact { CHIP_W } else { drag_uniform_w };
             Some((
-                drag_ghost(base_label, detected_os, compact, ghost_w, accent, self.prefs.tab_accent_text, sg_icon, sg_color),
+                drag_ghost(base_label, detected_os, compact, ghost_w, accent, self.vaults.cur().prefs.tab_accent_text, sg_icon, sg_color),
                 ghost_w,
             ))
         } else if let Some(sftp_tab) = self.sftp_tabs.iter().find(|t| t.id == dragged) {
@@ -646,7 +646,7 @@ impl Oryxis {
                     ghost_w,
                     badge_accent,
                     accent,
-                    self.prefs.tab_accent_text,
+                    self.vaults.cur().prefs.tab_accent_text,
                 ),
                 ghost_w,
             ))

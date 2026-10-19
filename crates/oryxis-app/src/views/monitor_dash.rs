@@ -45,7 +45,7 @@ impl Oryxis {
             // becomes a dead end: with the live-only filter on, hosts
             // ARE opted in and the board is waiting for a session
             // instead (issue #197).
-            let waiting_for_session = self.prefs.monitor_dash_live_only
+            let waiting_for_session = self.vaults.cur().prefs.monitor_dash_live_only
                 && self.vaults.cur().connections.iter().any(|c| self.monitor_conn_opted_in(c));
             let (empty, hint) = if waiting_for_session {
                 ("monitor_dash_empty_live", "monitor_dash_empty_live_hint")
@@ -124,7 +124,7 @@ impl Oryxis {
         );
         let view_toggle = self.keynav_toolbar_ring(
             crate::keynav::ToolbarItem::ViewToggle,
-            dash_view_toggle_button(self.prefs.monitor_dash_list_view),
+            dash_view_toggle_button(self.vaults.cur().prefs.monitor_dash_list_view),
         );
         self.keynav_toolbar_reset();
         if self.host_tag_filter_available() {
@@ -178,7 +178,7 @@ impl Oryxis {
             - panel_w
             - 48.0)
             .max(0.0);
-        let list_mode = self.prefs.monitor_dash_list_view;
+        let list_mode = self.vaults.cur().prefs.monitor_dash_list_view;
         let body: Element<'_, Message> = if list_mode {
             self.dash_table(hosts)
         } else {

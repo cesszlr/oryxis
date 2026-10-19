@@ -49,7 +49,7 @@ impl Oryxis {
     /// connection when the editor is saved.
     fn rules_of(&mut self, scope: RuleScope) -> &mut Vec<HighlightRule> {
         match scope {
-            RuleScope::Global => &mut self.prefs.highlight_rules,
+            RuleScope::Global => &mut self.vaults.cur_mut().prefs.highlight_rules,
             RuleScope::Host => &mut self.editor_form.highlight_rules.rules,
         }
     }

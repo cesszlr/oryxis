@@ -220,7 +220,7 @@ impl Oryxis {
         // Auditable by design: output on a remote host caused a command
         // to run on it, and that should be findable in the log.
         tracing::info!(rule = rule_id, %pane_id, "highlight rule sent its snippet");
-        let snap = self.prefs.scrollback_reset_keypress;
+        let snap = self.vaults.cur().prefs.scrollback_reset_keypress;
         let mut bytes = text.into_bytes();
         bytes.push(b'\n');
         for tab in &mut self.tabs {

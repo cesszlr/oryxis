@@ -78,7 +78,7 @@ impl Oryxis {
         &self,
     ) -> Option<(crate::state::SidebarSide, TerminalSidebarTab)> {
         if let Some((tab, _)) = self.keynav.sidebar_selected
-            && let Some(side) = self.prefs.sidebar_tab_side(tab)
+            && let Some(side) = self.vaults.cur().prefs.sidebar_tab_side(tab)
             && self.effective_sidebar_tab(side) == Some(tab)
         {
             return Some((side, tab));
@@ -157,7 +157,7 @@ impl Oryxis {
         tab: TerminalSidebarTab,
     ) -> &std::cell::RefCell<Vec<SidebarRow>> {
         let side = self
-            .prefs
+            .vaults.cur().prefs
             .sidebar_tab_side(tab)
             .unwrap_or(crate::state::SidebarSide::Right);
         &self.keynav.sidebar_items[side.idx()]
@@ -700,7 +700,7 @@ impl Oryxis {
         // Open the target's region (a no-op when already open) and
         // make the target its shown tab. Targets come from
         // `sidebar_region_tabs`, so they always have a side.
-        let Some(target_side) = self.prefs.sidebar_tab_side(target) else {
+        let Some(target_side) = self.vaults.cur().prefs.sidebar_tab_side(target) else {
             return Task::none();
         };
         if let Some(tab) = self.tabs.get_mut(idx) {

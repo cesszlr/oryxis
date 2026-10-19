@@ -535,9 +535,9 @@ impl Oryxis {
                 .with_font_name(&self.terminal_font_name)
                 .with_font_weight(self.terminal_font_weight.font_weight())
                 .with_text_dilation(self.terminal_text_thickness.px())
-                .with_copy_on_select(self.prefs.copy_on_select)
-                .with_right_click_copy(self.prefs.right_click_copy)
-                .with_right_click_action(self.prefs.terminal_right_click.to_widget())
+                .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
+                .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
+                .with_right_click_action(self.vaults.cur().prefs.terminal_right_click.to_widget())
                 .with_terminal_chords(self.terminal_chord_resolver())
                 // A recording has no live edge to snap back to, and the
                 // "reset on output" snap must not fight the open-at-top
@@ -547,18 +547,18 @@ impl Oryxis {
                 // player never writes to a PTY, which is where the app
                 // queues that snap (issue #111).
                 .with_reset_scroll_on_output(false)
-                .with_bold_is_bright(self.prefs.bold_is_bright)
-                .with_keyword_highlight(self.prefs.keyword_highlight)
+                .with_bold_is_bright(self.vaults.cur().prefs.bold_is_bright)
+                .with_keyword_highlight(self.vaults.cur().prefs.keyword_highlight)
                 // Colours only: this backend is never given the rules, so
                 // a recording can be read without its triggers firing
                 // again years later.
-                .with_highlight_rules(self.prefs.compiled_highlight_rules.clone())
-                .with_performance(self.prefs.performance_mode)
+                .with_highlight_rules(self.vaults.cur().prefs.compiled_highlight_rules.clone())
+                .with_performance(self.vaults.cur().prefs.performance_mode)
                 .with_privacy(mask)
                 .with_privacy_terms(&self.privacy_terms())
                 .with_privacy_classes(self.privacy_classes())
-                .with_smart_contrast(self.prefs.smart_contrast)
-                .with_word_delimiters(&self.prefs.word_delimiters)
+                .with_smart_contrast(self.vaults.cur().prefs.smart_contrast)
+                .with_word_delimiters(&self.vaults.cur().prefs.word_delimiters)
                 // Same confirmation as a live remote pane: the transcript
                 // is the remote host's text, OSC 8 labels included.
                 .on_link_activate(|url| {
@@ -568,7 +568,7 @@ impl Oryxis {
             // own, so wire the read-only transcript context menu (Copy /
             // Copy All). The Paste and Extend schemes copy a live
             // selection without a menu, so they need no wiring here.
-            let term_view = if self.prefs.terminal_right_click
+            let term_view = if self.vaults.cur().prefs.terminal_right_click
                 == crate::util::RightClickMode::Menu
             {
                 term_view.on_context_menu(|x, y, sel| {
@@ -631,7 +631,7 @@ impl Oryxis {
             if let Some(idx) = viewed_idx {
                 // Play pairs with full-detail recording, same gate as
                 // the row menu (owner call 2026-07-04).
-                if self.prefs.session_log_full {
+                if self.vaults.cur().prefs.session_log_full {
                     header_items.push(viewer_header_btn(
                         iced_fonts::lucide::play()
                             .size(11)
@@ -875,7 +875,7 @@ impl Oryxis {
         // the global accent.
         let icon_style = crate::widgets::resolve_host_icon_style(
             conn.and_then(|c| c.icon_style.as_deref()),
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         let detected_os = conn.and_then(|c| c.detected_os.as_deref());
         let (glyph, default_color) = crate::os_icon::resolve_icon(

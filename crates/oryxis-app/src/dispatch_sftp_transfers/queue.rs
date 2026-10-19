@@ -75,7 +75,7 @@ impl Oryxis {
             SftpMessage::SftpTransferNext(_) => {
                 // Read before the slot borrow below, which runs to the end
                 // of the arm.
-                let temp_name = self.prefs.sftp_upload_temp_name;
+                let temp_name = self.vaults.cur().prefs.sftp_upload_temp_name;
                 let Some(book) = self.transfer_slot_mut(owner) else {
                     return Ok(Task::none());
                 };

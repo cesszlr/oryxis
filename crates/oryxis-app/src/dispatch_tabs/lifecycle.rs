@@ -235,7 +235,7 @@ impl Oryxis {
             });
             return Task::none();
         }
-        if self.prefs.confirm_close_session_tab && self.tab_has_live_session(idx) {
+        if self.vaults.cur().prefs.confirm_close_session_tab && self.tab_has_live_session(idx) {
             let Some(tab) = self.tabs.get(idx) else {
                 return Task::none();
             };
@@ -360,7 +360,7 @@ impl Oryxis {
             })
             .collect();
         let live = self.live_session_count(&doomed);
-        if live > 0 && self.prefs.confirm_close_session_tab {
+        if live > 0 && self.vaults.cur().prefs.confirm_close_session_tab {
             self.batch_close_confirm(
                 "close_others_title",
                 "close_others_body",
@@ -427,7 +427,7 @@ impl Oryxis {
             .filter(|&i| !self.tabs[i].pinned && self.shows_tab(i))
             .collect();
         let live = self.live_session_count(&doomed);
-        if live > 0 && self.prefs.confirm_close_session_tab {
+        if live > 0 && self.vaults.cur().prefs.confirm_close_session_tab {
             self.batch_close_confirm(
                 "close_all_title",
                 "close_all_body",
@@ -821,7 +821,7 @@ impl Oryxis {
     /// starts, a PTY that refuses to spawn); this covers the one we can.
     fn arm_tab_placement(&mut self, source_id: uuid::Uuid) {
         use crate::state::{PendingTabPlacement, TabPlacement};
-        let placement = TabPlacement::from_setting(&self.prefs.duplicate_tab_position);
+        let placement = TabPlacement::from_setting(&self.vaults.cur().prefs.duplicate_tab_position);
         // Appending IS what an unarmed spawn does, so leave it unarmed
         // and there is nothing that can go stale.
         if placement == TabPlacement::End {

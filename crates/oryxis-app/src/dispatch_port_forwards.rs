@@ -898,7 +898,7 @@ impl Oryxis {
             // different question from "keep it up", and it left a manually
             // started forward silently dead after a network blip while
             // every terminal tab climbed back on its own.
-            PfRetryCause::Dropped => self.prefs.auto_reconnect || is_auto,
+            PfRetryCause::Dropped => self.vaults.cur().prefs.auto_reconnect || is_auto,
             // A start the user just watched fail shows its error instead
             // of looping behind their back. Only an auto_start rule, whose
             // attempt nobody is watching, retries from here.
@@ -1007,7 +1007,7 @@ impl Oryxis {
     /// heartbeat and the census kick.
     fn pf_issue_due_retries(&mut self, now: Instant) -> Task<Message> {
         let ids: Vec<Uuid> = self.port_forward_retry.keys().copied().collect();
-        let auto_reconnect = self.prefs.auto_reconnect;
+        let auto_reconnect = self.vaults.cur().prefs.auto_reconnect;
         let mut due = Vec::new();
         for id in ids {
             let still_wanted = self

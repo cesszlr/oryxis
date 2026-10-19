@@ -397,7 +397,7 @@ impl Oryxis {
         use keyboard::key::Named;
         let items = self.keynav.subnav_items.borrow().clone();
         // The Settings sections sidebar is always a vertical list.
-        let vertical = self.prefs.nav_orientation == "vertical"
+        let vertical = self.vaults.cur().prefs.nav_orientation == "vertical"
             || self.cur_view() == View::Settings;
         let rtl = crate::i18n::is_rtl_layout();
         let new = match (named, vertical) {
@@ -456,7 +456,7 @@ impl Oryxis {
         // as a surprise fold state once the needle clears.
         if matches!(named, Named::ArrowLeft | Named::ArrowRight)
             && self.cur_view() == View::Dashboard
-            && self.prefs.host_view_mode == crate::state::HostViewMode::Tree
+            && self.vaults.cur().prefs.host_view_mode == crate::state::HostViewMode::Tree
             && self.cur_nav().host_search.trim().is_empty()
             && let NavItem::Dash(DashNavItem::Group(gid)) = cur
             && self
@@ -517,7 +517,7 @@ impl Oryxis {
         match zone {
             FocusZone::Content => self.keynav_scroll_content_to(item),
             FocusZone::SubNav => {
-                let vertical = self.prefs.nav_orientation == "vertical"
+                let vertical = self.vaults.cur().prefs.nav_orientation == "vertical"
                     || self.cur_view() == View::Settings;
                 if vertical {
                     self.panels.subnav_overflow = false;
@@ -853,7 +853,7 @@ impl Oryxis {
             // place (there is no drill-down to open); dynamic groups
             // keep the drill into their cloud screen.
             NavItem::Dash(DashNavItem::Group(gid))
-                if self.prefs.host_view_mode == crate::state::HostViewMode::Tree
+                if self.vaults.cur().prefs.host_view_mode == crate::state::HostViewMode::Tree
                     && self.vaults.cur().groups.iter().any(|g| g.id == gid && g.cloud_query.is_none()) =>
             {
                 Message::Ai(crate::app::AiMessage::HostsTreeToggleGroup(gid))
@@ -966,7 +966,7 @@ impl Oryxis {
             // List AND tree are one item per row; only the card grid
             // is 2-D.
             View::Dashboard => {
-                self.prefs.host_view_mode != crate::state::HostViewMode::Grid
+                self.vaults.cur().prefs.host_view_mode != crate::state::HostViewMode::Grid
             }
             View::Keys | View::Snippets | View::Cloud | View::PortForwarding => false,
             // Settings rows and the remaining vault views are
@@ -983,7 +983,7 @@ impl Oryxis {
         let (id, row_h) = match self.cur_view() {
             View::Dashboard => (
                 "dashboard-grid-scroll",
-                match self.prefs.host_view_mode {
+                match self.vaults.cur().prefs.host_view_mode {
                     crate::state::HostViewMode::Grid => 60.0,
                     crate::state::HostViewMode::List => 56.0,
                     // Dense rows: 26 px content + 2x4 padding + list
@@ -1009,7 +1009,7 @@ impl Oryxis {
             // starts.
             View::Monitoring => (
                 "monitor-dash-scroll",
-                if self.prefs.monitor_dash_list_view { 34.0 } else { 150.0 },
+                if self.vaults.cur().prefs.monitor_dash_list_view { 34.0 } else { 150.0 },
             ),
             _ => return None,
         };

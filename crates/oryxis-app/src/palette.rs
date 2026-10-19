@@ -201,7 +201,7 @@ impl Oryxis {
         if self.sftp_enabled {
             items.push(("SFTP", S::Sftp));
         }
-        if self.prefs.host_monitoring {
+        if self.vaults.cur().prefs.host_monitoring {
             items.push((t("settings_section_monitoring"), S::Monitoring));
         }
         if self.sync.enabled {

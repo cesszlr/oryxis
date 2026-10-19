@@ -213,7 +213,7 @@ impl Oryxis {
     /// clears the row on its way out, so a user who never asked for this
     /// has no list of their hosts sitting next to a locked vault.
     pub(crate) fn persist_open_tabs(&self) {
-        if !self.prefs.restore_tabs_on_launch {
+        if !self.vaults.cur().prefs.restore_tabs_on_launch {
             return;
         }
         let mut specs: Vec<crate::state::PinnedTabSpec> = Vec::new();
@@ -244,7 +244,7 @@ impl Oryxis {
         // The chip to land on, only while the user asked to land there
         // (issue #229): the row is cleared when either preference goes
         // off, so an absent write here is what keeps it cleared.
-        if self.prefs.restore_last_active_tab {
+        if self.vaults.cur().prefs.restore_last_active_tab {
             let active = self
                 .active_strip_ref()
                 .and_then(|a| serde_json::to_string(&a).ok())
@@ -360,7 +360,7 @@ impl Oryxis {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        if !self.prefs.restore_tabs_on_launch {
+        if !self.vaults.cur().prefs.restore_tabs_on_launch {
             return;
         }
         // One pass over each list, not a search per strip entry: this
@@ -388,7 +388,7 @@ impl Oryxis {
         // the strip itself is already in the hash, so which entry is
         // active is all that can still move the reference, and naming
         // it builds no spec. The key is computed on the write only.
-        if self.prefs.restore_last_active_tab {
+        if self.vaults.cur().prefs.restore_last_active_tab {
             self.active_strip_target().map(|r| r.strip_id()).hash(&mut h);
         }
         let signature = h.finish();
@@ -419,7 +419,7 @@ impl Oryxis {
         if std::mem::replace(&mut self.open_tabs_restored, true) {
             return;
         }
-        if !self.prefs.restore_tabs_on_launch {
+        if !self.vaults.cur().prefs.restore_tabs_on_launch {
             return;
         }
         let json = self
@@ -430,7 +430,7 @@ impl Oryxis {
         // strip, so a landing on one of them resolves even when the
         // list itself is empty.
         let active: Option<crate::state::ActiveTabRef> = self
-            .prefs
+            .vaults.cur().prefs
             .restore_last_active_tab
             .then_some(self.vaults.cur().store.as_ref())
             .flatten()
@@ -503,8 +503,8 @@ impl Oryxis {
     /// time only; a pick changed mid-session applies to the next launch,
     /// like the restore toggle itself.
     fn launch_dials_wanted(&self) -> bool {
-        self.prefs.restore_tabs_on_launch
-            && self.prefs.restore_tabs_connect == "launch"
+        self.vaults.cur().prefs.restore_tabs_on_launch
+            && self.vaults.cur().prefs.restore_tabs_connect == "launch"
     }
 
     /// Recreate pinned tabs as dormant placeholders at boot. They show in the

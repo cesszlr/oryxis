@@ -100,7 +100,7 @@ impl Oryxis {
         if tab.console_pane().is_some() {
             return self.show_tab_surface(tab_idx, TabSurface::Console);
         }
-        let layout = self.prefs.sftp_console_layout;
+        let layout = self.vaults.cur().prefs.sftp_console_layout;
         let target = tab.focused;
         // Files mode hides the whole grid, so a console split behind it
         // would open where nobody can see it. Leaving first also makes

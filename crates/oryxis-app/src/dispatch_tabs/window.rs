@@ -513,7 +513,7 @@ impl Oryxis {
         // leave a taskbar slot). Everywhere else and when
         // the toggle is off we fall through to the real
         // iced::window::minimize call.
-        if self.prefs.minimize_to_tray && cfg!(target_os = "windows") {
+        if self.device_prefs.minimize_to_tray && cfg!(target_os = "windows") {
             self.is_window_hidden = true;
             // Reveal the icon in the same frame the window vanishes.
             // The tray heartbeat would also get there via the signature,
@@ -559,7 +559,7 @@ impl Oryxis {
         if self.window_count() > 1 {
             return self.request_close_this_window();
         }
-        if self.prefs.confirm_close_session_tab
+        if self.vaults.cur().prefs.confirm_close_session_tab
             && !(self.tabs.is_empty() && self.sftp_tabs.is_empty())
             && !self.hides_to_tray()
         {
@@ -605,7 +605,7 @@ impl Oryxis {
     /// copies of the predicate would eventually answer differently, and
     /// the failure would be an ask that never fires.
     fn hides_to_tray(&self) -> bool {
-        self.prefs.close_to_tray && cfg!(target_os = "windows")
+        self.device_prefs.close_to_tray && cfg!(target_os = "windows")
     }
 
     /// The window close itself, with no prompt: teardown, tray-or-real

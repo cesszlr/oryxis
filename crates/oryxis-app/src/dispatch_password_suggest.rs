@@ -230,7 +230,7 @@ impl Oryxis {
     /// over the Dashboard, and the overlay slot is single: opening over
     /// a kebab menu the user is mid-click on would steal it.
     pub(crate) fn password_suggest_target(&self) -> Option<uuid::Uuid> {
-        if !self.prefs.terminal_password_autofill || self.overlay.is_some() {
+        if !self.vaults.cur().prefs.terminal_password_autofill || self.overlay.is_some() {
             return None;
         }
         // A blocking modal owns the screen and the keyboard (a host-key

@@ -102,7 +102,7 @@ impl Oryxis {
         &mut self,
         key: &ReuseKey,
     ) -> Option<Arc<oryxis_ssh::SshTransport>> {
-        if !self.prefs.ssh_connection_reuse {
+        if !self.vaults.cur().prefs.ssh_connection_reuse {
             return None;
         }
         let entry = self.ssh_transport_pool.get(key)?;
@@ -124,7 +124,7 @@ impl Oryxis {
     /// Remember a freshly dialled connection so the next tab to the
     /// same host can ride it.
     pub(crate) fn remember_transport(&mut self, key: ReuseKey, session: &oryxis_ssh::SshSession) {
-        if !self.prefs.ssh_connection_reuse {
+        if !self.vaults.cur().prefs.ssh_connection_reuse {
             return;
         }
         self.ssh_transport_pool

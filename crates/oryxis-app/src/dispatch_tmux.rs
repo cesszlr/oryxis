@@ -464,7 +464,7 @@ impl Oryxis {
         &self,
         pane_id: Uuid,
     ) -> Option<std::sync::Arc<oryxis_ssh::SshSession>> {
-        if !self.prefs.tmux_manager {
+        if !self.vaults.cur().prefs.tmux_manager {
             return None;
         }
         let pane = self

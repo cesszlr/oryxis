@@ -17,11 +17,11 @@ impl Oryxis {
 
             // ── Biometric (OS-keystore) unlock ──
             VaultMessage::ToggleBiometricUnlock => {
-                if self.prefs.biometric_unlock_enabled {
+                if self.vaults.cur().prefs.biometric_unlock_enabled {
                     // Opt out: forget the stored secret unconditionally, then
                     // flip the setting off and persist.
                     self.biometric_forget();
-                    self.prefs.biometric_unlock_enabled = false;
+                    self.vaults.cur_mut().prefs.biometric_unlock_enabled = false;
                     self.persist_setting("biometric_unlock_enabled", "false");
                 } else {
                     // Opt in: needs an available backend and the master
@@ -46,7 +46,7 @@ impl Oryxis {
                     };
                     match self.biometric_vault().map(|bv| bv.enroll(&pw)) {
                         Some(Ok(())) => {
-                            self.prefs.biometric_unlock_enabled = true;
+                            self.vaults.cur_mut().prefs.biometric_unlock_enabled = true;
                             self.persist_setting("biometric_unlock_enabled", "true");
                         }
                         Some(Err(e)) => {

@@ -463,8 +463,8 @@ impl Oryxis {
                 _ => None,
             })
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
-            .map(|c| c.sidebar_auto_open.unwrap_or(self.prefs.sidebar_auto_open))
-            .unwrap_or(self.prefs.sidebar_auto_open);
+            .map(|c| c.sidebar_auto_open.unwrap_or(self.vaults.cur().prefs.sidebar_auto_open))
+            .unwrap_or(self.vaults.cur().prefs.sidebar_auto_open);
         if auto_open
             && let Some(side) = self.sidebar_auto_open_side()
         {

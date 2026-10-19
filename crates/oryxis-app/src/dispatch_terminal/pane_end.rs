@@ -162,7 +162,7 @@ impl Oryxis {
         if self.tabs[tab_idx].pane_by_id(pane_id).is_some_and(|p| p.ended) {
             return Task::none();
         }
-        if self.prefs.pane_end_action == PaneEndAction::Close {
+        if self.vaults.cur().prefs.pane_end_action == PaneEndAction::Close {
             // Routed through `ClosePane` rather than closing here, so the
             // pane's log flush, monitor reset and sibling re-focus all
             // stay in the one place that already knows how to do them.

@@ -631,7 +631,7 @@ impl Oryxis {
                     //   - and the user hasn't set a custom icon override.
                     // OS detection execs over SSH; Telnet panes skip it
                     // (their icon stays the generic server glyph).
-                    if self.prefs.os_detection
+                    if self.vaults.cur().prefs.os_detection
                         && os_unknown
                         && !has_custom
                         && let Some(ssh) = session.ssh()

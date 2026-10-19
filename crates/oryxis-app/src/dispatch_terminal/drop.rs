@@ -131,7 +131,7 @@ impl Oryxis {
         // reported rect is the body only, so without this a drop on the
         // header strip would fall through to the focused pane instead
         // of the one it was aimed at.
-        let headers = tab.panes_have_headers(self.prefs.pane_headers);
+        let headers = tab.panes_have_headers(self.vaults.cur().prefs.pane_headers);
         let rects: Vec<(Uuid, iced::Rectangle)> = tab
             .pane_grid
             .panes
@@ -281,7 +281,7 @@ impl Oryxis {
     ) -> Task<Message> {
         // Dropping files onto a terminal is still an upload, so it obeys
         // the same scratch-name choice as every other one.
-        let temp_name = self.prefs.sftp_upload_temp_name;
+        let temp_name = self.vaults.cur().prefs.sftp_upload_temp_name;
         let abort = Arc::new(AtomicBool::new(false));
         if let Some(pane) = self.pane_by_id_mut(pane_id) {
             pane.drop_upload = Some(DropUploadPane {

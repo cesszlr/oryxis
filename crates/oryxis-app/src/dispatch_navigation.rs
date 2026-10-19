@@ -73,7 +73,7 @@ impl Oryxis {
                 // this is the guard for everything else that can send a
                 // `ChangeView` (a restored route, a hotkey, a deep link
                 // added later).
-                if view == View::NetworkTools && !self.prefs.network_tools {
+                if view == View::NetworkTools && !self.vaults.cur().prefs.network_tools {
                     return Task::none();
                 }
                 // Navigating away from the Shortcuts editor cancels

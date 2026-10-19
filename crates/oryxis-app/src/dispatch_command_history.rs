@@ -73,10 +73,10 @@ impl Oryxis {
                 };
             }
             CommandHistoryMessage::ToggleCommandHistoryFile => {
-                self.prefs.command_history_file = !self.prefs.command_history_file;
+                self.vaults.cur_mut().prefs.command_history_file = !self.vaults.cur_mut().prefs.command_history_file;
                 self.persist_setting(
                     "command_history_file",
-                    if self.prefs.command_history_file { "true" } else { "false" },
+                    if self.vaults.cur().prefs.command_history_file { "true" } else { "false" },
                 );
             }
             CommandHistoryMessage::PickCommandHistoryDir => {
@@ -93,14 +93,14 @@ impl Oryxis {
             CommandHistoryMessage::CommandHistoryDirPicked(dir) => {
                 if let Some(dir) = dir {
                     self.persist_setting("command_history_file_dir", &dir);
-                    self.prefs.command_history_file_dir = Some(dir);
+                    self.device_prefs.command_history_file_dir = Some(dir);
                 }
             }
             CommandHistoryMessage::ClearCommandHistoryDir => {
                 // An empty value is what boot reads as "default", so the
                 // reset persists the same shape it will be read back as.
                 self.persist_setting("command_history_file_dir", "");
-                self.prefs.command_history_file_dir = None;
+                self.device_prefs.command_history_file_dir = None;
             }
             CommandHistoryMessage::RunHistoryCommand(id) => {
                 self.inject_history_command(id, true);
@@ -178,7 +178,7 @@ impl Oryxis {
         // jumps back to the live edge, so what the user types is on screen
         // instead of hidden below a scrolled-up viewport. Read before the
         // mutable borrow of `self.tabs`.
-        let snap = self.prefs.scrollback_reset_keypress;
+        let snap = self.vaults.cur().prefs.scrollback_reset_keypress;
         if let Some(tab) = self.tabs.get_mut(tab_idx) {
             // Hybrid tab showing its Files (SFTP) surface: the terminal
             // is hidden and the keyboard belongs to the SFTP view (its
@@ -273,7 +273,7 @@ impl Oryxis {
         // one), and yanking a background pane's viewport out from under
         // a reader is the bug scroll-on-input exists to avoid. Same gate
         // `snap_tab_to_live_edge` documents for the AI-exec path.
-        let snap = self.prefs.scrollback_reset_keypress && self.cur_active_tab() == Some(tab_idx);
+        let snap = self.vaults.cur().prefs.scrollback_reset_keypress && self.cur_active_tab() == Some(tab_idx);
         if self.tabs.get(tab_idx).is_some_and(|t| t.files_mode) {
             return;
         }
@@ -300,7 +300,7 @@ impl Oryxis {
     /// bug this whole path exists to avoid. So the snap is gated on the tab
     /// being the visible terminal.
     pub(crate) fn snap_tab_to_live_edge(&self, tab_idx: usize) {
-        if !self.prefs.scrollback_reset_keypress || self.cur_active_tab() != Some(tab_idx) {
+        if !self.vaults.cur().prefs.scrollback_reset_keypress || self.cur_active_tab() != Some(tab_idx) {
             return;
         }
         if let Some(tab) = self.tabs.get(tab_idx)
@@ -321,8 +321,8 @@ impl Oryxis {
         // the mirror runs for any of the three. The capture itself is
         // origin-agnostic and secret-safe by construction; only the
         // command-history vault write below needs a saved host.
-        let want_history = self.prefs.command_history;
-        let want_smart = self.prefs.smart_tabs;
+        let want_history = self.vaults.cur().prefs.command_history;
+        let want_smart = self.vaults.cur().prefs.smart_tabs;
         let mut captured: Vec<(Uuid, String)> = Vec::new();
         let mut session_cmds: Vec<(Uuid, Option<i64>, String)> = Vec::new();
         if let Some(tab) = self.tabs.get_mut(tab_idx) {
@@ -401,7 +401,7 @@ impl Oryxis {
         // Optional plain-text mirror: append to the host's log file for
         // offline reference / support sharing. Plain filesystem write on
         // purpose (no vault), that is the feature.
-        if self.prefs.command_history_file {
+        if self.vaults.cur().prefs.command_history_file {
             let label = self
                 .vaults.cur().connections
                 .iter()
@@ -439,7 +439,7 @@ impl Oryxis {
     /// The folder the per-host command logs live in: the configured
     /// setting, or `~/.oryxis/command-history/` by default.
     pub(crate) fn command_history_dir(&self) -> std::path::PathBuf {
-        match &self.prefs.command_history_file_dir {
+        match &self.device_prefs.command_history_file_dir {
             Some(dir) => std::path::PathBuf::from(dir),
             None => oryxis_core::paths::oryxis_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from(".").join(".oryxis"))

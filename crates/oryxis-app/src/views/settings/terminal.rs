@@ -21,11 +21,11 @@ impl Oryxis {
             .filter(|t| match t {
                 STab::Chat => self.ai.enabled,
                 STab::Files => self.sftp_enabled,
-                STab::Monitor => self.prefs.host_monitoring,
+                STab::Monitor => self.vaults.cur().prefs.host_monitoring,
                 _ => true,
             })
             .collect();
-        if let Some(sel) = self.prefs.sidebar_default_tab
+        if let Some(sel) = self.vaults.cur().prefs.sidebar_default_tab
             && !tabs.contains(&sel)
         {
             tabs.push(sel);
@@ -33,7 +33,7 @@ impl Oryxis {
         let last = crate::i18n::t("sidebar_default_last").to_string();
         let mut options = vec![last.clone()];
         options.extend(tabs.iter().map(|t| crate::i18n::t(t.label_key()).to_string()));
-        let selected = match self.prefs.sidebar_default_tab {
+        let selected = match self.vaults.cur().prefs.sidebar_default_tab {
             None => last,
             Some(t) => crate::i18n::t(t.label_key()).to_string(),
         };
@@ -66,8 +66,8 @@ impl Oryxis {
             .filter(|t| match t {
                 STab::Chat => self.ai.enabled,
                 STab::Files => self.sftp_enabled,
-                STab::Monitor => self.prefs.host_monitoring,
-                STab::Tmux => self.prefs.tmux_manager,
+                STab::Monitor => self.vaults.cur().prefs.host_monitoring,
+                STab::Tmux => self.vaults.cur().prefs.tmux_manager,
                 _ => true,
             })
             .collect();
@@ -86,7 +86,7 @@ impl Oryxis {
             Space::new().height(6),
         ];
         for tab in tabs {
-            let selected = placement_label(self.prefs.sidebar_tab_placement(tab));
+            let selected = placement_label(self.vaults.cur().prefs.sidebar_tab_placement(tab));
             col = col.push(self.nav_pick_row(
                 crate::i18n::t(tab.label_key()),
                 options.clone(),
@@ -112,7 +112,7 @@ impl Oryxis {
     }
 
     fn smart_tabs_threshold_row(&self) -> Element<'_, Message> {
-        if !self.prefs.smart_tabs {
+        if !self.vaults.cur().prefs.smart_tabs {
             return Space::new().boxed();
         }
         column![
@@ -123,7 +123,7 @@ impl Oryxis {
                     .into_iter()
                     .map(|(_, l)| l)
                     .collect::<Vec<_>>(),
-                crate::smart_tabs::threshold_label(self.prefs.smart_long_secs),
+                crate::smart_tabs::threshold_label(self.vaults.cur().prefs.smart_long_secs),
                 |s: &String| s.clone(),
                 200.0,
                 |v| Message::Settings(SettingsMessage::SmartTabsThresholdChanged(v)),
@@ -139,7 +139,7 @@ impl Oryxis {
     /// does nothing while nothing is being captured, and a control that
     /// cannot matter yet is noise. Nested like the command-log folder row.
     fn shell_integration_row(&self) -> Element<'_, Message> {
-        if !self.prefs.command_history {
+        if !self.vaults.cur().prefs.command_history {
             return Space::new().boxed();
         }
         let indent = if crate::i18n::is_rtl_layout() {
@@ -198,7 +198,7 @@ impl Oryxis {
     /// Remove. Both buttons record keyboard rows in visual order, so
     /// Tab reaches Remove right after Browse.
     fn terminal_bg_image_row(&self) -> Element<'_, Message> {
-        let path = self.prefs.terminal_bg_image.trim();
+        let path = self.vaults.cur().prefs.terminal_bg_image.trim();
         // The file NAME, not the whole path: a wallpaper lives six
         // directories deep and the row would wrap. The full path is
         // recoverable from the picker, which opens where it left off.
@@ -260,7 +260,7 @@ impl Oryxis {
     /// when a custom folder is set, indented like the other nested
     /// sub-options.
     fn command_history_dir_row(&self) -> Element<'_, Message> {
-        if !self.prefs.command_history_file {
+        if !self.vaults.cur().prefs.command_history_file {
             return Space::new().boxed();
         }
         let indent = if crate::i18n::is_rtl_layout() {
@@ -288,7 +288,7 @@ impl Oryxis {
             change,
         ]);
         // Reset-to-default only when a custom folder is set.
-        if self.prefs.command_history_file_dir.is_some() {
+        if self.device_prefs.command_history_file_dir.is_some() {
             let reset = self.settings_nav_slot(
                 crate::keynav::RowAction::activate(Message::CommandHistory(CommandHistoryMessage::ClearCommandHistoryDir)),
                 8.0,
@@ -334,7 +334,7 @@ impl Oryxis {
             Space::new().width(10).boxed(),
             browse,
         ]);
-        if self.prefs.snippet_output_dir.is_some() {
+        if self.device_prefs.snippet_output_dir.is_some() {
             let reset = self.settings_nav_slot(
                 crate::keynav::RowAction::activate(Message::Settings(SettingsMessage::ClearSnippetOutputDir)),
                 8.0,
@@ -571,19 +571,19 @@ impl Oryxis {
         // in its on-screen position.
         self.keynav_settings_reset();
         let mut toggles_col: iced::widget::Column<iced::Element<'_, Message>> = column![
-            self.nav_toggle_row(crate::i18n::t("copy_on_select"), self.prefs.copy_on_select, Message::Settings(SettingsMessage::ToggleCopyOnSelect)),
+            self.nav_toggle_row(crate::i18n::t("copy_on_select"), self.vaults.cur().prefs.copy_on_select, Message::Settings(SettingsMessage::ToggleCopyOnSelect)),
         ];
         // Right-click scheme (PuTTY's Context menu / Paste / Extend). The
         // single authority for the gesture.
         let rc_is_paste =
-            self.prefs.terminal_right_click == crate::util::RightClickMode::Paste;
+            self.vaults.cur().prefs.terminal_right_click == crate::util::RightClickMode::Paste;
         toggles_col = toggles_col.push(Space::new().height(10).boxed()).push(self.nav_pick_row(
             crate::i18n::t("terminal_right_click"),
             crate::util::RightClickMode::ALL
                 .iter()
                 .map(|m| crate::i18n::t(m.label_key()).to_string())
                 .collect::<Vec<_>>(),
-            crate::i18n::t(self.prefs.terminal_right_click.label_key()).to_string(),
+            crate::i18n::t(self.vaults.cur().prefs.terminal_right_click.label_key()).to_string(),
             |s: &String| s.clone(),
             200.0,
             |v| Message::Settings(SettingsMessage::TerminalRightClickChanged(v)),
@@ -591,7 +591,7 @@ impl Oryxis {
         // "Copy on right-click" is a sub-option of copy-on-select, and
         // only meaningful when the right-click scheme is Paste (Menu and
         // Extend repurpose the gesture entirely). Hidden otherwise.
-        if self.prefs.copy_on_select && rc_is_paste {
+        if self.vaults.cur().prefs.copy_on_select && rc_is_paste {
             let indent = if crate::i18n::is_rtl_layout() {
                 Padding { right: 22.0, ..Padding::ZERO }
             } else {
@@ -602,7 +602,7 @@ impl Oryxis {
                 .push(
                     container(self.nav_toggle_row(
                         crate::i18n::t("copy_requires_right_click"),
-                        self.prefs.right_click_copy,
+                        self.vaults.cur().prefs.right_click_copy,
                         Message::Settings(SettingsMessage::ToggleRightClickCopy),
                     ))
                     .padding(indent).boxed(),
@@ -630,7 +630,7 @@ impl Oryxis {
             .push(Space::new().height(10).boxed())
             .push(self.nav_toggle_row(
                 crate::i18n::t("careful_paste_label"),
-                self.prefs.careful_paste,
+                self.vaults.cur().prefs.careful_paste,
                 Message::Settings(SettingsMessage::ToggleCarefulPaste),
             ))
             .push(Space::new().height(4).boxed())
@@ -646,7 +646,7 @@ impl Oryxis {
             .push(Space::new().height(10).boxed())
             .push(self.nav_toggle_row(
                 crate::i18n::t("paste_guard_label"),
-                self.prefs.paste_guard,
+                self.vaults.cur().prefs.paste_guard,
                 Message::Settings(SettingsMessage::TogglePasteGuard),
             ))
             .push(Space::new().height(4).boxed())
@@ -671,7 +671,7 @@ impl Oryxis {
                     t("word_delimiters"),
                     crate::keynav::RowAction::input(iced::widget::Id::new("set-terminal-word-delimiters")),
                     10.0,
-                    text_input(oryxis_terminal::DEFAULT_WORD_DELIMITERS, &self.prefs.word_delimiters)
+                    text_input(oryxis_terminal::DEFAULT_WORD_DELIMITERS, &self.vaults.cur().prefs.word_delimiters)
                         .id(iced::widget::Id::new("set-terminal-word-delimiters"))
                         .on_input(|v| Message::Settings(SettingsMessage::SettingWordDelimitersChanged(v)))
                         .padding(10)
@@ -703,7 +703,7 @@ impl Oryxis {
                 t("scrollback"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-terminal-scrollback")),
                 10.0,
-                text_input("10000", &self.prefs.scrollback_rows)
+                text_input("10000", &self.vaults.cur().prefs.scrollback_rows)
                     .id(iced::widget::Id::new("set-terminal-scrollback"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingScrollbackChanged(v)))
                     .padding(10)
@@ -717,13 +717,13 @@ impl Oryxis {
             Space::new().height(12),
             self.nav_toggle_row(
                 crate::i18n::t("scrollback_reset_keypress"),
-                self.prefs.scrollback_reset_keypress,
+                self.vaults.cur().prefs.scrollback_reset_keypress,
                 Message::Settings(SettingsMessage::ToggleScrollbackResetKeypress),
             ),
             Space::new().height(10),
             self.nav_toggle_row(
                 crate::i18n::t("scrollback_reset_output"),
-                self.prefs.scrollback_reset_output,
+                self.vaults.cur().prefs.scrollback_reset_output,
                 Message::Settings(SettingsMessage::ToggleScrollbackResetOutput),
             ),
             // Issue #117. On by default: a suggestion that never sends
@@ -732,7 +732,7 @@ impl Oryxis {
             Space::new().height(12),
             self.nav_toggle_row(
                 crate::i18n::t("terminal_password_autofill"),
-                self.prefs.terminal_password_autofill,
+                self.vaults.cur().prefs.terminal_password_autofill,
                 Message::Settings(SettingsMessage::ToggleTerminalPasswordAutofill),
             ),
             Space::new().height(4),
@@ -746,7 +746,7 @@ impl Oryxis {
             Space::new().height(12),
             self.nav_toggle_row(
                 crate::i18n::t("terminal_link_confirm"),
-                self.prefs.terminal_link_confirm,
+                self.vaults.cur().prefs.terminal_link_confirm,
                 Message::Settings(SettingsMessage::ToggleTerminalLinkConfirm),
             ),
             Space::new().height(4),
@@ -756,7 +756,7 @@ impl Oryxis {
             Space::new().height(12),
             self.nav_toggle_row(
                 crate::i18n::t("terminal_link_tunnel"),
-                self.prefs.terminal_link_tunnel,
+                self.vaults.cur().prefs.terminal_link_tunnel,
                 Message::Settings(SettingsMessage::ToggleTerminalLinkTunnel),
             ),
             Space::new().height(4),
@@ -787,11 +787,11 @@ impl Oryxis {
         // Appearance: what the grid LOOKS like. Font blocks and the theme
         // picker join this card below.
         let mut appearance_col = column![
-            self.nav_toggle_row(crate::i18n::t("bold_bright"), self.prefs.bold_is_bright, Message::Settings(SettingsMessage::ToggleBoldIsBright)),
+            self.nav_toggle_row(crate::i18n::t("bold_bright"), self.vaults.cur().prefs.bold_is_bright, Message::Settings(SettingsMessage::ToggleBoldIsBright)),
             Space::new().height(10),
-            self.nav_toggle_row(crate::i18n::t("keyword_highlight"), self.prefs.keyword_highlight, Message::Settings(SettingsMessage::ToggleKeywordHighlight)),
+            self.nav_toggle_row(crate::i18n::t("keyword_highlight"), self.vaults.cur().prefs.keyword_highlight, Message::Settings(SettingsMessage::ToggleKeywordHighlight)),
             Space::new().height(10),
-            self.nav_toggle_row(crate::i18n::t("smart_contrast"), self.prefs.smart_contrast, Message::Settings(SettingsMessage::ToggleSmartContrast)),
+            self.nav_toggle_row(crate::i18n::t("smart_contrast"), self.vaults.cur().prefs.smart_contrast, Message::Settings(SettingsMessage::ToggleSmartContrast)),
             Space::new().height(10),
             self.nav_pick_row(
                 crate::i18n::t("terminal_opacity"),
@@ -799,7 +799,7 @@ impl Oryxis {
                     .iter()
                     .map(|p| format!("{p}%"))
                     .collect::<Vec<_>>(),
-                format!("{}%", self.prefs.terminal_opacity),
+                format!("{}%", self.vaults.cur().prefs.terminal_opacity),
                 |s: &String| s.clone(),
                 120.0,
                 |v| Message::Settings(SettingsMessage::TerminalOpacityChanged(v)),
@@ -813,7 +813,7 @@ impl Oryxis {
         // picture is set: they are meaningless without one, and the
         // optional-features rule says a control that governs nothing
         // should not be on screen.
-        let has_bg_image = !self.prefs.terminal_bg_image.trim().is_empty();
+        let has_bg_image = !self.vaults.cur().prefs.terminal_bg_image.trim().is_empty();
         appearance_col = appearance_col
             .push(Space::new().height(10).boxed())
             .push(self.terminal_bg_image_row())
@@ -836,7 +836,7 @@ impl Oryxis {
                         })
                         .collect::<Vec<_>>(),
                     crate::i18n::t(crate::terminal_appearance::bg_fit_label_key(
-                        oryxis_terminal::BgFit::from_str_or_default(&self.prefs.terminal_bg_fit),
+                        oryxis_terminal::BgFit::from_str_or_default(&self.vaults.cur().prefs.terminal_bg_fit),
                     ))
                     .to_string(),
                     |s: &String| s.clone(),
@@ -850,7 +850,7 @@ impl Oryxis {
                         .iter()
                         .map(|p| format!("{p}%"))
                         .collect::<Vec<_>>(),
-                    format!("{}%", self.prefs.terminal_bg_dim),
+                    format!("{}%", self.vaults.cur().prefs.terminal_bg_dim),
                     |s: &String| s.clone(),
                     120.0,
                     |v| Message::Settings(SettingsMessage::TerminalBgDimChanged(v)),
@@ -874,7 +874,7 @@ impl Oryxis {
                     .iter()
                     .map(|m| crate::i18n::t(m.label_key()).to_string())
                     .collect::<Vec<_>>(),
-                crate::i18n::t(self.prefs.bell_mode.label_key()).to_string(),
+                crate::i18n::t(self.vaults.cur().prefs.bell_mode.label_key()).to_string(),
                 |s: &String| s.clone(),
                 200.0,
                 |v| Message::Settings(SettingsMessage::BellModeChanged(v)),
@@ -886,16 +886,16 @@ impl Oryxis {
                     .iter()
                     .map(|m| crate::i18n::t(m.label_key()).to_string())
                     .collect::<Vec<_>>(),
-                crate::i18n::t(self.prefs.notification_mode.label_key()).to_string(),
+                crate::i18n::t(self.vaults.cur().prefs.notification_mode.label_key()).to_string(),
                 |s: &String| s.clone(),
                 200.0,
                 |v| Message::Settings(SettingsMessage::NotificationModeChanged(v)),
             ),
             Space::new().height(10),
-            self.nav_toggle_row(crate::i18n::t("smart_tabs"), self.prefs.smart_tabs, Message::Settings(SettingsMessage::SettingToggleSmartTabs)),
+            self.nav_toggle_row(crate::i18n::t("smart_tabs"), self.vaults.cur().prefs.smart_tabs, Message::Settings(SettingsMessage::SettingToggleSmartTabs)),
             self.smart_tabs_threshold_row(),
             Space::new().height(10),
-            self.nav_toggle_row(crate::i18n::t("confirm_close_session_tab"), self.prefs.confirm_close_session_tab, Message::Settings(SettingsMessage::ToggleConfirmCloseSessionTab)),
+            self.nav_toggle_row(crate::i18n::t("confirm_close_session_tab"), self.vaults.cur().prefs.confirm_close_session_tab, Message::Settings(SettingsMessage::ToggleConfirmCloseSessionTab)),
         ];
 
         // Integration: what the REMOTE END is allowed to drive, and what
@@ -908,7 +908,7 @@ impl Oryxis {
                     .iter()
                     .map(|m| crate::i18n::t(m.label_key()).to_string())
                     .collect::<Vec<_>>(),
-                crate::i18n::t(self.prefs.clipboard_access.label_key()).to_string(),
+                crate::i18n::t(self.vaults.cur().prefs.clipboard_access.label_key()).to_string(),
                 |s: &String| s.clone(),
                 200.0,
                 |v| Message::Settings(SettingsMessage::ClipboardAccessChanged(v)),
@@ -916,10 +916,10 @@ impl Oryxis {
             Space::new().height(10),
             self.nav_toggle_row(crate::i18n::t("terminal_auto_title"), crate::state::auto_title_enabled(), Message::Settings(SettingsMessage::ToggleTerminalAutoTitle)),
             Space::new().height(10),
-            self.nav_toggle_row(crate::i18n::t("command_history_capture"), self.prefs.command_history, Message::Settings(SettingsMessage::ToggleCommandHistory)),
+            self.nav_toggle_row(crate::i18n::t("command_history_capture"), self.vaults.cur().prefs.command_history, Message::Settings(SettingsMessage::ToggleCommandHistory)),
             self.shell_integration_row(),
             Space::new().height(10),
-            self.nav_toggle_row(crate::i18n::t("cmd_history_file"), self.prefs.command_history_file, Message::CommandHistory(CommandHistoryMessage::ToggleCommandHistoryFile)),
+            self.nav_toggle_row(crate::i18n::t("cmd_history_file"), self.vaults.cur().prefs.command_history_file, Message::CommandHistory(CommandHistoryMessage::ToggleCommandHistoryFile)),
             self.command_history_dir_row(),
             self.snippet_output_dir_row(),
         ];
@@ -929,7 +929,7 @@ impl Oryxis {
         let sidebar_col = column![
             self.nav_toggle_row(
                 crate::i18n::t("sidebar_auto_open"),
-                self.prefs.sidebar_auto_open,
+                self.vaults.cur().prefs.sidebar_auto_open,
                 Message::Settings(SettingsMessage::SettingToggleSidebarAutoOpen),
             ),
             Space::new().height(4),
@@ -1323,7 +1323,7 @@ impl Oryxis {
             self.nav_pick_row(
                 crate::i18n::t("pane_gap"),
                 vec!["0".into(), "4".into(), "8".into(), "12".into()],
-                self.prefs.pane_gap.clone(),
+                self.vaults.cur().prefs.pane_gap.clone(),
                 |v| {
                     if v == "0" {
                         crate::i18n::t("pane_gap_none").to_string()
@@ -1337,13 +1337,13 @@ impl Oryxis {
             Space::new().height(10),
             self.nav_toggle_row(
                 crate::i18n::t("pane_border_inactive"),
-                self.prefs.pane_border_inactive,
+                self.vaults.cur().prefs.pane_border_inactive,
                 Message::Settings(SettingsMessage::TogglePaneBorderInactive),
             ),
             Space::new().height(10),
             self.nav_toggle_row(
                 crate::i18n::t("pane_headers"),
-                self.prefs.pane_headers,
+                self.vaults.cur().prefs.pane_headers,
                 Message::Settings(SettingsMessage::TogglePaneHeaders),
             ),
             Space::new().height(4),
@@ -1362,7 +1362,7 @@ impl Oryxis {
                     .iter()
                     .map(|a| crate::i18n::t(a.label_key()).to_string())
                     .collect::<Vec<_>>(),
-                crate::i18n::t(self.prefs.pane_end_action.label_key()).to_string(),
+                crate::i18n::t(self.vaults.cur().prefs.pane_end_action.label_key()).to_string(),
                 |s: &String| s.clone(),
                 200.0,
                 |v| Message::Settings(SettingsMessage::PaneEndActionChanged(v)),

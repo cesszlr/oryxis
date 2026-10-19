@@ -169,7 +169,7 @@ impl Oryxis {
         let conn = self.progress_connection(progress);
         let badge_style = crate::widgets::resolve_host_icon_style(
             conn.and_then(|c| c.icon_style.as_deref()),
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         // Two-step color, mirroring the dashboard host card: resolve the
         // brand color from detected OS / custom icon, then let an explicit

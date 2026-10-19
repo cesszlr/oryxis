@@ -54,9 +54,9 @@ impl Oryxis {
                             // A passwordless vault has nothing to gate, so
                             // drop any biometric enrollment and turn the
                             // setting off (it would otherwise dangle on).
-                            if self.prefs.biometric_unlock_enabled {
+                            if self.vaults.cur().prefs.biometric_unlock_enabled {
                                 self.biometric_forget();
-                                self.prefs.biometric_unlock_enabled = false;
+                                self.vaults.cur_mut().prefs.biometric_unlock_enabled = false;
                                 self.persist_setting("biometric_unlock_enabled", "false");
                             }
                         }

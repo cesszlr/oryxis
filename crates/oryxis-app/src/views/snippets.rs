@@ -458,7 +458,7 @@ impl Oryxis {
             // and the rest of the cards on this screen look the same.
             let snip_style = crate::widgets::resolve_host_icon_style(
                 None,
-                &self.prefs.default_host_icon,
+                &self.vaults.cur().prefs.default_host_icon,
             );
             // `line_height(1.0)` collapses the default text padding so
             // the glyph sits at the optical centre of the badge; the
@@ -615,7 +615,7 @@ self.keynav_ring_content(kb_selected, card_el)
             == Some(crate::keynav::NavItem::SnippetGroup(gi));
         let style = crate::widgets::resolve_host_icon_style(
             None,
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         let glyph: Element<'_, Message> = iced_fonts::lucide::folder()
             .size(16)

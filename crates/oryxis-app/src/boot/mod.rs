@@ -341,12 +341,19 @@ impl Oryxis {
 
         let (mut app, task) = (
             Self {
-                vaults: crate::vault_slots::VaultSlots::single(crate::vault_slots::OpenVault::new(
-                    oryxis_vault::device::installed()
-                        .map(|d| d.boot_vault().id)
-                        .unwrap_or(oryxis_vault::device::FIRST_VAULT_ID),
-                    vault,
-                )),
+                vaults: crate::vault_slots::VaultSlots::single({
+                    let mut first = crate::vault_slots::OpenVault::new(
+                        oryxis_vault::device::installed()
+                            .map(|d| d.boot_vault().id)
+                            .unwrap_or(oryxis_vault::device::FIRST_VAULT_ID),
+                        vault,
+                    );
+                    // Hydrated before the unlock (the lock screen runs
+                    // while the vault can still be locked), so it comes
+                    // from the read above rather than the factory default.
+                    first.prefs.biometric_unlock_enabled = biometric_unlock_enabled;
+                    first
+                }),
                 vault_ui: crate::state::VaultUi {
                     state: vault_state,
                     open_error: vault_open_error,
@@ -582,12 +589,9 @@ impl Oryxis {
                 snippet_form: crate::state::SnippetForm::default(),
                 keys_ui: crate::state::KeysUi::default(),
                 sftp_chrome: crate::state::SftpChrome::default(),
-                prefs: crate::state::AppPrefs {
-                    // Hydrated before the unlock (the lock screen and the
-                    // boot update check both run while the vault can still
-                    // be locked), so these three come from the reads above
-                    // rather than from the factory defaults.
-                    biometric_unlock_enabled,
+                device_prefs: crate::state::DevicePrefs {
+                    // Read before any vault is unlocked: the boot update
+                    // check runs on the lock screen.
                     auto_check_updates,
                     update_channel,
                     offline_mode,

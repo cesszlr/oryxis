@@ -68,7 +68,7 @@ impl Oryxis {
     ) -> Option<std::time::Duration> {
         crate::util::resolve_keepalive(
             conn.keepalive_interval,
-            &self.prefs.keepalive_interval,
+            &self.vaults.cur().prefs.keepalive_interval,
         )
     }
 

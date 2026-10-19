@@ -29,7 +29,7 @@ impl Oryxis {
                     // use the selected option" opt-in commits directly;
                     // Settings > Security exposes the same value so the
                     // dialog can be brought back ("ask", the default).
-                    match self.prefs.manual_lock_action.as_str() {
+                    match self.vaults.cur().prefs.manual_lock_action.as_str() {
                         "sleep" => {
                             return Task::done(Message::Vault(VaultMessage::SoftLockVault));
                         }
@@ -59,7 +59,7 @@ impl Oryxis {
                 // settings without the master key).
                 if self.vault_ui.lock_confirm_remember {
                     let value = if sleep { "sleep" } else { "lock" };
-                    self.prefs.manual_lock_action = value.into();
+                    self.vaults.cur_mut().prefs.manual_lock_action = value.into();
                     self.persist_setting("manual_lock_action", value);
                 }
                 return Task::done(Message::Vault(if sleep {
@@ -399,7 +399,7 @@ impl Oryxis {
                         // the next message anyway; saying it here is
                         // what makes it a decision rather than a
                         // side effect.
-                        if self.prefs.restore_tabs_on_launch {
+                        if self.vaults.cur().prefs.restore_tabs_on_launch {
                             self.persist_setting("open_tabs", "[]");
                             self.persist_setting("open_tabs_active", "");
                             self.open_tabs_signature = 0;

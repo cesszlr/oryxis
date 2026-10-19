@@ -133,8 +133,8 @@ impl Oryxis {
     pub(crate) fn view_top_chrome_bar(&self) -> Element<'_, Message> {
         let side = tab_bar_pos().is_side();
         let solid_fill =
-            self.prefs.tab_fill_style == "solid" || self.prefs.performance_mode;
-        let pins_here = side && self.prefs.pinned_tabs_top_bar;
+            self.vaults.cur().prefs.tab_fill_style == "solid" || self.vaults.cur().prefs.performance_mode;
+        let pins_here = side && self.vaults.cur().prefs.pinned_tabs_top_bar;
 
         let mut cluster_items: Vec<Element<'_, Message>> = Vec::new();
         if self.cur_active_tab().is_some() {
@@ -247,7 +247,7 @@ impl Oryxis {
         compact_pins: bool,
         approx_strip_width: f32,
     ) -> Option<f32> {
-        if self.prefs.tab_width_mode != "uniform" {
+        if self.vaults.cur().prefs.tab_width_mode != "uniform" {
             return None;
         }
         let mut widest = TAB_MIN_WIDTH;
@@ -295,7 +295,7 @@ impl Oryxis {
         // the strip stops reshuffling, and letting one long label set 200
         // for everyone is the complaint that asked for this. The widest
         // label still decides below the cap.
-        let cap = match self.prefs.tab_uniform_size.as_str() {
+        let cap = match self.vaults.cur().prefs.tab_uniform_size.as_str() {
             "small" => 140.0,
             "large" => 260.0,
             _ => TAB_NATURAL_WIDTH,
@@ -316,7 +316,7 @@ impl Oryxis {
     /// slim chrome bar: horizontal widths (active natural, inactives
     /// content-hugged; the scrollable is the overflow safety net).
     fn chrome_bar_pins_ctx(&self) -> StripCtx {
-        let close_on_right = self.prefs.tab_close_button_side == "right";
+        let close_on_right = self.vaults.cur().prefs.tab_close_button_side == "right";
         let number_px = self.tab_number_px();
         let mut session_widths = vec![TAB_MIN_WIDTH; self.tabs.len()];
         let mut max_inactive_content = TAB_MIN_WIDTH;
@@ -338,9 +338,9 @@ impl Oryxis {
             privacy_terms: self.privacy_terms(),
             close_on_right,
             close_armed: self.cur_nav().hover.tab_close_armed,
-            compact_pins: self.prefs.pinned_tab_style == "compact",
-            solid_fill: self.prefs.tab_fill_style == "solid"
-                || self.prefs.performance_mode,
+            compact_pins: self.vaults.cur().prefs.pinned_tab_style == "compact",
+            solid_fill: self.vaults.cur().prefs.tab_fill_style == "solid"
+                || self.vaults.cur().prefs.performance_mode,
             dragging_any: self.strip_drag_id().is_some(),
             drag_uniform_w: max_inactive_content.clamp(TAB_MIN_WIDTH, TAB_NATURAL_WIDTH),
             uniform_w: None,
@@ -440,7 +440,7 @@ impl Oryxis {
     /// bottom-docked strip so the chrome reads as one material.
     fn tab_bar_background(&self) -> Background {
         let bar_base = OryxisColors::t().bg_sidebar;
-        if self.prefs.tab_accent_wash {
+        if self.vaults.cur().prefs.tab_accent_wash {
             let washed = crate::theme::mix(bar_base, self.top_accent_tint(), 0.16);
             Background::Gradient(iced::Gradient::Linear(
                 iced::gradient::Linear::new(iced::Radians(std::f32::consts::FRAC_PI_2))
@@ -502,8 +502,8 @@ impl Oryxis {
         // the inactive tabs shrink proportionally toward MIN (the
         // scrollable is the final safety net). Compact pinned chips are
         // fixed at CHIP_W and don't participate in the flexible sizing.
-        let close_on_right = self.prefs.tab_close_button_side == "right";
-        let compact_pins = self.prefs.pinned_tab_style == "compact";
+        let close_on_right = self.vaults.cur().prefs.tab_close_button_side == "right";
+        let compact_pins = self.vaults.cur().prefs.pinned_tab_style == "compact";
         let number_px = self.tab_number_px();
         let mut session_widths = vec![TAB_MIN_WIDTH; n_tabs];
         let mut max_inactive_content = TAB_MIN_WIDTH;
@@ -584,7 +584,7 @@ impl Oryxis {
         // Performance mode forces the flat tint: the gradient is a
         // per-pixel shader in the software renderer, the flat tint a
         // single solid fill.
-        let solid_fill = self.prefs.tab_fill_style == "solid" || self.prefs.performance_mode;
+        let solid_fill = self.vaults.cur().prefs.tab_fill_style == "solid" || self.vaults.cur().prefs.performance_mode;
 
         // Terminal and SFTP tabs share one strip, pinned-first across BOTH
         // kinds (so an unpinned SFTP tab never jumps ahead of a pinned
@@ -876,7 +876,7 @@ impl Oryxis {
     /// `tab_scroll_to_active` (offset math) so the two can't drift.
     /// The `tab_number_style` setting, parsed.
     pub(crate) fn tab_number_style(&self) -> TabNumberStyle {
-        TabNumberStyle::from_setting(&self.prefs.tab_number_style)
+        TabNumberStyle::from_setting(&self.vaults.cur().prefs.tab_number_style)
     }
 
     /// Room every chip reserves for the number prefix, sized to the
@@ -966,7 +966,7 @@ impl Oryxis {
             // several per row, which makes this slightly overshoot;
             // like the horizontal math below, approximate is fine, the
             // scrollable clamps.
-            let pins_top = self.prefs.pinned_tabs_top_bar;
+            let pins_top = self.vaults.cur().prefs.pinned_tabs_top_bar;
             let preceding = self
                 .strip_order()
                 .iter()

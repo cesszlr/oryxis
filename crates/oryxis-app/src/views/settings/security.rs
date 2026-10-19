@@ -327,7 +327,7 @@ impl Oryxis {
                     column![
                         self.nav_toggle_row(
                             crate::biometric::bio_setting_label(),
-                            self.prefs.biometric_unlock_enabled,
+                            self.vaults.cur().prefs.biometric_unlock_enabled,
                             Message::Vault(VaultMessage::ToggleBiometricUnlock),
                         ),
                         Space::new().height(4),
@@ -463,7 +463,7 @@ impl Oryxis {
                 self.nav_pick_row(
                     t("manual_lock_action"),
                     vec!["ask".into(), "sleep".into(), "lock".into()],
-                    self.prefs.manual_lock_action.clone(),
+                    self.vaults.cur().prefs.manual_lock_action.clone(),
                     |v| crate::i18n::t(match v.as_str() {
                         "sleep" => "lock_vault_sleep",
                         "lock" => "lock_vault",
@@ -497,7 +497,7 @@ impl Oryxis {
                 t("auto_lock_minutes"),
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-security-auto-lock")),
                 10.0,
-                text_input("0", &self.prefs.auto_lock_minutes)
+                text_input("0", &self.vaults.cur().prefs.auto_lock_minutes)
                     .id(iced::widget::Id::new("set-security-auto-lock"))
                     .on_input(|v| Message::Settings(SettingsMessage::SettingAutoLockChanged(v)))
                     .padding(10)
@@ -667,7 +667,7 @@ impl Oryxis {
     /// sub-options. Sibling of the command-history folder row in
     /// Settings > Terminal.
     fn session_log_dir_row(&self) -> Element<'_, Message> {
-        if !self.prefs.session_log_file {
+        if !self.vaults.cur().prefs.session_log_file {
             return Space::new().boxed();
         }
         let indent = if crate::i18n::is_rtl_layout() {
@@ -697,7 +697,7 @@ impl Oryxis {
             change,
         ]);
         // Reset-to-default only when a custom folder is set.
-        if self.prefs.session_log_file_dir.is_some() {
+        if self.device_prefs.session_log_file_dir.is_some() {
             let reset = self.settings_nav_slot(
                 crate::keynav::RowAction::activate(Message::Settings(
                     SettingsMessage::ClearSessionLogFileDir,
@@ -721,7 +721,7 @@ impl Oryxis {
     /// connection-history toggle and the retention picker, one
     /// logging theme in a single card.
     fn security_logging_card(&self) -> Element<'_, Message> {
-        let session_logging_enabled = self.prefs.session_logging;
+        let session_logging_enabled = self.vaults.cur().prefs.session_logging;
         let mut session_logging_rows = column![
             self.nav_toggle_row(
                 crate::i18n::t("session_logging"),
@@ -740,7 +740,7 @@ impl Oryxis {
                 .push(Space::new().height(8).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("session_log_full"),
-                    self.prefs.session_log_full,
+                    self.vaults.cur().prefs.session_log_full,
                     Message::Settings(SettingsMessage::SettingToggleSessionLogFull),
                 ))
                 .push(Space::new().height(4).boxed())
@@ -751,7 +751,7 @@ impl Oryxis {
                 .push(Space::new().height(8).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("session_log_compress"),
-                    self.prefs.session_log_compress,
+                    self.vaults.cur().prefs.session_log_compress,
                     Message::Settings(SettingsMessage::SettingToggleSessionLogCompress),
                 ))
                 .push(Space::new().height(4).boxed())
@@ -766,7 +766,7 @@ impl Oryxis {
                 .push(Space::new().height(8).boxed())
                 .push(self.nav_toggle_row(
                     crate::i18n::t("session_log_file"),
-                    self.prefs.session_log_file,
+                    self.vaults.cur().prefs.session_log_file,
                     Message::Settings(SettingsMessage::SettingToggleSessionLogFile),
                 ))
                 .push(Space::new().height(4).boxed())
@@ -783,7 +783,7 @@ impl Oryxis {
             .push(Space::new().height(16).boxed())
             .push(self.nav_toggle_row(
                 crate::i18n::t("connection_history"),
-                self.prefs.connection_history,
+                self.vaults.cur().prefs.connection_history,
                 Message::Settings(SettingsMessage::SettingToggleConnectionHistory),
             ))
             .push(Space::new().height(4).boxed())
@@ -800,7 +800,7 @@ impl Oryxis {
         let retention_selected = RETENTION_CODES
             .iter()
             .copied()
-            .find(|c| *c == self.prefs.logs_retention)
+            .find(|c| *c == self.vaults.cur().prefs.logs_retention)
             .unwrap_or("off");
         // Left/Right cycle the retention codes without opening the
         // dropdown (non-standard picker layout: label above, list
@@ -815,7 +815,7 @@ impl Oryxis {
         const SIZE_CAP_CODES: [&str; 6] =
             ["off", "536870912", "1073741824", "5368709120", "10737418240", "53687091200"];
         let cap_now = self
-            .prefs
+            .vaults.cur().prefs
             .session_log_max_bytes
             .map(|n| n.to_string())
             .unwrap_or_else(|| "off".into());

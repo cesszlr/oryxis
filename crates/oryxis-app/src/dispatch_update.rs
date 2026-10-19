@@ -42,14 +42,14 @@ impl Oryxis {
         }
         match message {
             UpdateMessage::SettingToggleAutoCheckUpdates => {
-                self.prefs.auto_check_updates = !self.prefs.auto_check_updates;
+                self.device_prefs.auto_check_updates = !self.device_prefs.auto_check_updates;
                 self.persist_setting(
                     "auto_check_updates",
-                    if self.prefs.auto_check_updates { "true" } else { "false" },
+                    if self.device_prefs.auto_check_updates { "true" } else { "false" },
                 );
             }
             UpdateMessage::SettingUpdateChannelChanged(channel) => {
-                self.prefs.update_channel = channel;
+                self.device_prefs.update_channel = channel;
                 self.persist_setting("update_channel", channel.as_setting());
                 // A channel switch invalidates any "skip this version" so
                 // the user is offered the other stream's build right away.
@@ -61,7 +61,7 @@ impl Oryxis {
                 // "Checking…" status + toast as a manual check) instead of
                 // waiting for the next boot check.
                 self.update_error = None;
-                if self.prefs.offline_mode {
+                if self.device_prefs.offline_mode {
                     // The stream is recorded; the check it would have
                     // run is what the About row now explains.
                     self.update_check_status = Some(crate::update::UpdateStatus::Offline);
@@ -82,7 +82,7 @@ impl Oryxis {
                 // (`UpdateError::Offline`), but the boot check would
                 // only log that refusal once per launch while Settings >
                 // About already says it; nothing to spawn.
-                if !self.prefs.auto_check_updates || self.prefs.offline_mode {
+                if !self.device_prefs.auto_check_updates || self.device_prefs.offline_mode {
                     return Task::none();
                 }
                 // Also respect a persisted "skip this version" so we never
@@ -92,7 +92,7 @@ impl Oryxis {
                     .as_ref()
                     .and_then(|v| v.get_setting("skipped_update_version").ok().flatten());
                 return Task::perform(
-                    crate::update::check_latest_release(self.prefs.update_channel),
+                    crate::update::check_latest_release(self.device_prefs.update_channel),
                     move |res| {
                         match res {
                             Ok(Some(info)) if Some(&info.version) != skipped.as_ref() => {
@@ -125,7 +125,7 @@ impl Oryxis {
                 // Settings would show with no chip (issue #120).
                 self.ensure_panel_tab(crate::state::PanelKind::Settings);
                 self.update_error = None;
-                if self.prefs.offline_mode {
+                if self.device_prefs.offline_mode {
                     // The click still lands on About, where the row
                     // names the switch instead of a network failure.
                     self.update_check_status = Some(crate::update::UpdateStatus::Offline);
@@ -137,7 +137,7 @@ impl Oryxis {
                     let _ = vault.set_setting("skipped_update_version", "");
                 }
                 return Task::perform(
-                    crate::update::check_latest_release(self.prefs.update_channel),
+                    crate::update::check_latest_release(self.device_prefs.update_channel),
                     |res| match res {
                         Ok(info) => Message::Update(UpdateMessage::UpdateCheckResult(info)),
                         Err(e) => Message::Update(UpdateMessage::UpdateCheckFailed(e.to_string())),
@@ -355,7 +355,7 @@ impl Oryxis {
     /// state and asks; otherwise the restart the user asked for a
     /// download ago happens on its own.
     fn offer_update_install(&mut self) -> Task<Message> {
-        if self.prefs.confirm_close_session_tab && self.live_session_tab_count() > 0 {
+        if self.vaults.cur().prefs.confirm_close_session_tab && self.live_session_tab_count() > 0 {
             return Task::none();
         }
         self.install_ready_update()

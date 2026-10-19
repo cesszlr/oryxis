@@ -140,14 +140,14 @@ impl Oryxis {
     pub(super) fn hp_row_monitor(&self, is_ssh: bool) -> Element<'_, Message> {
         // The per-host opt-in only exists once the monitoring feature is
         // enabled in Features & Plugins.
-        if !is_ssh || !self.prefs.host_monitoring {
+        if !is_ssh || !self.vaults.cur().prefs.host_monitoring {
             return empty();
         }
         // "Enable for all hosts" forces this host on: the toggle renders
         // locked (no press, muted "On", no keyboard slot) with a hint that
         // it is controlled globally, so the state is honest but the user
         // isn't led to click a control that does nothing.
-        let locked = self.prefs.monitor_all_hosts;
+        let locked = self.vaults.cur().prefs.monitor_all_hosts;
         let on = locked || self.editor_form.monitor_enabled;
 
         let toggle: Element<'_, Message> = {
@@ -233,8 +233,8 @@ impl Oryxis {
     /// off and on again must bring back the list the user typed rather
     /// than silently resetting the host to Auto.
     pub(super) fn hp_row_monitor_disks(&self, is_ssh: bool) -> Element<'_, Message> {
-        let monitored = self.prefs.monitor_all_hosts || self.editor_form.monitor_enabled;
-        if !is_ssh || !self.prefs.host_monitoring || !monitored {
+        let monitored = self.vaults.cur().prefs.monitor_all_hosts || self.editor_form.monitor_enabled;
+        if !is_ssh || !self.vaults.cur().prefs.host_monitoring || !monitored {
             return empty();
         }
         let custom = self.editor_form.monitor_disks_custom;

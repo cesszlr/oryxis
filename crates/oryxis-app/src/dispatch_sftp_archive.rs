@@ -688,7 +688,7 @@ impl Oryxis {
         let owner = self.current_sftp_owner();
         // Copying members OUT of an archive onto a host is an upload like
         // any other, so it obeys the same scratch-name choice.
-        let temp_name = self.prefs.sftp_upload_temp_name;
+        let temp_name = self.vaults.cur().prefs.sftp_upload_temp_name;
         // Copy-out busies the SOURCE pane (the one browsing the
         // archive) while the DESTINATION pane receives the files, so
         // the completion carries a token per pane: the busy clear is

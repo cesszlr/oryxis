@@ -143,7 +143,7 @@ impl Oryxis {
         // beside the default-folder row that ZMODEM reads, so a user who
         // turned it on expects the terminal to stop and ask too (issue
         // #230). Snapshotted here because the stream outlives `self`.
-        let ask_dest = self.prefs.sftp_ask_download_dir;
+        let ask_dest = self.vaults.cur().prefs.sftp_ask_download_dir;
         let cancelled = abort.clone();
         let io = TransferIo {
             wire_in,
@@ -555,13 +555,13 @@ impl Oryxis {
             ZmodemMessage::ZmodemDownloadDirPicked(dir) => {
                 if let Some(dir) = dir {
                     self.persist_setting("zmodem_download_dir", &dir);
-                    self.prefs.zmodem_download_dir = dir;
+                    self.device_prefs.zmodem_download_dir = dir;
                 }
                 Task::none()
             }
             ZmodemMessage::ClearZmodemDownloadDir => {
                 self.persist_setting("zmodem_download_dir", "");
-                self.prefs.zmodem_download_dir = String::new();
+                self.device_prefs.zmodem_download_dir = String::new();
                 Task::none()
             }
             ZmodemMessage::ZmodemDelivered { dir, files } => {

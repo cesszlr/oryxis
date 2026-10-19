@@ -23,7 +23,7 @@ impl Oryxis {
     /// rail with labels.
     pub(crate) fn view_vault_nav_rail(&self) -> Element<'_, Message> {
         let active = self.cur_active_tab().is_none();
-        let expanded = self.prefs.nav_rail_expanded;
+        let expanded = self.vaults.cur().prefs.nav_rail_expanded;
         let act = |view: View| active && self.cur_view() == view;
         // Record the section order for the keyboard router (same
         // logical list as the horizontal pills; only one of the two
@@ -53,7 +53,7 @@ impl Oryxis {
         items.push(rail_item(iced_fonts::lucide::cloud(), crate::i18n::t("cloud_accounts"), View::Cloud, act(View::Cloud), expanded, kb(View::Cloud)));
         items.push(rail_item(iced_fonts::lucide::router(), crate::i18n::t("proxies"), View::Proxies, act(View::Proxies), expanded, kb(View::Proxies)));
         items.push(rail_item(iced_fonts::lucide::shield_check(), crate::i18n::t("known_hosts"), View::KnownHosts, act(View::KnownHosts), expanded, kb(View::KnownHosts)));
-        if self.prefs.host_monitoring {
+        if self.vaults.cur().prefs.host_monitoring {
             items.push(rail_item(iced_fonts::lucide::activity(), crate::i18n::t("monitor_dash_pill"), View::Monitoring, act(View::Monitoring), expanded, kb(View::Monitoring)));
         }
 

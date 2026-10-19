@@ -167,10 +167,10 @@ impl Oryxis {
                 Ok(self.dash_round(false))
             }
             MonitorMessage::DashToggleListView => {
-                self.prefs.monitor_dash_list_view = !self.prefs.monitor_dash_list_view;
+                self.vaults.cur_mut().prefs.monitor_dash_list_view = !self.vaults.cur_mut().prefs.monitor_dash_list_view;
                 self.persist_setting(
                     "monitor_dash_list_view",
-                    if self.prefs.monitor_dash_list_view { "true" } else { "false" },
+                    if self.vaults.cur().prefs.monitor_dash_list_view { "true" } else { "false" },
                 );
                 Ok(Task::none())
             }
@@ -207,7 +207,7 @@ impl Oryxis {
         // why it is empty. The keys are collected once rather than per
         // row: this runs on every render and every heartbeat.
         let live = self
-            .prefs
+            .vaults.cur().prefs
             .monitor_dash_live_only
             .then(|| self.dash_live_keys());
         let mut hosts: Vec<(String, Uuid)> = self

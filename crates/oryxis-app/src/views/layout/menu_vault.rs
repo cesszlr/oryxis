@@ -434,7 +434,7 @@ impl Oryxis {
         // viewport it copies is the one the widget last drew, and a
         // background pane keeps taking output without redrawing, so its
         // stored position would no longer be what anyone is looking at.
-        if self.prefs.terminal_right_click != crate::util::RightClickMode::Menu
+        if self.vaults.cur().prefs.terminal_right_click != crate::util::RightClickMode::Menu
             && Some(idx) == self.cur_active_tab()
             && self.terminal_surface_visible()
             && let Some(pane_id) =
@@ -452,7 +452,7 @@ impl Oryxis {
         // Any tab of the strip, not only the one on screen: it reads the
         // whole buffer, which a background pane keeps exactly as current
         // as a drawn one.
-        if self.prefs.terminal_right_click != crate::util::RightClickMode::Menu
+        if self.vaults.cur().prefs.terminal_right_click != crate::util::RightClickMode::Menu
             && let Some(pane_id) = self.tabs.get(idx).map(|t| t.active().id)
         {
             items.push(self.menu_item(
@@ -1128,7 +1128,7 @@ impl Oryxis {
                 // View cycler: the entry names the NEXT mode (grid ->
                 // list -> tree -> grid), opposite convention from the
                 // toolbar button, which shows the current one.
-                let (icon, label) = match self.prefs.host_view_mode.next() {
+                let (icon, label) = match self.vaults.cur().prefs.host_view_mode.next() {
                     crate::state::HostViewMode::Grid => (
                         iced_fonts::lucide::layout_grid(),
                         crate::i18n::t("toolbar_view_grid"),

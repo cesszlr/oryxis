@@ -62,7 +62,7 @@ impl Oryxis {
         &self,
         then: SftpMessage,
     ) -> Option<Task<Message>> {
-        if !self.prefs.sftp_ask_download_dir || self.cur_sftp().download_dest_override.is_some() {
+        if !self.vaults.cur().prefs.sftp_ask_download_dir || self.cur_sftp().download_dest_override.is_some() {
             return None;
         }
         Some(self.sftp_pick_download_dir(then))

@@ -401,7 +401,7 @@ impl Oryxis {
                 crate::widgets::host_icon(
                     crate::widgets::resolve_host_icon_style(
                         None,
-                        &self.prefs.default_host_icon,
+                        &self.vaults.cur().prefs.default_host_icon,
                     ),
                     bg,
                     &group.label,
@@ -492,7 +492,7 @@ impl Oryxis {
         );
         let host_style = crate::widgets::resolve_host_icon_style(
             conn.icon_style.as_deref(),
-            &self.prefs.default_host_icon,
+            &self.vaults.cur().prefs.default_host_icon,
         );
         let badge_color = conn
             .custom_color
@@ -530,7 +530,7 @@ impl Oryxis {
             );
         }
         items.push(Space::new().width(Length::Fill).boxed());
-        if self.prefs.show_host_address {
+        if self.vaults.cur().prefs.show_host_address {
             // Privacy Mode masks the address behind blocks, same as
             // the card subtitle (no hover reveal here: tree rows are
             // click-to-connect, a reveal gesture would sit one pixel
@@ -618,7 +618,7 @@ impl Oryxis {
                 .map(crate::os_icon::custom_icon_glyph)
                 .unwrap_or(crate::os_icon::BrandIcon::Glyph(iced_fonts::lucide::boxes()));
             let icon_box = crate::widgets::host_icon(
-                crate::widgets::resolve_host_icon_style(None, &self.prefs.default_host_icon),
+                crate::widgets::resolve_host_icon_style(None, &self.vaults.cur().prefs.default_host_icon),
                 bg,
                 &sg.label,
                 Some(glyph.view(10.0, Color::WHITE)),

@@ -607,7 +607,7 @@ impl Oryxis {
                         8 => Some(View::KnownHosts),
                         // Monitoring pill (issue #95): same visibility
                         // gate as its pill and burger entry.
-                        9 => self.prefs.host_monitoring.then_some(View::Monitoring),
+                        9 => self.vaults.cur().prefs.host_monitoring.then_some(View::Monitoring),
                         _ => None,
                     };
                     match view {

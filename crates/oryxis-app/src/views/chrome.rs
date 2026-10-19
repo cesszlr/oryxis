@@ -102,7 +102,7 @@ impl crate::app::Oryxis {
     pub(crate) fn top_bar_hidden(&self) -> bool {
         let pos = crate::views::tab_bar::tab_bar_pos();
         pos.is_side()
-            && self.prefs.side_hide_top_bar
+            && self.vaults.cur().prefs.side_hide_top_bar
             && !(NATIVE_FRAME && pos == crate::views::tab_bar::TabBarPos::Right)
     }
 }

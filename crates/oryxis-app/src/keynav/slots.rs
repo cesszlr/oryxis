@@ -491,7 +491,7 @@ impl crate::app::Oryxis {
         // tab never renders, so the fallback is unreachable; Right
         // keeps a misuse harmless rather than panicking mid-view.
         let side = self
-            .prefs
+            .vaults.cur().prefs
             .sidebar_tab_side(tab)
             .unwrap_or(crate::state::SidebarSide::Right);
         let idx = {

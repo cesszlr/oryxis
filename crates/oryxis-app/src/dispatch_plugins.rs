@@ -191,7 +191,7 @@ impl Oryxis {
         // at once, the migration flipping its card to an error the
         // Plugins panel's own banner already explains. Nothing to spawn;
         // the switch going off re-runs this.
-        if self.prefs.offline_mode {
+        if self.device_prefs.offline_mode {
             return tasks;
         }
 

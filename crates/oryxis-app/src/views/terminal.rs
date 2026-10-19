@@ -76,7 +76,7 @@ impl Oryxis {
                 // A visible gutter belongs to no pane, so it IS the handle
                 // and the panes keep all their pixels. Only when the panes
                 // sit flush does each one have to hand a strip back.
-                let gap = self.prefs.pane_gap.parse::<f32>().unwrap_or(0.0).clamp(0.0, 24.0);
+                let gap = self.vaults.cur().prefs.pane_gap.parse::<f32>().unwrap_or(0.0).clamp(0.0, 24.0);
                 let neighbours: std::collections::HashMap<_, _> = if multipane && gap <= 0.0 {
                     const UNIT: f32 = 1000.0;
                     let regions = tab.pane_grid.layout().pane_regions(
@@ -111,7 +111,7 @@ impl Oryxis {
                 // Headers are a SPLIT-tab affordance (issue #208): a lone
                 // pane has no sibling to tell itself apart from, and its
                 // end-of-session card is the answer it already has.
-                let headers = multipane && self.prefs.pane_headers;
+                let headers = multipane && self.vaults.cur().prefs.pane_headers;
                 // The body of a pane, shared by both grids below: the title
                 // bar is part of the content's TYPE, so a grid with headers
                 // and one without are two different widgets.
@@ -656,26 +656,26 @@ impl Oryxis {
             .with_font_name(&self.terminal_font_name)
             .with_font_weight(self.terminal_font_weight.font_weight())
             .with_text_dilation(self.terminal_text_thickness.px())
-            .with_copy_on_select(self.prefs.copy_on_select)
-            .with_right_click_copy(self.prefs.right_click_copy)
+            .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
+            .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
             .with_terminal_chords(self.terminal_chord_resolver())
             .with_mouse_bindings(self.terminal_mouse_resolver())
-            .with_right_click_action(self.prefs.terminal_right_click.to_widget())
+            .with_right_click_action(self.vaults.cur().prefs.terminal_right_click.to_widget())
             // The keypress half of the pair is queued on the input funnel
             // (`write_bytes_to_pane`), not here: see issue #111.
-            .with_reset_scroll_on_output(self.prefs.scrollback_reset_output)
-            .with_bold_is_bright(self.prefs.bold_is_bright)
-            .with_keyword_highlight(self.prefs.keyword_highlight)
+            .with_reset_scroll_on_output(self.vaults.cur().prefs.scrollback_reset_output)
+            .with_bold_is_bright(self.vaults.cur().prefs.bold_is_bright)
+            .with_keyword_highlight(self.vaults.cur().prefs.keyword_highlight)
             // Resolved for this pane's host, the same set its backend
             // watches with: a rule must never colour one pattern while
             // firing on another.
             .with_highlight_rules(self.highlight_rules_for(pane.saved_conn_id()))
-            .with_performance(self.prefs.performance_mode)
-            .with_perf_overlay(self.prefs.perf_overlay)
+            .with_performance(self.vaults.cur().prefs.performance_mode)
+            .with_perf_overlay(self.device_prefs.perf_overlay)
             .with_privacy(self.privacy_active_for_label(&pane.label))
             .with_privacy_terms(&self.privacy_terms())
             .with_privacy_classes(self.privacy_classes())
-            .with_smart_contrast(self.prefs.smart_contrast)
+            .with_smart_contrast(self.vaults.cur().prefs.smart_contrast)
             // The backdrop is painted once, by whoever sits behind this
             // canvas: the container in `view_terminal` (translucent
             // terminal) or the per-pane `Backdrop` canvas stacked below
@@ -687,7 +687,7 @@ impl Oryxis {
             // C5: a host with `disable_mouse_reporting` keeps clicks local
             // even when the remote turns on mouse tracking.
             .with_mouse_reporting(!pane.quirks.disable_mouse_reporting)
-            .with_word_delimiters(&self.prefs.word_delimiters)
+            .with_word_delimiters(&self.vaults.cur().prefs.word_delimiters)
             .with_resize_margins(resize_margins)
             .on_paste_request(Message::Terminal(TerminalMessage::TerminalPasteFromClipboard))
             // Captures THIS pane's id so the paste can't land in another
@@ -715,7 +715,7 @@ impl Oryxis {
         // the per-frame snapshot lock costs nothing when it's off. The
         // env-var check mirrors the widget's own `ORYXIS_TERM_PERF`
         // force-on so the forced HUD isn't missing its net row.
-        let hud_on = self.prefs.perf_overlay
+        let hud_on = self.device_prefs.perf_overlay
             || std::env::var("ORYXIS_TERM_PERF").is_ok_and(|v| !v.is_empty() && v != "0");
         if hud_on && let Some(ssh) = pane.session.as_ref().and_then(|t| t.ssh()) {
             let q = ssh.net_quality();
@@ -732,7 +732,7 @@ impl Oryxis {
         // Context menu (right-click scheme = Menu): carry the clicked
         // pane's id so Save Output / Clear Scrollback target the right pane,
         // not just the focused one.
-        if self.prefs.terminal_right_click == crate::util::RightClickMode::Menu {
+        if self.vaults.cur().prefs.terminal_right_click == crate::util::RightClickMode::Menu {
             let pane_id = pane.id;
             term_view = term_view.on_context_menu(move |x, y, sel| {
                 Message::Terminal(TerminalMessage::ShowTerminalContextMenu(pane_id, x, y, sel))
@@ -741,10 +741,10 @@ impl Oryxis {
         // Wire the teaching hints only while they should still show for
         // this pane, so the widget stops emitting once HintMode::Once has
         // retired them (and never emits under Never).
-        if self.prefs.hint_mode.should_show(pane.mouse_hint_shown) {
+        if self.vaults.cur().prefs.hint_mode.should_show(pane.mouse_hint_shown) {
             term_view = term_view.on_mouse_capture_hint(|| Message::Terminal(TerminalMessage::TerminalMouseCaptureHint));
         }
-        if self.prefs.hint_mode.should_show(pane.link_hint_shown) {
+        if self.vaults.cur().prefs.hint_mode.should_show(pane.link_hint_shown) {
             term_view = term_view.on_link_click_hint(|| Message::Terminal(TerminalMessage::TerminalLinkClickHint));
         }
         // Wrap the canvas so the focused pane asks the OS to enable its IME.
@@ -830,7 +830,7 @@ impl Oryxis {
                 (OryxisColors::t().warning, 2.0)
             } else if is_focused {
                 (OryxisColors::t().accent, 2.0)
-            } else if self.prefs.pane_border_inactive {
+            } else if self.vaults.cur().prefs.pane_border_inactive {
                 (OryxisColors::t().border, 1.0)
             } else {
                 // Setting off: the focused pane still gets its accent
@@ -860,7 +860,7 @@ impl Oryxis {
         // the card remains the default answer and the only one a lone
         // pane ever gets.
         let ended_card: Option<Element<'a, Message>> = (pane.ended
-            && !(multipane && self.prefs.pane_headers))
+            && !(multipane && self.vaults.cur().prefs.pane_headers))
             .then(|| self.pane_ended_card(pane));
         if overlay.is_none() && link_chip.is_none() && ring.is_none() && ended_card.is_none() {
             return host;

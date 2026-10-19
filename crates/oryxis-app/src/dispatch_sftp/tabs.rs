@@ -72,7 +72,7 @@ impl Oryxis {
                 // The same opt-in guard a terminal tab's X has (issue
                 // #204): a mounted SSH session is a live session, and the
                 // setting says "a tab or the app", not "a terminal tab".
-                if self.prefs.confirm_close_session_tab
+                if self.vaults.cur().prefs.confirm_close_session_tab
                     && self.sftp_tab_is_live(idx)
                     && let Some(tab) = self.sftp_tabs.get(idx)
                 {

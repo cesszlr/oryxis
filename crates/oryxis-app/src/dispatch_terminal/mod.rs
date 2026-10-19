@@ -112,7 +112,7 @@ impl Oryxis {
         // careful paste parks multi-line text; the paste guard parks
         // suspicious CONTENT (bidi/invisible chars, raw control bytes,
         // curl|sh one-liners, homograph tokens) even on one line.
-        if crate::paste_guard::needs_confirmation(text, self.prefs.careful_paste, self.prefs.paste_guard) {
+        if crate::paste_guard::needs_confirmation(text, self.vaults.cur().prefs.careful_paste, self.vaults.cur().prefs.paste_guard) {
             paste_trace("gate", "parked for confirm", text, None);
             self.pending_paste = Some((tab_id, text.to_string()));
             // An ordinary paste park replaces whatever was parked; a

@@ -49,7 +49,7 @@ impl Oryxis {
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id));
         let trigger_inner: Element<'_, Message> = if let Some(conn) = selected_conn {
             dir_row(vec![
-                super::host_picker::host_badge(conn, &self.prefs.default_host_icon, 22.0),
+                super::host_picker::host_badge(conn, &self.vaults.cur().prefs.default_host_icon, 22.0),
                 Space::new().width(10).boxed(),
                 text(conn.label.clone()).size(13).color(c.text_primary).boxed(),
                 Space::new().width(Length::Fill).boxed(),

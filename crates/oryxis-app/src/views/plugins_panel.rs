@@ -95,7 +95,7 @@ impl Oryxis {
                     toggle_row_desc(
                         crate::i18n::t("feature_monitoring"),
                         crate::i18n::t("feature_monitoring_desc"),
-                        self.prefs.host_monitoring,
+                        self.vaults.cur().prefs.host_monitoring,
                         Message::Settings(SettingsMessage::SettingToggleHostMonitoring),
                     ),
                 ),
@@ -110,7 +110,7 @@ impl Oryxis {
                     toggle_row_desc(
                         crate::i18n::t("feature_tmux"),
                         crate::i18n::t("feature_tmux_desc"),
-                        self.prefs.tmux_manager,
+                        self.vaults.cur().prefs.tmux_manager,
                         Message::Settings(SettingsMessage::SettingToggleTmuxManager),
                     ),
                 ),
@@ -127,7 +127,7 @@ impl Oryxis {
                     toggle_row_desc(
                         crate::i18n::t("setting_network_tools"),
                         crate::i18n::t("setting_network_tools_hint"),
-                        self.prefs.network_tools,
+                        self.vaults.cur().prefs.network_tools,
                         Message::Settings(SettingsMessage::SettingToggleNetworkTools),
                     ),
                 ),
@@ -143,7 +143,7 @@ impl Oryxis {
             // rather than as a network failure on every card: the cards
             // keep their disk-derived status and a click on any of them
             // lands on the same answer.
-            if self.prefs.offline_mode {
+            if self.device_prefs.offline_mode {
                 container(
                     text(crate::i18n::t("plugins_offline_banner"))
                         .size(12)
@@ -279,7 +279,7 @@ impl Oryxis {
             // reach. Decided from the switch, not from the fetch's
             // error text (which is English and only says what one
             // attempt reported).
-            None if self.prefs.offline_mode => text(crate::i18n::t("plugin_err_offline"))
+            None if self.device_prefs.offline_mode => text(crate::i18n::t("plugin_err_offline"))
                 .size(12)
                 .color(OryxisColors::t().warning)
                 .boxed(),

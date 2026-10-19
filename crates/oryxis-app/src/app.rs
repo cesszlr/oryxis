@@ -743,7 +743,8 @@ pub struct Oryxis {
     pub(crate) keys_ui: crate::state::KeysUi,
     /// See [`crate::state::SftpChrome`].
     pub(crate) sftp_chrome: crate::state::SftpChrome,
-    pub(crate) prefs: crate::state::AppPrefs,
+    /// See [`crate::state::DevicePrefs`].
+    pub(crate) device_prefs: crate::state::DevicePrefs,
     pub(crate) sftp: crate::state::SftpState,
     /// Open SFTP browser tabs. Share the unified strip with terminal tabs.
     /// The active tab's live state is hoisted to `self.sftp`; inactive tabs
@@ -1667,8 +1668,8 @@ impl Oryxis {
     /// is real for this user: a recording toggle is on, or the vault
     /// already holds recorded data (issue #38, zero-config visibility).
     pub(crate) fn logs_surface_visible(&self) -> bool {
-        self.prefs.session_logging
-            || self.prefs.connection_history
+        self.vaults.cur().prefs.session_logging
+            || self.vaults.cur().prefs.connection_history
             || self.vaults.cur().logs_total > 0
             || self.vaults.cur().session_logs_total > 0
     }
@@ -1703,7 +1704,7 @@ impl Oryxis {
         // over-corrected. 84 seats the menu right under the button.
         const BASE_Y: f32 = 84.0;
         const SUBNAV_HEIGHT: f32 = 50.0;
-        let horizontal_subnav = self.prefs.nav_orientation != "vertical"
+        let horizontal_subnav = self.vaults.cur().prefs.nav_orientation != "vertical"
             && self.cur_active_tab().is_none()
             && matches!(
                 self.cur_view(),

@@ -281,9 +281,9 @@ impl Oryxis {
                 let auto_open = match origin {
                     crate::state::ProgressOrigin::Saved(_) => conn
                         .sidebar_auto_open
-                        .unwrap_or(self.prefs.sidebar_auto_open),
+                        .unwrap_or(self.vaults.cur().prefs.sidebar_auto_open),
                     crate::state::ProgressOrigin::Quick(_) => {
-                        self.prefs.sidebar_auto_open
+                        self.vaults.cur().prefs.sidebar_auto_open
                     }
                 };
                 if auto_open

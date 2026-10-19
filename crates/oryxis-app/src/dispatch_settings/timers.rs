@@ -14,22 +14,22 @@ impl Oryxis {
     ) -> Result<Task<Message>, SettingsMessage> {
         match message {
             SettingsMessage::SettingToggleAutoReconnect => {
-                self.prefs.auto_reconnect = !self.prefs.auto_reconnect;
+                self.vaults.cur_mut().prefs.auto_reconnect = !self.vaults.cur_mut().prefs.auto_reconnect;
                 self.persist_setting(
                     "auto_reconnect",
-                    if self.prefs.auto_reconnect { "true" } else { "false" },
+                    if self.vaults.cur().prefs.auto_reconnect { "true" } else { "false" },
                 );
             }
             SettingsMessage::SettingMaxReconnectChanged(val) => {
-                self.prefs.max_reconnect_attempts = sanitize_uint(&val, 100);
+                self.vaults.cur_mut().prefs.max_reconnect_attempts = sanitize_uint(&val, 100);
                 self.persist_setting(
                     "max_reconnect_attempts",
-                    &self.prefs.max_reconnect_attempts,
+                    &self.vaults.cur().prefs.max_reconnect_attempts,
                 );
             }
             SettingsMessage::SettingAutoLockChanged(val) => {
-                self.prefs.auto_lock_minutes = sanitize_uint(&val, 1440);
-                self.persist_setting("auto_lock_minutes", &self.prefs.auto_lock_minutes);
+                self.vaults.cur_mut().prefs.auto_lock_minutes = sanitize_uint(&val, 1440);
+                self.persist_setting("auto_lock_minutes", &self.vaults.cur().prefs.auto_lock_minutes);
             }
             SettingsMessage::SettingManualLockActionChanged(val) => {
                 // Sibling of the lock family above: what the Lock Vault
@@ -40,7 +40,7 @@ impl Oryxis {
                     "sleep" | "lock" => val.as_str(),
                     _ => "ask",
                 };
-                self.prefs.manual_lock_action = normalized.into();
+                self.vaults.cur_mut().prefs.manual_lock_action = normalized.into();
                 self.persist_setting("manual_lock_action", normalized);
             }
             SettingsMessage::AutoLockTick => {
@@ -49,7 +49,7 @@ impl Oryxis {
                 // (the subscription only mounts then, but the setting can
                 // change between mount and fire).
                 let minutes = self
-                    .prefs.auto_lock_minutes
+                    .vaults.cur().prefs.auto_lock_minutes
                     .parse::<u64>()
                     .ok()
                     .filter(|m| *m > 0);
@@ -92,11 +92,11 @@ impl Oryxis {
                             .map(|id| Task::done(Message::Ssh(SshMessage::SshDisconnected(id)))),
                     ));
                 }
-                if !self.prefs.auto_reconnect {
+                if !self.vaults.cur().prefs.auto_reconnect {
                     // fall through, nothing to do
                 } else {
                     let max_attempts: u32 =
-                        self.prefs.max_reconnect_attempts.parse().unwrap_or(5);
+                        self.vaults.cur().prefs.max_reconnect_attempts.parse().unwrap_or(5);
                     // Find the first disconnected SSH tab whose counter is under the limit.
                     // Only reconnect one per tick to avoid thrashing; next tick picks up
                     // the next candidate.

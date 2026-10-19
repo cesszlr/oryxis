@@ -116,7 +116,7 @@ impl Oryxis {
     /// SFTP transfer slots to spin up. Falls back to `2` if the user
     /// typed garbage; clamped to `[1, 8]` to keep the channel pool sane.
     pub(crate) fn sftp_concurrency(&self) -> u8 {
-        self.prefs.sftp_concurrency
+        self.vaults.cur().prefs.sftp_concurrency
             .parse::<u8>()
             .unwrap_or(2)
             .clamp(1, 8)
@@ -128,7 +128,7 @@ impl Oryxis {
     /// landing dir and the sidebar browser's save dialog alike, which is
     /// what that setting promises.
     pub(crate) fn default_download_dir(&self) -> std::path::PathBuf {
-        crate::state::resolve_download_dir(&self.prefs.zmodem_download_dir)
+        crate::state::resolve_download_dir(&self.device_prefs.zmodem_download_dir)
     }
 
     fn parse_secs(input: &str, default: u64) -> std::time::Duration {
@@ -137,22 +137,22 @@ impl Oryxis {
     }
 
     pub(crate) fn sftp_connect_timeout(&self) -> std::time::Duration {
-        Self::parse_secs(&self.prefs.sftp_connect_timeout, 15)
+        Self::parse_secs(&self.vaults.cur().prefs.sftp_connect_timeout, 15)
     }
     pub(crate) fn sftp_auth_timeout(&self) -> std::time::Duration {
-        Self::parse_secs(&self.prefs.sftp_auth_timeout, 30)
+        Self::parse_secs(&self.vaults.cur().prefs.sftp_auth_timeout, 30)
     }
     pub(crate) fn sftp_session_timeout(&self) -> std::time::Duration {
-        Self::parse_secs(&self.prefs.sftp_session_timeout, 10)
+        Self::parse_secs(&self.vaults.cur().prefs.sftp_session_timeout, 10)
     }
     pub(crate) fn sftp_op_timeout(&self) -> std::time::Duration {
-        Self::parse_secs(&self.prefs.sftp_op_timeout, 30)
+        Self::parse_secs(&self.vaults.cur().prefs.sftp_op_timeout, 30)
     }
     /// The terminal dials' budget for opening the shell on an
     /// authenticated connection (channel open + PTY + shell request),
     /// Settings > Connection. Fresh dials and reused connections alike.
     pub(crate) fn ssh_session_timeout(&self) -> std::time::Duration {
-        Self::parse_secs(&self.prefs.ssh_session_timeout, 30)
+        Self::parse_secs(&self.vaults.cur().prefs.ssh_session_timeout, 30)
     }
 
     /// Build the ordered list of paths currently shown in a pane
@@ -477,7 +477,7 @@ impl Oryxis {
         use crate::state::{SftpDirDoubleClick, SftpFileDoubleClick, SftpPendingFocus};
         let browsable_zip = !opens_as_folder && self.sftp_zip_browsable(side, &path);
         if opens_as_folder || browsable_zip {
-            return match self.prefs.sftp_dir_double_click {
+            return match self.vaults.cur().prefs.sftp_dir_double_click {
                 SftpDirDoubleClick::Enter if browsable_zip => {
                     Task::done(Message::Sftp(SftpMessage::SftpZipOpen(side, path)))
                 }
@@ -494,7 +494,7 @@ impl Oryxis {
                 SftpDirDoubleClick::Nothing => Task::none(),
             };
         }
-        match self.prefs.sftp_file_double_click {
+        match self.vaults.cur().prefs.sftp_file_double_click {
             SftpFileDoubleClick::Transfer => self.sftp_transfer_entry(side, path),
             // A file inside a browsed archive has no "open": the listing is
             // virtual, and copying it out is the transfer.
