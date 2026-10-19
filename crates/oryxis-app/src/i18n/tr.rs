@@ -2720,7 +2720,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "Son kullanılan",
         "vault_picker_missing" => "Dosya bulunamadı",
         "setting_device_badge_tip" => "Bu cihazdaki tüm kasalara uygulanır",
-        "hotkey_device_note" => "Kısayollar bu cihaza aittir: her kasada aynıdır.",
+        "hotkey_device_note" => "Kısayol tablosu bu cihaza aittir: her kasada aynıdır.",
         "vault_status_missing" => "Dosya bulunamadı. Dosyası geri geldiğinde (örneğin bir USB bellek) kasa da geri gelir.",
         "vault_status_unlocked" => "Kilidi açık",
         "vault_status_locked" => "Kilitli",

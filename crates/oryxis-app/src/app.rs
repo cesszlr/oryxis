@@ -1459,9 +1459,10 @@ impl Oryxis {
     }
 
     /// A recent host's label on an app-wide door: with several vaults
-    /// open, the vault holding it follows the name.
+    /// (registered, the rule the switcher and the Settings tab follow),
+    /// the vault holding it follows the name.
     pub(crate) fn recent_host_door_label(&self, vault: Uuid, label: &str) -> String {
-        if self.vaults.ids().count() > 1 {
+        if self.vault_count() > 1 {
             format!("{label} \u{b7} {}", self.vault_name(vault))
         } else {
             label.to_string()

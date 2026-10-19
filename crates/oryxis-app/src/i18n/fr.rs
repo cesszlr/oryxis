@@ -2687,7 +2687,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "Dernier utilisé",
         "vault_picker_missing" => "Fichier introuvable",
         "setting_device_badge_tip" => "S’applique à tous les coffres de cet appareil",
-        "hotkey_device_note" => "Les raccourcis appartiennent à cet appareil : les mêmes dans tous les coffres.",
+        "hotkey_device_note" => "La table des raccourcis appartient à cet appareil : la même dans tous les coffres.",
         "vault_status_missing" => "Fichier introuvable. Le coffre revient quand son fichier revient (une clé USB, par exemple).",
         "vault_status_unlocked" => "Déverrouillé",
         "vault_status_locked" => "Verrouillé",

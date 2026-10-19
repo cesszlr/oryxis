@@ -2688,7 +2688,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "Последнее",
         "vault_picker_missing" => "Файл не найден",
         "setting_device_badge_tip" => "Действует для всех хранилищ на этом устройстве",
-        "hotkey_device_note" => "Сочетания клавиш относятся к этому устройству: одинаковы во всех хранилищах.",
+        "hotkey_device_note" => "Таблица сочетаний клавиш относится к этому устройству: одинакова во всех хранилищах.",
         "vault_status_missing" => "Файл не найден. Хранилище вернётся, когда вернётся его файл (например, флешка).",
         "vault_status_unlocked" => "Разблокировано",
         "vault_status_locked" => "Заблокировано",

@@ -2688,7 +2688,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "Último usado",
         "vault_picker_missing" => "Archivo no encontrado",
         "setting_device_badge_tip" => "Se aplica a todos los cofres de este dispositivo",
-        "hotkey_device_note" => "Los atajos son de este dispositivo: los mismos en todos los cofres.",
+        "hotkey_device_note" => "La tabla de atajos es de este dispositivo: la misma en todos los cofres.",
         "vault_status_missing" => "Archivo no encontrado. El cofre vuelve cuando vuelva su archivo (una memoria USB, por ejemplo).",
         "vault_status_unlocked" => "Desbloqueado",
         "vault_status_locked" => "Bloqueado",

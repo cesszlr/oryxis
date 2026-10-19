@@ -2689,7 +2689,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "前回使用",
         "vault_picker_missing" => "ファイルが見つかりません",
         "setting_device_badge_tip" => "このデバイスのすべてのボールトに適用されます",
-        "hotkey_device_note" => "ショートカットはこのデバイスのものです。どのボールトでも同じです。",
+        "hotkey_device_note" => "ショートカット表はこのデバイスのものです。どのボールトでも同じです。",
         "vault_status_missing" => "ファイルが見つかりません。ファイルが戻れば (USB メモリなど) ボールトも戻ります。",
         "vault_status_unlocked" => "ロック解除済み",
         "vault_status_locked" => "ロック中",

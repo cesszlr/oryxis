@@ -2688,7 +2688,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "上次使用",
         "vault_picker_missing" => "找不到文件",
         "setting_device_badge_tip" => "适用于此设备上的所有保险库",
-        "hotkey_device_note" => "快捷键属于此设备：在每个保险库中都相同。",
+        "hotkey_device_note" => "快捷键表属于此设备：在每个保险库中都相同。",
         "vault_status_missing" => "找不到文件。文件回来后（例如 U 盘），保险库也会回来。",
         "vault_status_unlocked" => "已解锁",
         "vault_status_locked" => "已锁定",

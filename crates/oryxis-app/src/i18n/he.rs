@@ -2726,7 +2726,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "שימוש אחרון",
         "vault_picker_missing" => "הקובץ לא נמצא",
         "setting_device_badge_tip" => "חל על כל הכספות במכשיר הזה",
-        "hotkey_device_note" => "קיצורי המקשים שייכים למכשיר הזה: זהים בכל הכספות.",
+        "hotkey_device_note" => "טבלת קיצורי המקשים שייכת למכשיר הזה: זהה בכל הכספות.",
         "vault_status_missing" => "הקובץ לא נמצא. הכספת תחזור כשהקובץ שלה יחזור (למשל דיסק און קי).",
         "vault_status_unlocked" => "לא נעולה",
         "vault_status_locked" => "נעולה",

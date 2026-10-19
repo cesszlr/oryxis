@@ -2727,7 +2727,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "ใช้ล่าสุด",
         "vault_picker_missing" => "ไม่พบไฟล์",
         "setting_device_badge_tip" => "ใช้กับทุก Vault บนอุปกรณ์นี้",
-        "hotkey_device_note" => "ทางลัดเป็นของอุปกรณ์นี้: เหมือนกันในทุก Vault",
+        "hotkey_device_note" => "ตารางทางลัดเป็นของอุปกรณ์นี้: เหมือนกันในทุก Vault",
         "vault_status_missing" => "ไม่พบไฟล์ Vault จะกลับมาเมื่อไฟล์กลับมา (เช่น แฟลชไดรฟ์)",
         "vault_status_unlocked" => "ปลดล็อกแล้ว",
         "vault_status_locked" => "ล็อกอยู่",

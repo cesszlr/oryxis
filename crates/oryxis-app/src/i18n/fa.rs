@@ -2708,7 +2708,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_last_used" => "آخرین استفاده",
         "vault_picker_missing" => "فایل پیدا نشد",
         "setting_device_badge_tip" => "برای همهٔ صندوقچه‌های این دستگاه اعمال می‌شود",
-        "hotkey_device_note" => "میان‌برها مال این دستگاه‌اند: در همهٔ صندوقچه‌ها یکسان‌اند.",
+        "hotkey_device_note" => "جدول میان‌برها مال این دستگاه است: در همهٔ صندوقچه‌ها یکسان است.",
         "vault_status_missing" => "فایل پیدا نشد. وقتی فایل برگردد (مثلاً یک فلش USB)، صندوقچه هم برمی‌گردد.",
         "vault_status_unlocked" => "باز",
         "vault_status_locked" => "قفل",

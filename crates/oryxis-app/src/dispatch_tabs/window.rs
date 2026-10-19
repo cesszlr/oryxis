@@ -410,9 +410,6 @@ impl Oryxis {
             // background.
             self.refresh_vault_presence();
             self.remember_window_vault();
-            // Taking the focus is the user's doing: it counts against
-            // this vault's idle auto-lock like any input.
-            self.vaults.window_vault_mut().last_user_activity = std::time::Instant::now();
         }
         if !focused {
             self.on_window_blur();

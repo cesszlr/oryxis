@@ -99,9 +99,21 @@ impl Oryxis {
                 }
                 // Each open vault by its own setting, over its own tabs
                 // and hosts: a tab of another vault does not resolve
-                // against this one's connections.
-                let reconnects = self.on_each_open_vault(|app| app.auto_reconnect_candidate());
-                return Ok(Task::batch(reconnects.into_iter().map(Task::done)));
+                // against this one's connections. ONE dial per tick for
+                // the whole app, never one per vault: the host-key / 2FA
+                // / command-proxy answers ride single staging slots, so
+                // the first vault with a candidate takes the tick and the
+                // next tick picks up the next.
+                let mut picked = false;
+                let reconnect = self.on_each_open_vault(|app| {
+                    if picked {
+                        return None;
+                    }
+                    let candidate = app.auto_reconnect_candidate();
+                    picked = candidate.is_some();
+                    candidate
+                });
+                return Ok(Task::batch(reconnect.into_iter().map(Task::done)));
             }
             m => return Err(m),
         }

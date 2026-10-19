@@ -500,8 +500,15 @@ impl OpenVault {
 
     /// Armed, and idle past its threshold.
     pub(crate) fn auto_lock_due(&self) -> bool {
+        self.auto_lock_due_at(std::time::Instant::now())
+    }
+
+    /// [`Self::auto_lock_due`] at `now`.
+    pub(crate) fn auto_lock_due_at(&self, now: std::time::Instant) -> bool {
         self.auto_lock_armed()
-            && self.auto_lock_after().is_some_and(|after| self.last_user_activity.elapsed() >= after)
+            && self
+                .auto_lock_after()
+                .is_some_and(|after| now.saturating_duration_since(self.last_user_activity) >= after)
     }
 
     /// A vault just opened, nothing loaded from it yet (`load_data_from_vault`
@@ -908,45 +915,48 @@ mod tests {
     }
 
     /// An unlocked vault with a master password and a threshold, its
-    /// last input `idle` ago.
-    fn idle_for(minutes: &str, idle: std::time::Duration) -> OpenVault {
+    /// last input now; `later(idle)` is the instant `idle` after it (a
+    /// sum: an instant BEFORE now may not exist on a machine just booted).
+    fn armed(minutes: &str) -> OpenVault {
         let mut v = bare(Uuid::new_v4());
         v.vault_ui.state = crate::state::VaultState::Unlocked;
         v.vault_ui.has_user_password = true;
         v.prefs.auto_lock_minutes = minutes.into();
-        v.last_user_activity = std::time::Instant::now()
-            .checked_sub(idle)
-            .expect("an instant that far back");
         v
+    }
+
+    fn later(v: &OpenVault, idle: std::time::Duration) -> std::time::Instant {
+        v.last_user_activity + idle
     }
 
     #[test]
     fn each_vault_locks_by_its_own_threshold_and_its_own_input() {
         let min = std::time::Duration::from_secs(60);
         // Idle past its own five minutes: due, whatever the others do.
-        assert!(idle_for("5", 6 * min).auto_lock_due());
+        let quick = armed("5");
+        assert!(quick.auto_lock_due_at(later(&quick, 6 * min)));
         // The same idle under a longer threshold of its own: not yet.
-        let patient = idle_for("10", 6 * min);
+        let patient = armed("10");
         assert!(patient.auto_lock_armed());
-        assert!(!patient.auto_lock_due());
+        assert!(!patient.auto_lock_due_at(later(&patient, 6 * min)));
         // Fresh input in its windows: not due.
-        assert!(!idle_for("5", std::time::Duration::ZERO).auto_lock_due());
+        assert!(!quick.auto_lock_due_at(later(&quick, std::time::Duration::ZERO)));
     }
 
     #[test]
     fn the_auto_lock_never_arms_where_a_lock_could_not_hold() {
         let long = std::time::Duration::from_secs(3600);
         // Off ("0") or a row that does not parse.
-        assert!(!idle_for("0", long).auto_lock_armed());
-        assert!(!idle_for("soon", long).auto_lock_armed());
+        assert!(!armed("0").auto_lock_armed());
+        assert!(!armed("soon").auto_lock_armed());
         // No master password: locking would reopen at once.
-        let mut open = idle_for("1", long);
+        let mut open = armed("1");
         open.vault_ui.has_user_password = false;
-        assert!(!open.auto_lock_due());
+        assert!(!open.auto_lock_due_at(later(&open, long)));
         // Already locked: nothing to do.
-        let mut locked = idle_for("1", long);
+        let mut locked = armed("1");
         locked.vault_ui.state = crate::state::VaultState::Locked;
-        assert!(!locked.auto_lock_due());
+        assert!(!locked.auto_lock_due_at(later(&locked, long)));
     }
 
     #[test]
