@@ -379,3 +379,18 @@ fn a_start_never_opens_a_vault_whose_file_went_away() {
     std::fs::remove_file(dir.path().join(FIRST_VAULT_FILE)).unwrap();
     assert_eq!(store.boot_vault().id, work.id, "the first one whose file is there");
 }
+
+#[test]
+fn a_vault_keeps_its_chord_and_loses_it_on_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    let work = store.create_entry("Work").unwrap();
+    assert_eq!(work.hotkey, None);
+    store.set_hotkey(work.id, Some("ctrl+alt+2")).unwrap();
+    assert_eq!(store_in(dir.path()).entry(work.id).unwrap().hotkey.as_deref(), Some("ctrl+alt+2"));
+    store.set_hotkey(work.id, None).unwrap();
+    assert_eq!(store.entry(work.id).unwrap().hotkey, None);
+    // A file without the field (any build before it) reads as no chord.
+    let raw = std::fs::read_to_string(dir.path().join(FILE_NAME)).unwrap();
+    assert!(!raw.contains("hotkey"), "an unset chord is not written");
+}

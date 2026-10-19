@@ -40,6 +40,11 @@ pub enum MultiVaultMessage {
     /// Settings > Vaults: hide the switcher while this device has a
     /// single vault.
     VaultSwitcherHideSingleToggled(bool),
+    /// Settings > Vaults: record the chord of vault `id` (the next
+    /// keypress).
+    VaultHotkeyCaptureStart(Uuid),
+    /// Settings > Vaults: vault `id` has no chord any more.
+    VaultHotkeyClear(Uuid),
     /// Settings > Vaults: where the switcher lives.
     VaultSwitcherPlaceChanged(crate::state::VaultSwitcherPlace),
     /// The setup step of a vault just made was abandoned: back to the

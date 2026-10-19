@@ -42,7 +42,7 @@ settle 250
 expect "Home"
 absent "Personal"
 # Work's Delete (the second one): nothing happens until the name matches.
-click (678, 349)
+click (678, 435)
 settle 250
 expect "Delete Work?"
 type "Wor"
@@ -59,7 +59,7 @@ absent "Work"
 expect "This window"
 expect "Home"
 # One vault left: the chip may go (the row's toggle).
-click (1141, 414)
+click (1141, 458)
 settle 250
 click (56, 20)
 settle 250

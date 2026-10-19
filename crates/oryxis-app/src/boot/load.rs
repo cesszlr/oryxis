@@ -1110,6 +1110,9 @@ impl Oryxis {
     /// Hotkey overrides (with factory-conflict resolution) and the
     /// new-connection defaults, including the one-shot setting migrations.
     fn load_vault_hotkeys_and_defaults(&mut self) {
+        // The vaults' own chords (Settings > Vaults) are user choices that
+        // collide with everything, like a snippet's.
+        let vault_chords: Vec<crate::hotkeys::HotkeyBinding> = self.vault_chords.iter().map(|(_, c)| *c).collect();
         let ov = self.vaults.cur_mut();
         if let Some(vault) = &ov.store {
             // Hotkey overrides: each action persists under
@@ -1178,6 +1181,7 @@ impl Oryxis {
                     .filter_map(crate::hotkeys::HotkeyBinding::parse)
                     .map(|b| (b, None)),
             );
+            user_chords.extend(vault_chords.iter().map(|b| (*b, None)));
             let mut emptied: Vec<crate::hotkeys::HotkeyAction> = Vec::new();
             for action in crate::hotkeys::HotkeyAction::all() {
                 if user_bound.contains(action) {

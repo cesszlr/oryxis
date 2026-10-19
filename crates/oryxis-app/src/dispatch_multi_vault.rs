@@ -78,8 +78,10 @@ impl Oryxis {
                     VaultChipPlace::Tabs => self.vault_tab_bounds.get(),
                 };
                 // Under the control; a strip docked at the bottom is
-                // kept inside the window by the overlay's own clamp.
-                let (x, y) = (b.x, b.y + b.height + 4.0);
+                // kept inside the window by the overlay's own clamp. A
+                // door never drawn (the keyboard opening a hidden
+                // switcher) hangs it under the tab bar's leading edge.
+                let (x, y) = if b.width > 0.0 { (b.x, b.y + b.height + 4.0) } else { (8.0, 44.0) };
                 self.overlay = Some(OverlayState {
                     content: OverlayContent::VaultSwitcher,
                     x,
@@ -173,6 +175,11 @@ impl Oryxis {
                     return Task::done(Message::ForVault(id, Box::new(Message::Vault(VaultMessage::LockVault))));
                 }
             }
+            MultiVaultMessage::VaultHotkeyCaptureStart(id) => self.editing_vault_hotkey = Some(id),
+            MultiVaultMessage::VaultHotkeyClear(id) => {
+                self.editing_vault_hotkey = None;
+                return self.set_vault_hotkey(id, None);
+            }
             MultiVaultMessage::VaultSwitcherPlaceChanged(place) => {
                 self.device_prefs.vault_switcher_place = place;
                 self.persist_setting("vault_switcher_place", place.code());
@@ -264,13 +271,97 @@ impl Oryxis {
     }
 
     /// Check which registered vault files are there, for the views (see
-    /// `vault_presence`).
+    /// `vault_presence`), and take each vault's chord from the registry
+    /// (`vault_chords`).
     pub(crate) fn refresh_vault_presence(&mut self) {
-        self.vault_presence = self
+        let entries = self.registered_vaults();
+        self.vault_presence = entries.iter().map(|entry| (entry.id, self.vault_file(entry.id).is_some())).collect();
+        self.vault_chords = entries
+            .iter()
+            .filter_map(|entry| {
+                let chord = entry.hotkey.as_deref().and_then(crate::hotkeys::HotkeyBinding::parse)?;
+                Some((entry.id, chord))
+            })
+            .collect();
+    }
+
+    /// The vault whose chord this keypress is, if any.
+    pub(crate) fn vault_chord_hit(
+        &self,
+        key: &iced::keyboard::Key,
+        modifiers: &iced::keyboard::Modifiers,
+    ) -> Option<Uuid> {
+        self.vault_chords
+            .iter()
+            .find(|(_, chord)| chord.match_event(key, modifiers).is_some())
+            .map(|(id, _)| *id)
+    }
+
+    /// The vault holding `chord` (by keypress), other than `except`.
+    pub(crate) fn vault_holding_chord(
+        &self,
+        chord: &crate::hotkeys::HotkeyBinding,
+        except: Option<Uuid>,
+    ) -> Option<Uuid> {
+        self.vault_chords
+            .iter()
+            .find(|(id, held)| Some(*id) != except && held.shares_keypress(chord))
+            .map(|(id, _)| *id)
+    }
+
+    /// Write vault `id`'s chord to the registry (the cache follows on the
+    /// way out of `handle_multi_vault`, or here for the key path).
+    pub(crate) fn set_vault_hotkey(
+        &mut self,
+        id: Uuid,
+        chord: Option<crate::hotkeys::HotkeyBinding>,
+    ) -> Task<Message> {
+        let text = chord.map(|c| c.serialize());
+        if let Some(device) = oryxis_vault::device::installed()
+            && let Err(e) = device.set_hotkey(id, text.as_deref())
+        {
+            return self.show_toast(e.to_string());
+        }
+        self.refresh_vault_presence();
+        Task::none()
+    }
+
+    /// The keyboard's way to the switcher (the "Open vault switcher"
+    /// action): the menu opens under whichever door this window draws,
+    /// and under the tab bar's leading edge when none is drawn (the
+    /// switcher hidden with a single vault).
+    pub(crate) fn open_vault_switcher_from_keyboard(&mut self) -> Task<Message> {
+        let drawn = |cell: &crate::widgets::BoundsCell| cell.get().width > 0.0;
+        let place = if self.vault_switcher_in_tabs() {
+            VaultChipPlace::Tabs
+        } else if drawn(&self.vault_badge_bounds) && !drawn(&self.vault_chip_bounds) {
+            VaultChipPlace::Rail
+        } else {
+            VaultChipPlace::Toolbar
+        };
+        self.handle_multi_vault(MultiVaultMessage::ShowVaultSwitcher(place))
+    }
+
+    /// "Next vault" / "Previous vault": the window moves `step` places
+    /// along the registry's order, wrapping, over the vaults that can be
+    /// shown (an unavailable one is passed over).
+    pub(crate) fn switch_to_adjacent_vault(&mut self, step: isize) -> Task<Message> {
+        self.refresh_vault_presence();
+        let here = self.vaults.window_id();
+        let ring: Vec<Uuid> = self
             .registered_vaults()
             .into_iter()
-            .map(|entry| (entry.id, self.vault_file(entry.id).is_some()))
+            .map(|e| e.id)
+            .filter(|id| *id == here || self.vault_available(*id))
             .collect();
+        let Some(at) = ring.iter().position(|id| *id == here) else {
+            return Task::none();
+        };
+        let next = ring[(at as isize + step).rem_euclid(ring.len() as isize) as usize];
+        if next == here {
+            return Task::none();
+        }
+        self.switch_this_window_to_vault(next)
     }
 
     /// Open `entry`'s file beside the vaults already open: where it

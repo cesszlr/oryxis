@@ -153,6 +153,11 @@ pub struct VaultEntry {
     /// `ORYXIS_HOME` takes its vaults along); absolute = where the user
     /// put it.
     pub path: PathBuf,
+    /// The chord that moves the window in use to this vault, in the
+    /// hotkey table's text form (`"ctrl+alt+1"`); `None` = none. Lives on
+    /// the entry so it goes with the vault.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hotkey: Option<String>,
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
@@ -172,6 +177,7 @@ impl VaultEntry {
             slug: "personal".to_owned(),
             label: None,
             path: PathBuf::from(FIRST_VAULT_FILE),
+            hotkey: None,
             extra: serde_json::Map::new(),
         }
     }
@@ -421,6 +427,7 @@ impl DeviceStore {
                 slug: slug_for(label, &taken),
                 label: Some(label.trim().to_owned()).filter(|l| !l.is_empty()),
                 path: PathBuf::from(VAULTS_DIR).join(format!("{id}.db")),
+                hotkey: None,
                 extra: serde_json::Map::new(),
             };
             f.vaults.push(entry.clone());
@@ -449,6 +456,7 @@ impl DeviceStore {
                 slug: slug_for(label, &taken),
                 label: Some(label.trim().to_owned()).filter(|l| !l.is_empty()),
                 path: std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf()),
+                hotkey: None,
                 extra: serde_json::Map::new(),
             };
             f.vaults.push(entry.clone());
@@ -470,6 +478,15 @@ impl DeviceStore {
         self.update(|f| {
             if let Some(v) = f.vaults.iter_mut().find(|v| v.id == id) {
                 v.label = Some(label.trim().to_owned()).filter(|l| !l.is_empty());
+            }
+        })
+    }
+
+    /// Set (or, with `None`, clear) the chord of vault `id`.
+    pub fn set_hotkey(&self, id: Uuid, hotkey: Option<&str>) -> Result<(), DeviceError> {
+        self.update(|f| {
+            if let Some(v) = f.vaults.iter_mut().find(|v| v.id == id) {
+                v.hotkey = hotkey.map(str::to_owned);
             }
         })
     }

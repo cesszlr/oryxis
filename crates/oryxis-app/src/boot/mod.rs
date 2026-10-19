@@ -406,6 +406,8 @@ impl Oryxis {
                 parked_views: crate::window_ctx::ParkedViews::new(),
                 vault_dialog: None,
                 vault_presence: std::collections::HashMap::new(),
+                vault_chords: Vec::new(),
+                editing_vault_hotkey: None,
                 vault_chip_bounds: crate::widgets::new_bounds_cell(),
                 vault_tab_bounds: crate::widgets::new_bounds_cell(),
                 vault_badge_bounds: crate::widgets::new_bounds_cell(),

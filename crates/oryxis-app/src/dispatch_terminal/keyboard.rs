@@ -149,6 +149,15 @@ impl Oryxis {
                     {
                         return Ok(task);
                     }
+                    // A vault's chord still moves the window: the way out
+                    // of a lock screen to another vault, with no unlock.
+                    if !self.any_modal_blocks_input()
+                        && let iced::keyboard::Event::KeyPressed { key, modifiers, .. } = &event
+                        && let Some(vault) = self.vault_chord_hit(key, modifiers)
+                        && vault != self.vaults.window_id()
+                    {
+                        return Ok(self.switch_this_window_to_vault(vault));
+                    }
                     return Ok(Task::none());
                 }
                 // The gate above cannot catch the key press that UNLOCKED

@@ -212,7 +212,7 @@ impl Oryxis {
     }
 
     /// Whether "Lock all vaults" has anything to lock.
-    fn any_vault_lockable(&self) -> bool {
+    pub(crate) fn any_vault_lockable(&self) -> bool {
         self.vaults
             .all()
             .any(|v| v.vault_ui.has_user_password && v.vault_ui.state == VaultState::Unlocked)

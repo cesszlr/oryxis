@@ -366,6 +366,12 @@ impl Oryxis {
             self.set_toast(toast);
             return super::toast_clear_after_secs(3);
         }
+        // A vault's chord likewise (Settings > Vaults holds it).
+        if let Some(vault) = self.vault_holding_chord(&new_binding, None) {
+            let toast = crate::i18n::t("vault_hotkey_taken_by_vault").replace("{name}", &self.vault_name(vault));
+            self.set_toast(toast);
+            return super::toast_clear_after_secs(3);
+        }
         // Conflict resolution: take the chord away from whichever other
         // action holds it, and surface a toast that names *the action*
         // (not the key combo) so the family case reads "Switch to

@@ -175,6 +175,9 @@ impl Oryxis {
             // The chip shows the action's primary chord: an action can
             // carry several, and the palette has room for one.
             .and_then(|b| b.badges())
+            // A vault's own chord (Settings > Vaults), held outside the
+            // table.
+            .or_else(|| row.chord.map(|c| c.badges()))
             .map(|badges| badges.join("+"))
         {
             Some(badge) if !badge.is_empty() => container(

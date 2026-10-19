@@ -92,6 +92,19 @@ impl Oryxis {
             }
         }
 
+        // 1.4. Settings > Vaults recording a vault's chord: the next
+        //      chord becomes it, Esc cancels. Guarded on the section
+        //      still being on screen, like the Shortcuts capture.
+        if let Some(vault) = self.editing_vault_hotkey {
+            let on_vaults = self.cur_view() == View::Settings
+                && self.settings_section == crate::state::SettingsSection::Vaults;
+            if !on_vaults {
+                self.editing_vault_hotkey = None;
+            } else {
+                return Some(self.handle_vault_hotkey_capture(vault, key, modifiers));
+            }
+        }
+
         // 1.5. Snippet-shortcut recorder (armed from either snippet
         //      editor). The next chord becomes the snippet's custom
         //      run hotkey; Esc cancels. Guarded on the editor being
@@ -132,7 +145,9 @@ impl Oryxis {
                         && sn.hotkey.as_deref()
                             == Some(binding.serialize()).as_deref()
                 });
-                if in_table || in_snippets {
+                // A vault's chord fires everywhere, a terminal included.
+                let in_vaults = self.vault_holding_chord(&binding, None).is_some();
+                if in_table || in_snippets || in_vaults {
                     self.set_toast(crate::i18n::t("snippet_hotkey_in_use").to_string());
                     return Some(super::toast_clear_after_secs(2));
                 }
@@ -320,6 +335,18 @@ impl Oryxis {
             if let Some(idx) = hit {
                 return Some(self.update(Message::Snippet(SnippetMessage::RunSnippet(idx))));
             }
+        }
+
+        // 2.6. Per-vault chords (Settings > Vaults): the window in use
+        //      moves to that vault, from any surface, a terminal
+        //      included (the recorder refuses the shell's own chords).
+        if !modal_owns_keys
+            && let Some(vault) = self.vault_chord_hit(key, modifiers)
+        {
+            if vault == self.vaults.window_id() {
+                return Some(Task::none());
+            }
+            return Some(self.switch_this_window_to_vault(vault));
         }
 
         // 3. Esc closes the topmost open modal as a fallback. Only
@@ -855,6 +882,9 @@ impl Oryxis {
             // declines a vault with no master password, like the burger
             // menu's row.
             LockVault => Task::done(Message::Vault(VaultMessage::LockVaultConfirm)),
+            ShowVaultSwitcher => self.open_vault_switcher_from_keyboard(),
+            NextVault => self.switch_to_adjacent_vault(1),
+            PreviousVault => self.switch_to_adjacent_vault(-1),
             // The card the ring has focused wins, the way its Enter
             // connects exactly that card; with no ringed card, the
             // dashboard selection in view order, the selection menu's
@@ -917,3 +947,56 @@ impl Oryxis {
         }
     }
 }
+
+impl Oryxis {
+    /// One keypress while Settings > Vaults records `vault`'s chord: Esc
+    /// cancels, a lone modifier keeps waiting, anything else becomes the
+    /// chord unless something else already answers it. A vault chord
+    /// fires on every surface, a terminal included, so the shell's own
+    /// keys are refused as for a snippet; and it may not share a keypress
+    /// with the hotkey table, this vault's snippets or another vault.
+    fn handle_vault_hotkey_capture(&mut self, vault: uuid::Uuid, key: &Key, modifiers: &Modifiers) -> Task<Message> {
+        if matches!(key, Key::Named(Named::Escape)) {
+            self.editing_vault_hotkey = None;
+            return Task::none();
+        }
+        if matches!(key, Key::Named(Named::Control | Named::Shift | Named::Alt | Named::Super | Named::Meta)) {
+            return Task::none();
+        }
+        let refuse = |s: &mut Self, text: String| {
+            s.set_toast(text);
+            super::toast_clear_after_secs(3)
+        };
+        let Some(binding) = crate::hotkeys::binding_from_event(key, modifiers, true) else {
+            return refuse(self, crate::i18n::t("hotkey_must_have_modifier").to_string());
+        };
+        if binding.is_terminal_control_sequence() {
+            return refuse(self, crate::i18n::t("snippet_hotkey_reserved").to_string());
+        }
+        if let Some(action) = crate::hotkeys::HotkeyAction::all()
+            .iter()
+            .find(|a| self.hotkey_bindings.get(a).is_some_and(|b| b.shares_keypress(&binding)))
+        {
+            return refuse(
+                self,
+                crate::i18n::t("vault_hotkey_taken_by_action").replace("{name}", crate::i18n::t(action.label_key())),
+            );
+        }
+        if let Some(snippet) = self.vaults.cur().snippets.iter().find(|sn| {
+            sn.hotkey
+                .as_deref()
+                .and_then(crate::hotkeys::HotkeyBinding::parse)
+                .is_some_and(|held| held.shares_keypress(&binding))
+        }) {
+            let text = crate::i18n::t("hotkey_taken_by_snippet").replace("{name}", &snippet.label);
+            return refuse(self, text);
+        }
+        if let Some(other) = self.vault_holding_chord(&binding, Some(vault)) {
+            let text = crate::i18n::t("vault_hotkey_taken_by_vault").replace("{name}", &self.vault_name(other));
+            return refuse(self, text);
+        }
+        self.editing_vault_hotkey = None;
+        self.set_vault_hotkey(vault, Some(binding))
+    }
+}
+

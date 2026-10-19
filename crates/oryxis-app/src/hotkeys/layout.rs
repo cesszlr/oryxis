@@ -41,7 +41,7 @@ pub type LayoutEntry = (HotkeyAction, HotkeyBindings);
 /// Why a chord of a layout did not land.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Skipped {
-    /// A snippet holds it.
+    /// A snippet or a vault holds it (the `reserved` chords).
     Snippet { action: HotkeyAction, chord: HotkeyBinding },
 }
 

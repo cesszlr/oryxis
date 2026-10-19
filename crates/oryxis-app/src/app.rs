@@ -660,6 +660,13 @@ pub struct Oryxis {
     /// focus, a registry change). Views read this, never the disk: a
     /// vault on a network share can take seconds to answer a stat.
     pub(crate) vault_presence: std::collections::HashMap<uuid::Uuid, bool>,
+    /// Each registered vault's chord, parsed from the registry by
+    /// `refresh_vault_presence` (a keypress is matched against this, never
+    /// against `device.json`).
+    pub(crate) vault_chords: Vec<(uuid::Uuid, crate::hotkeys::HotkeyBinding)>,
+    /// Settings > Vaults is recording the chord of this vault: the next
+    /// keypress becomes it (Esc cancels).
+    pub(crate) editing_vault_hotkey: Option<uuid::Uuid>,
     /// The vault switcher chip on the toolbar and the badge on the nav
     /// rail, as last drawn: the switcher menu opens under the one pressed.
     pub(crate) vault_chip_bounds: crate::widgets::BoundsCell,

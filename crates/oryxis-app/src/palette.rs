@@ -63,6 +63,9 @@ pub(crate) struct PaletteRow {
     /// The bound chord, if this row mirrors a hotkey (rendered live from
     /// the current binding map so rebinds show correctly).
     pub(crate) hotkey: Option<HotkeyAction>,
+    /// A chord held outside the table (a vault's, Settings > Vaults),
+    /// shown when `hotkey` is `None`.
+    pub(crate) chord: Option<crate::hotkeys::HotkeyBinding>,
     pub(crate) category: PaletteCategory,
     /// The real message this row dispatches (carried into the
     /// `RowAction`, not re-derived by index).
@@ -79,6 +82,8 @@ struct Candidate {
     label: String,
     keywords: &'static str,
     hotkey: Option<HotkeyAction>,
+    /// A chord that is not a table action's (a vault's own).
+    chord: Option<crate::hotkeys::HotkeyBinding>,
     category: PaletteCategory,
     message: Message,
     enabled: bool,
@@ -109,7 +114,9 @@ fn hotkey_category(action: HotkeyAction) -> PaletteCategory {
         }
         OpenSettings => PaletteCategory::Settings,
         ToggleFullscreen | ShowCommandPalette | SwitchToTabSlot | CycleTabs
-        | TogglePrivacyMode | LockVault => PaletteCategory::Session,
+        | TogglePrivacyMode | LockVault | ShowVaultSwitcher | NextVault | PreviousVault => {
+            PaletteCategory::Session
+        }
     }
 }
 
@@ -254,11 +261,15 @@ impl Oryxis {
             let enabled = (!action.terminal_only() || in_terminal)
                 && (!action.vault_only() || self.in_vault_area())
                 && (!action.tab_only() || self.focused_strip_tab().is_some())
-                && (action != HotkeyAction::LockVault || self.vaults.cur().vault_ui.has_user_password);
+                && (action != HotkeyAction::LockVault || self.vaults.cur().vault_ui.has_user_password)
+                // Nothing to move to with a single vault.
+                && (!matches!(action, HotkeyAction::NextVault | HotkeyAction::PreviousVault)
+                    || self.vault_count() > 1);
             candidates.push(Candidate {
                 label: t(action.label_key()).to_string(),
                 keywords: action.id(),
                 hotkey: Some(action),
+                chord: None,
                 category: hotkey_category(action),
                 message: Message::Tabs(TabsMessage::RunHotkeyAction(action)),
                 enabled,
@@ -272,6 +283,7 @@ impl Oryxis {
             label: t("privacy_mode_label").to_string(),
             keywords: "privacy_mode",
             hotkey: None,
+            chord: None,
             category: PaletteCategory::Session,
             message: Message::Settings(SettingsMessage::TogglePrivacyMode),
             enabled: true,
@@ -284,11 +296,48 @@ impl Oryxis {
                 label: format!("{connect}: {}", conn.label),
                 keywords: "connect_host_ssh",
                 hotkey: None,
+                chord: None,
                 category: PaletteCategory::Vault,
                 message: Message::Ssh(SshMessage::ConnectSsh(ci)),
                 enabled: true,
             });
         }
+
+        // ── Dynamic: vaults ────────────────────────────────────────────
+        // Every vault this device knows, its own chord on the row; the
+        // one this window is on, and one whose file is gone, list
+        // disabled. Then the two doors of the switcher's menu.
+        let vault_word = t("vault");
+        let here = self.vaults.cur().id;
+        for entry in self.registered_vaults() {
+            candidates.push(Candidate {
+                label: format!("{vault_word}: {}", Self::vault_display_name(&entry)),
+                keywords: "vault_switch",
+                hotkey: None,
+                chord: self.vault_chords.iter().find(|(id, _)| *id == entry.id).map(|(_, c)| *c),
+                category: PaletteCategory::Vault,
+                message: Message::MultiVault(crate::app::MultiVaultMessage::SwitchToVault(entry.id)),
+                enabled: entry.id != here && self.vault_available(entry.id),
+            });
+        }
+        candidates.push(Candidate {
+            label: t("vault_new").to_string(),
+            keywords: "vault_new_create",
+            hotkey: None,
+            chord: None,
+            category: PaletteCategory::Vault,
+            message: Message::MultiVault(crate::app::MultiVaultMessage::ShowNewVault),
+            enabled: true,
+        });
+        candidates.push(Candidate {
+            label: t("vault_lock_all").to_string(),
+            keywords: "vault_lock_all",
+            hotkey: None,
+            chord: None,
+            category: PaletteCategory::Session,
+            message: Message::MultiVault(crate::app::MultiVaultMessage::LockAllVaults),
+            enabled: self.any_vault_lockable(),
+        });
 
         // ── Dynamic: Settings sections ─────────────────────────────────
         let settings = t("settings");
@@ -297,6 +346,7 @@ impl Oryxis {
                 label: format!("{settings}: {label}"),
                 keywords: "settings_section",
                 hotkey: None,
+                chord: None,
                 category: PaletteCategory::Settings,
                 message: Message::Tabs(TabsMessage::OpenSettingsSection(section)),
                 enabled: true,
@@ -315,6 +365,7 @@ impl Oryxis {
                     label: format!("{section_label}: {}", t(entry.label_key)),
                     keywords: entry.keywords,
                     hotkey: None,
+                    chord: None,
                     category: PaletteCategory::Settings,
                     message: Message::Settings(SettingsMessage::RevealSetting(
                         entry.section,
@@ -358,6 +409,7 @@ impl Oryxis {
             .map(|(_, c)| PaletteRow {
                 label: c.label,
                 hotkey: c.hotkey,
+                chord: c.chord,
                 category: c.category,
                 message: c.message,
                 enabled: c.enabled,

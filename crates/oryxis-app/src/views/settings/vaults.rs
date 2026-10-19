@@ -177,6 +177,8 @@ impl Oryxis {
             text(t(status_key)).size(11).color(status_color),
             Space::new().height(2),
             text(path).size(11).font(iced::Font::MONOSPACE).color(c.text_muted).selectable(true),
+            Space::new().height(8),
+            self.vault_hotkey_row(id),
             Space::new().height(10),
             dir_row(actions).align_y(iced::Alignment::Center),
         ]
@@ -197,5 +199,43 @@ impl Oryxis {
                 ..Default::default()
             })
             .boxed()
+    }
+
+    /// A vault's chord: what it is (or a dash), Record (the next keypress
+    /// becomes it; "Press a key…" while armed) and a clear button once
+    /// there is one. Fires from any window and any vault, a lock screen
+    /// included.
+    fn vault_hotkey_row(&self, id: uuid::Uuid) -> Element<'_, Message> {
+        let c = OryxisColors::t();
+        let chord = self.vault_chords.iter().find(|(v, _)| *v == id).map(|(_, chord)| *chord);
+        let armed = self.editing_vault_hotkey == Some(id);
+        let shown = chord.map(|ch| ch.badges().join(" + ")).unwrap_or_else(|| "-".to_string());
+        let record = Message::MultiVault(MultiVaultMessage::VaultHotkeyCaptureStart(id));
+        let (record_label, record_color) = if armed {
+            (t("hotkey_press_a_key"), c.accent)
+        } else {
+            (t("snippet_hotkey_record"), c.bg_selected)
+        };
+        let mut row: Vec<Element<'_, Message>> = vec![
+            text(t("vault_hotkey")).size(12).color(c.text_secondary).boxed(),
+            Space::new().width(10).boxed(),
+            text(shown).size(12).font(iced::Font::MONOSPACE).color(c.text_primary).boxed(),
+            Space::new().width(12).boxed(),
+            self.settings_nav_slot(
+                crate::keynav::RowAction::activate(record.clone()),
+                6.0,
+                styled_button(record_label, record, record_color),
+            ),
+        ];
+        if chord.is_some() {
+            let clear = Message::MultiVault(MultiVaultMessage::VaultHotkeyClear(id));
+            row.push(Space::new().width(6).boxed());
+            row.push(self.settings_nav_slot(
+                crate::keynav::RowAction::activate(clear.clone()),
+                6.0,
+                styled_button(t("vault_hotkey_clear"), clear, c.bg_selected),
+            ));
+        }
+        dir_row(row).align_y(iced::Alignment::Center).boxed()
     }
 }

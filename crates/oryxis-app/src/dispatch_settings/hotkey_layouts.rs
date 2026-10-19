@@ -57,7 +57,7 @@ impl Oryxis {
     /// Oryxis; the outer `None` is a hand-made set). Derived every time,
     /// never stored, so an edit in the table below is reflected at once.
     pub(crate) fn current_hotkey_preset(&self) -> Option<Option<ShortcutPreset>> {
-        let reserved = self.snippet_chords();
+        let reserved = self.reserved_chords();
         // Oryxis's own is what picking it applies: the factory table less
         // the chords snippets hold (the boot pass's table), not a bare
         // "no override" test that a snippet-held factory chord fails.
@@ -74,11 +74,13 @@ impl Oryxis {
             .map(|p| Some(*p))
     }
 
-    /// The chords snippets hold: a set never takes them.
-    fn snippet_chords(&self) -> Vec<HotkeyBinding> {
+    /// The chords snippets and vaults hold (a vault's from Settings >
+    /// Vaults): a set never takes them.
+    fn reserved_chords(&self) -> Vec<HotkeyBinding> {
         self.vaults.cur().snippets
             .iter()
             .filter_map(|sn| sn.hotkey.as_deref().and_then(HotkeyBinding::parse))
+            .chain(self.vault_chords.iter().map(|(_, chord)| *chord))
             .collect()
     }
 
@@ -92,13 +94,13 @@ impl Oryxis {
         refused: Vec<Refused>,
         mode: Mode,
     ) -> Task<Message> {
-        let (target, applied) = layout::apply_layout(&entries, &self.snippet_chords(), mode, &self.hotkey_bindings);
+        let (target, applied) = layout::apply_layout(&entries, &self.reserved_chords(), mode, &self.hotkey_bindings);
         if same_bindings(&target, &self.hotkey_bindings) && refused.is_empty() {
             return self.show_toast(crate::i18n::t("hotkey_layout_already").replace("{name}", &name));
         }
         // Hand-made = differs from what Oryxis's own set is here (the
         // factory table less the chords snippets hold), the selector's test.
-        let (oryxis, _) = layout::apply_layout(&[], &self.snippet_chords(), Mode::Exact, &self.hotkey_bindings);
+        let (oryxis, _) = layout::apply_layout(&[], &self.reserved_chords(), Mode::Exact, &self.hotkey_bindings);
         let hand_made = !same_bindings(&oryxis, &self.hotkey_bindings);
         // Everything the user would not see coming: rows that do not
         // land, chords a snippet keeps, and actions left with no
@@ -106,7 +108,7 @@ impl Oryxis {
         let notes: Vec<String> = refused
             .iter()
             .map(refused_line)
-            .chain(applied.skipped.iter().map(skipped_line))
+            .chain(applied.skipped.iter().map(|s| self.skipped_line(s)))
             // Only an action that has a shortcut NOW loses one; a factory
             // chord a snippet already holds left its action long ago.
             .chain(
@@ -159,7 +161,7 @@ impl Oryxis {
     fn apply_hotkey_layout(&mut self, entries: &[LayoutEntry], name: &str, mode: Mode) -> Task<Message> {
         // Recomputed, not carried from the offer: a snippet can have taken
         // a chord while the confirm was up.
-        let (map, _) = layout::apply_layout(entries, &self.snippet_chords(), mode, &self.hotkey_bindings);
+        let (map, _) = layout::apply_layout(entries, &self.reserved_chords(), mode, &self.hotkey_bindings);
         for (action, value) in layout::settings_rows(&map) {
             self.persist_setting(&format!("hotkey_{}", action.id()), &value);
         }
@@ -248,12 +250,20 @@ fn refused_line(r: &Refused) -> String {
     }
 }
 
-/// One chord left with a snippet, as the confirm lists it.
-fn skipped_line(s: &Skipped) -> String {
-    match s {
-        Skipped::Snippet { action, chord } => crate::i18n::t("hotkey_layout_snippet_kept")
-            .replace("{action}", crate::i18n::t(action.label_key()))
-            .replace("{chord}", &chord.badges().join("+")),
+impl Oryxis {
+    /// One chord left with a snippet or a vault, as the confirm lists it.
+    fn skipped_line(&self, s: &Skipped) -> String {
+        match s {
+            Skipped::Snippet { action, chord } => {
+                let key = match self.vault_holding_chord(chord, None) {
+                    Some(_) => "hotkey_layout_vault_kept",
+                    None => "hotkey_layout_snippet_kept",
+                };
+                crate::i18n::t(key)
+                    .replace("{action}", crate::i18n::t(action.label_key()))
+                    .replace("{chord}", &chord.badges().join("+"))
+            }
+        }
     }
 }
 
