@@ -48,7 +48,7 @@ impl Oryxis {
             }
             SshMessage::SshHostKeyAcceptAndSave => {
                 // Accept and save to known hosts
-                if let (Some(query), Some(vault)) = (&self.pending_host_key, &self.vault) {
+                if let (Some(query), Some(vault)) = (&self.pending_host_key, &self.vaults.cur().store) {
                     let kh = oryxis_core::models::known_host::KnownHost::new(
                         &query.hostname, query.port, &query.key_type, &query.fingerprint,
                     );
@@ -67,7 +67,7 @@ impl Oryxis {
                 // user already accepted, and re-asking would train them
                 // to click through it.
                 let trusted = self
-                    .vault
+                    .vaults.cur().store
                     .as_ref()
                     .is_some_and(|v| v.is_proxy_command_trusted(&query.command));
                 if trusted {
@@ -120,7 +120,7 @@ impl Oryxis {
                 }
             }
             SshMessage::SshProxyCommandAlways => {
-                if let (Some(query), Some(vault)) = (&self.pending_proxy_command, &self.vault) {
+                if let (Some(query), Some(vault)) = (&self.pending_proxy_command, &self.vaults.cur().store) {
                     // Label the grant with the endpoint it was given
                     // from, so the revocation list means something
                     // without keeping a second copy of the line (which
@@ -222,7 +222,7 @@ impl Oryxis {
                     self.connections.iter().position(|c| c.id == pending.conn_id)
                 {
                     expand(&mut self.connections[idx]);
-                    if remember && let Some(vault) = &self.vault {
+                    if remember && let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.save_connection(&self.connections[idx], None);
                     }
                 } else if let Some(entry) = self.quick_connects.get_mut(&pending.conn_id) {

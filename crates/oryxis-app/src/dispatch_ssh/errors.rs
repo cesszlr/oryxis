@@ -124,7 +124,7 @@ impl Oryxis {
                     .and_then(|i| self.tabs.get(i))
                     .map(|t| t.label.clone());
                 if self.should_record_history()
-                    && let Some(vault) = &self.vault {
+                    && let Some(vault) = &self.vaults.cur().store {
                     let label = pane_label.as_deref().unwrap_or("unknown");
                     let entry = oryxis_core::models::log_entry::LogEntry::new(
                         label, label, oryxis_core::models::log_entry::LogEvent::Error, &err,

@@ -275,7 +275,7 @@ impl Oryxis {
         let terminal = Arc::new(Mutex::new(state));
         let tab_idx = self.tabs.len();
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vault.as_ref().map(|vault| {
+            self.vaults.cur().store.as_ref().map(|vault| {
                 let log_id = Uuid::new_v4();
                 if let Err(e) = vault.create_session_log(&log_id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");
@@ -411,7 +411,7 @@ impl Oryxis {
         };
 
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vault.as_ref().map(|v| {
+            self.vaults.cur().store.as_ref().map(|v| {
                 let id = Uuid::new_v4();
                 if let Err(e) = v.create_session_log(&id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");

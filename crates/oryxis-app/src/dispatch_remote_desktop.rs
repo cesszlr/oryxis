@@ -185,7 +185,7 @@ impl Oryxis {
         // Agent-auth pin (B3), same rule as the tab connect.
         let pinned_agent = self.pinned_agent_public(&gw);
         let totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&gw.id).ok().flatten());
         let resolver = self.make_jump_resolver(&mut gw);

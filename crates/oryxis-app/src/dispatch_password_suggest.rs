@@ -191,7 +191,7 @@ impl Oryxis {
         // a host whose password you can see in the editor, never
         // offered. Both queries are existence checks (no decrypt, no
         // unlock), and once per prompt is not a hot path.
-        let Some(vault) = self.vault.as_ref() else {
+        let Some(vault) = self.vaults.cur().store.as_ref() else {
             return (Vec::new(), None);
         };
         let with_password = vault.list_connection_ids_with_password().unwrap_or_default();
@@ -460,11 +460,11 @@ impl Oryxis {
                 self.overlay = None;
                 let secret = match kind {
                     PasswordSourceKind::Connection(id) => self
-                        .vault
+                        .vaults.cur().store
                         .as_ref()
                         .and_then(|v| v.get_connection_password(&id).ok().flatten()),
                     PasswordSourceKind::Identity(id) => self
-                        .vault
+                        .vaults.cur().store
                         .as_ref()
                         .and_then(|v| v.get_identity_password(&id).ok().flatten()),
                 };

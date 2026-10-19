@@ -83,7 +83,7 @@ impl Oryxis {
                     // to a prompt, never approve, and fails safe on error.
                     ToolGate::Judge => {
                         let api_key = self
-                            .vault
+                            .vaults.cur().store
                             .as_ref()
                             .and_then(|v| v.get_ai_api_key().ok().flatten())
                             .unwrap_or_default();

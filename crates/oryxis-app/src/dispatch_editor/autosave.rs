@@ -196,19 +196,19 @@ impl Oryxis {
             return;
         };
         self.host_panel_error = None;
-        let has_pw = self.vault.as_ref()
+        let has_pw = self.vaults.cur().store.as_ref()
             .and_then(|v| v.get_connection_password(&conn.id).ok())
             .flatten()
             .is_some();
-        let has_proxy_pw = self.vault.as_ref()
+        let has_proxy_pw = self.vaults.cur().store.as_ref()
             .and_then(|v| v.get_proxy_password(&conn.id).ok())
             .flatten()
             .is_some();
-        let has_totp = self.vault.as_ref()
+        let has_totp = self.vaults.cur().store.as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok())
             .flatten()
             .is_some();
-        let has_target_pw = self.vault.as_ref()
+        let has_target_pw = self.vaults.cur().store.as_ref()
             .and_then(|v| v.get_connection_target_password(&conn.id).ok())
             .flatten()
             .is_some();

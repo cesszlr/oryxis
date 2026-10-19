@@ -131,7 +131,7 @@ impl Oryxis {
                     self.cloud_form.aws_access_key_secret = String::new();
                     self.cloud_form.aws_access_key_secret_touched = false;
                     self.cloud_form.aws_has_existing_secret = self
-                        .vault
+                        .vaults.cur().store
                         .as_ref()
                         .and_then(|v| v.get_cloud_profile_secret(&id).ok().flatten())
                         .is_some();
@@ -348,7 +348,7 @@ impl Oryxis {
                 profile.config = self.serialize_cloud_form_config();
                 profile.updated_at = now;
 
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     // Tri-state secret: only override the encrypted
                     // column when the user actually typed in the
                     // field. Empty + touched = explicit clear.
@@ -415,7 +415,7 @@ impl Oryxis {
                     .and_then(|p| serde_json::from_str::<serde_json::Value>(&p.config).ok())
                     .and_then(|v| v.get("kubeconfig")?.as_str().map(str::to_string))
                     .filter(|path| crate::kubeconfig_file::is_managed_path(path));
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_cloud_profile(&id);
                     self.load_data_from_vault();
                 }

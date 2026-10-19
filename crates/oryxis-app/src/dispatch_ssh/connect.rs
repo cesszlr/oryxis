@@ -79,7 +79,7 @@ impl Oryxis {
         // autofill. Independent of the identity indirection
         // above, 2FA enrollment is per-host.
         let totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
 
@@ -128,7 +128,7 @@ impl Oryxis {
             return;
         };
         conn.last_used = Some(now);
-        if let Some(vault) = &self.vault
+        if let Some(vault) = &self.vaults.cur().store
             && let Err(e) = vault.mark_connection_used(&id, now)
         {
             tracing::warn!("marking host {id} as used failed: {e}");
@@ -226,7 +226,7 @@ impl Oryxis {
                 // unless recording is disabled (per-host
                 // override or the global setting).
                 let session_log_id = if self.should_record_session(Some(&conn)) {
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let log_id = Uuid::new_v4();
                         if let Err(e) =
                             vault.create_session_log(&log_id, &conn.id, &conn.label)
@@ -1332,7 +1332,7 @@ impl Oryxis {
     /// shows an inherited field as unset and clearing an override still
     /// means "go back to inheriting".
     pub(crate) fn apply_group_inheritance(&self, conn: &mut oryxis_core::models::Connection) {
-        let Some(vault) = self.vault.as_ref() else {
+        let Some(vault) = self.vaults.cur().store.as_ref() else {
             return;
         };
         // The collapse itself lives in the vault (`apply_effective`) so
@@ -1529,7 +1529,7 @@ impl Oryxis {
         // Agent-auth pin (B3), same rule as the tab connect.
         let pinned_agent = self.pinned_agent_public(&conn);
         let mut totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
         if let Some(id) = quick_id {
@@ -1561,7 +1561,7 @@ impl Oryxis {
         let algo_host_keys = conn.host_key_algorithms.clone();
 
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vault.as_ref().map(|v| {
+            self.vaults.cur().store.as_ref().map(|v| {
                 let id = Uuid::new_v4();
                 if let Err(e) = v.create_session_log(&id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");

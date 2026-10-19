@@ -167,6 +167,7 @@ mod tray;
 mod tray_ipc;
 mod update;
 mod util;
+mod vault_slots;
 mod views;
 mod widgets;
 mod wol;

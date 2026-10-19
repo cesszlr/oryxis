@@ -400,7 +400,7 @@ impl Oryxis {
             }
             conn.group_id = target;
             conn.updated_at = chrono::Utc::now();
-            match &self.vault {
+            match &self.vaults.cur().store {
                 Some(vault) => match vault.save_connection(conn, None) {
                     Ok(()) => moved += 1,
                     Err(e) => {

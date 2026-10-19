@@ -81,7 +81,7 @@ impl Oryxis {
             self.sync.folder.status = Some(Err(t("folder_sync_no_path").to_string()));
             return Task::none();
         }
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };
         // Group key: the typed buffer for a manual round, else the

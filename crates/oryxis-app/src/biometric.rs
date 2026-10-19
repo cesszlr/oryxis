@@ -82,7 +82,7 @@ impl Oryxis {
     /// platform provider), so callers make one per operation rather than
     /// caching it.
     pub(crate) fn biometric_vault(&self) -> Option<BiometricVault> {
-        let path = self.vault.as_ref()?.db_path().to_string_lossy().to_string();
+        let path = self.vaults.cur().store.as_ref()?.db_path().to_string_lossy().to_string();
         Some(BiometricVault::new(account_for(&path)))
     }
 

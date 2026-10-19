@@ -79,7 +79,7 @@ impl Oryxis {
         let model = self.ai.model.clone();
         let total = savable.len();
 
-        let Some(vault) = self.vault.as_ref() else { return };
+        let Some(vault) = self.vaults.cur().store.as_ref() else { return };
         if restart {
             // Replace the turns; the conversation keeps its identity.
             let _ = vault.delete_chat_conversation(&conversation_id);

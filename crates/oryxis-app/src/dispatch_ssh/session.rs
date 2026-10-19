@@ -234,7 +234,7 @@ impl Oryxis {
                 // save-host prefill); nothing is written to the vault.
                 if let Some(conn) = self.connections.iter_mut().find(|c| c.id == conn_id) {
                     conn.detected_os = os.clone();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_detected_os(&conn_id, os.as_deref());
                     }
                 } else if let Some(entry) = self.quick_connects.get_mut(&conn_id) {
@@ -415,14 +415,14 @@ impl Oryxis {
                         self.end_session_log_now(log_id);
                     }
                     if self.should_record_history()
-                        && let Some(vault) = &self.vault {
+                        && let Some(vault) = &self.vaults.cur().store {
                         let entry = oryxis_core::models::log_entry::LogEntry::new(
                             &label, &label, oryxis_core::models::log_entry::LogEvent::Disconnected, "Session ended",
                         );
                         let _ = vault.add_log(&entry);
                     }
                     // Refresh session logs list (count + current page)
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         self.session_logs_total =
                             vault.count_session_logs().unwrap_or(0);
                         self.session_logs = vault
@@ -542,7 +542,7 @@ impl Oryxis {
                     .pane_origin_connection(pane_id)
                     .map(|c| {
                         let inherited = self
-                            .vault
+                            .vaults.cur().store
                             .as_ref()
                             .and_then(|v| v.resolve_effective(c, &self.groups, &self.identities).ok())
                             .and_then(|e| e.startup_snippet_id.map(|(id, _)| id));
@@ -605,7 +605,7 @@ impl Oryxis {
                 }
                 tracing::info!("SSH connected: {}", label);
                 if self.should_record_history()
-                    && let Some(vault) = &self.vault {
+                    && let Some(vault) = &self.vaults.cur().store {
                     let entry = oryxis_core::models::log_entry::LogEntry::new(
                         &label, &label, oryxis_core::models::log_entry::LogEvent::Connected, "Session established",
                     );

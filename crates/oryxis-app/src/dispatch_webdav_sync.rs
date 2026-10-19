@@ -105,7 +105,7 @@ impl Oryxis {
             self.sync.webdav.status = Some(Err(t("webdav_sync_no_url").to_string()));
             return Task::none();
         }
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };
         // Group key: the typed buffer for a manual round, else the

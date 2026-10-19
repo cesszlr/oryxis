@@ -89,7 +89,7 @@ impl Oryxis {
                         if self.vault_ui.state != crate::state::VaultState::Unlocked {
                             return Ok(Task::none());
                         }
-                        let Some(vault) = &self.vault else {
+                        let Some(vault) = &self.vaults.cur().store else {
                             return Ok(Task::none());
                         };
                         if let Err(e) =
@@ -169,7 +169,7 @@ impl Oryxis {
                 // state) and passphrase-encrypted here when one was
                 // given; an empty pair exports plaintext (the panel
                 // shows an explicit warning line for that case).
-                let pem = match self.vault.as_ref().map(|v| v.get_key_private(&result.id)) {
+                let pem = match self.vaults.cur().store.as_ref().map(|v| v.get_key_private(&result.id)) {
                     Some(Ok(Some(pem))) => pem,
                     Some(Ok(None)) | None => {
                         self.keys_ui.generate_form.error =

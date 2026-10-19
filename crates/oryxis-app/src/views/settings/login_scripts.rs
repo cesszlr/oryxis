@@ -15,7 +15,7 @@ use oryxis_core::login_script::{ExpectPattern, LoginStep, SecretRef, SendPayload
 impl Oryxis {
     pub(crate) fn login_scripts_section(&self) -> Element<'_, Message> {
         let usage = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.login_script_usage().ok())
             .unwrap_or_default();

@@ -112,7 +112,7 @@ impl Oryxis {
                     {
                         group.label = trimmed.to_string();
                         group.updated_at = chrono::Utc::now();
-                        if let Some(vault) = &self.vault {
+                        if let Some(vault) = &self.vaults.cur().store {
                             let _ = vault.save_group(group);
                         }
                     }

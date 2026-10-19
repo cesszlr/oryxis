@@ -64,7 +64,7 @@ impl Oryxis {
         };
         let (id, open) = window::open(settings);
         self.extra_windows
-            .insert(id, ExtraWindow::new(order, view, self.window_size));
+            .insert(id, ExtraWindow::new(order, view, self.window_size, self.vaults.current_id()));
         (id, open.discard())
     }
 

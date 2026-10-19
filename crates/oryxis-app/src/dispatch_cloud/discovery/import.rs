@@ -67,7 +67,7 @@ impl Oryxis {
                     return Ok(Task::none());
                 }
 
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     // Resolve the target group from the typed name.
                     // Empty = root (no parent). Matching label = reuse
                     // existing group. Non-matching = create a new

@@ -55,7 +55,7 @@ impl Oryxis {
         }
         // No vault could be opened: the error screen is the whole window,
         // and nothing else can be on it.
-        if self.vault.is_none() && self.vault_ui.state == crate::state::VaultState::Loading {
+        if self.vaults.cur().store.is_none() && self.vault_ui.state == crate::state::VaultState::Loading {
             return Some((ModalSurface::VaultOpenFailed, SurfaceFamily::Confirm));
         }
         if let Some(ov) = &self.overlay {

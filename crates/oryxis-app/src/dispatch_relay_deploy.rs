@@ -342,7 +342,7 @@ impl Oryxis {
                     // token and the plan's URL, the level-1 rule.
                     self.sync.signaling_url = url.clone();
                     self.sync.signaling_token = token.clone();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("sync_signaling_url", &url);
                         let _ = vault.set_setting("sync_signaling_token", &token);
                     }

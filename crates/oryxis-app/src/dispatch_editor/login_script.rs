@@ -200,7 +200,7 @@ impl Oryxis {
                 }
                 let mut script = oryxis_core::models::LoginScript::new(name);
                 script.steps = steps;
-                if let Some(vault) = &self.vault
+                if let Some(vault) = &self.vaults.cur().store
                     && let Err(e) = vault.save_login_script(&script)
                 {
                     self.host_panel_error = Some(e.to_string());

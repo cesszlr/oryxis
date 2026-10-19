@@ -436,12 +436,12 @@ impl Oryxis {
             .privacy_active_for_label(&pane_label)
             .then(|| self.privacy_terms());
         let api_key = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_ai_api_key().ok().flatten())
             .unwrap_or_default();
         let extra_prompt = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_setting("ai_system_prompt").ok().flatten());
         let config = crate::ai::AiConfig {

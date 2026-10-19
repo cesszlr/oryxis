@@ -6,7 +6,6 @@ use oryxis_core::models::connection::Connection;
 use oryxis_core::models::group::Group;
 use oryxis_core::models::identity::Identity;
 use oryxis_core::models::key::SshKey;
-use oryxis_vault::VaultStore;
 
 use std::sync::OnceLock;
 use uuid::Uuid;
@@ -314,7 +313,7 @@ pub(crate) fn terminal_font_serves_weight(family: &str, weight: u16) -> bool {
 
 pub struct Oryxis {
     // Vault
-    pub(crate) vault: Option<VaultStore>,
+    pub(crate) vaults: crate::vault_slots::VaultSlots,
     pub(crate) vault_ui: crate::state::VaultUi,
     // Vector logo handles (see boot.rs). SVG goes through iced's
     // resvg/tiny-skia path instead of the wgpu image atlas, which on

@@ -41,7 +41,7 @@ impl Oryxis {
                 // the question was on screen: the DELETE matches nothing
                 // and the reload is what the user would have asked for
                 // anyway.
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_known_host(&id);
                     self.load_data_from_vault();
                 }
@@ -59,7 +59,7 @@ impl Oryxis {
                 });
             }
             KnownHostMessage::ClearAllKnownHosts => {
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     for kh in self.known_hosts.clone() {
                         let _ = vault.delete_known_host(&kh.id);
                     }

@@ -289,7 +289,7 @@ impl Oryxis {
                 // SSH path's add_log call here so cloud sessions show up
                 // alongside regular hosts.
                 if self.should_record_history()
-                    && let Some(vault) = &self.vault {
+                    && let Some(vault) = &self.vaults.cur().store {
                     let entry = oryxis_core::models::log_entry::LogEntry::new(
                         &label,
                         &label,
@@ -319,7 +319,7 @@ impl Oryxis {
                     "Failed to spawn session-manager-plugin in PTY"
                 );
                 if self.should_record_history()
-                    && let Some(vault) = &self.vault {
+                    && let Some(vault) = &self.vaults.cur().store {
                     let entry = oryxis_core::models::log_entry::LogEntry::new(
                         tab_label,
                         tab_label,
@@ -399,7 +399,7 @@ impl Oryxis {
             }
         } else {
             self.cloud_form.editing_id.and_then(|id| {
-                self.vault
+                self.vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_cloud_profile_secret(&id).ok().flatten())
             })
@@ -450,7 +450,7 @@ impl Oryxis {
             .iter()
             .find(|p| p.id == profile_id)
             .cloned()?;
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             profile.secret = vault.get_cloud_profile_secret(&profile_id).ok().flatten();
         }
         Some(profile)

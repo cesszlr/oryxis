@@ -29,7 +29,7 @@ impl Oryxis {
                     lang.code().to_string()
                 };
                 Language::set_active(lang);
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault
                         .set_setting("language", &self.prefs.language_choice);
                 }

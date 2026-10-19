@@ -53,7 +53,7 @@ impl Oryxis {
                 self.persist_setting("update_channel", channel.as_setting());
                 // A channel switch invalidates any "skip this version" so
                 // the user is offered the other stream's build right away.
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("skipped_update_version", "");
                 }
                 // Switching channel is an explicit intent to follow that
@@ -88,7 +88,7 @@ impl Oryxis {
                 // Also respect a persisted "skip this version" so we never
                 // nag about the same tag twice.
                 let skipped = self
-                    .vault
+                    .vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_setting("skipped_update_version").ok().flatten());
                 return Task::perform(
@@ -133,7 +133,7 @@ impl Oryxis {
                 }
                 self.update_check_status = Some(crate::update::UpdateStatus::Checking);
                 self.set_toast(crate::i18n::t("update_check_checking").to_string());
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("skipped_update_version", "");
                 }
                 return Task::perform(
@@ -205,7 +205,7 @@ impl Oryxis {
             }
             UpdateMessage::UpdateSkipVersion => {
                 if let Some(info) = self.pending_update.take()
-                    && let Some(vault) = &self.vault {
+                    && let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("skipped_update_version", &info.version);
                 }
                 // A skipped version's download goes with it.

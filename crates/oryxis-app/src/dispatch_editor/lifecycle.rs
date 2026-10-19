@@ -297,7 +297,7 @@ impl Oryxis {
                     // `customized_fields` only means anything next to it.
                     dup.cloud_ref = None;
                     dup.customized_fields.clear();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         // Secrets live in their own encrypted columns, so
                         // they are copied explicitly rather than riding
                         // the clone. Each decrypted plaintext is wrapped
@@ -561,8 +561,8 @@ impl Oryxis {
         }
         // Disjoint borrows: the derived-clear rescues below write into
         // the form while the vault handle is held.
-        let Self { vault, editor_form: form, .. } = self;
-        let Some(vault) = vault.as_ref() else {
+        let Self { vaults, editor_form: form, .. } = self;
+        let Some(vault) = vaults.cur().store.as_ref() else {
             // Unreachable in practice: the editor only renders over an
             // unlocked vault. A hard error beats a silent drop.
             return Err(PersistError::Vault(crate::i18n::t("error").to_string()));
@@ -783,7 +783,7 @@ impl Oryxis {
             .copied()
             .filter(|id| self.connections.iter().any(|c| c.id == *id))
             .collect();
-        if ids.is_empty() || self.vault.is_none() {
+        if ids.is_empty() || self.vaults.cur().store.is_none() {
             return;
         }
         let editing_removed = self
@@ -793,7 +793,7 @@ impl Oryxis {
         if !editing_removed {
             self.editor_flush_pending();
         }
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             for id in &ids {
                 match vault.delete_connection(id) {
                     Ok(()) => {

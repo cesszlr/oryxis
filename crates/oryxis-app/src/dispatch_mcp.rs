@@ -20,7 +20,7 @@ impl Oryxis {
             // ── MCP ──
             McpMessage::ToggleMcpServer => {
                 self.mcp.server_enabled = !self.mcp.server_enabled;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("mcp_server_enabled", if self.mcp.server_enabled { "true" } else { "false" });
                 }
                 // MCP ships as a plugin (~5 MB binary external clients
@@ -168,7 +168,7 @@ impl Oryxis {
                     return Task::none();
                 };
                 let ok = self
-                    .vault
+                    .vaults.cur().store
                     .as_ref()
                     .map(|v| v.verify_password(&typed).unwrap_or(false))
                     .unwrap_or(false);

@@ -59,7 +59,7 @@ impl Oryxis {
                 }
             }
             AgentMessage::KeyExposeViaAgentToggled(id) => {
-                if let Some(vault) = &self.vault
+                if let Some(vault) = &self.vaults.cur().store
                     && let Some(key) = self.keys.iter_mut().find(|k| k.id == id)
                 {
                     key.expose_via_agent = !key.expose_via_agent;
@@ -111,7 +111,7 @@ impl Oryxis {
             self.agent.enabled = true;
             return Task::none();
         }
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };
         let db_path = vault.db_path().to_path_buf();

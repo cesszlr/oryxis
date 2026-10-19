@@ -137,7 +137,7 @@ impl Oryxis {
                 script.steps = steps;
                 script.updated_at = chrono::Utc::now();
                 let saved = script.clone();
-                if let Some(vault) = &self.vault
+                if let Some(vault) = &self.vaults.cur().store
                     && let Err(e) = vault.save_login_script(&saved)
                 {
                     self.login_script_form.error = Some(e.to_string());
@@ -153,7 +153,7 @@ impl Oryxis {
                 self.login_script_form.confirm_delete = None;
             }
             SettingsMessage::LoginScriptDelete(id) => {
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_login_script(&id);
                 }
                 self.login_scripts.retain(|s| s.id != id);

@@ -185,7 +185,7 @@ impl Oryxis {
     ) -> (Option<String>, Option<String>, Option<String>) {
         if let Some(iid) = conn.identity_id {
             let id_pw = self
-                .vault
+                .vaults.cur().store
                 .as_ref()
                 .and_then(|v| v.get_identity_password(&iid).ok().flatten());
             let kid = self
@@ -194,7 +194,7 @@ impl Oryxis {
                 .find(|i| i.id == iid)
                 .and_then(|i| i.key_id);
             let id_key = kid.and_then(|kid| {
-                self.vault
+                self.vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_key_private(&kid).ok().flatten())
             });
@@ -202,12 +202,12 @@ impl Oryxis {
             (id_pw, id_key, id_cert)
         } else {
             let pw = self
-                .vault
+                .vaults.cur().store
                 .as_ref()
                 .and_then(|v| v.get_connection_password(&conn.id).ok().flatten());
             let (pk, cert) = if conn_uses_key(conn) {
                 let pk = conn.key_id.and_then(|kid| {
-                    self.vault
+                    self.vaults.cur().store
                         .as_ref()
                         .and_then(|v| v.get_key_private(&kid).ok().flatten())
                 });
@@ -299,7 +299,7 @@ impl Oryxis {
             // The hop's OWN second factor: the engine answers a bastion's
             // OTP round with this, never with the target's secret.
             if let Some(secret) = self
-                .vault
+                .vaults.cur().store
                 .as_ref()
                 .and_then(|v| v.get_connection_totp_secret(jid).ok().flatten())
             {
@@ -337,7 +337,7 @@ impl Oryxis {
         // Agent-auth pin (B3), same rule as the tab connect.
         let pinned_agent = self.pinned_agent_public(&conn);
         let totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
         let resolver = self.make_jump_resolver(&mut conn);

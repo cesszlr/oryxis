@@ -119,7 +119,7 @@ impl Oryxis {
                 // Apply right away, same reason the retention picker
                 // does: picking a smaller cap must have a visible
                 // effect, not wait for the next flush tick.
-                if let (Some(cap), Some(vault)) = (cap, &self.vault) {
+                if let (Some(cap), Some(vault)) = (cap, &self.vaults.cur().store) {
                     match vault.prune_session_logs_to_fit(cap) {
                         Ok(0) => {}
                         Ok(n) => tracing::info!("session log size cap pruned {n} recordings"),
@@ -138,7 +138,7 @@ impl Oryxis {
                 // Apply right away so picking a shorter window has a
                 // visible effect, then refresh the cached Logs state.
                 if let Some(days) = Self::retention_days(code)
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                 {
                     let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
                     match vault.prune_logs_older_than(cutoff) {

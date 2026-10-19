@@ -18,10 +18,10 @@ impl Oryxis {
         // ends. Idempotent; only writes rows that need fixing.
         // Take ownership of the option so we hand the migration a real
         // borrow without conflicting with `&mut self`. Restored below.
-        if let Some(vault) = self.vault.take() {
+        if let Some(vault) = self.vaults.cur_mut().store.take() {
             self.migrate_legacy_cloud_layout(&vault);
             self.migrate_port_forwards(&vault);
-            self.vault = Some(vault);
+            self.vaults.cur_mut().store = Some(vault);
         }
 
         // A managed kubeconfig whose account is gone (deleted here, or
@@ -78,7 +78,7 @@ impl Oryxis {
         };
         let group_id_before = group_id_of(self);
         self.load_vault_entities();
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             self.known_hosts = vault.list_known_hosts().unwrap_or_default();
             self.port_forward_rules = vault.list_port_forward_rules().unwrap_or_default();
             // A P2P round pulls snippets too; the snippet editor holds its
@@ -114,7 +114,7 @@ impl Oryxis {
     /// then the core entity lists: connections, groups (parent repair),
     /// session groups, keys, identities, proxy identities, cloud profiles.
     fn load_vault_entities(&mut self) {
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             // Auto-archive sweep: when the user has opted into the
             // cleanup, drop orphan-imported hosts whose `orphaned_at`
             // is older than the configured threshold. Runs before the
@@ -170,7 +170,7 @@ impl Oryxis {
     /// Plugin rows, content lists (snippets, custom themes, port-forward
     /// rules, known hosts) and the retention-pruned event / session logs.
     fn load_vault_plugins_and_logs(&mut self) {
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
 
             // Plugins panel: global auto-update default from settings,
             // then rebuild the per-provider rows from the on-disk
@@ -247,7 +247,7 @@ impl Oryxis {
     /// Language / layout / theme, the derived terminal palette, plus the
     /// AI, MCP, sync and local-terminal settings.
     fn load_vault_locale_ai_sync(&mut self) {
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
 
             // Language: "auto" (the default, also what a missing row
             // means) follows the OS locale; a concrete code is an
@@ -533,7 +533,7 @@ impl Oryxis {
 
     /// Terminal / SFTP / tab-appearance settings and the vault nav shape.
     fn load_vault_terminal_settings(&mut self) {
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
 
             // Terminal / SFTP / connection settings, load whatever
             // the user previously typed, fall back to defaults silently
@@ -1085,7 +1085,7 @@ impl Oryxis {
     /// Hotkey overrides (with factory-conflict resolution) and the
     /// new-connection defaults, including the one-shot setting migrations.
     fn load_vault_hotkeys_and_defaults(&mut self) {
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             // Hotkey overrides: each action persists under
             // `hotkey_<id>` with the canonical serialized form, chords
             // space-separated (`"ctrl+shift+v shift+ins"`). Defaults

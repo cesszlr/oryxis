@@ -87,7 +87,7 @@ impl Oryxis {
         // and on lock, and refreshed by the round that commits a new key.
         if self.sync.passphrase_stored.is_none() && self.sync.passphrase_known {
             self.sync.passphrase_stored = self
-                .vault
+                .vaults.cur().store
                 .as_ref()
                 .and_then(|v| v.get_sync_sftp_passphrase().ok().flatten())
                 .map(Zeroizing::new);
@@ -156,7 +156,7 @@ impl Oryxis {
         if !succeeded {
             return;
         }
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             let _ = vault.set_sync_sftp_passphrase(&sealed);
         }
         self.sync.passphrase_known = !sealed.is_empty();
@@ -199,7 +199,7 @@ impl Oryxis {
                 });
             }
         }
-        self.vault
+        self.vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_sync_sftp_passphrase().ok().flatten())
             .filter(|p| !p.is_empty())
@@ -217,7 +217,7 @@ impl Oryxis {
             // ── Sync ──
             SyncMessage::ToggleEnabled => {
                 self.sync.enabled = !self.sync.enabled;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_enabled", if self.sync.enabled { "true" } else { "false" });
                 }
                 // SFTP transport has no background engine: enabling just
@@ -242,7 +242,7 @@ impl Oryxis {
             }
             SyncMessage::TogglePasswords => {
                 self.sync.passwords = !self.sync.passwords;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting(
                         "sync_passwords",
                         if self.sync.passwords { "true" } else { "false" },
@@ -251,7 +251,7 @@ impl Oryxis {
             }
             SyncMessage::ModeChanged(v) => {
                 self.sync.mode = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_mode", &v);
                 }
             }
@@ -263,32 +263,32 @@ impl Oryxis {
                     .take(oryxis_sync::engine::DEVICE_NAME_MAX_CHARS)
                     .collect();
                 self.sync.device_name = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_device_name", &v);
                 }
             }
             SyncMessage::SignalingUrlChanged(v) => {
                 self.sync.signaling_url = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_signaling_url", &v);
                 }
             }
             SyncMessage::SignalingTokenChanged(v) => {
                 let v = v.into_inner();
                 self.sync.signaling_token = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_signaling_token", &v);
                 }
             }
             SyncMessage::RelayUrlChanged(v) => {
                 self.sync.relay_url = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_relay_url", &v);
                 }
             }
             SyncMessage::ListenPortChanged(v) => {
                 self.sync.listen_port = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_listen_port", &v);
                 }
             }
@@ -387,7 +387,7 @@ impl Oryxis {
                     // probed snapshot, never the live form.
                     self.sync.signaling_url = base.clone();
                     self.sync.signaling_token = token.clone();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("sync_signaling_url", &base);
                         let _ =
                             vault.set_setting("sync_signaling_token", &token);
@@ -538,7 +538,7 @@ impl Oryxis {
                 );
             }
             SyncMessage::UnpairDevice(peer_id) => {
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_sync_peer(&peer_id);
                     self.sync.peers = vault.list_sync_peers().unwrap_or_default();
                 }
@@ -648,7 +648,7 @@ impl Oryxis {
                     // Leaving P2P: tear the engine down so QUIC/mDNS stop.
                     // Entering P2P (and enabled): bring it up.
                     self.sync.transport = v.clone();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("sync_transport", &v);
                     }
                     // Every transport's status, not just SFTP's: the
@@ -687,7 +687,7 @@ impl Oryxis {
                 self.sync.sftp.host_id = Some(id);
                 self.sync.sftp.picker_open = false;
                 self.sync.sftp.picker_search.clear();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_sftp_host_id", &id.to_string());
                 }
             }
@@ -704,20 +704,20 @@ impl Oryxis {
             }
             SyncMessage::WebdavUrlChanged(v) => {
                 self.sync.webdav.url = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_webdav_url", &v);
                 }
             }
             SyncMessage::WebdavUserChanged(v) => {
                 self.sync.webdav.user = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_webdav_user", &v);
                 }
             }
             SyncMessage::WebdavPasswordChanged(v) => {
                 let v = v.into_inner();
                 self.sync.webdav.password = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     // Its own encrypted setting, not the group
                     // passphrase: this one is an account credential on
                     // one server, and every device has a different one.
@@ -793,7 +793,7 @@ impl Oryxis {
             }
             SyncMessage::GitRemoteChanged(v) => {
                 self.sync.git.remote = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_git_remote", &v);
                 }
             }
@@ -822,7 +822,7 @@ impl Oryxis {
             }
             SyncMessage::FolderPathChanged(v) => {
                 self.sync.folder.path = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_folder_path", &v);
                 }
             }
@@ -842,7 +842,7 @@ impl Oryxis {
                 // not an event worth reporting.
                 if let Some(path) = picked {
                     self.sync.folder.path = path.clone();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("sync_folder_path", &path);
                     }
                 }
@@ -870,7 +870,7 @@ impl Oryxis {
             }
             SyncMessage::SftpPathChanged(v) => {
                 self.sync.sftp.remote_path = v.clone();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("sync_sftp_remote_path", &v);
                 }
             }
@@ -941,7 +941,7 @@ impl Oryxis {
                 }
                 // Per-peer outcomes already arrived as SyncEngineEvent;
                 // refresh the peer list so last_synced_at is current.
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     self.sync.peers = vault.list_sync_peers().unwrap_or_default();
                 }
             }
@@ -984,7 +984,7 @@ impl Oryxis {
                             crate::state::SyncPairingState::Idle;
                         self.sync.pairing.code = None;
                         self.sync.pairing.link = None;
-                        if let Some(vault) = &self.vault {
+                        if let Some(vault) = &self.vaults.cur().store {
                             self.sync.peers =
                                 vault.list_sync_peers().unwrap_or_default();
                         }
@@ -1018,7 +1018,7 @@ impl Oryxis {
                             "{} (+{pushed} / -{pulled})",
                             crate::i18n::t("sync_status_done"),
                         ));
-                        if let Some(vault) = &self.vault {
+                        if let Some(vault) = &self.vaults.cur().store {
                             self.sync.peers =
                                 vault.list_sync_peers().unwrap_or_default();
                         }

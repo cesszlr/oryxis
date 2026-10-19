@@ -38,7 +38,7 @@ impl Oryxis {
                 let Some(provider) = registry.get(&profile.provider) else {
                     return Ok(Task::none());
                 };
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     profile.secret =
                         vault.get_cloud_profile_secret(&profile_id).ok().flatten();
                 }
@@ -64,7 +64,7 @@ impl Oryxis {
                 // Credentials fetched: create + save the K8s profile
                 // (auth = kubeconfig, default file, the GKE context) unless
                 // one already points at this context (idempotent re-add).
-                let Some(vault) = self.vault.as_ref() else {
+                let Some(vault) = self.vaults.cur().store.as_ref() else {
                     return Ok(Task::none());
                 };
                 let exists = self.cloud_profiles.iter().any(|p| {
@@ -152,7 +152,7 @@ impl Oryxis {
                 let Some(provider) = registry.get(&profile.provider) else {
                     return Ok(Task::none());
                 };
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     profile.secret = vault.get_cloud_profile_secret(&profile_id).ok().flatten();
                 }
                 // Label the new K8s account after the cluster so it reads
@@ -175,7 +175,7 @@ impl Oryxis {
                 // Credentials fetched: create + save the K8s profile
                 // (auth = kubeconfig, default file, the AKS context) unless
                 // one already points at this context (idempotent re-add).
-                let Some(vault) = self.vault.as_ref() else {
+                let Some(vault) = self.vaults.cur().store.as_ref() else {
                     return Ok(Task::none());
                 };
                 let exists = self.cloud_profiles.iter().any(|p| {
@@ -251,7 +251,7 @@ impl Oryxis {
                 let Some(provider) = registry.get(&profile.provider) else {
                     return Ok(Task::none());
                 };
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     profile.secret = vault.get_cloud_profile_secret(&profile_id).ok().flatten();
                 }
                 self.cloud_discover.managed_in_flight.insert(path.clone());
@@ -319,7 +319,7 @@ impl Oryxis {
                     .iter()
                     .find(|p| points_at(p, &path))
                     .cloned();
-                let Some(vault) = self.vault.as_ref().filter(|v| !v.is_locked()) else {
+                let Some(vault) = self.vaults.cur().store.as_ref().filter(|v| !v.is_locked()) else {
                     // The vault locked while the fetch ran. An account
                     // already on this file still works with the fresh
                     // credential; a file nothing points at would be a
@@ -422,7 +422,7 @@ impl Oryxis {
     /// referenced" and take every file with it. Files whose fetch is in
     /// flight are spared, since their account does not exist yet.
     pub(crate) fn sweep_orphan_kubeconfigs(&self) {
-        let Some(vault) = self.vault.as_ref().filter(|v| !v.is_locked()) else {
+        let Some(vault) = self.vaults.cur().store.as_ref().filter(|v| !v.is_locked()) else {
             return;
         };
         let Ok(profiles) = vault.list_cloud_profiles() else {

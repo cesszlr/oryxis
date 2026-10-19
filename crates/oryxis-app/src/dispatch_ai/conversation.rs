@@ -52,7 +52,7 @@ impl Oryxis {
                     tab.chat_mode = mode;
                 }
                 crate::state::set_default_chat_mode(mode);
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("ai_default_mode", mode.as_setting());
                 }
             }

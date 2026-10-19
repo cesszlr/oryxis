@@ -81,7 +81,7 @@ impl Oryxis {
         });
         // Key-derivation parameters (E1). Read-only: shows the vault's
         // tuned Argon2id profile, or that it uses the crate defaults.
-        let kdf_line = match self.vault.as_ref().and_then(|v| v.kdf_params()) {
+        let kdf_line = match self.vaults.cur().store.as_ref().and_then(|v| v.kdf_params()) {
             Some(p) => t("kdf_params_label")
                 .replacen("{mib}", &(p.m_kib / 1024).to_string(), 1)
                 .replacen("{t}", &p.t.to_string(), 1),

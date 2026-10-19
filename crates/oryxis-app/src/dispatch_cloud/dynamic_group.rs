@@ -358,7 +358,7 @@ impl Oryxis {
                     &std::collections::HashSet::from([gid]),
                 );
                 group.updated_at = chrono::Utc::now();
-                if let Some(vault) = &self.vault
+                if let Some(vault) = &self.vaults.cur().store
                     && vault.save_group(&group).is_ok()
                 {
                     self.cloud_dynamic_form.visible = false;
@@ -368,7 +368,7 @@ impl Oryxis {
             }
             CloudMessage::DeleteDynamicGroup(gid) => {
                 self.overlay = None;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_group(&gid);
                     self.cloud_dynamic_group_state.remove(&gid);
                     // If the user was viewing this group, kick them

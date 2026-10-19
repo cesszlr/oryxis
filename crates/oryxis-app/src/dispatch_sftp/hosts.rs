@@ -82,7 +82,7 @@ impl Oryxis {
         conn.updated_at = chrono::Utc::now();
         // Full save (like the icon picker's): the row must persist without
         // clobbering the host's other columns.
-        if let Some(vault) = &self.vault
+        if let Some(vault) = &self.vaults.cur().store
             && let Err(e) = vault.save_connection(conn, None)
         {
             return self.show_toast_secs(format!("{e}"), 5);
@@ -247,7 +247,7 @@ impl Oryxis {
                 // terminal path (headless here: no modal, so the autofill is
                 // the only way an OTP-gated host can mount at all).
                 let totp_secret = self
-                    .vault
+                    .vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
 

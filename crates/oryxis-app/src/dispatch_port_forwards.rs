@@ -230,7 +230,7 @@ impl Oryxis {
                     let session = self.active_forwards.remove(&id);
                     self.port_forward_starting.remove(&id);
                     self.port_forward_retry.remove(&id);
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_port_forward_rule(&id);
                         self.panels.port_forward_panel = false;
                         self.load_data_from_vault();
@@ -478,7 +478,7 @@ impl Oryxis {
         rule.auto_start = self.port_forward_form.auto_start;
         rule.updated_at = chrono::Utc::now();
 
-        let vault = self.vault.as_ref()?;
+        let vault = self.vaults.cur().store.as_ref()?;
         match vault.save_port_forward_rule(&rule) {
             Ok(()) => None,
             Err(e) => Some(e.to_string()),
@@ -551,7 +551,7 @@ impl Oryxis {
         // Agent-auth pin (B3), same rule as the tab connect.
         let pinned_agent = self.pinned_agent_public(&conn);
         let totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
         let resolver = self.make_jump_resolver(&mut conn);

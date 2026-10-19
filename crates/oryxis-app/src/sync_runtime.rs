@@ -174,7 +174,7 @@ impl Oryxis {
     /// their view. That holds today, yet it makes a security invariant
     /// depend on view gating rather than stating it locally; each
     /// `run_*_sync_round` calls this so the guard travels with the code
-    /// that needs the master key. A soft auto-lock keeps `self.vault`
+    /// that needs the master key. A soft auto-lock keeps `self.vaults.cur().store`
     /// set (established sessions survive it), so the `let Some(vault)`
     /// check inside those functions is NOT the gate.
     pub(crate) fn sync_round_allowed(&self) -> bool {
@@ -191,7 +191,7 @@ impl Oryxis {
         if self.sync.runtime.is_some() || self.sync.pending_engine.is_some() {
             return Task::none();
         }
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };
         let db_path = vault.db_path().to_path_buf();

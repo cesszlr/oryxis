@@ -222,7 +222,7 @@ impl Oryxis {
             KeysMessage::DeleteKey(idx) => {
                 if let Some(key) = self.keys.get(idx) {
                     let id = key.id;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_key(&id);
                         self.load_data_from_vault();
                         self.keys_ui.success = Some("Key deleted".into());
@@ -256,7 +256,7 @@ impl Oryxis {
                     self.keys_ui.import_form.editing_id = Some(key.id);
                     self.keys_ui.import_form.label = key.label.clone();
                     // Load existing private key PEM from vault
-                    let pem = self.vault.as_ref()
+                    let pem = self.vaults.cur().store.as_ref()
                         .and_then(|v| v.get_key_private(&key.id).ok().flatten())
                         .unwrap_or_default();
                     self.keys_ui.import_content = text_editor::Content::with_text(&pem);
@@ -361,7 +361,7 @@ impl Oryxis {
                 // private) has nothing to check against, so this
                 // only fires when a private is actually stored.
                 let stored_private = self
-                    .vault
+                    .vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_key_private(&existing_id).ok().flatten());
                 if let Some(pem) = stored_private {
@@ -409,7 +409,7 @@ impl Oryxis {
                     return Task::none();
                 }
             }
-            if let Some(vault) = &self.vault {
+            if let Some(vault) = &self.vaults.cur().store {
                 let private = if editing { None } else { Some("") };
                 match vault.save_key(&key, private) {
                     Ok(()) => {
@@ -502,7 +502,7 @@ impl Oryxis {
                         return Task::none();
                     }
                 }
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     match vault.save_key(&generated.key, Some(&generated.private_pem)) {
                         Ok(()) => {
                             let verb = if self.keys_ui.import_form.editing_id.is_some() { "updated" } else { "imported" };

@@ -33,7 +33,7 @@ impl Oryxis {
             }
             HistoryMessage::ClearLogs => {
                 self.clear_history_confirm = false;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.clear_logs();
                     let _ = vault.clear_session_logs();
                     // "Clear all" clears the whole timeline, and saved
@@ -61,7 +61,7 @@ impl Oryxis {
                 let max_page = (self.logs_total.saturating_sub(1)) / 50;
                 if self.logs_page < max_page {
                     self.logs_page += 1;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         self.logs = vault
                             .list_logs_page(self.logs_page * 50, 50)
                             .unwrap_or_default();
@@ -71,7 +71,7 @@ impl Oryxis {
             HistoryMessage::LogsPagePrev => {
                 if self.logs_page > 0 {
                     self.logs_page -= 1;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         self.logs = vault
                             .list_logs_page(self.logs_page * 50, 50)
                             .unwrap_or_default();
@@ -160,7 +160,7 @@ impl Oryxis {
                 let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 let events = match vault.get_session_events(&log_id) {
@@ -202,7 +202,7 @@ impl Oryxis {
                 let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 let data = match vault.get_session_data(&log_id) {
@@ -237,7 +237,7 @@ impl Oryxis {
                 let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 let events = match vault.get_session_commands(&log_id) {
@@ -287,7 +287,7 @@ impl Oryxis {
                 let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 let events = match vault.get_session_events(&log_id) {
@@ -413,7 +413,7 @@ impl Oryxis {
                 if let Some(idx) = self.cur_active_tab() {
                     self.flush_chat_history(idx);
                 }
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 let messages = match vault.chat_messages(&id) {
@@ -466,7 +466,7 @@ impl Oryxis {
                 let Some(id) = self.chat_ui.conversations.get(idx).map(|e| e.id) else {
                     return Task::none();
                 };
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_chat_conversation(&id);
                     self.chat_ui.conversations =
                         vault.list_chat_conversations().unwrap_or_default();
@@ -493,7 +493,7 @@ impl Oryxis {
             }
             HistoryMessage::DeleteSessionLog(id) => {
                 if self.session_logs.iter().any(|e| e.id == id) {
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_session_log(&id);
                         self.session_logs_total =
                             vault.count_session_logs().unwrap_or(0);
@@ -536,7 +536,7 @@ impl Oryxis {
                 }
             }
             HistoryMessage::ClearSessionLogs => {
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.clear_session_logs();
                     self.session_logs_page = 0;
                     self.load_data_from_vault();
@@ -552,7 +552,7 @@ impl Oryxis {
                 let max_page = self.session_logs_total.saturating_sub(1) / 50;
                 if self.session_logs_page < max_page {
                     self.session_logs_page += 1;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         self.session_logs = vault
                             .list_session_logs_page(self.session_logs_page * 50, 50)
                             .unwrap_or_default();
@@ -562,7 +562,7 @@ impl Oryxis {
             HistoryMessage::SessionLogsPagePrev => {
                 if self.session_logs_page > 0 {
                     self.session_logs_page -= 1;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         self.session_logs = vault
                             .list_session_logs_page(self.session_logs_page * 50, 50)
                             .unwrap_or_default();
@@ -747,7 +747,7 @@ impl Oryxis {
         if self.session_logs.iter().any(|e| e.id == log_id) {
             return;
         }
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return;
         };
         let Ok(Some(entry)) = vault.get_session_log(&log_id) else {
@@ -806,7 +806,7 @@ impl Oryxis {
         // Rows a previous query pulled in don't necessarily match this
         // one; drop them before recomputing.
         self.history_drop_extra_logs();
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };
         let cmd_hits = vault.search_session_commands(&needle).unwrap_or_default();
@@ -866,7 +866,7 @@ impl Oryxis {
                 return Task::none();
             }
             let log_id = self.history_content.queue.remove(0);
-            let Some(vault) = &self.vault else {
+            let Some(vault) = &self.vaults.cur().store else {
                 // Vault gone mid-scan (lock): stop; the lock path also
                 // resets the results.
                 self.history_content.scanning = false;
@@ -938,7 +938,7 @@ impl Oryxis {
         self.flush_session_logs_final();
         // The History slot holds one reader at a time.
         self.chat_ui.viewer = None;
-        let Some(vault) = &self.vault else {
+        let Some(vault) = &self.vaults.cur().store else {
             return Task::none();
         };
         let events = match vault.get_session_events(&log_id) {

@@ -132,7 +132,7 @@ impl Oryxis {
         };
 
         {
-            let Some(vault) = &self.vault else {
+            let Some(vault) = &self.vaults.cur().store else {
                 return Some(crate::i18n::t("theme_error_save_failed").to_string());
             };
             if vault.save_custom_terminal_theme(&theme).is_err() {
@@ -150,7 +150,7 @@ impl Oryxis {
         }
 
         self.custom_terminal_themes = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.list_custom_terminal_themes().ok())
             .unwrap_or_default();
@@ -166,7 +166,7 @@ impl Oryxis {
     /// if the name matches neither. Does not persist; callers that handle a
     /// user action persist + repaint.
     /// Caller sets `active_app_theme_name` on a `true` result (kept `&self`
-    /// so it can be called while `self.vault` is borrowed during boot).
+    /// so it can be called while `self.vaults.cur().store` is borrowed during boot).
     pub(crate) fn apply_app_theme_name(&self, name: &str) -> bool {
         // Custom themes resolve FIRST: a homonymous custom can only
         // predate its builtin (the editor refuses new collisions), and
@@ -237,7 +237,7 @@ impl Oryxis {
         };
 
         {
-            let Some(vault) = &self.vault else {
+            let Some(vault) = &self.vaults.cur().store else {
                 return Some(crate::i18n::t("theme_error_save_failed").to_string());
             };
             if vault.save_custom_ui_theme(&theme).is_err() {
@@ -245,7 +245,7 @@ impl Oryxis {
             }
         }
         self.custom_ui_themes = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.list_custom_ui_themes().ok())
             .unwrap_or_default();
@@ -371,7 +371,7 @@ impl Oryxis {
         // host's own choice and the global setting, not instead of
         // either.
         if let Some(name) = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.resolve_effective(conn, &self.groups, &self.identities).ok())
             .and_then(|e| e.terminal_theme.map(|(name, _)| name))
@@ -625,7 +625,7 @@ impl Oryxis {
             }
             SettingsMessage::UiThemeDelete(idx) => {
                 if let Some(theme) = self.custom_ui_themes.get(idx)
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                 {
                     let was_active = self.active_app_theme_name == theme.name;
                     let _ = vault.delete_custom_ui_theme(&theme.id);
@@ -705,7 +705,7 @@ impl Oryxis {
             }
             SettingsMessage::ThemeDelete(idx) => {
                 if let Some(theme) = self.custom_terminal_themes.get(idx)
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                 {
                     let _ = vault.delete_custom_terminal_theme(&theme.id);
                     self.custom_terminal_themes =

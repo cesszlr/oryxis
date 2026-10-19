@@ -43,14 +43,14 @@ impl Oryxis {
                 conn.username
                     .clone()
                     .or_else(|| identity.and_then(|i| i.username.clone())),
-                self.vault
+                self.vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_identity_password(&iid).ok().flatten()),
             )
         } else {
             (
                 conn.username.clone(),
-                self.vault
+                self.vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_connection_password(&conn.id).ok().flatten()),
             )
@@ -131,7 +131,7 @@ impl Oryxis {
         // Session recording rides the shared PtyOutput path, so a Telnet
         // session records exactly like an SSH one.
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vault.as_ref().map(|vault| {
+            self.vaults.cur().store.as_ref().map(|vault| {
                 let log_id = Uuid::new_v4();
                 if let Err(e) = vault.create_session_log(&log_id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");
@@ -239,7 +239,7 @@ impl Oryxis {
         let config = self.telnet_config(&mut conn, quick_id);
 
         let session_log_id = if self.should_record_session(Some(&conn)) {
-            self.vault.as_ref().map(|v| {
+            self.vaults.cur().store.as_ref().map(|v| {
                 let id = Uuid::new_v4();
                 if let Err(e) = v.create_session_log(&id, &conn.id, &conn.label) {
                     tracing::warn!("session log create failed: {e}");

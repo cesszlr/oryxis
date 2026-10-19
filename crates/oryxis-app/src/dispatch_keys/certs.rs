@@ -81,7 +81,7 @@ impl Oryxis {
                     let mut key = key.clone();
                     key.certificate = None;
                     key.updated_at = chrono::Utc::now();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         // `None` pem preserves the encrypted private blob and
                         // rewrites the (now empty) certificate column.
                         let _ = vault.save_key(&key, None);

@@ -424,7 +424,7 @@ impl Oryxis {
         let (password, private_key, certificate) = self.resolve_credentials(&conn);
         let pinned_agent = self.pinned_agent_public(&conn);
         let totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
         let resolver = self.make_jump_resolver(&mut conn);

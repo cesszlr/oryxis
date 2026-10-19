@@ -35,7 +35,7 @@ impl Oryxis {
                 let Some(entry) = self.session_logs.iter().find(|e| e.id == log_id) else {
                     return Task::none();
                 };
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 let rows = match vault.get_session_events(&log_id) {

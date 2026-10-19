@@ -253,7 +253,7 @@ impl Oryxis {
                 );
                 // Rows without an explicit per-plugin override follow
                 // the global default.
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     for entry in &mut self.plugins {
                         let has_override = vault
                             .get_setting(&format!(
@@ -680,7 +680,7 @@ impl Oryxis {
                     }
                     // A removed server shouldn't stay toggled on.
                     self.mcp.server_enabled = false;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("mcp_server_enabled", "false");
                     }
                 }

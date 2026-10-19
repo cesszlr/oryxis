@@ -87,7 +87,7 @@ impl Oryxis {
     pub(super) fn toggle_editor_secret(&mut self, which: EditorSecret) {
         // Disjoint field borrows: the buffer below is borrowed out of
         // the form, so anything else the form knows is read first.
-        let Self { editor_form: form, vault, .. } = self;
+        let Self { editor_form: form, vaults, .. } = self;
         let editing_id = form.editing_id;
         let (buffer, visible) = match which {
             EditorSecret::Password => (&mut form.password, &mut form.password_visible),
@@ -111,7 +111,7 @@ impl Oryxis {
         // already showed.
         if !buffer.touched()
             && let Some(id) = editing_id
-            && let Some(store) = vault.as_ref()
+            && let Some(store) = vaults.cur().store.as_ref()
             && let Ok(Some(secret)) = match which {
                 EditorSecret::Password => store.get_connection_password(&id),
                 EditorSecret::ProxyPassword => store.get_proxy_password(&id),
@@ -389,7 +389,7 @@ impl Oryxis {
                 let mut created = Vec::new();
                 let gid =
                     Group::resolve_or_create_path(&mut self.groups, &group_name, &mut created);
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     for g in &created {
                         let _ = vault.save_group(g);
                     }
@@ -1200,7 +1200,7 @@ impl Oryxis {
         };
         mutate(&mut self.connections[idx]);
         let label = self.connections[idx].label.clone();
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             // `None` preserves the encrypted password column untouched.
             let _ = vault.save_connection(&self.connections[idx], None);
         }

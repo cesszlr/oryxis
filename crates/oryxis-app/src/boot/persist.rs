@@ -87,7 +87,7 @@ impl Oryxis {
     /// open (the open-failed screen) it still reaches the device store,
     /// so a language picked there is the one the next start shows.
     pub(crate) fn persist_setting(&self, key: &str, value: &str) {
-        let result = match &self.vault {
+        let result = match &self.vaults.cur().store {
             Some(vault) => vault.set_setting(key, value).map_err(|e| e.to_string()),
             None => match oryxis_vault::device::installed() {
                 Some(device) if oryxis_vault::device::is_device_key(key) => {
@@ -423,7 +423,7 @@ impl Oryxis {
             return;
         }
         let json = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_setting("open_tabs").ok().flatten());
         // Read before the list is walked: the pins are already in the
@@ -432,7 +432,7 @@ impl Oryxis {
         let active: Option<crate::state::ActiveTabRef> = self
             .prefs
             .restore_last_active_tab
-            .then_some(self.vault.as_ref())
+            .then_some(self.vaults.cur().store.as_ref())
             .flatten()
             .and_then(|v| v.get_setting("open_tabs_active").ok().flatten())
             .and_then(|s| serde_json::from_str(&s).ok());
@@ -513,7 +513,7 @@ impl Oryxis {
     /// is loaded so the reopen path can resolve host ids.
     pub(crate) fn restore_pinned_tabs_dormant(&mut self) {
         let json = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_setting("pinned_tabs").ok().flatten());
         let Some(json) = json else { return };

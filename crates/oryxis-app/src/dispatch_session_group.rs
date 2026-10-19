@@ -207,7 +207,7 @@ impl Oryxis {
                     dup.group_id = src.group_id;
                     dup.color = src.color.clone();
                     dup.icon_style = src.icon_style.clone();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.save_session_group(&dup);
                         self.load_data_from_vault();
                     }
@@ -225,7 +225,7 @@ impl Oryxis {
             SessionGroupMessage::DeleteSessionGroup(idx) => {
                 self.overlay = None;
                 if let Some(group) = self.session_groups.get(idx)
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                 {
                     let _ = vault.delete_session_group(&group.id);
                     self.load_data_from_vault();
@@ -319,7 +319,7 @@ impl Oryxis {
             let name = form.group_name.trim().to_string();
             let mut created = Vec::new();
             let gid = Group::resolve_or_create_path(&mut self.groups, &name, &mut created);
-            if let Some(vault) = &self.vault {
+            if let Some(vault) = &self.vaults.cur().store {
                 for g in &created {
                     let _ = vault.save_group(g);
                 }
@@ -358,7 +358,7 @@ impl Oryxis {
         let group_id_saved = group.id;
         let group_label = group.label.clone();
         let source_tab = form.source_tab;
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             match vault.save_session_group(&group) {
                 Ok(()) => {
                     // Stamp the originating tab so its context menu reads
@@ -398,7 +398,7 @@ impl Oryxis {
         if let Some(g) = self.session_groups.get_mut(idx) {
             g.last_used = Some(now);
         }
-        if let Some(vault) = &self.vault
+        if let Some(vault) = &self.vaults.cur().store
             && let Err(e) = vault.mark_session_group_used(&group.id, now)
         {
             tracing::warn!("marking session group {} as used failed: {e}", group.id);

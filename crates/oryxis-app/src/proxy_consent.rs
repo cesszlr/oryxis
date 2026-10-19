@@ -61,7 +61,7 @@ impl Oryxis {
         else {
             return;
         };
-        if let Some(vault) = &self.vault
+        if let Some(vault) = &self.vaults.cur().store
             && let Err(e) = vault.trust_proxy_command(cmd, label)
         {
             tracing::warn!("failed to record an authored command proxy: {e}");
@@ -74,7 +74,7 @@ impl Oryxis {
     /// everything: the auto-start sweep runs right after unlock, and a
     /// vault that cannot answer must never be read as approval.
     pub(crate) fn trusted_proxy_commands(&self) -> HashSet<String> {
-        self.vault
+        self.vaults.cur().store
             .as_ref()
             .and_then(|v| v.list_trusted_proxy_commands().ok())
             .map(|list| list.into_iter().map(|t| t.fingerprint).collect())

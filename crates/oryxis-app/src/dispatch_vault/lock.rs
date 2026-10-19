@@ -91,10 +91,10 @@ impl Oryxis {
                 // What the recordings hold now reaches the vault while
                 // the key is still there; only what arrives after the
                 // lock goes to the spool.
-                if self.vault.is_some() && self.vault_ui.has_user_password {
+                if self.vaults.cur().store.is_some() && self.vault_ui.has_user_password {
                     self.flush_session_logs();
                 }
-                if let Some(vault) = &mut self.vault
+                if let Some(vault) = &mut self.vaults.cur_mut().store
                     && self.vault_ui.has_user_password
                 {
                     vault.lock();
@@ -288,7 +288,7 @@ impl Oryxis {
                 // auto-save while the key still exists, and on the same
                 // interrupted terms.
                 self.editor_flush_interrupted();
-                if let Some(vault) = &mut self.vault {
+                if let Some(vault) = &mut self.vaults.cur_mut().store {
                     vault.lock();
                     // The dialog that armed this is committed; clear the
                     // latch so it cannot re-open over the unlocked app.

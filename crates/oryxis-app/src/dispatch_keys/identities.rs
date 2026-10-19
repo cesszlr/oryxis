@@ -76,7 +76,7 @@ impl Oryxis {
                 // cleared removes it, typed stores (SecretInput::resolve).
                 let password = self.identity_form.password.resolve();
 
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.save_identity(&identity, password);
                     self.load_data_from_vault();
                 }
@@ -89,7 +89,7 @@ impl Oryxis {
                     self.identity_form.username = identity.username.clone().unwrap_or_default();
                     self.identity_form.password.clear();
                     self.identity_form.password_visible = false;
-                    self.identity_form.has_existing_password = self.vault.as_ref()
+                    self.identity_form.has_existing_password = self.vaults.cur().store.as_ref()
                         .and_then(|v| v.get_identity_password(&identity.id).ok().flatten())
                         .is_some();
                     self.identity_form.key = identity.key_id.and_then(|kid| {
@@ -109,7 +109,7 @@ impl Oryxis {
             KeysMessage::DeleteIdentity(idx) => {
                 if let Some(identity) = self.identities.get(idx) {
                     let id = identity.id;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_identity(&id);
                         self.load_data_from_vault();
                     }

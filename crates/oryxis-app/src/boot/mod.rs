@@ -341,7 +341,12 @@ impl Oryxis {
 
         let (mut app, task) = (
             Self {
-                vault,
+                vaults: crate::vault_slots::VaultSlots::single(crate::vault_slots::OpenVault {
+                    id: oryxis_vault::device::installed()
+                        .map(|d| d.boot_vault().id)
+                        .unwrap_or(oryxis_vault::device::FIRST_VAULT_ID),
+                    store: vault,
+                }),
                 vault_ui: crate::state::VaultUi {
                     state: vault_state,
                     open_error: vault_open_error,

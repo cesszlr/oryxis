@@ -240,7 +240,7 @@ impl Oryxis {
         let crate::state::PaneOrigin::Host(host_id) = tab.active().origin else {
             return;
         };
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             let _ = vault.record_install_run(&host_id, &snippet_id);
         }
         self.install_runs
@@ -460,7 +460,7 @@ impl Oryxis {
                 snip.tags = crate::util::parse_tags(&self.snippet_form.tags_input);
                 snip.hotkey = self.snippet_form.hotkey.map(|b| b.serialize());
                 snip.install = self.snippet_form.install;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     match vault.save_snippet(&snip) {
                         Ok(()) => {
                             self.panels.snippet_panel = false;
@@ -484,7 +484,7 @@ impl Oryxis {
                 self.overlay = None;
                 if let Some(snip) = self.snippets.get(idx) {
                     let id = snip.id;
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_snippet(&id);
                         self.panels.snippet_panel = false;
                         self.load_data_from_vault();
@@ -513,7 +513,7 @@ impl Oryxis {
                         _ => return None,
                     };
                     let pw = self
-                        .vault
+                        .vaults.cur().store
                         .as_ref()
                         .and_then(|v| v.get_connection_password(&conn_id).ok().flatten())
                         .filter(|p| !p.is_empty())?;

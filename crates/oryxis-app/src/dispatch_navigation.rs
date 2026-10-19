@@ -187,7 +187,7 @@ impl Oryxis {
                 // recording, fresh connection events) only exist in the
                 // tables, not in the cached page state.
                 if view == View::History
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                 {
                     self.logs_total = vault.count_logs().unwrap_or(0);
                     self.logs = vault
@@ -499,7 +499,7 @@ impl Oryxis {
                         "snippets_sort"
                     }
                 };
-                if let Some(v) = &self.vault {
+                if let Some(v) = &self.vaults.cur().store {
                     if let Err(e) = v.set_setting(key, sort.as_storage_str()) {
                         tracing::warn!("failed to persist sort setting {key}: {e}");
                     }

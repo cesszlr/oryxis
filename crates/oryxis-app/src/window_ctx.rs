@@ -59,6 +59,23 @@ enum Viewing {
 
 thread_local! {
     static VIEWING: Cell<Viewing> = const { Cell::new(Viewing::Nothing) };
+    /// The vault of the extra window being drawn (`VaultSlots::cur`).
+    static VIEWED_VAULT: Cell<Option<Uuid>> = const { Cell::new(None) };
+}
+
+/// The vault of the window whose view is being built, when that is an
+/// extra window. `None` during `update` and while the resident window is
+/// drawn: then the vault is the one in the fields
+/// (`VaultSlots::current_id`).
+pub(crate) fn viewed_vault() -> Option<Uuid> {
+    VIEWED_VAULT.with(Cell::get)
+}
+
+/// Run `f` as if the view of an extra window on `vault` were being built.
+#[cfg(test)]
+pub(crate) fn with_viewed_vault_for_test<R>(vault: Option<Uuid>, f: impl FnOnce() -> R) -> R {
+    let _pass = ViewPass::begin(Viewing::Nothing, vault);
+    f()
 }
 
 /// The extra window whose view is being built right now.
@@ -73,8 +90,9 @@ fn viewing() -> Option<window::Id> {
 struct ViewPass;
 
 impl ViewPass {
-    fn begin(target: Viewing) -> Self {
+    fn begin(target: Viewing, vault: Option<Uuid>) -> Self {
         VIEWING.with(|v| v.set(target));
+        VIEWED_VAULT.with(|v| v.set(vault));
         Self
     }
 }
@@ -82,6 +100,7 @@ impl ViewPass {
 impl Drop for ViewPass {
     fn drop(&mut self) {
         VIEWING.with(|v| v.set(Viewing::Nothing));
+        VIEWED_VAULT.with(|v| v.set(None));
     }
 }
 
@@ -174,10 +193,12 @@ pub(crate) struct ExtraWindow {
     pub(crate) mru: Vec<TabRef>,
     /// Its place in the vault screens.
     pub(crate) nav: WindowNav,
+    /// The vault it works on (`vault_slots`).
+    pub(crate) vault: Uuid,
 }
 
 impl ExtraWindow {
-    pub(crate) fn new(order: Vec<TabRef>, view: View, size: Size) -> Self {
+    pub(crate) fn new(order: Vec<TabRef>, view: View, size: Size, vault: Uuid) -> Self {
         let active = order.iter().find_map(|r| match r {
             TabRef::Terminal(id) | TabRef::Sftp(id) => Some(*id),
             TabRef::Panel(_) => None,
@@ -195,6 +216,7 @@ impl ExtraWindow {
             focused: true,
             mru: Vec::new(),
             nav: WindowNav::default(),
+            vault,
         }
     }
 
@@ -304,6 +326,7 @@ pub(crate) struct WindowCtx {
     focused: bool,
     mru: Vec<TabRef>,
     nav: WindowNav,
+    vault: Uuid,
 }
 
 impl Oryxis {
@@ -518,15 +541,15 @@ impl Oryxis {
     /// view with itself made ambient for the `cur_*` accessors, and its
     /// messages tagged with its id.
     pub(crate) fn view_for_window(&self, id: window::Id) -> iced::Element<'_, Message> {
-        if self.extra_windows.contains_key(&id) {
-            let _pass = ViewPass::begin(Viewing::Extra(id));
+        if let Some(window) = self.extra_windows.get(&id) {
+            let _pass = ViewPass::begin(Viewing::Extra(id), Some(window.vault));
             self.view()
                 .map(move |m| Message::InWindow(id, Box::new(m))).boxed()
         } else {
             // Any other id is the resident window, which keeps the harness
             // (its emulator owns a single window) and a window on its
             // way out on the ordinary path.
-            let _pass = ViewPass::begin(Viewing::Main);
+            let _pass = ViewPass::begin(Viewing::Main, None);
             self.view()
         }
     }
@@ -636,6 +659,7 @@ impl Oryxis {
             focused: std::mem::replace(&mut self.window_focused, w.focused),
             mru: std::mem::replace(&mut self.tab_mru, w.mru),
             nav: std::mem::replace(&mut self.nav, w.nav),
+            vault: self.vaults.set_current(w.vault),
         });
         self.active_tab = w
             .active
@@ -681,6 +705,7 @@ impl Oryxis {
             focused: std::mem::replace(&mut self.window_focused, ctx.focused),
             mru: std::mem::replace(&mut self.tab_mru, ctx.mru),
             nav: std::mem::replace(&mut self.nav, ctx.nav),
+            vault: self.vaults.set_current(ctx.vault),
         };
         self.active_view = ctx.view;
         self.active_tab = ctx

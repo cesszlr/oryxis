@@ -212,7 +212,7 @@ impl Oryxis {
                             group.parent_id = parent_id;
                             group.defaults = defaults;
                             group.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vault {
+                            if let Some(vault) = &self.vaults.cur().store {
                                 let _ = vault.save_group(group);
                             }
                         }
@@ -248,7 +248,7 @@ impl Oryxis {
                                 group.color = color;
                                 group.defaults = defaults;
                                 group.updated_at = chrono::Utc::now();
-                                if let Some(vault) = &self.vault {
+                                if let Some(vault) = &self.vaults.cur().store {
                                     let _ = vault.save_group(group);
                                 }
                             }
@@ -258,7 +258,7 @@ impl Oryxis {
                             group.color = color;
                             group.parent_id = parent_id;
                             group.defaults = defaults;
-                            if let Some(vault) = &self.vault {
+                            if let Some(vault) = &self.vaults.cur().store {
                                 let _ = vault.save_group(&group);
                             }
                             self.groups.push(group);
@@ -298,7 +298,7 @@ impl Oryxis {
                         if conn.group_id == Some(gid) {
                             conn.group_id = new_parent;
                             conn.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vault
+                            if let Some(vault) = &self.vaults.cur().store
                                 && let Err(e) = vault.save_connection(conn, None)
                             {
                                 tracing::error!(
@@ -317,7 +317,7 @@ impl Oryxis {
                         if g.parent_id == Some(gid) {
                             g.parent_id = new_parent;
                             g.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vault
+                            if let Some(vault) = &self.vaults.cur().store
                                 && let Err(e) = vault.save_group(g)
                             {
                                 tracing::error!(
@@ -335,7 +335,7 @@ impl Oryxis {
                     let mut removed = false;
                     if write_failed {
                         self.set_toast(crate::i18n::t("folder_delete_failed").to_string());
-                    } else if let Some(vault) = &self.vault {
+                    } else if let Some(vault) = &self.vaults.cur().store {
                         if let Err(e) = vault.delete_group(&gid) {
                             tracing::error!("delete folder {gid}: failed to delete group: {e}");
                             self.set_toast(
@@ -394,7 +394,7 @@ impl Oryxis {
                         if g.parent_id == Some(gid) {
                             g.parent_id = new_parent;
                             g.updated_at = chrono::Utc::now();
-                            if let Some(vault) = &self.vault
+                            if let Some(vault) = &self.vaults.cur().store
                                 && let Err(e) = vault.save_group(g)
                             {
                                 tracing::error!(
@@ -406,7 +406,7 @@ impl Oryxis {
                         }
                     }
                     let mut dropped: Vec<uuid::Uuid> = Vec::new();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         for cid in &to_drop {
                             if let Err(e) = vault.delete_connection(cid) {
                                 tracing::error!(
@@ -433,7 +433,7 @@ impl Oryxis {
                     let mut removed = false;
                     if write_failed {
                         self.set_toast(crate::i18n::t("folder_delete_failed").to_string());
-                    } else if let Some(vault) = &self.vault {
+                    } else if let Some(vault) = &self.vaults.cur().store {
                         if let Err(e) = vault.delete_group(&gid) {
                             tracing::error!("delete folder {gid}: failed to delete group: {e}");
                             self.set_toast(

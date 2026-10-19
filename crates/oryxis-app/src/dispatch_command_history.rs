@@ -119,7 +119,7 @@ impl Oryxis {
                 }
             }
             CommandHistoryMessage::DeleteHistoryCommand(id) => {
-                if let Some(ref vault) = self.vault {
+                if let Some(ref vault) = self.vaults.cur().store {
                     let _ = vault.delete_command_history_entry(&id);
                 }
                 // Tripwire for the debug log: history rows only ever
@@ -388,7 +388,7 @@ impl Oryxis {
         // a keyed dedup hash). The optional plain-text mirror below
         // also sees only the scrubbed text.
         let cmd = crate::session_redact::redact_command(&cmd);
-        if let Some(ref vault) = self.vault {
+        if let Some(ref vault) = self.vaults.cur().store {
             match vault.record_command(&host, &cmd) {
                 Ok(()) => {}
                 // Soft auto-lock keeps sessions alive while the master
@@ -429,7 +429,7 @@ impl Oryxis {
         offset_ms: Option<i64>,
         cmd: &str,
     ) {
-        let Some(vault) = &self.vault else { return };
+        let Some(vault) = &self.vaults.cur().store else { return };
         let text = crate::session_redact::redact_command(cmd);
         if let Err(e) = vault.append_session_command(log_id, offset_ms, &text) {
             tracing::warn!("session command append failed for {log_id}: {e}");
@@ -537,7 +537,7 @@ impl Oryxis {
                 _ => None,
             });
         self.command_history_host = host;
-        self.command_history = match (host, &self.vault) {
+        self.command_history = match (host, &self.vaults.cur().store) {
             (Some(h), Some(v)) => v.list_command_history(&h).unwrap_or_default(),
             _ => Vec::new(),
         };

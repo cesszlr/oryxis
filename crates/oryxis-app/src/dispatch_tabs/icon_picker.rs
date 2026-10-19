@@ -41,7 +41,7 @@ impl Oryxis {
                 conn.custom_color = color.clone();
                 // Full save so the row persists (and other fields
                 // aren't accidentally overwritten).
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.save_connection(conn, None);
                 }
             }
@@ -78,7 +78,7 @@ impl Oryxis {
             && let Some(conn) = self.connections.iter_mut().find(|c| c.id == conn_id) {
             conn.custom_icon = None;
             conn.custom_color = None;
-            if let Some(vault) = &self.vault {
+            if let Some(vault) = &self.vaults.cur().store {
                 let _ = vault.save_connection(conn, None);
             }
         }

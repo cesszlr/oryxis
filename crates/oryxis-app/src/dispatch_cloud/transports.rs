@@ -353,7 +353,7 @@ impl Oryxis {
                             "SSM Session start failed"
                         );
                         if self.should_record_history()
-                            && let Some(vault) = &self.vault {
+                            && let Some(vault) = &self.vaults.cur().store {
                             let entry = oryxis_core::models::log_entry::LogEntry::new(
                                 &host_label,
                                 &host_label,
@@ -379,7 +379,7 @@ impl Oryxis {
                                 "session-manager-plugin missing, install it to use SSM Session"
                             );
                             if self.should_record_history()
-                                && let Some(vault) = &self.vault {
+                                && let Some(vault) = &self.vaults.cur().store {
                                 let entry = oryxis_core::models::log_entry::LogEntry::new(
                                     &host_label,
                                     &host_label,
@@ -432,7 +432,7 @@ impl Oryxis {
                             "ECS Exec session start failed"
                         );
                         if self.should_record_history()
-                            && let Some(vault) = &self.vault {
+                            && let Some(vault) = &self.vaults.cur().store {
                             let entry = oryxis_core::models::log_entry::LogEntry::new(
                                 &task_label,
                                 &task_label,
@@ -516,7 +516,7 @@ impl Oryxis {
                                 "session-manager-plugin missing, install it to use ECS Exec"
                             );
                             if self.should_record_history()
-                                && let Some(vault) = &self.vault {
+                                && let Some(vault) = &self.vaults.cur().store {
                                 let entry = oryxis_core::models::log_entry::LogEntry::new(
                                     &task_label,
                                     &task_label,

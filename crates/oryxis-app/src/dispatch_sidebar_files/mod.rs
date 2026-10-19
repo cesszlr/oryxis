@@ -303,7 +303,7 @@ impl Oryxis {
         // so it just doesn't persist; the in-memory list still works for
         // the session.
         if let Ok(json) = serde_json::to_string(&self.files_recent_folders)
-            && let Some(vault) = &self.vault
+            && let Some(vault) = &self.vaults.cur().store
             && let Err(e) = vault.set_files_recent_folders(&json)
         {
             tracing::warn!("failed to persist the Files folder history: {e}");

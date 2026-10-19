@@ -313,7 +313,7 @@ impl Oryxis {
         conn_id: uuid::Uuid,
         secret: SecretRef,
     ) -> Option<zeroize::Zeroizing<String>> {
-        let vault = self.vault.as_ref()?;
+        let vault = self.vaults.cur().store.as_ref()?;
         let value = match secret {
             SecretRef::ConnectionPassword => {
                 vault.get_connection_password(&conn_id).ok().flatten()

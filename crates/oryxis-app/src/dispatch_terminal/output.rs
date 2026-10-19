@@ -230,7 +230,7 @@ impl Oryxis {
             return None;
         }
         self.last_session_log_capacity_check = std::time::Instant::now();
-        let vault = self.vault.as_ref()?;
+        let vault = self.vaults.cur().store.as_ref()?;
 
         // The size cap is the user's own quota, so reaching it drops the
         // oldest FINISHED recordings first (retention by size) and
@@ -279,7 +279,7 @@ impl Oryxis {
         if stopped.is_empty() {
             return;
         }
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             for log_id in &stopped {
                 if let Err(e) = vault.mark_session_log_truncated(log_id) {
                     tracing::warn!("marking session log {log_id} truncated failed: {e}");
@@ -315,7 +315,7 @@ impl Oryxis {
     /// a log open because it happened to end under a lock.
     pub(crate) fn end_session_log_now(&mut self, log_id: uuid::Uuid) {
         if self.vault_ui.state == crate::state::VaultState::Unlocked {
-            if let Some(vault) = &self.vault
+            if let Some(vault) = &self.vaults.cur().store
                 && let Err(e) = vault.end_session_log(&log_id)
             {
                 tracing::warn!("ending session log {log_id} failed: {e}");
@@ -578,7 +578,7 @@ impl Oryxis {
                 pending = ahead;
             }
         }
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             for log_id in self.session_spool_lost.drain(..) {
                 if let Err(e) = vault.mark_session_log_truncated(&log_id) {
                     tracing::warn!("marking session log {log_id} truncated failed: {e}");
@@ -599,7 +599,7 @@ impl Oryxis {
         // the next one. Recording is what stops; the session keeps
         // running, untouched.
         if let Some(reason) = self.session_log_capacity_stop() {
-            if let Some(vault) = &self.vault {
+            if let Some(vault) = &self.vaults.cur().store {
                 for (log_id, row) in pending {
                     match row {
                         PendingSessionRow::Chunk(offset_ms, bytes) => {
@@ -629,7 +629,7 @@ impl Oryxis {
         // a copy of what was STORED, so it never carries a byte the
         // recording did not, redaction included.
         let mut mirror_writes: Vec<(uuid::Uuid, std::path::PathBuf, Vec<u8>)> = Vec::new();
-        if let Some(vault) = &self.vault {
+        if let Some(vault) = &self.vaults.cur().store {
             for (log_id, row) in pending {
                 match row {
                     PendingSessionRow::Chunk(offset_ms, bytes) => {

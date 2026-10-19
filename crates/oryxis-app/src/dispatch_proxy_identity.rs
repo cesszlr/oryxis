@@ -28,7 +28,7 @@ impl Oryxis {
                     && let Some(pi) = self.proxy_identities.iter().find(|p| p.id == id)
                 {
                     let has_pw = self
-                        .vault
+                        .vaults.cur().store
                         .as_ref()
                         .and_then(|v| v.get_proxy_identity_password(&id).ok())
                         .flatten()
@@ -176,7 +176,7 @@ impl Oryxis {
                 // Tri-state per SecretInput::resolve.
                 let password_arg = self.proxy_identity_form.password.resolve();
 
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     match vault.save_proxy_identity(&identity, password_arg) {
                         Ok(()) => {
                             self.proxy_identity_form.visible = false;
@@ -190,7 +190,7 @@ impl Oryxis {
                 }
             }
             ProxyIdentityMessage::DeleteProxyIdentity(id) => {
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.delete_proxy_identity(&id);
                     self.load_data_from_vault();
                 }

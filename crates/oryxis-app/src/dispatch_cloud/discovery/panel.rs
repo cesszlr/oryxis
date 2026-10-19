@@ -74,7 +74,7 @@ impl Oryxis {
                 // results, so the cards list shows fresh metadata.
                 if matches!(self.cloud_discover.state, CloudDiscoverState::Loaded(_))
                     && let Some(id) = self.cloud_discover.profile_id
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                     && let Some(mut cp) = self
                         .cloud_profiles
                         .iter()

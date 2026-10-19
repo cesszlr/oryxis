@@ -46,7 +46,7 @@ impl Oryxis {
                 let Some(provider) = registry.get(&profile.provider) else {
                     return Ok(Task::none());
                 };
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     profile.secret =
                         vault.get_cloud_profile_secret(&profile_id).ok().flatten();
                 }
@@ -61,7 +61,7 @@ impl Oryxis {
                 ));
             }
             CloudMessage::CloudProfileSyncResult(profile_id, result) => {
-                if self.vault.is_none() {
+                if self.vaults.cur().store.is_none() {
                     return Ok(Task::none());
                 }
                 match result {
@@ -177,7 +177,7 @@ impl Oryxis {
                                 cp.last_discovered = Some(now);
                                 cp
                             });
-                        if let Some(vault) = &self.vault {
+                        if let Some(vault) = &self.vaults.cur().store {
                             // One transaction for the whole refresh batch
                             // (a save per row used to mean a commit per
                             // row), and patch the in-memory lists instead

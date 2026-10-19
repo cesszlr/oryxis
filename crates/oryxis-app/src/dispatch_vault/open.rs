@@ -41,7 +41,7 @@ impl Oryxis {
                 return calibrate_kdf_task(crate::state::VaultPwOp::FirstSetup);
             }
             VaultMessage::VaultSkipPassword => {
-                if let Some(vault) = &mut self.vault {
+                if let Some(vault) = &mut self.vaults.cur_mut().store {
                     match vault.open_without_password() {
                         Ok(()) => {
                             self.vault_ui.state = VaultState::Unlocked;
@@ -82,7 +82,7 @@ impl Oryxis {
                 self.vault_ui.destroy_confirm = !self.vault_ui.destroy_confirm;
             }
             VaultMessage::VaultDestroy => {
-                if let Some(vault) = &mut self.vault {
+                if let Some(vault) = &mut self.vaults.cur_mut().store {
                     match vault.destroy_and_recreate() {
                         Ok(()) => {
                             self.vault_ui.state = VaultState::NeedSetup;
@@ -104,7 +104,7 @@ impl Oryxis {
                 if self.vault_ui.password_input.is_empty() {
                     return Task::none();
                 }
-                if let Some(vault) = &mut self.vault {
+                if let Some(vault) = &mut self.vaults.cur_mut().store {
                     match vault.unlock(&self.vault_ui.password_input) {
                         Ok(()) => {
                             self.vault_ui.state = VaultState::Unlocked;

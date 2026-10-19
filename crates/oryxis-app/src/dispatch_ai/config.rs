@@ -19,13 +19,13 @@ impl Oryxis {
                 if !self.ai.enabled {
                     self.abort_all_chat_tasks();
                 }
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("ai_enabled", if self.ai.enabled { "true" } else { "false" });
                 }
             }
             AiMessage::ToggleAiSaveHistory => {
                 self.ai.save_history = !self.ai.save_history;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting(
                         "ai_save_history",
                         if self.ai.save_history { "true" } else { "false" },
@@ -45,7 +45,7 @@ impl Oryxis {
             }
             AiMessage::ToggleAiReasoning => {
                 self.ai.reasoning = !self.ai.reasoning;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting(
                         "ai_reasoning",
                         if self.ai.reasoning { "true" } else { "false" },
@@ -59,14 +59,14 @@ impl Oryxis {
                 let info = crate::ai::provider_from_display(&provider)
                     .unwrap_or_else(|| crate::ai::provider_info(&provider));
                 self.ai.provider = info.id.to_string();
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("ai_provider", &self.ai.provider);
                 }
                 // Suggest the provider's default model when the user hasn't
                 // picked one. For Custom we keep whatever model is set.
                 if !info.default_model.is_empty() {
                     self.ai.model = info.default_model.into();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("ai_model", &self.ai.model);
                     }
                 }
@@ -74,14 +74,14 @@ impl Oryxis {
                 // override so Save doesn't carry it across providers.
                 if info.kind != crate::ai::ProviderKind::Custom {
                     self.ai.api_url.clear();
-                    if let Some(vault) = &self.vault {
+                    if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.set_setting("ai_api_url", "");
                     }
                 }
             }
             AiMessage::AiModelChanged(model) => {
                 self.ai.model = model;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("ai_model", &self.ai.model);
                 }
             }
@@ -90,7 +90,7 @@ impl Oryxis {
             }
             AiMessage::AiApiUrlChanged(url) => {
                 self.ai.api_url = url;
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("ai_api_url", &self.ai.api_url);
                 }
             }
@@ -98,14 +98,14 @@ impl Oryxis {
                 let was_edit = action.is_edit();
                 self.ai.system_prompt.perform(action);
                 if was_edit
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                 {
                     let _ = vault.set_setting("ai_system_prompt", &self.ai.system_prompt.text());
                 }
             }
             AiMessage::SaveAiApiKey => {
                 if !self.ai.api_key.is_empty()
-                    && let Some(vault) = &self.vault
+                    && let Some(vault) = &self.vaults.cur().store
                     && vault.set_ai_api_key(&self.ai.api_key).is_ok() {
                         self.ai.api_key.clear();
                         self.ai.api_key_set = true;

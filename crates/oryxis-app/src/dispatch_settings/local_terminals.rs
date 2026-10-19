@@ -22,7 +22,7 @@ impl Oryxis {
     pub(crate) fn persist_local_terminals(&self) {
         let json = serde_json::to_string(self.local_terminals.as_deref().unwrap_or(&[]))
             .unwrap_or_else(|_| "[]".to_string());
-        if let Some(vault) = self.vault.as_ref()
+        if let Some(vault) = self.vaults.cur().store.as_ref()
             && let Err(e) = vault.set_setting("local_terminals", &json)
         {
             tracing::warn!("Failed to persist local_terminals: {e}");
@@ -36,7 +36,7 @@ impl Oryxis {
             .local_terminal_default
             .map(|id| id.to_string())
             .unwrap_or_default();
-        if let Some(vault) = self.vault.as_ref()
+        if let Some(vault) = self.vaults.cur().store.as_ref()
             && let Err(e) = vault.set_setting("local_terminal_default", &value)
         {
             tracing::warn!("Failed to persist local_terminal_default: {e}");

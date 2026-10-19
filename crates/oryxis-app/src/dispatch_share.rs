@@ -39,7 +39,7 @@ impl Oryxis {
     /// (pre-creation) and soft-locked (`vault.lock()` zeroizes the
     /// key, the store stays `Some`) both answer false. Every
     /// export / import / share confirm gates on this rather than
-    /// `self.vault.is_some()`: a locked store still answers `list_*`
+    /// `self.vaults.cur().store.is_some()`: a locked store still answers `list_*`
     /// calls while every per-field decrypt inside `export_vault`
     /// degrades to `None`, so an export run against it would quietly
     /// write a file with every password missing. Reachable in
@@ -47,7 +47,7 @@ impl Oryxis {
     /// dialog's blocking task, and browsing that dialog feeds iced no
     /// input events, so the idle auto-lock can fire mid-pick.
     fn vault_usable(&self) -> bool {
-        self.vault.as_ref().is_some_and(|v| !v.is_locked())
+        self.vaults.cur().store.as_ref().is_some_and(|v| !v.is_locked())
     }
 
     /// The shared "can't act on the vault right now" status line for
@@ -89,7 +89,7 @@ impl Oryxis {
                     self.export_status = Some(Self::vault_locked_status("vault export"));
                     return Task::none();
                 }
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     let options = oryxis_vault::ExportOptions {
                         include_private_keys: self.export_include_keys,
                         filter: oryxis_vault::ExportFilter::All,
@@ -426,7 +426,7 @@ impl Oryxis {
                         Some(Self::vault_locked_status("ssh config import"));
                     return Task::none();
                 }
-                if self.vault.is_none() {
+                if self.vaults.cur().store.is_none() {
                     return Task::none();
                 }
                 // Where the batch lands (issue #230): the folder that
@@ -439,7 +439,7 @@ impl Oryxis {
                 // group column ride `notes`), so there is nothing to
                 // out-rank.
                 let target_group = self.take_import_target_group();
-                let Some(vault) = &self.vault else {
+                let Some(vault) = &self.vaults.cur().store else {
                     return Task::none();
                 };
                 // Third-party batch (PuTTY, ...): already Connections,
@@ -641,7 +641,7 @@ impl Oryxis {
                     self.vault_import.status = Some(Self::vault_locked_status("vault import"));
                     return Task::none();
                 }
-                if let (Some(vault), Some(data)) = (&self.vault, &self.vault_import.file_data) {
+                if let (Some(vault), Some(data)) = (&self.vaults.cur().store, &self.vault_import.file_data) {
                     // The folder the hub was opened in, when the file
                     // arrived through it (issue #230); `None` from the
                     // Security cards. Consumed only by an import that
@@ -936,7 +936,7 @@ impl Oryxis {
                     self.share.status = Some(Self::vault_locked_status("share export"));
                     return Task::none();
                 }
-                if let (Some(vault), Some(filter)) = (&self.vault, &self.share.filter) {
+                if let (Some(vault), Some(filter)) = (&self.vaults.cur().store, &self.share.filter) {
                     let options = oryxis_vault::ExportOptions {
                         include_private_keys: self.share.include_keys,
                         filter: filter.clone(),
@@ -1175,7 +1175,7 @@ impl Oryxis {
                     Some(Self::vault_locked_status("sftp backup export"));
                 return Task::none();
             }
-            let Some(vault) = &self.vault else {
+            let Some(vault) = &self.vaults.cur().store else {
                 return Task::none();
             };
             let options = oryxis_vault::ExportOptions {
@@ -1279,7 +1279,7 @@ impl Oryxis {
         self.proxy_command_response_tx = Some(pc_resp_tx);
 
         let totp_secret = self
-            .vault
+            .vaults.cur().store
             .as_ref()
             .and_then(|v| v.get_connection_totp_secret(&conn.id).ok().flatten());
 

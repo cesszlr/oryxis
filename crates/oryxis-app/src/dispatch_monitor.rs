@@ -120,7 +120,7 @@ impl Oryxis {
                     let conn = conn.clone();
                     // A failed persist must be loud: the flag would work
                     // until restart and then silently vanish.
-                    if let Some(vault) = &self.vault
+                    if let Some(vault) = &self.vaults.cur().store
                         && let Err(e) = vault.save_connection(&conn, None)
                     {
                         return self.show_toast_secs(e.to_string(), 6);
@@ -317,7 +317,7 @@ impl Oryxis {
         // never logged, never shown, and never part of a command line.
         let password = sudo
             .then(|| {
-                self.vault
+                self.vaults.cur().store
                     .as_ref()
                     .and_then(|v| v.get_connection_password(&conn_id).ok().flatten())
             })

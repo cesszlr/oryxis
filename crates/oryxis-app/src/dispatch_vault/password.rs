@@ -42,7 +42,7 @@ impl Oryxis {
                 }
             }
             VaultMessage::ConfirmRemoveVaultPassword => {
-                if let Some(vault) = &mut self.vault {
+                if let Some(vault) = &mut self.vaults.cur_mut().store {
                     match vault.remove_user_password() {
                         Ok(()) => {
                             self.vault_ui.has_user_password = false;
@@ -142,7 +142,7 @@ impl Oryxis {
                 // The vault is already unlocked, so this guards against
                 // someone changing the password at an unattended session and
                 // against a typo silently rotating to an unknown key.
-                if let Some(vault) = &self.vault {
+                if let Some(vault) = &self.vaults.cur().store {
                     match vault.verify_password(&self.vault_ui.current_password) {
                         Ok(true) => {}
                         Ok(false) => {
@@ -176,7 +176,7 @@ impl Oryxis {
                 let Some(pw) = self.vault_ui.pending_kdf_pw.take() else {
                     return Task::none();
                 };
-                let Some(vault) = &mut self.vault else {
+                let Some(vault) = &mut self.vaults.cur_mut().store else {
                     return Task::none();
                 };
                 match op {

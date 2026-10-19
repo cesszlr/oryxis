@@ -16,7 +16,7 @@ impl Oryxis {
                 // vault is open, and never a second time once the rebuilt
                 // file is in place: a rebuild of the REBUILT file would
                 // rename a healthy vault to `.damaged-*`.
-                let allowed = self.vault.is_none()
+                let allowed = self.vaults.cur().store.is_none()
                     && self.vault_ui.open_corrupt
                     && matches!(self.vault_ui.rebuild, VaultRebuild::Idle | VaultRebuild::Failed(_));
                 if !allowed {
