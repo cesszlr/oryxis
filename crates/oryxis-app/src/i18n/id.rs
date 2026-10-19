@@ -2722,6 +2722,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Berkas tidak ditemukan",
         "setting_device_badge_tip" => "Berlaku untuk semua vault di perangkat ini",
         "hotkey_device_note" => "Tabel pintasan milik perangkat ini: sama di setiap vault.",
+        "sync_target_taken" => "Vault {vault} sudah menyinkronkan ke target ini. Dua vault pada satu target akan saling tercampur: pilih target lain.",
         "vault_status_missing" => "Berkas tidak ditemukan. Vault kembali saat berkasnya kembali (misalnya flashdisk).",
         "vault_status_unlocked" => "Tidak terkunci",
         "vault_status_locked" => "Terkunci",

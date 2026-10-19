@@ -2688,6 +2688,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Fichier introuvable",
         "setting_device_badge_tip" => "S’applique à tous les coffres de cet appareil",
         "hotkey_device_note" => "La table des raccourcis appartient à cet appareil : la même dans tous les coffres.",
+        "sync_target_taken" => "Le coffre {vault} se synchronise déjà avec cette cible. Deux coffres sur une même cible se mélangeraient : choisissez-en une autre.",
         "vault_status_missing" => "Fichier introuvable. Le coffre revient quand son fichier revient (une clé USB, par exemple).",
         "vault_status_unlocked" => "Déverrouillé",
         "vault_status_locked" => "Verrouillé",

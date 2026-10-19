@@ -2722,6 +2722,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Không tìm thấy tệp",
         "setting_device_badge_tip" => "Áp dụng cho mọi kho trên thiết bị này",
         "hotkey_device_note" => "Bảng phím tắt thuộc về thiết bị này: giống nhau trong mọi kho.",
+        "sync_target_taken" => "Kho {vault} đã đồng bộ với đích này. Hai kho trên cùng một đích sẽ trộn lẫn vào nhau: hãy chọn đích khác.",
         "vault_status_missing" => "Không tìm thấy tệp. Kho sẽ trở lại khi tệp trở lại (ví dụ một USB).",
         "vault_status_unlocked" => "Đã mở khóa",
         "vault_status_locked" => "Đã khóa",

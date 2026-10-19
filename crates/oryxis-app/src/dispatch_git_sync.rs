@@ -221,6 +221,12 @@ impl Oryxis {
         if !self.sync_round_allowed() {
             return Task::none();
         }
+        // Another vault syncing with the same target would merge into
+        // this one (`sync_targets`).
+        if let Some(other) = self.sync_target_taken_by() {
+            self.vaults.cur_mut().sync.git.status = Some(Err(Self::sync_target_taken_text(&other)));
+            return Task::none();
+        }
         let remote = self.vaults.cur().sync.git.remote.trim().to_string();
         if remote.is_empty() {
             self.vaults.cur_mut().sync.git.status = Some(Err(t("git_sync_no_remote").to_string()));

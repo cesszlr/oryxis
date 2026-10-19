@@ -2726,6 +2726,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Το αρχείο δεν βρέθηκε",
         "setting_device_badge_tip" => "Ισχύει για όλα τα vault σε αυτή τη συσκευή",
         "hotkey_device_note" => "Ο πίνακας συντομεύσεων ανήκει σε αυτή τη συσκευή: ίδιος σε κάθε vault.",
+        "sync_target_taken" => "Το vault {vault} συγχρονίζεται ήδη με αυτόν τον προορισμό. Δύο vault στον ίδιο προορισμό θα αναμειχθούν: διαλέξτε άλλον.",
         "vault_status_missing" => "Το αρχείο δεν βρέθηκε. Το vault επιστρέφει όταν επιστρέψει το αρχείο του (π.χ. ένα USB stick).",
         "vault_status_unlocked" => "Ξεκλείδωτο",
         "vault_status_locked" => "Κλειδωμένο",

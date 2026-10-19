@@ -2689,6 +2689,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "找不到文件",
         "setting_device_badge_tip" => "适用于此设备上的所有保险库",
         "hotkey_device_note" => "快捷键表属于此设备：在每个保险库中都相同。",
+        "sync_target_taken" => "保险库 {vault} 已在使用此同步目标。两个保险库使用同一目标会互相合并：请换一个。",
         "vault_status_missing" => "找不到文件。文件回来后（例如 U 盘），保险库也会回来。",
         "vault_status_unlocked" => "已解锁",
         "vault_status_locked" => "已锁定",

@@ -720,18 +720,23 @@ impl Oryxis {
         // Only the P2P transport runs a background engine; every
         // snapshot transport reconciles on the iced cadence
         // subscription instead.
+        // Its follow-ups name the boot vault: boot's tasks do not go
+        // through `update`, which is what tags the others, and the
+        // engine's events must reach this vault whichever one the
+        // window is on when they arrive.
+        let boot_vault = app.vaults.current_id();
         if open_now
             && app.vaults.cur().sync.enabled
             && app.sync_uses_p2p()
         {
-            tasks.push(app.start_sync_engine());
+            tasks.push(app.start_sync_engine().map(move |m| m.on_vault(boot_vault)));
         }
         // The git card's availability probe spawns a subprocess, so it
         // runs as a task rather than inside `view()`. Fire it whenever
         // the git transport can be on screen (also done on `VaultUnlock`
         // and on `TransportChanged`).
         if open_now && app.vaults.cur().sync.transport == "git" {
-            tasks.push(crate::dispatch_git_sync::git_availability_task());
+            tasks.push(crate::dispatch_git_sync::git_availability_task().map(move |m| m.on_vault(boot_vault)));
         }
 
         // Auto-start port forward rules marked `auto_start`. Deferred to

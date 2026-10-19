@@ -2690,6 +2690,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Arquivo não encontrado",
         "setting_device_badge_tip" => "Vale para todos os cofres deste dispositivo",
         "hotkey_device_note" => "A tabela de atalhos é deste dispositivo: a mesma em todos os cofres.",
+        "sync_target_taken" => "O cofre {vault} já sincroniza com este destino. Dois cofres no mesmo destino se misturariam: escolha outro.",
         "vault_status_missing" => "Arquivo não encontrado. O cofre volta quando o arquivo voltar (um pendrive, por exemplo).",
         "vault_status_unlocked" => "Desbloqueado",
         "vault_status_locked" => "Bloqueado",

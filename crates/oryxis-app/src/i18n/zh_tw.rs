@@ -2689,6 +2689,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "找不到檔案",
         "setting_device_badge_tip" => "適用於此裝置上的所有保險庫",
         "hotkey_device_note" => "快速鍵表屬於此裝置：在每個保險庫中都相同。",
+        "sync_target_taken" => "保險庫 {vault} 已在使用此同步目標。兩個保險庫使用同一目標會互相合併：請換一個。",
         "vault_status_missing" => "找不到檔案。檔案回來後（例如隨身碟），保險庫也會回來。",
         "vault_status_unlocked" => "已解鎖",
         "vault_status_locked" => "已鎖定",

@@ -433,3 +433,22 @@ fn the_host_probe_writes_nothing_and_misses_a_missing_file() {
     assert!(!file_holds_connection(&junk, uuid::Uuid::new_v4()));
     assert_eq!(std::fs::read(&junk).unwrap(), b"not a database at all");
 }
+
+#[test]
+fn another_vaults_sync_target_reads_while_locked_and_never_a_sealed_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("work.db");
+    let mut vault = VaultStore::open(&path).unwrap();
+    vault.set_master_password("pw").unwrap();
+    vault.set_setting("sync_folder_path", "/mnt/share/oryxis").unwrap();
+    vault.set_setting("sync_webdav_password", "secret").unwrap();
+    let host = oryxis_core::models::Connection::new("nas", "nas.lan");
+    vault.save_connection(&host, None).unwrap();
+    vault.lock();
+    drop(vault);
+    let rows = read_plain_settings(&path, &["sync_folder_path", "sync_webdav_password", "sync_enabled"]);
+    assert_eq!(rows, vec![("sync_folder_path".to_string(), "/mnt/share/oryxis".to_string())]);
+    assert_eq!(read_host_address(&path, host.id), Some(("nas.lan".to_string(), 22)));
+    assert!(read_plain_settings(&dir.path().join("missing.db"), &["sync_folder_path"]).is_empty());
+    assert!(!dir.path().join("missing.db").exists());
+}

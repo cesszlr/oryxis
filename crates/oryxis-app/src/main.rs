@@ -154,6 +154,7 @@ mod ssh_reuse;
 mod state;
 mod subscription;
 mod sync_runtime;
+mod sync_targets;
 mod tab_conn_state;
 mod tab_cycle;
 mod terminal_appearance;

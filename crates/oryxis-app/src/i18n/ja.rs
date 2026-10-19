@@ -2690,6 +2690,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "ファイルが見つかりません",
         "setting_device_badge_tip" => "このデバイスのすべてのボールトに適用されます",
         "hotkey_device_note" => "ショートカット表はこのデバイスのものです。どのボールトでも同じです。",
+        "sync_target_taken" => "ボールト {vault} はすでにこの同期先を使っています。同じ同期先の2つのボールトは互いに混ざってしまいます。別の同期先を選んでください。",
         "vault_status_missing" => "ファイルが見つかりません。ファイルが戻れば (USB メモリなど) ボールトも戻ります。",
         "vault_status_unlocked" => "ロック解除済み",
         "vault_status_locked" => "ロック中",

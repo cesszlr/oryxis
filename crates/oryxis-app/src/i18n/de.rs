@@ -2689,6 +2689,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Datei nicht gefunden",
         "setting_device_badge_tip" => "Gilt für alle Tresore auf diesem Gerät",
         "hotkey_device_note" => "Die Tastenkürzel-Tabelle gehört zu diesem Gerät: in jedem Tresor dieselbe.",
+        "sync_target_taken" => "Der Tresor {vault} synchronisiert bereits mit diesem Ziel. Zwei Tresore auf einem Ziel würden sich vermischen: wähle ein anderes.",
         "vault_status_missing" => "Datei nicht gefunden. Der Tresor kommt zurück, wenn seine Datei zurückkommt (etwa ein USB-Stick).",
         "vault_status_unlocked" => "Entsperrt",
         "vault_status_locked" => "Gesperrt",

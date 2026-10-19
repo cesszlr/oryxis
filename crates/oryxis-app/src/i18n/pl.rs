@@ -2721,6 +2721,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Nie znaleziono pliku",
         "setting_device_badge_tip" => "Dotyczy wszystkich sejfów na tym urządzeniu",
         "hotkey_device_note" => "Tabela skrótów należy do tego urządzenia: jest taka sama w każdym sejfie.",
+        "sync_target_taken" => "Sejf {vault} już synchronizuje się z tym celem. Dwa sejfy na jednym celu zmieszałyby się: wybierz inny.",
         "vault_status_missing" => "Nie znaleziono pliku. Sejf wróci, gdy wróci jego plik (na przykład pendrive).",
         "vault_status_unlocked" => "Odblokowany",
         "vault_status_locked" => "Zablokowany",

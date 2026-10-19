@@ -100,6 +100,12 @@ impl Oryxis {
         if !self.sync_round_allowed() {
             return Task::none();
         }
+        // Another vault syncing with the same target would merge into
+        // this one (`sync_targets`).
+        if let Some(other) = self.sync_target_taken_by() {
+            self.vaults.cur_mut().sync.webdav.status = Some(Err(Self::sync_target_taken_text(&other)));
+            return Task::none();
+        }
         let url = self.vaults.cur().sync.webdav.url.trim().to_string();
         if url.is_empty() {
             self.vaults.cur_mut().sync.webdav.status = Some(Err(t("webdav_sync_no_url").to_string()));

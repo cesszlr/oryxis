@@ -71,7 +71,13 @@ impl Oryxis {
             ) => self.handle_vault_repair(m),
             VaultMessage::VaultChangedOutside { writer } => {
                 tracing::info!(writer = %writer, "vault written by another process, reloading");
-                self.reload_after_external_write();
+                // The marker names no vault (one file for the device), so
+                // every open vault re-reads its rows; the reload is a
+                // no-op for a locked one.
+                self.on_each_open_vault(|app| {
+                    app.reload_after_external_write();
+                    None::<()>
+                });
                 Task::none()
             }
         }

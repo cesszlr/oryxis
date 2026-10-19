@@ -50,7 +50,7 @@ const DEFAULT_SNAPSHOT_NAME: &str = "oryxis-sync.bin";
 /// expansion it resolves to a literal `./~` directory that does not
 /// exist, so the round fails with "directory not found" pointing at a
 /// path the user believes is right.
-fn snapshot_path(input: &str) -> PathBuf {
+pub(crate) fn snapshot_path(input: &str) -> PathBuf {
     let trimmed = input.trim();
     let expanded = crate::util::expand_home(trimmed);
     let path = expanded.as_path();
@@ -74,6 +74,12 @@ impl Oryxis {
         // A locked vault has no master key to decrypt with; the
         // manual buttons must not rely on the lock screen hiding them.
         if !self.sync_round_allowed() {
+            return Task::none();
+        }
+        // Another vault syncing with the same target would merge into
+        // this one (`sync_targets`).
+        if let Some(other) = self.sync_target_taken_by() {
+            self.vaults.cur_mut().sync.folder.status = Some(Err(Self::sync_target_taken_text(&other)));
             return Task::none();
         }
         let input = self.vaults.cur().sync.folder.path.trim().to_string();

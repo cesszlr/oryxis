@@ -2726,6 +2726,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Soubor nenalezen",
         "setting_device_badge_tip" => "Platí pro všechny trezory v tomto zařízení",
         "hotkey_device_note" => "Tabulka zkratek patří tomuto zařízení: ve všech trezorech stejná.",
+        "sync_target_taken" => "Trezor {vault} se s tímto cílem už synchronizuje. Dva trezory na jednom cíli by se smíchaly: zvolte jiný.",
         "vault_status_missing" => "Soubor nenalezen. Trezor se vrátí, až se vrátí jeho soubor (třeba USB disk).",
         "vault_status_unlocked" => "Odemčeno",
         "vault_status_locked" => "Zamčeno",

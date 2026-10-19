@@ -735,6 +735,55 @@ pub fn file_holds_connection(path: &Path, id: Uuid) -> bool {
     path.is_file() && probe().unwrap_or(false)
 }
 
+/// A vault file's plaintext `settings` rows among `keys`, read-only and
+/// without its password (only `ENCRYPTED_SETTING_KEYS` are sealed): what
+/// another vault, locked or not open, is configured to do. A missing or
+/// unreadable file has no rows.
+pub fn read_plain_settings(path: &Path, keys: &[&str]) -> Vec<(String, String)> {
+    let probe = || -> rusqlite::Result<Vec<(String, String)>> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        let mut stmt = db.prepare("SELECT key, value FROM settings")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (key, value) = row?;
+            if keys.contains(&key.as_str()) && !crate::store::ENCRYPTED_SETTING_KEYS.contains(&key.as_str()) {
+                out.push((key, value));
+            }
+        }
+        Ok(out)
+    };
+    if !path.is_file() {
+        return Vec::new();
+    }
+    probe().unwrap_or_default()
+}
+
+/// A saved host's address (hostname, port) in a vault file, read-only
+/// and without its password (both columns are plaintext).
+pub fn read_host_address(path: &Path, id: Uuid) -> Option<(String, u16)> {
+    let probe = || -> rusqlite::Result<(String, u16)> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.query_row(
+            "SELECT hostname, port FROM connections WHERE id = ?1",
+            [id.to_string()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+    };
+    if !path.is_file() {
+        return None;
+    }
+    probe().ok()
+}
+
 /// The device keys of a vault file's `settings` table, read-only.
 fn read_device_rows(path: &Path) -> rusqlite::Result<Vec<(String, String)>> {
     let db = rusqlite::Connection::open_with_flags(

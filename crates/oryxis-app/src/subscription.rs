@@ -663,14 +663,21 @@ impl Oryxis {
         // would then reach a server with stored credentials on behalf
         // of a vault the user believes is closed (and fail, since it
         // cannot decrypt anything).
-        if self.vaults.cur().sync.enabled
-            && !self.sync_uses_p2p()
-            && self.vaults.cur().sync.mode == "auto"
-            && self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
-        {
+        // One ticker per open vault that qualifies, each tick `ForVault`
+        // to it: every vault syncs on its own, not only the one the
+        // resident window shows.
+        for vault in self.vaults.all().filter(|v| {
+            v.sync.enabled
+                && v.sync.transport != "p2p"
+                && v.sync.mode == "auto"
+                && v.vault_ui.state == crate::state::VaultState::Unlocked
+        }) {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(300))
-                    .map(|_| Message::Sync(SyncMessage::SnapshotTick)),
+                    .with(vault.id)
+                    .map(|(vault, _)| {
+                        Message::ForVault(vault, Box::new(Message::Sync(SyncMessage::SnapshotTick)))
+                    }),
             );
         }
 

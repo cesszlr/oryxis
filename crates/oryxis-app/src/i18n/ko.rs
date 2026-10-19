@@ -2722,6 +2722,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "파일을 찾을 수 없음",
         "setting_device_badge_tip" => "이 기기의 모든 볼트에 적용됩니다",
         "hotkey_device_note" => "단축키 표는 이 기기에 속합니다. 모든 볼트에서 같습니다.",
+        "sync_target_taken" => "볼트 {vault}가 이미 이 동기화 대상을 사용합니다. 두 볼트가 같은 대상을 쓰면 서로 섞입니다. 다른 대상을 고르세요.",
         "vault_status_missing" => "파일을 찾을 수 없습니다. 파일이 돌아오면(예: USB 메모리) 볼트도 돌아옵니다.",
         "vault_status_unlocked" => "잠금 해제됨",
         "vault_status_locked" => "잠김",

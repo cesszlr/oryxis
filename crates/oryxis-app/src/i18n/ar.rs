@@ -2708,6 +2708,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "الملف غير موجود",
         "setting_device_badge_tip" => "ينطبق على كل الخزائن في هذا الجهاز",
         "hotkey_device_note" => "جدول الاختصارات خاص بهذا الجهاز: هو نفسه في كل الخزائن.",
+        "sync_target_taken" => "الخزنة {vault} تتزامن بالفعل مع هذا الهدف. خزنتان على هدف واحد ستندمجان معًا: اختر هدفًا آخر.",
         "vault_status_missing" => "الملف غير موجود. تعود الخزنة عندما يعود ملفها (ذاكرة USB مثلًا).",
         "vault_status_unlocked" => "غير مقفلة",
         "vault_status_locked" => "مقفلة",

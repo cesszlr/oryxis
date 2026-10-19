@@ -2721,6 +2721,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_picker_missing" => "Dosya bulunamadı",
         "setting_device_badge_tip" => "Bu cihazdaki tüm kasalara uygulanır",
         "hotkey_device_note" => "Kısayol tablosu bu cihaza aittir: her kasada aynıdır.",
+        "sync_target_taken" => "{vault} kasası bu hedefle zaten eşitleniyor. Aynı hedefteki iki kasa birbirine karışır: başka bir hedef seçin.",
         "vault_status_missing" => "Dosya bulunamadı. Dosyası geri geldiğinde (örneğin bir USB bellek) kasa da geri gelir.",
         "vault_status_unlocked" => "Kilidi açık",
         "vault_status_locked" => "Kilitli",
