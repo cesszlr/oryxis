@@ -73,7 +73,7 @@ impl Oryxis {
             // translations on one line.
             OverlayContent::PluginActions(_) => 230.0,
             OverlayContent::CloudDiscoverGroupPicker => {
-                let b = self.cloud_discover.default_group_combo_bounds.get();
+                let b = self.vaults.cur().cloud_discover.default_group_combo_bounds.get();
                 if b.width > 0.0 { b.width } else { 308.0 }
             }
             OverlayContent::GroupPicker(target) => {

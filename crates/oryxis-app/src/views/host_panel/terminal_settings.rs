@@ -18,7 +18,7 @@ impl Oryxis {
         // preview swatch; fall back to the inherited global when there's no
         // override (or the named custom theme was deleted).
         let override_name = self
-            .editor_form
+            .vaults.cur().editor_form
             .terminal_theme
             .as_deref()
             .filter(|name| self.terminal_palette_for_name(name).is_some());
@@ -73,7 +73,7 @@ impl Oryxis {
             "outline".to_string(),
             "initials".to_string(),
         ];
-        let icon_selected = self.editor_form.icon_style.clone().unwrap_or_default();
+        let icon_selected = self.vaults.cur().editor_form.icon_style.clone().unwrap_or_default();
         let icon_picker = pick_list(
             Some(icon_selected),
             icon_options,
@@ -118,7 +118,7 @@ impl Oryxis {
         .map(|s| s.to_string())
         .collect();
         let encoding_selected = self
-            .editor_form
+            .vaults.cur().editor_form
             .encoding
             .clone()
             .unwrap_or_else(|| "UTF-8".to_string());
@@ -153,7 +153,7 @@ impl Oryxis {
             AmbiguousWidth::Wide,
         ];
         let ambiguous_picker = pick_list(
-            Some(self.editor_form.ambiguous_width),
+            Some(self.vaults.cur().editor_form.ambiguous_width),
             ambiguous_options,
             |w: &AmbiguousWidth| crate::i18n::t(crate::util::ambiguous_width_key(*w)).to_string(),
         )
@@ -198,7 +198,7 @@ impl Oryxis {
         .map(|s| s.to_string())
         .collect();
         let term_selected = self
-            .editor_form
+            .vaults.cur().editor_form
             .terminal_type
             .clone()
             .unwrap_or_else(|| "xterm-256color".to_string());
@@ -256,7 +256,7 @@ impl Oryxis {
             .push(Space::new().height(18).boxed())
             .push(self.highlight_rules_block(
                 crate::state::RuleScope::Host,
-                &self.editor_form.highlight_rules.rules,
+                &self.vaults.cur().editor_form.highlight_rules.rules,
             ).boxed());
         appearance_items.boxed()
     }
@@ -273,7 +273,7 @@ impl Oryxis {
     /// to say the second one.
     fn hp_backdrop_rows(&self) -> Vec<Element<'_, Message>> {
         let inherit = crate::i18n::t("appearance_inherit");
-        let app = &self.editor_form.terminal_appearance;
+        let app = &self.vaults.cur().editor_form.terminal_appearance;
         let mut rows: Vec<Element<'_, Message>> = Vec::new();
 
         // Opacity: inherit + the same steps Settings offers.
@@ -449,7 +449,7 @@ impl Oryxis {
                     text(t("session_logging")).size(13).color(OryxisColors::t().text_secondary).boxed(),
                     Space::new().width(Length::Fill).boxed(),
                     {
-                        let (label_key, bg) = match self.editor_form.session_logging {
+                        let (label_key, bg) = match self.vaults.cur().editor_form.session_logging {
                             None => ("session_log_default", OryxisColors::t().bg_hover),
                             Some(true) => ("session_log_on", OryxisColors::t().success),
                             Some(false) => ("session_log_off", OryxisColors::t().error),
@@ -475,7 +475,7 @@ impl Oryxis {
     pub(super) fn hp_row_privacy_mode(&self) -> Element<'_, Message> {
         // Per-host Privacy Mode override: Default (inherit global) / On
         // (always hide sensitive data for this host) / Off (never hide).
-        let privacy_mode_selected = match self.editor_form.privacy_mode {
+        let privacy_mode_selected = match self.vaults.cur().editor_form.privacy_mode {
             Some(true) => t("host_privacy_mode_on"),
             Some(false) => t("host_privacy_mode_off"),
             None => t("host_privacy_mode_default"),
@@ -511,7 +511,7 @@ impl Oryxis {
         // Per-host sidebar auto-open override: Default (inherit the
         // global setting) / On (always open on connect) / Off (never).
         // Reuses the tri-state option labels of the privacy row.
-        let selected = match self.editor_form.sidebar_auto_open {
+        let selected = match self.vaults.cur().editor_form.sidebar_auto_open {
             Some(true) => t("host_privacy_mode_on"),
             Some(false) => t("host_privacy_mode_off"),
             None => t("host_privacy_mode_default"),
@@ -629,7 +629,7 @@ impl Oryxis {
         use oryxis_core::models::terminal_quirks::{
             BackspaceMode, FunctionKeyMode, HomeEndMode, OptionAsMeta,
         };
-        let q = &self.editor_form.quirks;
+        let q = &self.vaults.cur().editor_form.quirks;
 
         let backspace_row = self.hp_quirk_pick_row(
             iced_fonts::lucide::delete(),
@@ -735,7 +735,7 @@ impl Oryxis {
         let rekey_input: Element<'_, Message> = self.panel_nav_slot(
             crate::keynav::RowAction::input(iced::widget::Id::new("editor-quirk-rekey")),
             crate::widgets::INPUT_RADIUS,
-            text_input(t("quirks_rekey_hint"), &self.editor_form.rekey_limit_mb)
+            text_input(t("quirks_rekey_hint"), &self.vaults.cur().editor_form.rekey_limit_mb)
                 .id(iced::widget::Id::new("editor-quirk-rekey"))
                 .on_input(|v| Message::Editor(EditorMessage::EditorQuirkRekeyChanged(v)))
                 .width(120)

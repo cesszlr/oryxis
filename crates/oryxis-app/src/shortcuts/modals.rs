@@ -17,15 +17,15 @@ impl Oryxis {
     pub(crate) fn is_modal_open(&self, m: crate::state::Modal) -> bool {
         use crate::state::Modal;
         match m {
-            Modal::NewTabPicker => self.panels.new_tab_picker,
-            Modal::TabJump => self.panels.tab_jump,
+            Modal::NewTabPicker => self.vaults.cur().panels.new_tab_picker,
+            Modal::TabJump => self.vaults.cur().panels.tab_jump,
             Modal::CommandPalette => self.palette.open,
-            Modal::IconPicker => self.panels.icon_picker,
-            Modal::ThemePicker => self.panels.theme_picker,
-            Modal::ChainEditor => self.panels.chain_editor,
-            Modal::SessionGroupPanel => self.panels.session_group_panel,
-            Modal::FolderRename => self.folder_rename.is_some(),
-            Modal::FolderDelete => self.folder_delete.is_some(),
+            Modal::IconPicker => self.vaults.cur().panels.icon_picker,
+            Modal::ThemePicker => self.vaults.cur().panels.theme_picker,
+            Modal::ChainEditor => self.vaults.cur().panels.chain_editor,
+            Modal::SessionGroupPanel => self.vaults.cur().panels.session_group_panel,
+            Modal::FolderRename => self.vaults.cur().folder_rename.is_some(),
+            Modal::FolderDelete => self.vaults.cur().folder_delete.is_some(),
             Modal::TabRename => self.tab_rename.is_some(),
             Modal::CarefulPaste => self.pending_paste.is_some(),
             Modal::SnippetVars => self.pending_snippet_vars.is_some(),
@@ -43,17 +43,17 @@ impl Oryxis {
             Modal::TriggerConfirm => self.trigger_confirm.is_some(),
             Modal::TerminalLinkConfirm => self.link_confirm.is_some(),
             Modal::TerminalSaveOutput => self.save_output.is_some(),
-            Modal::TerminalThemeGallery => self.panels.terminal_theme_gallery,
-            Modal::UiThemeGallery => self.panels.ui_theme_gallery,
-            Modal::ThemeEditor => self.theme_ui.editor.is_some(),
-            Modal::ThemeImport => self.panels.theme_import,
-            Modal::UiThemeEditor => self.ui_theme_editor.is_some(),
-            Modal::UiThemeImport => self.panels.ui_theme_import,
-            Modal::ShareDialog => self.panels.share_dialog,
-            Modal::CloudImportConfirm => self.cloud_import_confirm_visible,
+            Modal::TerminalThemeGallery => self.vaults.cur().panels.terminal_theme_gallery,
+            Modal::UiThemeGallery => self.vaults.cur().panels.ui_theme_gallery,
+            Modal::ThemeEditor => self.vaults.cur().theme_ui.editor.is_some(),
+            Modal::ThemeImport => self.vaults.cur().panels.theme_import,
+            Modal::UiThemeEditor => self.vaults.cur().ui_theme_editor.is_some(),
+            Modal::UiThemeImport => self.vaults.cur().panels.ui_theme_import,
+            Modal::ShareDialog => self.vaults.cur().panels.share_dialog,
+            Modal::CloudImportConfirm => self.vaults.cur().cloud_import_confirm_visible,
             Modal::ErrorDialog => self.error_dialog.is_some(),
             Modal::ClearHistoryConfirm => self.clear_history_confirm,
-            Modal::SshImport => self.panels.ssh_import_dialog,
+            Modal::SshImport => self.vaults.cur().panels.ssh_import_dialog,
             Modal::SftpRename => self.cur_sftp().rename.is_some(),
             Modal::SftpNewEntry => self.cur_sftp().new_entry.is_some(),
             Modal::SftpProperties => self.cur_sftp().properties.is_some(),
@@ -63,7 +63,7 @@ impl Oryxis {
             Modal::SftpEditPrompt => self.pending_edit_save().is_some(),
             Modal::SftpEditReopen => self.sftp_edit_reopen.is_some(),
             Modal::SftpPicker => self.cur_sftp().picker_open,
-            Modal::CertificateViewer => self.cert_viewer.is_some(),
+            Modal::CertificateViewer => self.vaults.cur().cert_viewer.is_some(),
             Modal::MonitorKill => self.monitor.kill.is_some(),
             // Gated on the surface that owns the list being up, the same
             // predicate the render site uses, so the flag can never say
@@ -93,27 +93,27 @@ impl Oryxis {
                 // Mirror HideNewTabPicker: abandoning the picker also
                 // abandons any pending split-fill intent, so a later
                 // unrelated open can't inherit it.
-                self.panels.new_tab_picker = false;
+                self.vaults.cur_mut().panels.new_tab_picker = false;
                 self.pending_pane_split = None;
                 self.new_tab_picker_group = None;
             }
-            Modal::TabJump => self.panels.tab_jump = false,
+            Modal::TabJump => self.vaults.cur_mut().panels.tab_jump = false,
             Modal::CommandPalette => {
                 self.palette.open = false;
                 self.palette.query.clear();
             }
             Modal::IconPicker => {
-                self.panels.icon_picker = false;
-                self.icon_picker.for_id = None;
+                self.vaults.cur_mut().panels.icon_picker = false;
+                self.vaults.cur_mut().icon_picker.for_id = None;
             }
-            Modal::ThemePicker => self.panels.theme_picker = false,
-            Modal::ChainEditor => self.panels.chain_editor = false,
+            Modal::ThemePicker => self.vaults.cur_mut().panels.theme_picker = false,
+            Modal::ChainEditor => self.vaults.cur_mut().panels.chain_editor = false,
             Modal::SessionGroupPanel => {
-                self.panels.session_group_panel = false;
-                self.session_group_panel_error = None;
+                self.vaults.cur_mut().panels.session_group_panel = false;
+                self.vaults.cur_mut().session_group_panel_error = None;
             }
-            Modal::FolderRename => self.folder_rename = None,
-            Modal::FolderDelete => self.folder_delete = None,
+            Modal::FolderRename => self.vaults.cur_mut().folder_rename = None,
+            Modal::FolderDelete => self.vaults.cur_mut().folder_delete = None,
             Modal::TabRename => self.tab_rename = None,
             Modal::CarefulPaste => self.pending_paste = None,
             Modal::SnippetVars => self.pending_snippet_vars = None,
@@ -168,26 +168,26 @@ impl Oryxis {
             // Esc saves nothing and drops the parked buffer.
             Modal::TerminalSaveOutput => self.save_output = None,
             Modal::ThemeEditor => {
-                self.theme_ui.editor = None;
-                self.theme_ui.color_popover = None;
+                self.vaults.cur_mut().theme_ui.editor = None;
+                self.vaults.cur_mut().theme_ui.color_popover = None;
             }
-            Modal::TerminalThemeGallery => self.panels.terminal_theme_gallery = false,
-            Modal::UiThemeGallery => self.panels.ui_theme_gallery = false,
-            Modal::ThemeImport => self.panels.theme_import = false,
+            Modal::TerminalThemeGallery => self.vaults.cur_mut().panels.terminal_theme_gallery = false,
+            Modal::UiThemeGallery => self.vaults.cur_mut().panels.ui_theme_gallery = false,
+            Modal::ThemeImport => self.vaults.cur_mut().panels.theme_import = false,
             Modal::UiThemeEditor => {
-                self.ui_theme_editor = None;
+                self.vaults.cur_mut().ui_theme_editor = None;
                 self.ui_color_popover = None;
             }
-            Modal::UiThemeImport => self.panels.ui_theme_import = false,
+            Modal::UiThemeImport => self.vaults.cur_mut().panels.ui_theme_import = false,
             Modal::ShareDialog => {
-                self.panels.share_dialog = false;
-                self.share.filter = None;
-                self.share.status = None;
-                self.share.suggested_name = None;
+                self.vaults.cur_mut().panels.share_dialog = false;
+                self.vaults.cur_mut().share.filter = None;
+                self.vaults.cur_mut().share.status = None;
+                self.vaults.cur_mut().share.suggested_name = None;
             }
             Modal::CloudImportConfirm => {
-                self.cloud_import_confirm_visible = false;
-                self.cloud_discover.default_group_picker_open = false;
+                self.vaults.cur_mut().cloud_import_confirm_visible = false;
+                self.vaults.cur_mut().cloud_discover.default_group_picker_open = false;
             }
             // Esc on the error dialog is always Dismiss, never the
             // dialog's action (mirrors ErrorDialogDismiss).
@@ -196,10 +196,10 @@ impl Oryxis {
             Modal::ClearHistoryConfirm => self.clear_history_confirm = false,
             // Mirrors SshImportDismiss, companion state included.
             Modal::SshImport => {
-                self.panels.ssh_import_dialog = false;
-                self.ssh_import_hosts.clear();
-                self.ssh_import_selected.clear();
-                self.ssh_import_existing.clear();
+                self.vaults.cur_mut().panels.ssh_import_dialog = false;
+                self.vaults.cur_mut().ssh_import_hosts.clear();
+                self.vaults.cur_mut().ssh_import_selected.clear();
+                self.vaults.cur_mut().ssh_import_existing.clear();
             }
             Modal::SftpRename => self.sftp.rename = None,
             Modal::SftpNewEntry => self.sftp.new_entry = None,
@@ -217,7 +217,7 @@ impl Oryxis {
             // its three answers (neither branch runs).
             Modal::SftpEditReopen => self.sftp_edit_reopen = None,
             Modal::SftpPicker => self.sftp.picker_open = false,
-            Modal::CertificateViewer => self.cert_viewer = None,
+            Modal::CertificateViewer => self.vaults.cur_mut().cert_viewer = None,
             // Esc abandons the working copy, exactly like the Cancel
             // button; the list's own state (the scope it addresses, a
             // pending delete confirmation) is left alone because those
@@ -333,9 +333,9 @@ impl Oryxis {
                 // The chain editor's Esc is two-stage: in "add a hop" mode
                 // the first Esc pops back to the chain list, only a second
                 // closes the whole editor.
-                if m == crate::state::Modal::ChainEditor && self.chain_editor_adding {
-                    self.chain_editor_adding = false;
-                    self.chain_editor_search.clear();
+                if m == crate::state::Modal::ChainEditor && self.vaults.cur().chain_editor_adding {
+                    self.vaults.cur_mut().chain_editor_adding = false;
+                    self.vaults.cur_mut().chain_editor_search.clear();
                     return Some(iced::Task::none());
                 }
                 // Same two-stage rule for the new-tab picker drilled
@@ -369,8 +369,8 @@ impl Oryxis {
         }
         // Burger menu last; it's a dropdown rather than a modal but
         // Esc still feels right for it.
-        if self.panels.burger_menu {
-            self.panels.burger_menu = false;
+        if self.vaults.cur().panels.burger_menu {
+            self.vaults.cur_mut().panels.burger_menu = false;
             return Some(iced::Task::none());
         }
         None

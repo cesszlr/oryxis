@@ -17,7 +17,7 @@ impl Oryxis {
                     text(t("expose_to_mcp")).size(13).color(OryxisColors::t().text_secondary).boxed(),
                     Space::new().width(Length::Fill).boxed(),
                     {
-                        let on = self.editor_form.mcp_enabled;
+                        let on = self.vaults.cur().editor_form.mcp_enabled;
                         let bg = if on { OryxisColors::t().success } else { OryxisColors::t().bg_hover };
                         let fg = crate::theme::contrast_text_for(bg);
                         button(text(if on { crate::i18n::t("toggle_on") } else { crate::i18n::t("toggle_off") }).size(12).color(fg))
@@ -75,7 +75,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         t("host_sftp_initial_path_placeholder"),
-                        &self.editor_form.sftp_initial_path,
+                        &self.vaults.cur().editor_form.sftp_initial_path,
                     )
                     .id(iced::widget::Id::new("editor-sftp-initial-path"))
                     .on_input(|v| {
@@ -118,7 +118,7 @@ impl Oryxis {
             panel_option_row(
                 iced_fonts::lucide::upload(),
                 t("host_zmodem_drops"),
-                super::basics::hp_toggle_button(self.editor_form.zmodem_drops, msg),
+                super::basics::hp_toggle_button(self.vaults.cur().editor_form.zmodem_drops, msg),
             ),
         );
         container(
@@ -148,7 +148,7 @@ impl Oryxis {
         // it is controlled globally, so the state is honest but the user
         // isn't led to click a control that does nothing.
         let locked = self.vaults.cur().prefs.monitor_all_hosts;
-        let on = locked || self.editor_form.monitor_enabled;
+        let on = locked || self.vaults.cur().editor_form.monitor_enabled;
 
         let toggle: Element<'_, Message> = {
             let bg = if on {
@@ -233,11 +233,11 @@ impl Oryxis {
     /// off and on again must bring back the list the user typed rather
     /// than silently resetting the host to Auto.
     pub(super) fn hp_row_monitor_disks(&self, is_ssh: bool) -> Element<'_, Message> {
-        let monitored = self.vaults.cur().prefs.monitor_all_hosts || self.editor_form.monitor_enabled;
+        let monitored = self.vaults.cur().prefs.monitor_all_hosts || self.vaults.cur().editor_form.monitor_enabled;
         if !is_ssh || !self.vaults.cur().prefs.host_monitoring || !monitored {
             return empty();
         }
-        let custom = self.editor_form.monitor_disks_custom;
+        let custom = self.vaults.cur().editor_form.monitor_disks_custom;
         let custom_label = t("monitor_disks_custom").to_string();
         let selected = if custom { custom_label.clone() } else { t("monitor_disks_auto").to_string() };
         let options =
@@ -318,7 +318,7 @@ impl Oryxis {
             // Same static-id limitation as the env-var / port-forward
             // rows: the pattern inputs stay mouse-only and the remove
             // button is the row's keyboard stop.
-            for (i, mount) in self.editor_form.monitor_disks.iter().enumerate() {
+            for (i, mount) in self.vaults.cur().editor_form.monitor_disks.iter().enumerate() {
                 let idx = i;
                 block = block.push(Space::new().height(8).boxed());
                 block = block.push(
@@ -385,7 +385,7 @@ impl Oryxis {
                     crate::keynav::RowAction::input(iced::widget::Id::new("editor-pick-rd-kind")),
                     crate::widgets::INPUT_RADIUS,
                     pick_list(
-                        Some(self.editor_form.rd_kind),
+                        Some(self.vaults.cur().editor_form.rd_kind),
                         vec![RemoteDesktopKind::Rdp, RemoteDesktopKind::Vnc],
                         |k: &RemoteDesktopKind| k.to_string(),
                     )
@@ -424,7 +424,7 @@ impl Oryxis {
                     crate::keynav::RowAction::input(iced::widget::Id::new("editor-pick-rd-gateway")),
                     crate::widgets::INPUT_RADIUS,
                     pick_list(
-                        Some(self.editor_form.rd_gateway_id),
+                        Some(self.vaults.cur().editor_form.rd_gateway_id),
                         gw_options,
                         move |id: &Option<uuid::Uuid>| {
                             gw_labels.get(id).cloned().unwrap_or_default()
@@ -487,7 +487,7 @@ impl Oryxis {
             ]).align_y(iced::Alignment::Center),
         ];
 
-        for (i, e) in self.editor_form.env_vars.iter().enumerate() {
+        for (i, e) in self.vaults.cur().editor_form.env_vars.iter().enumerate() {
             let idx = i;
             env_items = env_items.push(Space::new().height(8).boxed());
             // Same static-id limitation as the port-forward rows: the
@@ -546,7 +546,7 @@ impl Oryxis {
         let startup_selected = self.editor_startup_label();
         // Keyboard row: Left/Right cycle None / Custom / snippet labels.
         let (startup_prev, startup_next) = crate::keynav::slots::cycle_pair(
-            self.editor_startup_combo.options(),
+            self.vaults.cur().editor_startup_combo.options(),
             &startup_selected,
             |v| Message::Editor(EditorMessage::EditorStartupChoiceChanged(v)),
         );
@@ -554,7 +554,7 @@ impl Oryxis {
             crate::keynav::RowAction::picker(startup_prev, startup_next),
             10.0,
             iced::widget::combo_box(
-                &self.editor_startup_combo,
+                &self.vaults.cur().editor_startup_combo,
                 // Owned placeholder (frame-local String); see auth.rs.
                 startup_selected.clone(),
                 Some(&startup_selected),
@@ -577,7 +577,7 @@ impl Oryxis {
             Space::new().height(8),
             startup_picker,
         ];
-        if matches!(self.editor_startup_choice, crate::state::StartupChoice::Custom) {
+        if matches!(self.vaults.cur().editor_startup_choice, crate::state::StartupChoice::Custom) {
             startup_block = startup_block.push(Space::new().height(8).boxed()).push(
                 // Multi-line, auto-grows with content; container caps the
                 // height (~8 lines) and then it scrolls internally. Supports
@@ -586,7 +586,7 @@ impl Oryxis {
                     crate::keynav::RowAction::input(iced::widget::Id::new("editor-initial-command")),
                     10.0,
                     container(
-                        text_editor(&self.editor_initial_command)
+                        text_editor(&self.vaults.cur().editor_initial_command)
                             .id(iced::widget::Id::new("editor-initial-command"))
                             .placeholder(t("initial_command_ph"))
                             .on_action(|v| Message::Editor(EditorMessage::EditorInitialCommandChanged(v)))

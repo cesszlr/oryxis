@@ -60,33 +60,33 @@ impl Oryxis {
     pub(crate) fn view_host_panel(&self) -> Element<'_, Message> {
         // Keyboard rows are recorded in visual order (row mode: Up/Down from any input).
         self.panel_nav_reset();
-        let is_editing = self.editor_form.editing_id.is_some();
+        let is_editing = self.vaults.cur().editor_form.editing_id.is_some();
         let title = if is_editing { crate::i18n::t("edit_host") } else { crate::i18n::t("new_host") };
-        let mut has_address = !self.editor_form.hostname.is_empty();
+        let mut has_address = !self.vaults.cur().editor_form.hostname.is_empty();
         // Telnet hosts hide the whole SSH block (keys, identities,
         // agent-fwd, jump chain, proxy, port-forwards, TOTP, MCP,
         // algorithms, initial command); the reduced form keeps only
         // label/parent/tags, host/port, username/password, encoding and
         // the terminal theme. `is_ssh` gates every SSH-only piece below.
         use oryxis_core::models::connection::ConnectionProtocol as Proto;
-        let is_ssh = self.editor_form.protocol == Proto::Ssh;
+        let is_ssh = self.vaults.cur().editor_form.protocol == Proto::Ssh;
         // Serial is even more reduced than Telnet: no auth (no
         // username/password), no numeric port, and its own line-param
         // block instead. `is_serial` additionally gates the shared
         // credentials + numeric-port widgets off.
-        let is_serial = self.editor_form.protocol == Proto::Serial;
+        let is_serial = self.vaults.cur().editor_form.protocol == Proto::Serial;
         // Remote desktop: the endpoint (host/port), a login (username /
         // password), a kind (RDP/VNC) and an optional SSH gateway. All the
         // SSH-only rows below are `is_ssh`-gated, so they drop for free.
-        let is_rd = self.editor_form.protocol == Proto::RemoteDesktop;
+        let is_rd = self.vaults.cur().editor_form.protocol == Proto::RemoteDesktop;
         // Raw is Telnet minus the credentials: a bare socket has nobody
         // to authenticate to, so the device prompts in band if it wants
         // anything.
-        let is_raw = self.editor_form.protocol == Proto::Raw;
+        let is_raw = self.vaults.cur().editor_form.protocol == Proto::Raw;
         // Local reaches no endpoint at all: no address, no port, no
         // credentials. What it needs instead is which curated terminal
         // to spawn and where to start it.
-        let is_local = self.editor_form.protocol == Proto::Local;
+        let is_local = self.vaults.cur().editor_form.protocol == Proto::Local;
         // Whether the host has a network address to type. Drives both
         // the address row and the Connect button's enable gate: a local
         // host is connectable with no address at all.
@@ -122,7 +122,7 @@ impl Oryxis {
         // the form fields. New-host flow only: an existing host IS its
         // shape already, and the quick flow edits a live dial.
         let preset_row: Option<Element<'_, Message>> =
-            (!is_editing && !self.editor_form.quick_flow).then(|| self.hp_preset_row());
+            (!is_editing && !self.vaults.cur().editor_form.quick_flow).then(|| self.hp_preset_row());
 
         // Two-tier form: the essential fields build (= keynav-record)
         // first, then each collapsible section records its header and,
@@ -132,7 +132,7 @@ impl Oryxis {
         // A local host names no endpoint, so the Connect button gates on
         // the label instead: that IS its whole target.
         if is_local {
-            has_address = !self.editor_form.label.trim().is_empty();
+            has_address = !self.vaults.cur().editor_form.label.trim().is_empty();
         }
         let label_field = self.hp_label_field();
         let parent_combo = self.hp_parent_combo();
@@ -140,7 +140,7 @@ impl Oryxis {
         let hostname_row = takes_address.then(|| self.hp_hostname_row(is_serial));
         let protocol_row = self.hp_protocol_row();
         let cloud_transport_row = self.hp_cloud_transport_row();
-        let port_input = self.hp_port_input(!self.editor_form.protocol.uses_network_port());
+        let port_input = self.hp_port_input(!self.vaults.cur().editor_form.protocol.uses_network_port());
 
         // ── Compose one card per semantic group ──
         // Host (label / parent / connection target), the essential
@@ -202,7 +202,7 @@ impl Oryxis {
         };
         // Serial and Local have no numeric port, so their header is just
         // the label; everything else appends the "[22] port" field.
-        let proto_header = if !self.editor_form.protocol.uses_network_port() {
+        let proto_header = if !self.vaults.cur().editor_form.protocol.uses_network_port() {
             dir_row(vec![
                 text(proto_label).size(14).color(OryxisColors::t().accent).boxed(),
                 Space::new().width(Length::Fill).boxed(),
@@ -292,7 +292,7 @@ impl Oryxis {
             // Cleartext note: honest UX, not a lecture. The user is the
             // only party on the path without a secure option. It drops
             // once TLS is on, because then the statement is false.
-            let tls_on = self.editor_form.telnet_tls && !is_raw;
+            let tls_on = self.vaults.cur().editor_form.telnet_tls && !is_raw;
             let cleartext_note: Option<Element<'_, Message>> = (!tls_on).then(|| {
                 dir_row(vec![
                     iced_fonts::lucide::triangle_alert()
@@ -473,7 +473,7 @@ impl Oryxis {
         // shape, see main_layout's slot skeleton note), and a column
         // spacing would open a stray 8px band above the buttons when
         // there is no error to show.
-        let panel_error: Element<'_, Message> = if let Some(err) = &self.host_panel_error {
+        let panel_error: Element<'_, Message> = if let Some(err) = &self.vaults.cur().host_panel_error {
             container(text(err.clone()).size(11).color(OryxisColors::t().error).boxed())
                 .padding(Padding { top: 4.0, right: 16.0, bottom: 12.0, left: 16.0 })
                 .boxed()

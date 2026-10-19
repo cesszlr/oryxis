@@ -156,18 +156,18 @@ impl Oryxis {
                     .find(|c| c.id == conn_id)
                     .map(|c| format!("{} :{port}", c.label))
                     .unwrap_or_else(|| format!(":{port}"));
-                self.panels.port_forward_panel = true;
-                self.port_forward_form.editing_id = None;
-                self.port_forward_form.label = label;
-                self.port_forward_form.kind =
+                self.vaults.cur_mut().panels.port_forward_panel = true;
+                self.vaults.cur_mut().port_forward_form.editing_id = None;
+                self.vaults.cur_mut().port_forward_form.label = label;
+                self.vaults.cur_mut().port_forward_form.kind =
                     oryxis_core::models::port_forward_rule::ForwardKind::Local;
-                self.port_forward_form.host_id = Some(conn_id);
-                self.port_forward_form.listen_host = "127.0.0.1".into();
-                self.port_forward_form.listen_port = port.to_string();
-                self.port_forward_form.target_host = target;
-                self.port_forward_form.target_port = port.to_string();
-                self.port_forward_form.auto_start = false;
-                self.port_forward_form.error = None;
+                self.vaults.cur_mut().port_forward_form.host_id = Some(conn_id);
+                self.vaults.cur_mut().port_forward_form.listen_host = "127.0.0.1".into();
+                self.vaults.cur_mut().port_forward_form.listen_port = port.to_string();
+                self.vaults.cur_mut().port_forward_form.target_host = target;
+                self.vaults.cur_mut().port_forward_form.target_port = port.to_string();
+                self.vaults.cur_mut().port_forward_form.auto_start = false;
+                self.vaults.cur_mut().port_forward_form.error = None;
                 // The editor lives in the Port Forwarding view, so the
                 // click navigates there: the rule is reviewed and saved
                 // deliberately, never created silently.

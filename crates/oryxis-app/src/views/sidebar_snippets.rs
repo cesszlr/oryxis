@@ -21,7 +21,7 @@ impl Oryxis {
         // shown while a terminal tab is active, so navigating there is a
         // no-op). `show_snippet_panel` is the shared "editing a snippet"
         // flag, set by New / Edit and cleared on Save / close.
-        if self.panels.snippet_panel {
+        if self.vaults.cur().panels.snippet_panel {
             return self.sidebar_snippet_editor();
         }
 
@@ -516,7 +516,7 @@ impl Oryxis {
     /// list; Delete shows only when editing an existing snippet.
     fn sidebar_snippet_editor(&self) -> Element<'_, Message> {
         let c = OryxisColors::t();
-        let title = if self.snippet_form.editing_id.is_some() {
+        let title = if self.vaults.cur().snippet_form.editing_id.is_some() {
             t("edit_snippet")
         } else {
             t("new_snippet")
@@ -530,7 +530,7 @@ impl Oryxis {
         .align_y(iced::Alignment::Center);
 
         let label_input: Element<'_, Message> =
-            iced::widget::text_input("restart-nginx", &self.snippet_form.label)
+            iced::widget::text_input("restart-nginx", &self.vaults.cur().snippet_form.label)
                 .on_input(|v| Message::Snippet(SnippetMessage::SnippetLabelChanged(v)))
                 .padding(8)
                 .size(13)
@@ -541,9 +541,9 @@ impl Oryxis {
         // `on_close` makes the fork's combo restore the committed value
         // when the field is focused and then abandoned (it clears its
         // own input on focus, and restores only on that branch).
-        let group_selection = (!self.snippet_form.group.is_empty()).then_some(&self.snippet_form.group);
+        let group_selection = (!self.vaults.cur().snippet_form.group.is_empty()).then_some(&self.vaults.cur().snippet_form.group);
         let group_input: Element<'_, Message> = iced::widget::combo_box(
-            &self.snippet_form.group_combo,
+            &self.vaults.cur().snippet_form.group_combo,
             t("group_optional_placeholder"),
             group_selection,
             |v| Message::Snippet(SnippetMessage::SnippetGroupChanged(v)),
@@ -557,14 +557,14 @@ impl Oryxis {
         .width(Length::Fill)
         .boxed();
         let tags_input: Element<'_, Message> =
-            iced::widget::text_input(t("tags_placeholder"), &self.snippet_form.tags_input)
+            iced::widget::text_input(t("tags_placeholder"), &self.vaults.cur().snippet_form.tags_input)
                 .on_input(|v| Message::Snippet(SnippetMessage::SnippetTagsChanged(v)))
                 .padding(8)
                 .size(13)
                 .style(crate::widgets::rounded_input_style)
                 .boxed();
 
-        let error: Element<'_, Message> = if let Some(err) = &self.snippet_form.error {
+        let error: Element<'_, Message> = if let Some(err) = &self.vaults.cur().snippet_form.error {
             text(err.clone()).size(11).color(c.error).boxed()
         } else {
             Space::new().boxed()
@@ -613,7 +613,7 @@ impl Oryxis {
         .spacing(0)
         .padding(12);
 
-        if let Some(edit_id) = self.snippet_form.editing_id
+        if let Some(edit_id) = self.vaults.cur().snippet_form.editing_id
             && let Some(idx) = self.vaults.cur().snippets.iter().position(|s| s.id == edit_id)
         {
             let delete = button(

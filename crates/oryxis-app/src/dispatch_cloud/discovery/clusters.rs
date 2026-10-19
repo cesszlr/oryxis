@@ -22,7 +22,7 @@ impl Oryxis {
                 // provider (writes the kubeconfig), then create a K8s
                 // account pointed at the resulting context. Discovering
                 // that account then lists its workloads.
-                let Some(profile_id) = self.cloud_discover.profile_id else {
+                let Some(profile_id) = self.vaults.cur().cloud_discover.profile_id else {
                     return Ok(Task::none());
                 };
                 let Some(mut profile) = self
@@ -137,7 +137,7 @@ impl Oryxis {
                 if already {
                     return Ok(self.show_toast(crate::i18n::t("cloud_aks_added").to_string()));
                 }
-                let Some(profile_id) = self.cloud_discover.profile_id else {
+                let Some(profile_id) = self.vaults.cur().cloud_discover.profile_id else {
                     return Ok(Task::none());
                 };
                 let Some(mut profile) = self
@@ -221,7 +221,7 @@ impl Oryxis {
                 // account), so a second Add on the same pair overwrites
                 // the file: that is the refresh an expiring ACK
                 // credential needs.
-                let Some(profile_id) = self.cloud_discover.profile_id else {
+                let Some(profile_id) = self.vaults.cur().cloud_discover.profile_id else {
                     return Ok(Task::none());
                 };
                 let path = match crate::kubeconfig_file::path_for(&family, profile_id, &id) {
@@ -236,7 +236,7 @@ impl Oryxis {
                 // One fetch per file at a time: the button is disabled
                 // while this runs, and a keyboard activation or a double
                 // click that got through anyway lands here.
-                if self.cloud_discover.managed_in_flight.contains(&path) {
+                if self.vaults.cur().cloud_discover.managed_in_flight.contains(&path) {
                     return Ok(Task::none());
                 }
                 let Some(mut profile) = self
@@ -254,7 +254,7 @@ impl Oryxis {
                 if let Some(vault) = &self.vaults.cur().store {
                     profile.secret = vault.get_cloud_profile_secret(&profile_id).ok().flatten();
                 }
-                self.cloud_discover.managed_in_flight.insert(path.clone());
+                self.vaults.cur_mut().cloud_discover.managed_in_flight.insert(path.clone());
                 // Label the new K8s account after the cluster so it reads
                 // clearly in the accounts list: `ACK: prod`, `TKE: dev`.
                 let label = format!("{}: {name}", family.to_uppercase());
@@ -295,7 +295,7 @@ impl Oryxis {
                 context,
                 intranet,
             } => {
-                self.cloud_discover
+                self.vaults.cur_mut().cloud_discover
                     .managed_in_flight
                     .remove(std::path::Path::new(&path));
                 let points_at = |p: &oryxis_core::models::CloudProfile, file: &str| {
@@ -391,7 +391,7 @@ impl Oryxis {
                 return Ok(self.show_toast_secs(toast, 8));
             }
             CloudMessage::CloudDiscoverManagedClusterFailed { path, error } => {
-                self.cloud_discover
+                self.vaults.cur_mut().cloud_discover
                     .managed_in_flight
                     .remove(std::path::Path::new(&path));
                 return Ok(self.show_toast(format!(
@@ -435,7 +435,7 @@ impl Oryxis {
         for path in crate::kubeconfig_file::sweep_unreferenced(
             &dir,
             &referenced,
-            &self.cloud_discover.managed_in_flight,
+            &self.vaults.cur().cloud_discover.managed_in_flight,
         ) {
             tracing::info!(
                 "removed kubeconfig {} (no Kubernetes account points at it)",

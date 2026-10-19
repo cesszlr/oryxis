@@ -17,39 +17,39 @@ impl Oryxis {
                 // user gets a chance to set the target group (and the
                 // transport, when EC2 hosts are part of the batch).
                 // Empty selection short-circuits.
-                if self.cloud_discover.selected_ec2.is_empty()
-                    && self.cloud_discover.selected_ecs.is_empty()
+                if self.vaults.cur().cloud_discover.selected_ec2.is_empty()
+                    && self.vaults.cur().cloud_discover.selected_ecs.is_empty()
                 {
                     return Ok(Task::none());
                 }
-                self.cloud_import_confirm_visible = true;
+                self.vaults.cur_mut().cloud_import_confirm_visible = true;
             }
             CloudMessage::CloudDiscoverImportCancelled => {
-                self.cloud_import_confirm_visible = false;
-                self.cloud_discover.default_group_picker_open = false;
+                self.vaults.cur_mut().cloud_import_confirm_visible = false;
+                self.vaults.cur_mut().cloud_discover.default_group_picker_open = false;
             }
             CloudMessage::CloudDiscoverImportConfirmed => {
-                self.cloud_import_confirm_visible = false;
-                let Some(profile_id) = self.cloud_discover.profile_id else {
+                self.vaults.cur_mut().cloud_import_confirm_visible = false;
+                let Some(profile_id) = self.vaults.cur().cloud_discover.profile_id else {
                     return Ok(Task::none());
                 };
                 if !self.vaults.cur().cloud_profiles.iter().any(|p| p.id == profile_id) {
                     return Ok(Task::none());
                 }
-                let CloudDiscoverState::Loaded(result) = &self.cloud_discover.state else {
+                let CloudDiscoverState::Loaded(result) = &self.vaults.cur().cloud_discover.state else {
                     return Ok(Task::none());
                 };
                 let selected_ec2: Vec<_> = result
                     .ec2
                     .iter()
-                    .filter(|e| self.cloud_discover.selected_ec2.contains(&e.instance_id))
+                    .filter(|e| self.vaults.cur().cloud_discover.selected_ec2.contains(&e.instance_id))
                     .cloned()
                     .collect();
                 let selected_ecs: Vec<_> = result
                     .ecs_services
                     .iter()
                     .filter(|s| {
-                        self.cloud_discover.selected_ecs
+                        self.vaults.cur().cloud_discover.selected_ecs
                             .contains(&format!("{}/{}/{}", s.cluster, s.service, s.container))
                     })
                     .cloned()
@@ -58,7 +58,7 @@ impl Oryxis {
                     .k8s_workloads
                     .iter()
                     .filter(|w| {
-                        self.cloud_discover.selected_k8s
+                        self.vaults.cur().cloud_discover.selected_k8s
                             .contains(&format!("{}/{}/{}", w.namespace, w.kind, w.name))
                     })
                     .cloned()
@@ -75,7 +75,7 @@ impl Oryxis {
                     // group with that label on the spot, so the user
                     // can type any folder name (existing or new) and
                     // have it materialised in one go.
-                    let typed = self.cloud_discover.default_group_name.trim().to_string();
+                    let typed = ov.cloud_discover.default_group_name.trim().to_string();
                     let provider_id_str = ov
                         .cloud_profiles
                         .iter()
@@ -153,7 +153,7 @@ impl Oryxis {
                             // user picked at the bottom of the panel.
                             // Saves "import → edit each → set
                             // Instance Connect" on bulk imports.
-                            transport_pref: self.cloud_discover.default_transport,
+                            transport_pref: ov.cloud_discover.default_transport,
                             // Public IPs change across stop/start, so
                             // re-resolving on each connect is the safer
                             // default for imported EC2.
@@ -229,12 +229,12 @@ impl Oryxis {
                         let _ = vault.save_group(&g);
                     }
 
-                    self.cloud_discover.visible = false;
-                    self.cloud_discover.profile_id = None;
-                    self.cloud_discover.selected_ec2.clear();
-                    self.cloud_discover.selected_ecs.clear();
-                    self.cloud_discover.selected_k8s.clear();
-                    self.cloud_discover.state = CloudDiscoverState::Idle;
+                    ov.cloud_discover.visible = false;
+                    ov.cloud_discover.profile_id = None;
+                    ov.cloud_discover.selected_ec2.clear();
+                    ov.cloud_discover.selected_ecs.clear();
+                    ov.cloud_discover.selected_k8s.clear();
+                    ov.cloud_discover.state = CloudDiscoverState::Idle;
                     self.load_data_from_vault();
                 }
             }

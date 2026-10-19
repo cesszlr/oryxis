@@ -443,9 +443,9 @@ impl Oryxis {
     pub(crate) fn confirm_remove_body(&mut self, body: String, action: Message) {
         self.card_context_menu = None;
         self.snippet_context_menu = None;
-        self.keys_ui.context_menu = None;
-        self.identity_context_menu = None;
-        self.port_forward_context_menu = None;
+        self.vaults.cur_mut().keys_ui.context_menu = None;
+        self.vaults.cur_mut().identity_context_menu = None;
+        self.vaults.cur_mut().port_forward_context_menu = None;
         self.overlay = None;
         self.error_dialog = Some(crate::state::ErrorDialog {
             title: crate::i18n::t("remove_confirm_title").to_string(),

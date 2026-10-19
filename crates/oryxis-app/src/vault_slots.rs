@@ -111,7 +111,181 @@ pub(crate) struct OpenVault {
     /// What the user configured in this vault (every preference that is
     /// not the device's, see `state::DevicePrefs`).
     pub(crate) prefs: crate::state::AppPrefs,
+    /// Icon + color picker state (target routing, current selection,
+    /// search). The open flag (`show_icon_picker`) and the HSV popover
+    /// anchor (`icon_color_popover`) stay alongside it on `Oryxis`.
+    pub(crate) icon_picker: crate::state::IconPickerState,
+    pub(crate) chain_editor_adding: bool,
+    pub(crate) chain_editor_search: String,
+    // Armed when "Edit host" tears down a still-live connect (prompt
+    // cancelled / dial abandoned): the provoked error arrives after the
+    // progress card is gone and would otherwise land inside the editor
+    // as `host_panel_error`. Consumed by the next `SshError` that finds
+    // no progress card; a fresh connect clears the ambiguity because it
+    // sets `connecting` again.
+    pub(crate) pending_edit_cancel: bool,
+    pub(crate) editor_form: crate::state::ConnectionForm,
+    /// Multi-line buffer for the host's initial command. Kept out of the
+    /// form struct because `text_editor::Content` isn't Clone.
+    pub(crate) editor_initial_command: iced::widget::text_editor::Content,
+    pub(crate) host_panel_error: Option<String>,
+    pub(crate) editor_session_group: crate::state::SessionGroupForm,
+    /// Multi-line buffer for the currently-shown pane's startup script. Kept
+    /// out of the form struct because `text_editor::Content` isn't Clone.
+    pub(crate) session_group_script_editor: iced::widget::text_editor::Content,
+    pub(crate) session_group_panel_error: Option<String>,
+    /// The hosts the open "Move to group" picker will move.
+    pub(crate) move_hosts_pending: Vec<uuid::Uuid>,
+    /// Folder rename inline editor, `Some((group_id, current_input))`
+    /// while the modal is open.
+    pub(crate) folder_rename: Option<(Uuid, String)>,
+    /// Manual host-group editor side panel (label + icon + color). Open
+    /// when `group_edit_visible`; `group_edit_id` is the group being
+    /// edited. `group_edit_icon` / `group_edit_color` are empty strings
+    /// when unset (no override → folder default glyph / accent).
+    pub(crate) group_edit: crate::state::GroupEditForm,
+    /// Folder delete confirmation, group ID waiting for the user to
+    /// pick "move hosts to root" / "delete with hosts" / cancel.
+    pub(crate) folder_delete: Option<Uuid>,
+    /// SFTP browser state of the **active** SFTP tab. A working buffer:
+    /// the focused SFTP tab's live state lives here, the others park their
+    /// state in `SftpTab::state` (swap-on-focus). With no SFTP tab focused
+    /// this still holds the last-focused tab's state until it is parked.
+    /// Which card / row / chip the cursor is over, for the floating
+    /// hover-revealed actions every list uses. Twenty fields until
+    /// they moved here; see `state::hover`.
+    /// See [`crate::state::ThemeEditorUi`].
+    pub(crate) theme_ui: crate::state::ThemeEditorUi,
+    /// See [`crate::state::VaultImportState`].
+    pub(crate) vault_import: crate::state::VaultImportState,
+    /// Everything the user can change and the vault persists in its
+    /// `settings` table, in one place instead of 112 fields.
+    ///
+    /// Named `prefs`, not `settings`, because the `settings_*`
+    /// fields that stay behind are the Settings SCREEN's own state
+    /// (open section, scroll offset, search) and belong to the view,
+    /// not to the user's configuration.
+    /// See [`crate::state::PanelsOpen`].
+    pub(crate) panels: crate::state::PanelsOpen,
+    /// See [`crate::state::CloudDiscoverUi`].
+    pub(crate) cloud_discover: crate::state::CloudDiscoverUi,
+    /// See [`crate::state::SnippetForm`].
+    pub(crate) snippet_form: crate::state::SnippetForm,
+    /// See [`crate::state::KeysUi`].
+    pub(crate) keys_ui: crate::state::KeysUi,
+    /// Parsed certificate on display in the read-only cert viewer modal
+    /// (B2). `Some` = modal open; keyed to `Modal::CertificateViewer`.
+    pub(crate) cert_viewer: Option<crate::state::CertViewerData>,
+    pub(crate) identity_form: crate::state::IdentityForm,
+    pub(crate) identity_context_menu: Option<usize>,
+    pub(crate) proxy_identity_form: crate::state::ProxyIdentityForm,
+    pub(crate) login_script_form: crate::state::LoginScriptForm,
+    /// Settings > Terminal: the inline editor for one highlight rule.
+    /// The list itself is a preference (`prefs.highlight_rules`).
+    pub(crate) highlight_rule_form: crate::state::HighlightRuleForm,
+    /// Transient state for the add/edit cloud-account wizard (covers all
+    /// provider + auth combinations).
+    pub(crate) cloud_form: crate::state::CloudForm,
+    /// Native combo_box state for the host editor's Initial Command /
+    /// Snippet field. A forced-selection searchable combo: options are
+    /// the None / Custom sentinels plus the snippet labels; the picked
+    /// label commits through `EditorStartupChoiceChanged` (no free-text
+    /// path). Rebuilt on editor-open via `rebuild_editor_combos`.
+    pub(crate) editor_startup_combo: iced::widget::combo_box::State<String>,
+    /// Login-automation picker: off / every saved script / new.
+    pub(crate) editor_login_script_combo: iced::widget::combo_box::State<String>,
+    /// Template picker inside the inline "new script" sub-form.
+    pub(crate) editor_script_template_combo: iced::widget::combo_box::State<String>,
+    /// Native combo_box state for the host editor's SSH Key field. Same
+    /// forced-selection searchable pattern as the startup combo: options
+    /// are the `(none)` sentinel plus the key labels; picking commits
+    /// through `EditorKeyChanged`. Rebuilt on editor-open and cleared on
+    /// focus (`EditorKeyComboOpened`) so search starts fresh.
+    pub(crate) editor_key_combo: iced::widget::combo_box::State<String>,
+    /// Shared search input for the group picker (used by both side
+    /// panels' Parent Group fields). Reset on every open.
+    pub(crate) group_picker_search: String,
+    /// Host editor's startup-command source (None / a snippet / custom).
+    pub(crate) editor_startup_choice: crate::state::StartupChoice,
+    /// Modal that asks the user to pick the transport for the EC2
+    /// hosts about to be imported. Only opened when there's at
+    /// least one EC2 selected, pure-ECS imports skip straight to
+    /// the import logic since dynamic groups always use ECS Exec.
+    pub(crate) cloud_import_confirm_visible: bool,
+    /// Edit-dynamic-group form. Opened from the ⋮ menu on a dynamic
+    /// group card (root or nested). Edits the `cloud_query.template`
+    /// fields: username, initial_command, transport, key, identity.
+    pub(crate) cloud_dynamic_form: crate::state::CloudDynamicForm,
+    pub(crate) ui_theme_import_content: iced::widget::text_editor::Content,
+    pub(crate) ui_theme_import_name: String,
+    pub(crate) ui_theme_import_error: Option<String>,
+    /// Custom UI (chrome) theme editor modal + its color-picker popover and
+    /// the hovered card (mirrors the terminal-theme editor).
+    pub(crate) ui_theme_editor: Option<crate::state::UiThemeEditorForm>,
+    pub(crate) port_forward_form: crate::state::PortForwardRuleForm,
+    /// Index of the port-forward card whose kebab menu is open. Keeps the
+    /// kebab mounted while the pointer travels to the menu.
+    pub(crate) port_forward_context_menu: Option<usize>,
+    /// Signature of the editor form as of the last persist (or the
+    /// baseline recorded when the editor opened): what
+    /// `editor_autosave_dirty` compares against. `None` = no baseline
+    /// yet; the first post-open editor message records it.
+    pub(crate) editor_saved_snapshot: Option<String>,
+    /// Secret fields currently revealed via their eye toggle. Render
+    /// state only, never persisted; cleared per-field on toggle.
+    pub(crate) revealed_secrets: std::collections::HashSet<crate::state::SecretField>,
+    pub(crate) export_password: String,
+    pub(crate) export_include_keys: bool,
+    /// Which entity families to write into the export, one checkbox per
+    /// category in the dialog. Reset to `all()` each time the dialog opens.
+    pub(crate) export_selection: oryxis_vault::ExportSelection,
+    pub(crate) export_status: Option<Result<String, String>>,
+    /// SFTP backup target picker. Shown when the user routes an
+    /// export/import through a remote host instead of a local file.
+    /// `is_import` flips the same picker between writing the encrypted
+    /// blob (export) and reading it back (import); the export/import
+    /// password + selection state above is reused as-is.
+    pub(crate) sftp_backup: crate::state::SftpBackupForm,
+    /// Latest result of an `~/.ssh/config` import, `Ok(message)` is
+    /// rendered as a green banner, `Err` as red, in the Security
+    /// section's import card.
+    pub(crate) ssh_config_import_status: Option<Result<String, String>>,
+    pub(crate) share: crate::state::ShareForm,
+    /// Hosts parsed from a picked `~/.ssh/config`, awaiting the user's
+    /// pick of which to import. Non-empty drives the preview modal.
+    pub(crate) ssh_import_hosts: Vec<crate::ssh_config::SshConfigHost>,
+    /// A third-party import (PuTTY, ...) waiting in the same preview
+    /// dialog. Mutually exclusive with `ssh_import_hosts`; the shared
+    /// `ssh_import_selected` / `ssh_import_existing` vecs serve both.
+    pub(crate) ssh_import_direct: Option<crate::importers::DirectImport>,
+    /// Inline error of the Import hub modal ("couldn't recognize this
+    /// file"); cleared on open and on a successful detection.
+    pub(crate) import_hub_error: Option<String>,
+    /// The folder the dashboard had open when the Import hub was opened
+    /// from it (issue #230): every host the hub's flows end up saving
+    /// lands there, the way "Export hosts" from the same menu is
+    /// pre-scoped to it. A SNAPSHOT rather than a live read of
+    /// `active_group`, because the confirm can be several messages
+    /// away (the mRemoteNG password round trip, the `.oryxis` redirect
+    /// into Settings > Security) and `active_group` survives a trip
+    /// into Settings, where an import started from the Security cards
+    /// must never inherit it. `None` = the root. Cleared by every
+    /// dismiss and every confirm, and by the Settings-originated import
+    /// entries.
+    pub(crate) import_target_group: Option<Uuid>,
+    /// A protected mRemoteNG file held while the hub asks for its
+    /// password. Swept with the hub (dismiss / open / success).
+    pub(crate) import_hub_pending: Option<Vec<u8>>,
+    /// The file password typed in the hub for `import_hub_pending`.
+    pub(crate) import_hub_password: String,
+    /// Per-host tick state, parallel to `ssh_import_hosts`.
+    pub(crate) ssh_import_selected: Vec<bool>,
+    /// Per-host "label already exists" flag, parallel to
+    /// `ssh_import_hosts`; these are surfaced and default to unticked.
+    pub(crate) ssh_import_existing: Vec<bool>,
+    // MCP Server
     pub(crate) mcp: crate::state::McpState,
+    // Sync (settings + runtime engine handles + pairing/SFTP forms)
     pub(crate) sync: crate::state::SyncState,
     /// Its lock state and the screens around opening it.
     pub(crate) vault_ui: crate::state::VaultUi,
@@ -122,6 +296,11 @@ pub(crate) struct OpenVault {
     pub(crate) master_password: Option<String>,
     /// See [`crate::state::ChatUi`].
     pub(crate) chat_ui: crate::state::ChatUi,
+    // Per-list sort modes for the Hosts / Keychain / Snippets grids.
+    // Persisted via the `hosts_sort` / `keys_sort` / `snippets_sort`
+    // settings keys; loaded on boot and rewritten on each pick. The
+    // active value drives both the trigger button's glyph and the
+    // check mark in the dropdown.
     pub(crate) hosts_sort: crate::state::ListSort,
     pub(crate) keys_sort: crate::state::ListSort,
     pub(crate) snippets_sort: crate::state::ListSort,
@@ -196,6 +375,7 @@ pub(crate) struct OpenVault {
     /// still renders so the user can re-enable + tweak in one place,
     /// mirroring how `ai_enabled` works.
     pub(crate) sftp_enabled: bool,
+    // AI Chat settings
     pub(crate) ai: crate::state::AiState,
     /// When on, the dashboard root shows two sections, Groups (manual
     /// folder cards) and Hosts (a flat list of every connection,
@@ -237,6 +417,64 @@ impl OpenVault {
             custom_ui_themes: Vec::new(),
             files_recent_folders: std::collections::HashMap::new(),
             prefs: crate::state::AppPrefs::default(),
+            editor_form: crate::state::ConnectionForm::default(),
+            editor_initial_command: iced::widget::text_editor::Content::new(),
+            host_panel_error: None,
+            editor_session_group: crate::state::SessionGroupForm::default(),
+            session_group_script_editor: iced::widget::text_editor::Content::new(),
+            session_group_panel_error: None,
+            group_edit: crate::state::GroupEditForm::default(),
+            folder_delete: None,
+            folder_rename: None,
+            identity_form: crate::state::IdentityForm::default(),
+            identity_context_menu: None,
+            proxy_identity_form: crate::state::ProxyIdentityForm::default(),
+            login_script_form: crate::state::LoginScriptForm::default(),
+            highlight_rule_form: crate::state::HighlightRuleForm::default(),
+            cloud_form: crate::state::CloudForm::default(),
+            cloud_dynamic_form: crate::state::CloudDynamicForm::default(),
+            cloud_import_confirm_visible: false,
+            cloud_discover: crate::state::CloudDiscoverUi::default(),
+            port_forward_form: crate::state::PortForwardRuleForm::default(),
+            port_forward_context_menu: None,
+            snippet_form: crate::state::SnippetForm::default(),
+            keys_ui: crate::state::KeysUi::default(),
+            theme_ui: crate::state::ThemeEditorUi::default(),
+            ui_theme_editor: None,
+            ui_theme_import_content: iced::widget::text_editor::Content::new(),
+            ui_theme_import_name: String::new(),
+            ui_theme_import_error: None,
+            editor_startup_choice: crate::state::StartupChoice::None,
+            editor_saved_snapshot: None,
+            revealed_secrets: std::collections::HashSet::new(),
+            move_hosts_pending: Vec::new(),
+            cert_viewer: None,
+            panels: crate::state::PanelsOpen::default(),
+            editor_startup_combo: iced::widget::combo_box::State::new(Vec::new()),
+            editor_login_script_combo: iced::widget::combo_box::State::new(Vec::new()),
+            editor_script_template_combo: iced::widget::combo_box::State::new(Vec::new()),
+            editor_key_combo: iced::widget::combo_box::State::new(Vec::new()),
+            group_picker_search: String::new(),
+            pending_edit_cancel: false,
+            export_password: String::new(),
+            export_include_keys: true,
+            export_selection: oryxis_vault::ExportSelection::all(),
+            export_status: None,
+            share: crate::state::ShareForm::default(),
+            sftp_backup: crate::state::SftpBackupForm::default(),
+            ssh_config_import_status: None,
+            ssh_import_hosts: Vec::new(),
+            ssh_import_direct: None,
+            import_hub_error: None,
+            import_target_group: None,
+            import_hub_pending: None,
+            import_hub_password: String::new(),
+            ssh_import_selected: Vec::new(),
+            ssh_import_existing: Vec::new(),
+            vault_import: crate::state::VaultImportState::default(),
+            chain_editor_adding: false,
+            chain_editor_search: String::new(),
+            icon_picker: crate::state::IconPickerState::default(),
             sync: crate::state::SyncState::default(),
             mcp: crate::state::McpState::default(),
             vault_ui: crate::state::VaultUi::default(),

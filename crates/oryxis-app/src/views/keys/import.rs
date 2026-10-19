@@ -8,12 +8,12 @@ impl Oryxis {
     pub(crate) fn view_key_import_panel(&self) -> Element<'_, Message> {
         // Keyboard rows are recorded in visual order (row mode: Up/Down from any input).
         self.panel_nav_reset();
-        let has_content = !self.keys_ui.import_form.pem.is_empty();
+        let has_content = !self.vaults.cur().keys_ui.import_form.pem.is_empty();
         // Public-only rows (B3 security keys) save with no private
         // material at all, so a filled public line also arms Save.
         let can_save =
-            has_content || !self.keys_ui.import_form.public_key.trim().is_empty();
-        let panel_title = if self.keys_ui.import_form.editing_id.is_some() { t("edit_key") } else { t("add_key") };
+            has_content || !self.vaults.cur().keys_ui.import_form.public_key.trim().is_empty();
+        let panel_title = if self.vaults.cur().keys_ui.import_form.editing_id.is_some() { t("edit_key") } else { t("add_key") };
 
         // Panel header
         let panel_header = container(
@@ -40,7 +40,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("panel-key-import-name")),
                 10.0,
-                text_input("my-server-key", &self.keys_ui.import_form.label)
+                text_input("my-server-key", &self.vaults.cur().keys_ui.import_form.label)
                     .id(iced::widget::Id::new("panel-key-import-name"))
                     .on_input(|v| Message::Keys(KeysMessage::KeyImportLabelChanged(v)))
                     .padding(10)
@@ -86,7 +86,7 @@ impl Oryxis {
                     Space::new().width(6).boxed(),
                     text(
                         t("loaded_bytes")
-                            .replacen("{bytes}", &self.keys_ui.import_form.pem.len().to_string(), 1),
+                            .replacen("{bytes}", &self.vaults.cur().keys_ui.import_form.pem.len().to_string(), 1),
                     )
                     .size(12).color(OryxisColors::t().success).boxed(),
                 ]).align_y(iced::Alignment::Center),
@@ -101,7 +101,7 @@ impl Oryxis {
         let editor = self.panel_nav_slot(
             crate::keynav::RowAction::input(iced::widget::Id::new("panel-key-import-content")),
             10.0,
-            text_editor(&self.keys_ui.import_content)
+            text_editor(&self.vaults.cur().keys_ui.import_content)
                 .id(iced::widget::Id::new("panel-key-import-content"))
                 .on_action(|v| Message::Keys(KeysMessage::KeyContentAction(v)))
                 .padding(10)
@@ -117,7 +117,7 @@ impl Oryxis {
         // users understand we're not storing the passphrase anywhere.
         // Recorded only when rendered, so the keyboard row appears in
         // place between the content editor and the Save button.
-        let passphrase_section: Element<'_, Message> = if self.keys_ui.import_form.passphrase_required {
+        let passphrase_section: Element<'_, Message> = if self.vaults.cur().keys_ui.import_form.passphrase_required {
             // Keyboard rows: the field, then its reveal eye.
             self.panel_nav_record(crate::keynav::RowAction::input(
                 iced::widget::Id::new("panel-key-import-passphrase"),
@@ -131,10 +131,10 @@ impl Oryxis {
                     Space::new().width(10).boxed(),
                     crate::widgets::password_input_with_eye_nav(
                         t("key_passphrase_placeholder"),
-                        &self.keys_ui.import_form.passphrase,
+                        &self.vaults.cur().keys_ui.import_form.passphrase,
                         |v| Message::Keys(KeysMessage::KeyImportPassphraseChanged(v.into())),
                         Some(Message::Keys(KeysMessage::ImportKey)),
-                        self.keys_ui.import_form.passphrase_visible,
+                        self.vaults.cur().keys_ui.import_form.passphrase_visible,
                         Message::Keys(KeysMessage::KeyImportPassphraseToggleVisibility),
                         10.0,
                         Some(iced::widget::Id::new("panel-key-import-passphrase")),
@@ -171,7 +171,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("panel-key-import-public")),
                 10.0,
-                text_editor(&self.keys_ui.import_public_content)
+                text_editor(&self.vaults.cur().keys_ui.import_public_content)
                     .id(iced::widget::Id::new("panel-key-import-public"))
                     .on_action(|v| Message::Keys(KeysMessage::KeyImportPublicAction(v)))
                     .placeholder("ssh-ed25519 AAAA...")
@@ -223,7 +223,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("panel-key-import-cert")),
                 10.0,
-                text_editor(&self.keys_ui.import_cert_content)
+                text_editor(&self.vaults.cur().keys_ui.import_cert_content)
                     .id(iced::widget::Id::new("panel-key-import-cert"))
                     .on_action(|v| Message::Keys(KeysMessage::KeyImportCertAction(v)))
                     .placeholder("ssh-ed25519-cert-v01@openssh.com AAAA...")
@@ -237,7 +237,7 @@ impl Oryxis {
         ]
         .width(Length::Fill)
         .align_x(dir_align_x());
-        if self.keys_ui.import_form.cert_detected {
+        if self.vaults.cur().keys_ui.import_form.cert_detected {
             cert_section = cert_section.push(Space::new().height(6).boxed()).push(
                 dir_row(vec![
                     iced_fonts::lucide::circle_check()
@@ -257,8 +257,8 @@ impl Oryxis {
         // Shared form chrome: inline error above the footer, disabled
         // Save while there is no key content (structural gating
         // instead of the old color-only hint that still took clicks).
-        let panel_error = crate::widgets::form_error(self.keys_ui.error.as_deref());
-        let save_label = if self.keys_ui.import_form.editing_id.is_some() { t("update_key") } else { t("save_key") };
+        let panel_error = crate::widgets::form_error(self.vaults.cur().keys_ui.error.as_deref());
+        let save_label = if self.vaults.cur().keys_ui.import_form.editing_id.is_some() { t("update_key") } else { t("save_key") };
         let footer = crate::widgets::form_footer(
             self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::Keys(KeysMessage::HideKeyPanel)),

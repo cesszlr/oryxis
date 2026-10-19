@@ -264,7 +264,7 @@ impl Oryxis {
         // The live selection travels through the widget's `selection`
         // argument at view time (sidebar_snippets.rs / snippets.rs);
         // post-refactor the State only carries the options.
-        self.snippet_form.group_combo = iced::widget::combo_box::State::new(labels);
+        self.vaults.cur_mut().snippet_form.group_combo = iced::widget::combo_box::State::new(labels);
     }
 
     pub(crate) fn handle_snippets(
@@ -276,29 +276,29 @@ impl Oryxis {
             // -- Snippets --
             SnippetMessage::ShowSnippetPanel => {
                 self.overlay = None;
-                self.panels.snippet_panel = true;
-                self.snippet_form.label.clear();
-                self.snippet_form.steps = vec![crate::state::StepForm::new(
+                self.vaults.cur_mut().panels.snippet_panel = true;
+                self.vaults.cur_mut().snippet_form.label.clear();
+                self.vaults.cur_mut().snippet_form.steps = vec![crate::state::StepForm::new(
                     crate::state::StepKind::Command,
                 )];
-                self.snippet_form.group.clear();
-                self.snippet_form.tags_input.clear();
-                self.snippet_form.hotkey = None;
-                self.snippet_form.hotkey_capturing = false;
-                self.snippet_form.install = false;
-                self.snippet_form.editing_id = None;
-                self.snippet_form.error = None;
+                self.vaults.cur_mut().snippet_form.group.clear();
+                self.vaults.cur_mut().snippet_form.tags_input.clear();
+                self.vaults.cur_mut().snippet_form.hotkey = None;
+                self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
+                self.vaults.cur_mut().snippet_form.install = false;
+                self.vaults.cur_mut().snippet_form.editing_id = None;
+                self.vaults.cur_mut().snippet_form.error = None;
                 self.reset_snippet_group_combo();
             }
             SnippetMessage::HideSnippetPanel => {
-                self.panels.snippet_panel = false;
-                self.snippet_form.hotkey_capturing = false;
+                self.vaults.cur_mut().panels.snippet_panel = false;
+                self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
             }
-            SnippetMessage::SnippetLabelChanged(v) => self.snippet_form.label = v,
-            SnippetMessage::SnippetGroupChanged(v) => self.snippet_form.group = v,
-            SnippetMessage::SnippetTagsChanged(v) => self.snippet_form.tags_input = v,
+            SnippetMessage::SnippetLabelChanged(v) => self.vaults.cur_mut().snippet_form.label = v,
+            SnippetMessage::SnippetGroupChanged(v) => self.vaults.cur_mut().snippet_form.group = v,
+            SnippetMessage::SnippetTagsChanged(v) => self.vaults.cur_mut().snippet_form.tags_input = v,
             SnippetMessage::ToggleSnippetInstall => {
-                self.snippet_form.install = !self.snippet_form.install;
+                self.vaults.cur_mut().snippet_form.install = !self.vaults.cur_mut().snippet_form.install;
             }
             m @ (SnippetMessage::SnippetStepCommandAction(..)
             | SnippetMessage::SnippetStepAdd
@@ -416,24 +416,25 @@ impl Oryxis {
                 // Reached from the card kebab menu, close the popup.
                 self.snippet_context_menu = None;
                 self.overlay = None;
-                if let Some(snip) = self.vaults.cur().snippets.get(idx) {
-                    self.panels.snippet_panel = true;
-                    self.snippet_form.label = snip.label.clone();
-                    self.snippet_form.steps = snip
+                let ov = self.vaults.cur_mut();
+                if let Some(snip) = ov.snippets.get(idx) {
+                    ov.panels.snippet_panel = true;
+                    ov.snippet_form.label = snip.label.clone();
+                    ov.snippet_form.steps = snip
                         .actions()
                         .iter()
                         .map(crate::state::StepForm::from_step)
                         .collect();
-                    self.snippet_form.group = snip.group.clone().unwrap_or_default();
-                    self.snippet_form.tags_input = snip.tags.join(", ");
-                    self.snippet_form.hotkey = snip
+                    ov.snippet_form.group = snip.group.clone().unwrap_or_default();
+                    ov.snippet_form.tags_input = snip.tags.join(", ");
+                    ov.snippet_form.hotkey = snip
                         .hotkey
                         .as_deref()
                         .and_then(crate::hotkeys::HotkeyBinding::parse);
-                    self.snippet_form.hotkey_capturing = false;
-                    self.snippet_form.install = snip.install;
-                    self.snippet_form.editing_id = Some(snip.id);
-                    self.snippet_form.error = None;
+                    ov.snippet_form.hotkey_capturing = false;
+                    ov.snippet_form.install = snip.install;
+                    ov.snippet_form.editing_id = Some(snip.id);
+                    ov.snippet_form.error = None;
                     self.reset_snippet_group_combo();
                 }
             }
@@ -441,33 +442,33 @@ impl Oryxis {
                 let steps = match self.snippet_form_steps() {
                     Ok(steps) => steps,
                     Err(e) => {
-                        self.snippet_form.error = Some(e);
+                        self.vaults.cur_mut().snippet_form.error = Some(e);
                         return Task::none();
                     }
                 };
-                let mut snip = if let Some(id) = self.snippet_form.editing_id {
+                let mut snip = if let Some(id) = self.vaults.cur().snippet_form.editing_id {
                     self.vaults.cur().snippets.iter().find(|s| s.id == id).cloned()
                         .unwrap_or_else(|| oryxis_core::models::snippet::Snippet::new("", ""))
                 } else {
                     oryxis_core::models::snippet::Snippet::new("", "")
                 };
-                snip.label = self.snippet_form.label.clone();
+                snip.label = self.vaults.cur().snippet_form.label.clone();
                 snip.set_actions(steps);
                 snip.group = {
-                    let g = self.snippet_form.group.trim();
+                    let g = self.vaults.cur().snippet_form.group.trim();
                     (!g.is_empty()).then(|| g.to_string())
                 };
-                snip.tags = crate::util::parse_tags(&self.snippet_form.tags_input);
-                snip.hotkey = self.snippet_form.hotkey.map(|b| b.serialize());
-                snip.install = self.snippet_form.install;
+                snip.tags = crate::util::parse_tags(&self.vaults.cur().snippet_form.tags_input);
+                snip.hotkey = self.vaults.cur().snippet_form.hotkey.map(|b| b.serialize());
+                snip.install = self.vaults.cur().snippet_form.install;
                 if let Some(vault) = &self.vaults.cur().store {
                     match vault.save_snippet(&snip) {
                         Ok(()) => {
-                            self.panels.snippet_panel = false;
-                            self.snippet_form.error = None;
+                            self.vaults.cur_mut().panels.snippet_panel = false;
+                            self.vaults.cur_mut().snippet_form.error = None;
                             self.load_data_from_vault();
                         }
-                        Err(e) => self.snippet_form.error = Some(e.to_string()),
+                        Err(e) => self.vaults.cur_mut().snippet_form.error = Some(e.to_string()),
                     }
                 }
             }
@@ -486,7 +487,7 @@ impl Oryxis {
                     let id = snip.id;
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_snippet(&id);
-                        self.panels.snippet_panel = false;
+                        self.vaults.cur_mut().panels.snippet_panel = false;
                         self.load_data_from_vault();
                     }
                 }
@@ -585,11 +586,11 @@ impl Oryxis {
                 return self.handle_snippet_run(m).unwrap_or_else(crate::dispatch::unrouted);
             }
             SnippetMessage::SnippetHotkeyCaptureStart => {
-                self.snippet_form.hotkey_capturing = true;
+                self.vaults.cur_mut().snippet_form.hotkey_capturing = true;
             }
             SnippetMessage::SnippetHotkeyClear => {
-                self.snippet_form.hotkey = None;
-                self.snippet_form.hotkey_capturing = false;
+                self.vaults.cur_mut().snippet_form.hotkey = None;
+                self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
             }
         }
         Task::none()

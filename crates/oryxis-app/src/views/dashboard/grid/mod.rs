@@ -752,7 +752,7 @@ impl Oryxis {
         // Re-derived on every view() so resizing the window or toggling
         // the side panel reflows the cards into the new column count.
         let nav_width = self.vault_rail_width();
-        let panel_open = self.cloud_discover.visible || self.panels.host_panel;
+        let panel_open = self.vaults.cur().cloud_discover.visible || self.vaults.cur().panels.host_panel;
         let panel_width = if panel_open { self.vaults.cur().panel_width } else { 0.0 };
         // A side-docked tab strip (issue #87) narrows the content band
         // like the other grids; without it the math yields one column

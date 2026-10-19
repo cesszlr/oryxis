@@ -368,8 +368,8 @@ impl Oryxis {
         // gates on tone (`theme_tags::theme_matches`, the one rule every
         // theme list applies). The follow sentinel takes part with the
         // palette it previews; the action cards only by label.
-        let gallery_filter = self.theme_ui.gallery_filter.trim().to_lowercase();
-        let gallery_tone = self.theme_ui.gallery_tone;
+        let gallery_filter = self.vaults.cur().theme_ui.gallery_filter.trim().to_lowercase();
+        let gallery_tone = self.vaults.cur().theme_ui.gallery_tone;
         let shows = |label: &str, traits: Option<&[oryxis_terminal::ThemeTrait]>| {
             crate::theme_tags::theme_matches(&gallery_filter, gallery_tone, label, traits)
         };
@@ -518,7 +518,7 @@ impl Oryxis {
         let filter_input = self.settings_nav_ring_at(
             filter_idx,
             10.0,
-            iced::widget::text_input(t("filter_placeholder"), &self.theme_ui.gallery_filter)
+            iced::widget::text_input(t("filter_placeholder"), &self.vaults.cur().theme_ui.gallery_filter)
                 .id(iced::widget::Id::new("terminal-theme-gallery-filter"))
                 .on_input(|v| {
                     Message::Settings(SettingsMessage::ThemeGalleryFilterChanged(v))

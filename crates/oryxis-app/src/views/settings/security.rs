@@ -70,7 +70,7 @@ impl Oryxis {
             &self.vaults.cur().vault_ui.current_password,
             |v| Message::Vault(VaultMessage::VaultCurrentPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::ConfirmChangeVaultPassword)),
-            self.revealed_secrets.contains(&SecretField::VaultCurrentPassword),
+            self.vaults.cur().revealed_secrets.contains(&SecretField::VaultCurrentPassword),
             Message::Settings(SettingsMessage::ToggleSecretVisibility(SecretField::VaultCurrentPassword)),
             10.0,
         ))
@@ -80,7 +80,7 @@ impl Oryxis {
             &self.vaults.cur().vault_ui.new_password,
             |v| Message::Vault(VaultMessage::VaultNewPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::ConfirmChangeVaultPassword)),
-            self.revealed_secrets.contains(&SecretField::VaultNewPassword),
+            self.vaults.cur().revealed_secrets.contains(&SecretField::VaultNewPassword),
             Message::Settings(SettingsMessage::ToggleSecretVisibility(SecretField::VaultNewPassword)),
             10.0,
         ))
@@ -90,7 +90,7 @@ impl Oryxis {
             &self.vaults.cur().vault_ui.confirm_password,
             |v| Message::Vault(VaultMessage::VaultConfirmPasswordChanged(v.into())),
             Some(Message::Vault(VaultMessage::ConfirmChangeVaultPassword)),
-            self.revealed_secrets.contains(&SecretField::VaultConfirmPassword),
+            self.vaults.cur().revealed_secrets.contains(&SecretField::VaultConfirmPassword),
             Message::Settings(SettingsMessage::ToggleSecretVisibility(SecretField::VaultConfirmPassword)),
             10.0,
         ))
@@ -172,7 +172,7 @@ impl Oryxis {
                 &self.vaults.cur().vault_ui.new_password,
                 |v| Message::Vault(VaultMessage::VaultNewPasswordChanged(v.into())),
                 Some(Message::Vault(VaultMessage::SetVaultPassword)),
-                self.revealed_secrets
+                self.vaults.cur().revealed_secrets
                     .contains(&crate::state::SecretField::VaultNewPassword),
                 Message::Settings(SettingsMessage::ToggleSecretVisibility(
                     crate::state::SecretField::VaultNewPassword,
@@ -189,7 +189,7 @@ impl Oryxis {
                 &self.vaults.cur().vault_ui.confirm_password,
                 |v| Message::Vault(VaultMessage::VaultConfirmPasswordChanged(v.into())),
                 Some(Message::Vault(VaultMessage::SetVaultPassword)),
-                self.revealed_secrets
+                self.vaults.cur().revealed_secrets
                     .contains(&crate::state::SecretField::VaultConfirmPassword),
                 Message::Settings(SettingsMessage::ToggleSecretVisibility(
                     crate::state::SecretField::VaultConfirmPassword,
@@ -938,7 +938,7 @@ impl Oryxis {
         ];
 
         // Show export dialog inline
-        if self.panels.export_dialog {
+        if self.vaults.cur().panels.export_dialog {
             // Keyboard rows (audit fix: the field recorded nothing
             // while its neighbors did): the field, then its eye.
             let pw_idx = self.settings_nav_record(crate::keynav::RowAction::input(
@@ -949,10 +949,10 @@ impl Oryxis {
                 10.0,
                 container(crate::widgets::password_input_with_eye_nav(
                     crate::i18n::t("export_password"),
-                    &self.export_password,
+                    &self.vaults.cur().export_password,
                     |v| Message::Share(ShareMessage::ExportPasswordChanged(v.into())),
                     None,
-                    self.revealed_secrets
+                    self.vaults.cur().revealed_secrets
                         .contains(&crate::state::SecretField::ExportPassword),
                     Message::Settings(SettingsMessage::ToggleSecretVisibility(
                         crate::state::SecretField::ExportPassword,
@@ -984,7 +984,7 @@ impl Oryxis {
                 categories = categories.push(self.settings_nav_slot(
                     crate::keynav::RowAction::activate(Message::Share(ShareMessage::ExportToggleCategory(cat))),
                     4.0,
-                    checkbox(self.export_selection.get(cat))
+                    checkbox(self.vaults.cur().export_selection.get(cat))
                         .label(crate::i18n::t(category_label_key(cat)))
                         .on_toggle(move |_| Message::Share(ShareMessage::ExportToggleCategory(cat)))
                         .size(16)
@@ -994,7 +994,7 @@ impl Oryxis {
             }
             // Private-key material is a sub-option of the Keys
             // category, only meaningful when Keys is being exported.
-            let keys_toggle: Element<'_, Message> = if self.export_selection.keys {
+            let keys_toggle: Element<'_, Message> = if self.vaults.cur().export_selection.keys {
                 self.settings_nav_slot(
                     crate::keynav::RowAction::activate(Message::Share(ShareMessage::ExportToggleKeys)),
                     8.0,
@@ -1002,10 +1002,10 @@ impl Oryxis {
                         text(crate::i18n::t("include_private_keys")).size(13).color(OryxisColors::t().text_secondary).boxed(),
                         Space::new().width(Length::Fill).boxed(),
                         button(
-                            text(if self.export_include_keys { "ON" } else { "OFF" }).size(12)
+                            text(if self.vaults.cur().export_include_keys { "ON" } else { "OFF" }).size(12)
                         ).on_press(Message::Share(ShareMessage::ExportToggleKeys)).style(move |_theme, _status| {
                             button::Style {
-                                background: Some(Background::Color(if self.export_include_keys { OryxisColors::t().success } else { OryxisColors::t().bg_hover })),
+                                background: Some(Background::Color(if self.vaults.cur().export_include_keys { OryxisColors::t().success } else { OryxisColors::t().bg_hover })),
                                 border: Border { radius: Radius::from(4.0), ..Default::default() },
                                 text_color: OryxisColors::t().text_primary,
                                 ..Default::default()
@@ -1043,7 +1043,7 @@ impl Oryxis {
         }
 
         // Show import dialog inline
-        if self.panels.import_dialog {
+        if self.vaults.cur().panels.import_dialog {
             // Keyboard rows (audit fix, same as the export dialog).
             let pw_idx = self.settings_nav_record(crate::keynav::RowAction::input(
                 iced::widget::Id::new("set-import-password"),
@@ -1053,15 +1053,15 @@ impl Oryxis {
                 10.0,
                 container(crate::widgets::password_input_with_eye_nav(
                     crate::i18n::t("import_password"),
-                    &self.vault_import.password,
+                    &self.vaults.cur().vault_import.password,
                     |v| Message::Share(ShareMessage::ImportPasswordChanged(v.into())),
                     // Enter inspects in phase 1, imports in phase 2.
-                    Some(if self.vault_import.summary.is_some() {
+                    Some(if self.vaults.cur().vault_import.summary.is_some() {
                         Message::Share(ShareMessage::ImportConfirm)
                     } else {
                         Message::Share(ShareMessage::ImportInspect)
                     }),
-                    self.revealed_secrets
+                    self.vaults.cur().revealed_secrets
                         .contains(&crate::state::SecretField::ImportPassword),
                     Message::Settings(SettingsMessage::ToggleSecretVisibility(
                         crate::state::SecretField::ImportPassword,
@@ -1089,7 +1089,7 @@ impl Oryxis {
                 .push(self.import_target_line())
                 .push(Space::new().height(4).boxed())
                 .push(pw_input);
-            if let Some(summary) = &self.vault_import.summary {
+            if let Some(summary) = &self.vaults.cur().vault_import.summary {
                 // Phase 2: the file is decrypted, show what it
                 // holds. Present categories are interactive
                 // checkboxes (with counts); absent ones are
@@ -1109,7 +1109,7 @@ impl Oryxis {
                         categories = categories.push(self.settings_nav_slot(
                             crate::keynav::RowAction::activate(Message::Share(ShareMessage::ImportToggleCategory(cat))),
                             4.0,
-                            checkbox(self.vault_import.selection.get(cat))
+                            checkbox(self.vaults.cur().vault_import.selection.get(cat))
                                 .label(format!("{label} ({count})"))
                                 .on_toggle(move |_| Message::Share(ShareMessage::ImportToggleCategory(cat)))
                                 .size(16)
@@ -1163,12 +1163,12 @@ impl Oryxis {
         // SFTP backup-target picker (export to / import from a
         // saved host). Reuses the export/import password + selection
         // state above; here the user only picks the host and path.
-        if self.sftp_backup.open {
-            let is_import = self.sftp_backup.is_import;
+        if self.vaults.cur().sftp_backup.open {
+            let is_import = self.vaults.cur().sftp_backup.is_import;
             let host_options: Vec<String> =
                 self.vaults.cur().connections.iter().map(|c| c.label.clone()).collect();
             let selected_host = self
-                .sftp_backup.host
+                .vaults.cur().sftp_backup.host
                 .and_then(|i| self.vaults.cur().connections.get(i))
                 .map(|c| c.label.clone());
             let host_lookup: std::collections::HashMap<String, usize> = self
@@ -1209,7 +1209,7 @@ impl Oryxis {
             let path_field = self.settings_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("set-security-sftp-path")),
                 10.0,
-                text_input("vault.oryxis", &self.sftp_backup.path)
+                text_input("vault.oryxis", &self.vaults.cur().sftp_backup.path)
                     .id(iced::widget::Id::new("set-security-sftp-path"))
                     .on_input(|v| Message::Share(ShareMessage::SftpBackupPathChanged(v)))
                     .on_submit(Message::Share(ShareMessage::SftpBackupConfirm))
@@ -1231,10 +1231,10 @@ impl Oryxis {
                     10.0,
                     container(crate::widgets::password_input_with_eye_nav(
                         crate::i18n::t("import_password"),
-                        &self.vault_import.password,
+                        &self.vaults.cur().vault_import.password,
                         |v| Message::Share(ShareMessage::ImportPasswordChanged(v.into())),
                         Some(Message::Share(ShareMessage::SftpBackupConfirm)),
-                        self.revealed_secrets
+                        self.vaults.cur().revealed_secrets
                             .contains(&crate::state::SecretField::ImportPassword),
                         Message::Settings(SettingsMessage::ToggleSecretVisibility(
                             crate::state::SecretField::ImportPassword,
@@ -1258,12 +1258,12 @@ impl Oryxis {
                 None
             };
             let title_key = if is_import { "restore_from_sftp" } else { "backup_to_sftp" };
-            let confirm_msg = if self.sftp_backup.busy {
+            let confirm_msg = if self.vaults.cur().sftp_backup.busy {
                 None
             } else {
                 Some(Message::Share(ShareMessage::SftpBackupConfirm))
             };
-            let confirm_label = if self.sftp_backup.busy {
+            let confirm_label = if self.vaults.cur().sftp_backup.busy {
                 crate::i18n::t("sftp_backup_working")
             } else if is_import {
                 crate::i18n::t("sftp_backup_restore_confirm")
@@ -1313,7 +1313,7 @@ impl Oryxis {
             sftp_section = sftp_section
                 .push(Space::new().height(10).boxed())
                 .push(dir_row(vec![confirm_btn, Space::new().width(8).boxed(), cancel_btn]).boxed());
-            if let Some(status) = &self.sftp_backup.status {
+            if let Some(status) = &self.vaults.cur().sftp_backup.status {
                 let (msg, color) = match status {
                     Ok(m) => (m.clone(), OryxisColors::t().success),
                     Err(e) => (e.clone(), OryxisColors::t().error),
@@ -1328,7 +1328,7 @@ impl Oryxis {
         }
 
         // Status messages
-        if let Some(status) = &self.export_status {
+        if let Some(status) = &self.vaults.cur().export_status {
             let (msg, color) = match status {
                 Ok(m) => (m.as_str(), OryxisColors::t().success),
                 Err(m) => (m.as_str(), OryxisColors::t().error),
@@ -1337,7 +1337,7 @@ impl Oryxis {
                 .push(Space::new().height(8).boxed())
                 .push(text(msg).size(12).color(color).boxed());
         }
-        if let Some(status) = &self.vault_import.status {
+        if let Some(status) = &self.vaults.cur().vault_import.status {
             let (msg, color) = match status {
                 Ok(m) => (m.as_str(), OryxisColors::t().success),
                 Err(m) => (m.as_str(), OryxisColors::t().error),
@@ -1375,7 +1375,7 @@ impl Oryxis {
             Space::new().height(8),
             ssh_config_btn,
         ];
-        if let Some(status) = &self.ssh_config_import_status {
+        if let Some(status) = &self.vaults.cur().ssh_config_import_status {
             let (msg, color) = match status {
                 Ok(m) => (m.as_str(), OryxisColors::t().success),
                 Err(m) => (m.as_str(), OryxisColors::t().error),

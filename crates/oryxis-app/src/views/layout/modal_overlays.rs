@@ -17,8 +17,8 @@ impl Oryxis {
         resize_overlay: Option<Element<'a, Message>>,
     ) -> Element<'a, Message> {
         use oryxis_core::models::cloud::TransportKind;
-        let n_ec2 = self.cloud_discover.selected_ec2.len();
-        let n_ecs = self.cloud_discover.selected_ecs.len();
+        let n_ec2 = self.vaults.cur().cloud_discover.selected_ec2.len();
+        let n_ecs = self.vaults.cur().cloud_discover.selected_ecs.len();
         let summary = if n_ec2 > 0 && n_ecs > 0 {
             format!("{} EC2 + {} ECS", n_ec2, n_ecs)
         } else if n_ec2 > 0 {
@@ -42,7 +42,7 @@ impl Oryxis {
         const COMBO_HEIGHT: f32 = 36.0;
         let group_input = iced::widget::text_input(
             crate::i18n::t("cloud_discover_import_into_placeholder"),
-            &self.cloud_discover.default_group_name,
+            &self.vaults.cur().cloud_discover.default_group_name,
         )
         .on_input(|v| Message::Cloud(CloudMessage::CloudDiscoverDefaultGroupNameChanged(v)))
         .id(iced::widget::Id::new("cloud-import-group-input"))
@@ -98,7 +98,7 @@ impl Oryxis {
                 TransportKind::Ssm,
             ];
             let transport_pick = iced::widget::pick_list(
-                Some(self.cloud_discover.default_transport),
+                Some(self.vaults.cur().cloud_discover.default_transport),
                 transport_options.clone(),
                 |t| match t {
                     TransportKind::Ssh => "SSH".to_string(),
@@ -117,7 +117,7 @@ impl Oryxis {
             // opening the dropdown.
             let (t_prev, t_next) = crate::keynav::slots::cycle_pair(
                 &transport_options,
-                &self.cloud_discover.default_transport,
+                &self.vaults.cur().cloud_discover.default_transport,
                 |v| Message::Cloud(CloudMessage::CloudDiscoverDefaultTransportChanged(v)),
             );
             let transport_pick = self.modal_nav_slot(
@@ -182,7 +182,7 @@ impl Oryxis {
                     ])
                     .width(Length::Fixed(308.0))
                     .align_y(iced::Alignment::Center).boxed(),
-                    self.cloud_discover.default_group_combo_bounds.clone(),
+                    self.vaults.cur().cloud_discover.default_group_combo_bounds.clone(),
                 ),
                 Space::new().height(16),
                 transport_section,
@@ -248,7 +248,7 @@ impl Oryxis {
         // beneath the modal (otherwise iced's Stack lets mouse
         // hover propagate to lower layers, lighting up rows
         // under the cursor while the modal is open).
-        let on_scrim_click = if self.cloud_discover.default_group_picker_open {
+        let on_scrim_click = if self.vaults.cur().cloud_discover.default_group_picker_open {
             Message::Cloud(CloudMessage::ToggleCloudDiscoverGroupPicker)
         } else {
             Message::Cloud(CloudMessage::CloudDiscoverImportCancelled)
@@ -286,7 +286,7 @@ impl Oryxis {
             // bounds_reporter (falls back to 308 on the very
             // first open when the cell is still zeroed). Height
             // clamp keeps tall menus on-screen.
-            let combo = self.cloud_discover.default_group_combo_bounds.get();
+            let combo = self.vaults.cur().cloud_discover.default_group_combo_bounds.get();
             let menu_width = if combo.width > 0.0 { combo.width } else { 308.0 };
             let menu_height = 280.0_f32;
             let x = ovl

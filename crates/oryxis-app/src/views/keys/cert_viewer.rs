@@ -10,7 +10,7 @@ impl Oryxis {
     /// (behind the standard confirm) and Close. Keynav rows record under
     /// `Modal::CertificateViewer` (Confirm family: Close is the default).
     pub(crate) fn view_cert_viewer_modal(&self) -> Element<'_, Message> {
-        let Some(data) = self.cert_viewer.as_ref() else {
+        let Some(data) = self.vaults.cur().cert_viewer.as_ref() else {
             return Space::new().boxed();
         };
         let c = OryxisColors::t();

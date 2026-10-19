@@ -93,7 +93,7 @@ impl Oryxis {
                     // Chain editor: the add-a-hop sub-view is a search
                     // picker; the chain list navigates as a row menu.
                     Modal::ChainEditor => {
-                        if self.chain_editor_adding {
+                        if self.vaults.cur().chain_editor_adding {
                             SurfaceFamily::Picker
                         } else {
                             SurfaceFamily::Menu
@@ -184,7 +184,7 @@ impl Oryxis {
                 return Some((ModalSurface::Modal(m), family));
             }
         }
-        if self.panels.burger_menu {
+        if self.vaults.cur().panels.burger_menu {
             return Some((ModalSurface::Burger, SurfaceFamily::Menu));
         }
         // The SFTP right-click menu is a plain context menu: arrows move,

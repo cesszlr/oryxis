@@ -119,35 +119,35 @@ impl Oryxis {
                 // other panel that's currently open so the user
                 // doesn't end up with two side-by-side editors.
                 self.editor_flush_pending();
-                self.panels.host_panel = false;
+                self.vaults.cur_mut().panels.host_panel = false;
                 // Drop what the host editor's eyes revealed.
-                self.editor_form.sweep_secrets();
-                self.cloud_form.visible = false;
-                self.cloud_discover.visible = false;
-                self.group_edit.visible = false;
-                self.cloud_dynamic_form.visible = true;
-                self.cloud_dynamic_form.group_id = Some(gid);
-                self.cloud_dynamic_form.username =
+                self.vaults.cur_mut().editor_form.sweep_secrets();
+                self.vaults.cur_mut().cloud_form.visible = false;
+                self.vaults.cur_mut().cloud_discover.visible = false;
+                self.vaults.cur_mut().group_edit.visible = false;
+                self.vaults.cur_mut().cloud_dynamic_form.visible = true;
+                self.vaults.cur_mut().cloud_dynamic_form.group_id = Some(gid);
+                self.vaults.cur_mut().cloud_dynamic_form.username =
                     query.template.username.clone().unwrap_or_default();
-                self.cloud_dynamic_form.initial_command =
+                self.vaults.cur_mut().cloud_dynamic_form.initial_command =
                     query.template.initial_command.clone().unwrap_or_default();
-                self.cloud_dynamic_form.transport = query.template.transport;
-                self.cloud_dynamic_form.selected_key = query.template.key_id.and_then(|kid| {
+                self.vaults.cur_mut().cloud_dynamic_form.transport = query.template.transport;
+                self.vaults.cur_mut().cloud_dynamic_form.selected_key = query.template.key_id.and_then(|kid| {
                     self.vaults.cur().keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
                 });
-                self.cloud_dynamic_form.selected_identity =
+                self.vaults.cur_mut().cloud_dynamic_form.selected_identity =
                     query.template.identity_id.and_then(|iid| {
                         self.vaults.cur().identities
                             .iter()
                             .find(|i| i.id == iid)
                             .map(|i| i.label.clone())
                     });
-                self.cloud_dynamic_form.label = group.label.clone();
-                self.cloud_dynamic_form.color = group.color.clone().unwrap_or_default();
-                self.cloud_dynamic_form.icon = group.icon.clone().unwrap_or_default();
+                self.vaults.cur_mut().cloud_dynamic_form.label = group.label.clone();
+                self.vaults.cur_mut().cloud_dynamic_form.color = group.color.clone().unwrap_or_default();
+                self.vaults.cur_mut().cloud_dynamic_form.icon = group.icon.clone().unwrap_or_default();
                 // Full breadcrumb path, matching what the shared group
                 // picker displays and what the save resolves first.
-                self.cloud_dynamic_form.parent_label = group
+                self.vaults.cur_mut().cloud_dynamic_form.parent_label = group
                     .parent_id
                     .filter(|pid| self.vaults.cur().groups.iter().any(|g| g.id == *pid))
                     .map(|pid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, pid))
@@ -158,107 +158,107 @@ impl Oryxis {
                         service,
                         container,
                     } => {
-                        self.cloud_dynamic_form.is_k8s = false;
-                        self.cloud_dynamic_form.cluster = cluster.clone();
-                        self.cloud_dynamic_form.service = service.clone();
-                        self.cloud_dynamic_form.container = container.clone();
-                        self.cloud_dynamic_form.k8s_context = String::new();
-                        self.cloud_dynamic_form.namespace = String::new();
-                        self.cloud_dynamic_form.k8s_selector_kind =
+                        self.vaults.cur_mut().cloud_dynamic_form.is_k8s = false;
+                        self.vaults.cur_mut().cloud_dynamic_form.cluster = cluster.clone();
+                        self.vaults.cur_mut().cloud_dynamic_form.service = service.clone();
+                        self.vaults.cur_mut().cloud_dynamic_form.container = container.clone();
+                        self.vaults.cur_mut().cloud_dynamic_form.k8s_context = String::new();
+                        self.vaults.cur_mut().cloud_dynamic_form.namespace = String::new();
+                        self.vaults.cur_mut().cloud_dynamic_form.k8s_selector_kind =
                             crate::state::K8sSelectorKind::Labels;
-                        self.cloud_dynamic_form.k8s_selector_value = String::new();
+                        self.vaults.cur_mut().cloud_dynamic_form.k8s_selector_value = String::new();
                     }
                     oryxis_core::models::cloud::CloudQueryKind::K8sPods {
                         context,
                         namespace,
                         selector,
                     } => {
-                        self.cloud_dynamic_form.is_k8s = true;
-                        self.cloud_dynamic_form.k8s_context = context.clone();
-                        self.cloud_dynamic_form.namespace = namespace.clone();
+                        self.vaults.cur_mut().cloud_dynamic_form.is_k8s = true;
+                        self.vaults.cur_mut().cloud_dynamic_form.k8s_context = context.clone();
+                        self.vaults.cur_mut().cloud_dynamic_form.namespace = namespace.clone();
                         let (kind, value) = selector_to_form(selector);
-                        self.cloud_dynamic_form.k8s_selector_kind = kind;
-                        self.cloud_dynamic_form.k8s_selector_value = value;
-                        self.cloud_dynamic_form.cluster = String::new();
-                        self.cloud_dynamic_form.service = String::new();
-                        self.cloud_dynamic_form.container = String::new();
+                        self.vaults.cur_mut().cloud_dynamic_form.k8s_selector_kind = kind;
+                        self.vaults.cur_mut().cloud_dynamic_form.k8s_selector_value = value;
+                        self.vaults.cur_mut().cloud_dynamic_form.cluster = String::new();
+                        self.vaults.cur_mut().cloud_dynamic_form.service = String::new();
+                        self.vaults.cur_mut().cloud_dynamic_form.container = String::new();
                     }
                 }
             }
             CloudMessage::HideDynamicGroupForm => {
-                self.cloud_dynamic_form.visible = false;
-                self.cloud_dynamic_form.group_id = None;
+                self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                self.vaults.cur_mut().cloud_dynamic_form.group_id = None;
             }
             CloudMessage::DynamicGroupFormUsernameChanged(v) => {
-                self.cloud_dynamic_form.username = v;
+                self.vaults.cur_mut().cloud_dynamic_form.username = v;
             }
             CloudMessage::DynamicGroupFormInitialCommandChanged(v) => {
-                self.cloud_dynamic_form.initial_command = v;
+                self.vaults.cur_mut().cloud_dynamic_form.initial_command = v;
             }
             CloudMessage::DynamicGroupFormTransportChanged(t) => {
-                self.cloud_dynamic_form.transport = t;
+                self.vaults.cur_mut().cloud_dynamic_form.transport = t;
             }
             CloudMessage::DynamicGroupFormKeyChanged(label) => {
-                self.cloud_dynamic_form.selected_key = if label == "(none)" {
+                self.vaults.cur_mut().cloud_dynamic_form.selected_key = if label == "(none)" {
                     None
                 } else {
                     Some(label)
                 };
             }
             CloudMessage::DynamicGroupFormIdentityChanged(label) => {
-                self.cloud_dynamic_form.selected_identity = if label == "(none)" {
+                self.vaults.cur_mut().cloud_dynamic_form.selected_identity = if label == "(none)" {
                     None
                 } else {
                     Some(label)
                 };
             }
             CloudMessage::DynamicGroupFormLabelChanged(v) => {
-                self.cloud_dynamic_form.label = v;
+                self.vaults.cur_mut().cloud_dynamic_form.label = v;
             }
             CloudMessage::DynamicGroupFormParentChanged(v) => {
-                self.cloud_dynamic_form.parent_label = v;
+                self.vaults.cur_mut().cloud_dynamic_form.parent_label = v;
             }
             CloudMessage::DynamicGroupFormClusterChanged(v) => {
-                self.cloud_dynamic_form.cluster = v;
+                self.vaults.cur_mut().cloud_dynamic_form.cluster = v;
             }
             CloudMessage::DynamicGroupFormServiceChanged(v) => {
-                self.cloud_dynamic_form.service = v;
+                self.vaults.cur_mut().cloud_dynamic_form.service = v;
             }
             CloudMessage::DynamicGroupFormContainerChanged(v) => {
-                self.cloud_dynamic_form.container = v;
+                self.vaults.cur_mut().cloud_dynamic_form.container = v;
             }
             CloudMessage::DynamicGroupFormK8sContextChanged(v) => {
-                self.cloud_dynamic_form.k8s_context = v;
+                self.vaults.cur_mut().cloud_dynamic_form.k8s_context = v;
             }
             CloudMessage::DynamicGroupFormNamespaceChanged(v) => {
-                self.cloud_dynamic_form.namespace = v;
+                self.vaults.cur_mut().cloud_dynamic_form.namespace = v;
             }
             CloudMessage::DynamicGroupFormK8sSelectorKindChanged(k) => {
-                self.cloud_dynamic_form.k8s_selector_kind = k;
+                self.vaults.cur_mut().cloud_dynamic_form.k8s_selector_kind = k;
             }
             CloudMessage::DynamicGroupFormK8sSelectorValueChanged(v) => {
-                self.cloud_dynamic_form.k8s_selector_value = v;
+                self.vaults.cur_mut().cloud_dynamic_form.k8s_selector_value = v;
             }
             CloudMessage::ShowIconPickerForDynamicGroupForm => {
                 // Pre-fill the picker from the current form values so
                 // re-opens preserve the user's in-flight selection.
                 // Fallback to `server` so the preview always renders.
-                let icon = if self.cloud_dynamic_form.icon.trim().is_empty() {
+                let icon = if self.vaults.cur().cloud_dynamic_form.icon.trim().is_empty() {
                     "server".to_string()
                 } else {
-                    self.cloud_dynamic_form.icon.trim().to_string()
+                    self.vaults.cur().cloud_dynamic_form.icon.trim().to_string()
                 };
-                self.icon_picker.icon = Some(icon);
-                let color = self.cloud_dynamic_form.color.trim().to_string();
-                self.icon_picker.color = if color.is_empty() { None } else { Some(color.clone()) };
-                self.icon_picker.hex_input = color;
-                self.icon_picker.for_id = None;
-                self.icon_picker.for_group_form = true;
-                self.icon_picker.for_local_terminal = false;
-                self.panels.icon_picker = true;
+                self.vaults.cur_mut().icon_picker.icon = Some(icon);
+                let color = self.vaults.cur().cloud_dynamic_form.color.trim().to_string();
+                self.vaults.cur_mut().icon_picker.color = if color.is_empty() { None } else { Some(color.clone()) };
+                self.vaults.cur_mut().icon_picker.hex_input = color;
+                self.vaults.cur_mut().icon_picker.for_id = None;
+                self.vaults.cur_mut().icon_picker.for_group_form = true;
+                self.vaults.cur_mut().icon_picker.for_local_terminal = false;
+                self.vaults.cur_mut().panels.icon_picker = true;
             }
             CloudMessage::SaveDynamicGroup => {
-                let Some(gid) = self.cloud_dynamic_form.group_id else {
+                let Some(gid) = self.vaults.cur().cloud_dynamic_form.group_id else {
                     return Ok(Task::none());
                 };
                 let Some(mut group) = self.vaults.cur().groups.iter().find(|g| g.id == gid).cloned()
@@ -269,26 +269,26 @@ impl Oryxis {
                     return Ok(Task::none());
                 };
                 query.template.username =
-                    if self.cloud_dynamic_form.username.trim().is_empty() {
+                    if self.vaults.cur().cloud_dynamic_form.username.trim().is_empty() {
                         None
                     } else {
-                        Some(self.cloud_dynamic_form.username.trim().to_string())
+                        Some(self.vaults.cur().cloud_dynamic_form.username.trim().to_string())
                     };
                 query.template.initial_command =
-                    if self.cloud_dynamic_form.initial_command.trim().is_empty() {
+                    if self.vaults.cur().cloud_dynamic_form.initial_command.trim().is_empty() {
                         None
                     } else {
-                        Some(self.cloud_dynamic_form.initial_command.clone())
+                        Some(self.vaults.cur().cloud_dynamic_form.initial_command.clone())
                     };
-                query.template.transport = self.cloud_dynamic_form.transport;
+                query.template.transport = self.vaults.cur().cloud_dynamic_form.transport;
                 query.template.key_id = self
-                    .cloud_dynamic_form.selected_key
+                    .vaults.cur().cloud_dynamic_form.selected_key
                     .as_ref()
                     .and_then(|label| {
                         self.vaults.cur().keys.iter().find(|k| &k.label == label).map(|k| k.id)
                     });
                 query.template.identity_id = self
-                    .cloud_dynamic_form.selected_identity
+                    .vaults.cur().cloud_dynamic_form.selected_identity
                     .as_ref()
                     .and_then(|label| {
                         self.vaults.cur().identities
@@ -307,9 +307,9 @@ impl Oryxis {
                         service,
                         container,
                     } => {
-                        *cluster = self.cloud_dynamic_form.cluster.trim().to_string();
-                        *service = self.cloud_dynamic_form.service.trim().to_string();
-                        *container = self.cloud_dynamic_form.container.trim().to_string();
+                        *cluster = self.vaults.cur().cloud_dynamic_form.cluster.trim().to_string();
+                        *service = self.vaults.cur().cloud_dynamic_form.service.trim().to_string();
+                        *container = self.vaults.cur().cloud_dynamic_form.container.trim().to_string();
                     }
                     // K8s query fields: persist context / namespace and the
                     // parsed `k=v,k=v` label selector.
@@ -318,28 +318,28 @@ impl Oryxis {
                         namespace,
                         selector,
                     } => {
-                        *context = self.cloud_dynamic_form.k8s_context.trim().to_string();
-                        *namespace = self.cloud_dynamic_form.namespace.trim().to_string();
+                        *context = self.vaults.cur().cloud_dynamic_form.k8s_context.trim().to_string();
+                        *namespace = self.vaults.cur().cloud_dynamic_form.namespace.trim().to_string();
                         *selector = form_to_selector(
-                            self.cloud_dynamic_form.k8s_selector_kind,
-                            &self.cloud_dynamic_form.k8s_selector_value,
+                            self.vaults.cur().cloud_dynamic_form.k8s_selector_kind,
+                            &self.vaults.cur().cloud_dynamic_form.k8s_selector_value,
                         );
                     }
                 }
                 group.cloud_query = Some(query);
-                let new_label = self.cloud_dynamic_form.label.trim();
+                let new_label = self.vaults.cur().cloud_dynamic_form.label.trim();
                 if !new_label.is_empty() {
                     group.label = new_label.to_string();
                 }
-                group.color = if self.cloud_dynamic_form.color.trim().is_empty() {
+                group.color = if self.vaults.cur().cloud_dynamic_form.color.trim().is_empty() {
                     None
                 } else {
-                    Some(self.cloud_dynamic_form.color.trim().to_string())
+                    Some(self.vaults.cur().cloud_dynamic_form.color.trim().to_string())
                 };
-                group.icon = if self.cloud_dynamic_form.icon.trim().is_empty() {
+                group.icon = if self.vaults.cur().cloud_dynamic_form.icon.trim().is_empty() {
                     None
                 } else {
-                    Some(self.cloud_dynamic_form.icon.trim().to_string())
+                    Some(self.vaults.cur().cloud_dynamic_form.icon.trim().to_string())
                 };
                 // Parent picker resolution, shared with the host and
                 // group editors: full breadcrumb path first (what the
@@ -354,15 +354,15 @@ impl Oryxis {
                 // `dispatch_cloud/discovery.rs`.
                 group.parent_id = oryxis_core::models::Group::resolve_path_or_label(
                     &self.vaults.cur().groups,
-                    &self.cloud_dynamic_form.parent_label,
+                    &self.vaults.cur().cloud_dynamic_form.parent_label,
                     &std::collections::HashSet::from([gid]),
                 );
                 group.updated_at = chrono::Utc::now();
                 if let Some(vault) = &self.vaults.cur().store
                     && vault.save_group(&group).is_ok()
                 {
-                    self.cloud_dynamic_form.visible = false;
-                    self.cloud_dynamic_form.group_id = None;
+                    self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                    self.vaults.cur_mut().cloud_dynamic_form.group_id = None;
                     self.load_data_from_vault();
                 }
             }

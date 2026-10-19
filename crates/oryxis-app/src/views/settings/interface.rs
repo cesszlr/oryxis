@@ -772,8 +772,8 @@ impl Oryxis {
         // Filter and chips, the terminal gallery's rule
         // (`theme_tags::theme_matches`) over the chrome themes' measured
         // traits. Recorded before the cards, in draw order.
-        let gallery_filter = self.theme_ui.ui_gallery_filter.trim().to_lowercase();
-        let gallery_tone = self.theme_ui.ui_gallery_tone;
+        let gallery_filter = self.vaults.cur().theme_ui.ui_gallery_filter.trim().to_lowercase();
+        let gallery_tone = self.vaults.cur().theme_ui.ui_gallery_tone;
         let shows = |label: &str, traits: Option<&[oryxis_terminal::ThemeTrait]>| {
             crate::theme_tags::theme_matches(&gallery_filter, gallery_tone, label, traits)
         };
@@ -891,7 +891,7 @@ impl Oryxis {
         let filter_input = self.settings_nav_ring_at(
             filter_idx,
             10.0,
-            iced::widget::text_input(t("filter_placeholder"), &self.theme_ui.ui_gallery_filter)
+            iced::widget::text_input(t("filter_placeholder"), &self.vaults.cur().theme_ui.ui_gallery_filter)
                 .id(iced::widget::Id::new("ui-theme-gallery-filter"))
                 .on_input(|v| Message::Settings(SettingsMessage::UiThemeGalleryFilterChanged(v)))
                 .padding(10)

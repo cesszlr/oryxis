@@ -312,7 +312,7 @@ impl Oryxis {
                     && let Some(tab) = self.tabs.get(tab_idx)
                 {
                     self.pending_pane_split = Some((tab._id, tab.focused, axis));
-                    self.panels.new_tab_picker = true;
+                    self.vaults.cur_mut().panels.new_tab_picker = true;
                     self.new_tab_picker_search.clear();
                     self.new_tab_picker_group = None;
                     // Same focus-the-search behavior as ShowNewTabPicker.
@@ -332,7 +332,7 @@ impl Oryxis {
                     self.active_view = crate::state::View::Terminal;
                     self.remember_terminal_tab_focus(tab_idx);
                     self.pending_pane_split = Some((tab_id, target, axis));
-                    self.panels.new_tab_picker = true;
+                    self.vaults.cur_mut().panels.new_tab_picker = true;
                     self.new_tab_picker_search.clear();
                     self.new_tab_picker_group = None;
                     // Same focus-the-search behavior as ShowNewTabPicker.
@@ -1111,11 +1111,11 @@ impl Oryxis {
                 // never content.
                 let trace_ime = crate::logging::is_enabled();
                 let commit_len = text.chars().count();
-                if text.is_empty() || self.panels.host_panel || self.any_modal_blocks_input() {
+                if text.is_empty() || self.vaults.cur().panels.host_panel || self.any_modal_blocks_input() {
                     if trace_ime && !text.is_empty() {
                         tracing::debug!(
                             len = commit_len,
-                            host_panel = self.panels.host_panel,
+                            host_panel = self.vaults.cur().panels.host_panel,
                             modal = self.any_modal_blocks_input(),
                             "ime-commit dropped by surface gate"
                         );
@@ -1176,7 +1176,7 @@ impl Oryxis {
                 // opening mid-composition can never strand a ghost on the
                 // grid.
                 if !text.is_empty()
-                    && (self.panels.host_panel
+                    && (self.vaults.cur().panels.host_panel
                         || self.any_modal_blocks_input()
                         || self.cursor_over_sidebar())
                 {

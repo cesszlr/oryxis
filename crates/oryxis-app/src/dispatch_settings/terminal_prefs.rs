@@ -389,24 +389,24 @@ impl Oryxis {
                 );
             }
             SettingsMessage::OpenTerminalThemeGallery => {
-                self.panels.terminal_theme_gallery = true;
+                self.vaults.cur_mut().panels.terminal_theme_gallery = true;
                 // A stale filter from the last visit would open the
                 // gallery on a mysteriously short grid.
-                self.theme_ui.gallery_filter.clear();
-                self.theme_ui.gallery_tone = None;
+                self.vaults.cur_mut().theme_ui.gallery_filter.clear();
+                self.vaults.cur_mut().theme_ui.gallery_tone = None;
             }
             SettingsMessage::CloseTerminalThemeGallery => {
-                self.panels.terminal_theme_gallery = false;
+                self.vaults.cur_mut().panels.terminal_theme_gallery = false;
             }
             SettingsMessage::OpenUiThemeGallery => {
-                self.panels.ui_theme_gallery = true;
+                self.vaults.cur_mut().panels.ui_theme_gallery = true;
                 // Same rule as the terminal gallery: every visit starts
                 // showing everything.
-                self.theme_ui.ui_gallery_filter.clear();
-                self.theme_ui.ui_gallery_tone = None;
+                self.vaults.cur_mut().theme_ui.ui_gallery_filter.clear();
+                self.vaults.cur_mut().theme_ui.ui_gallery_tone = None;
             }
             SettingsMessage::CloseUiThemeGallery => {
-                self.panels.ui_theme_gallery = false;
+                self.vaults.cur_mut().panels.ui_theme_gallery = false;
             }
             SettingsMessage::PaneGapChanged(v) => {
                 self.vaults.cur_mut().prefs.pane_gap = v.clone();

@@ -126,45 +126,45 @@ impl Oryxis {
             }
 
             SessionGroupMessage::SessionGroupFormLabelChanged(v) => {
-                self.editor_session_group.label = v;
+                self.vaults.cur_mut().editor_session_group.label = v;
                 Task::none()
             }
             SessionGroupMessage::SessionGroupFormGroupChanged(v) => {
-                self.editor_session_group.group_name = v;
+                self.vaults.cur_mut().editor_session_group.group_name = v;
                 Task::none()
             }
             SessionGroupMessage::SessionGroupScriptAction(action) => {
-                self.session_group_script_editor.perform(action);
+                self.vaults.cur_mut().session_group_script_editor.perform(action);
                 // text_editor always reports a trailing newline; drop the one
                 // it appends so a single-line script doesn't gain a blank
                 // Enter when injected.
-                let txt = self.session_group_script_editor.text();
+                let txt = self.vaults.cur().session_group_script_editor.text();
                 let txt = txt.strip_suffix('\n').unwrap_or(&txt).to_string();
-                let cur = self.editor_session_group.current_pane;
-                if let Some(r) = self.editor_session_group.pane_rows.get_mut(cur) {
+                let cur = self.vaults.cur().editor_session_group.current_pane;
+                if let Some(r) = self.vaults.cur_mut().editor_session_group.pane_rows.get_mut(cur) {
                     r.script = txt;
                 }
                 Task::none()
             }
             SessionGroupMessage::SessionGroupPaneNav(next) => {
-                let len = self.editor_session_group.pane_rows.len();
+                let len = self.vaults.cur().editor_session_group.pane_rows.len();
                 if len > 0 {
-                    let cur = self.editor_session_group.current_pane;
+                    let cur = self.vaults.cur().editor_session_group.current_pane;
                     let new = if next {
                         (cur + 1).min(len - 1)
                     } else {
                         cur.saturating_sub(1)
                     };
-                    self.editor_session_group.current_pane = new;
+                    self.vaults.cur_mut().editor_session_group.current_pane = new;
                     // Current pane's text is already synced to its row on each
                     // action, so just reload the target row into the buffer.
                     let script = self
-                        .editor_session_group
+                        .vaults.cur().editor_session_group
                         .pane_rows
                         .get(new)
                         .map(|r| r.script.clone())
                         .unwrap_or_default();
-                    self.session_group_script_editor =
+                    self.vaults.cur_mut().session_group_script_editor =
                         iced::widget::text_editor::Content::with_text(&script);
                 }
                 Task::none()
@@ -175,8 +175,8 @@ impl Oryxis {
             }
 
             SessionGroupMessage::SessionGroupFormCancel => {
-                self.panels.session_group_panel = false;
-                self.session_group_panel_error = None;
+                self.vaults.cur_mut().panels.session_group_panel = false;
+                self.vaults.cur_mut().session_group_panel_error = None;
                 Task::none()
             }
 
@@ -184,16 +184,17 @@ impl Oryxis {
                 // Reuse the host icon/color picker, seeded from the form. The
                 // choice flows back into `editor_session_group` on the
                 // picker's Save (deferred, like the dynamic-group form).
-                let form = &self.editor_session_group;
-                self.icon_picker.icon =
+                let ov = self.vaults.cur_mut();
+                let form = &ov.editor_session_group;
+                ov.icon_picker.icon =
                     form.icon_style.clone().or_else(|| Some("boxes".to_string()));
-                self.icon_picker.color = form.color.clone();
-                self.icon_picker.hex_input = form.color.clone().unwrap_or_default();
-                self.icon_picker.for_id = None;
-                self.icon_picker.for_group_form = false;
-                self.icon_picker.for_session_group = true;
-                self.icon_picker.for_local_terminal = false;
-                self.panels.icon_picker = true;
+                ov.icon_picker.color = form.color.clone();
+                ov.icon_picker.hex_input = form.color.clone().unwrap_or_default();
+                ov.icon_picker.for_id = None;
+                ov.icon_picker.for_group_form = false;
+                ov.icon_picker.for_session_group = true;
+                ov.icon_picker.for_local_terminal = false;
+                ov.panels.icon_picker = true;
                 Task::none()
             }
 
@@ -272,14 +273,14 @@ impl Oryxis {
     fn open_session_group_editor(&mut self, mut form: SessionGroupForm) -> Task<Message> {
         // Mutually exclusive right-panel slot, close other panels first.
         self.editor_flush_pending();
-        self.panels.host_panel = false;
+        self.vaults.cur_mut().panels.host_panel = false;
         // Drop what the host editor's eyes revealed.
-        self.editor_form.sweep_secrets();
+        self.vaults.cur_mut().editor_form.sweep_secrets();
         self.panel_nav_clear();
-        self.cloud_form.visible = false;
-        self.cloud_dynamic_form.visible = false;
-        self.cloud_discover.visible = false;
-        self.group_edit.visible = false;
+        self.vaults.cur_mut().cloud_form.visible = false;
+        self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+        self.vaults.cur_mut().cloud_discover.visible = false;
+        self.vaults.cur_mut().group_edit.visible = false;
         // Seed the multi-line script buffer from the first pane.
         form.current_pane = 0;
         let first_script = form
@@ -287,25 +288,25 @@ impl Oryxis {
             .first()
             .map(|r| r.script.clone())
             .unwrap_or_default();
-        self.session_group_script_editor =
+        self.vaults.cur_mut().session_group_script_editor =
             iced::widget::text_editor::Content::with_text(&first_script);
-        self.editor_session_group = form;
-        self.session_group_panel_error = None;
-        self.panels.session_group_panel = true;
+        self.vaults.cur_mut().editor_session_group = form;
+        self.vaults.cur_mut().session_group_panel_error = None;
+        self.vaults.cur_mut().panels.session_group_panel = true;
         // Land focus in the name field so the user can type immediately
         // (otherwise the first keystrokes go nowhere, reading as broken).
         crate::widgets::focus_input(iced::widget::Id::new("session-group-name"))
     }
 
     fn save_session_group_form(&mut self) -> Task<Message> {
-        let form = &self.editor_session_group;
+        let form = self.vaults.cur().editor_session_group.clone();
         if form.label.trim().is_empty() {
-            self.session_group_panel_error =
+            self.vaults.cur_mut().session_group_panel_error =
                 Some(crate::i18n::t("session_group_label_required").to_string());
             return Task::none();
         }
         let Some(layout) = form.layout.clone() else {
-            self.panels.session_group_panel = false;
+            self.vaults.cur_mut().panels.session_group_panel = false;
             return Task::none();
         };
 
@@ -318,8 +319,9 @@ impl Oryxis {
         let group_id = if !form.group_name.trim().is_empty() {
             let name = form.group_name.trim().to_string();
             let mut created = Vec::new();
-            let gid = Group::resolve_or_create_path(&mut self.vaults.cur_mut().groups, &name, &mut created);
-            if let Some(vault) = &self.vaults.cur().store {
+            let ov = self.vaults.cur_mut();
+            let gid = Group::resolve_or_create_path(&mut ov.groups, &name, &mut created);
+            if let Some(vault) = &ov.store {
                 for g in &created {
                     let _ = vault.save_group(g);
                 }
@@ -369,12 +371,12 @@ impl Oryxis {
                         tab.session_group_id = Some(group_id_saved);
                         tab.label = group_label.clone();
                     }
-                    self.panels.session_group_panel = false;
-                    self.session_group_panel_error = None;
+                    self.vaults.cur_mut().panels.session_group_panel = false;
+                    self.vaults.cur_mut().session_group_panel_error = None;
                     self.load_data_from_vault();
                 }
                 Err(e) => {
-                    self.session_group_panel_error = Some(e.to_string());
+                    self.vaults.cur_mut().session_group_panel_error = Some(e.to_string());
                 }
             }
         }

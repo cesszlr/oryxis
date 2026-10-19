@@ -19,11 +19,11 @@ impl Oryxis {
         match message {
             KeysMessage::KeyImportCertAction(action) => {
                 let edited = action.is_edit();
-                self.keys_ui.import_cert_content.perform(action);
+                self.vaults.cur_mut().keys_ui.import_cert_content.perform(action);
                 if edited {
-                    self.keys_ui.import_form.certificate = self.keys_ui.import_cert_content.text();
-                    self.keys_ui.import_form.cert_detected = false;
-                    self.keys_ui.error = None;
+                    self.vaults.cur_mut().keys_ui.import_form.certificate = self.vaults.cur_mut().keys_ui.import_cert_content.text();
+                    self.vaults.cur_mut().keys_ui.import_form.cert_detected = false;
+                    self.vaults.cur_mut().keys_ui.error = None;
                 }
             }
             KeysMessage::BrowseCertFile => {
@@ -47,22 +47,22 @@ impl Oryxis {
                 ));
             }
             KeysMessage::CertFileLoaded(content) => {
-                self.keys_ui.import_form.certificate = content.trim().to_string();
-                self.keys_ui.import_cert_content =
+                self.vaults.cur_mut().keys_ui.import_form.certificate = content.trim().to_string();
+                self.vaults.cur_mut().keys_ui.import_cert_content =
                     text_editor::Content::with_text(content.trim());
                 // Explicitly picked, not auto-probed: no "detected" hint.
-                self.keys_ui.import_form.cert_detected = false;
-                self.keys_ui.error = None;
+                self.vaults.cur_mut().keys_ui.import_form.cert_detected = false;
+                self.vaults.cur_mut().keys_ui.error = None;
             }
             KeysMessage::ViewKeyCertificate(idx) => {
                 if let Some(data) = self.build_cert_viewer(idx) {
-                    self.cert_viewer = Some(data);
+                    self.vaults.cur_mut().cert_viewer = Some(data);
                 }
-                self.keys_ui.context_menu = None;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
                 self.overlay = None;
             }
             KeysMessage::CloseCertViewer => {
-                self.cert_viewer = None;
+                self.vaults.cur_mut().cert_viewer = None;
             }
             KeysMessage::RequestRemoveKeyCertificate(idx) => {
                 if let Some(key) = self.vaults.cur().keys.get(idx) {
@@ -72,8 +72,8 @@ impl Oryxis {
                 // The confirm dialog renders inside the main view (below the
                 // cert-viewer overlay), so close the viewer first, otherwise
                 // the confirmation would be hidden behind it.
-                self.cert_viewer = None;
-                self.keys_ui.context_menu = None;
+                self.vaults.cur_mut().cert_viewer = None;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
                 self.overlay = None;
             }
             KeysMessage::RemoveKeyCertificate(idx) => {
@@ -86,12 +86,12 @@ impl Oryxis {
                         // rewrites the (now empty) certificate column.
                         let _ = vault.save_key(&key, None);
                         self.load_data_from_vault();
-                        self.keys_ui.success =
+                        self.vaults.cur_mut().keys_ui.success =
                             Some(crate::i18n::t("key_certificate_removed").into());
                     }
                 }
-                self.cert_viewer = None;
-                self.keys_ui.context_menu = None;
+                self.vaults.cur_mut().cert_viewer = None;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
                 self.overlay = None;
             }
 

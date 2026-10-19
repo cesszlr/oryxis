@@ -148,7 +148,7 @@ impl Oryxis {
         // list, because "replace with nothing" is the deliberate way to
         // turn highlighting off on a noisy host.
         if host {
-            let selected = if self.editor_form.highlight_rules.replace {
+            let selected = if self.vaults.cur().editor_form.highlight_rules.replace {
                 t("hl_host_mode_replace")
             } else {
                 t("hl_host_mode_append")
@@ -170,7 +170,7 @@ impl Oryxis {
 
         // A rule being created or changed lives in the modal, so the list
         // here is exactly the saved rules, empty state included.
-        let open_here = self.highlight_rule_form.scope == scope;
+        let open_here = self.vaults.cur().highlight_rule_form.scope == scope;
         if rules.is_empty() {
             return col.push(
                 text(t("hl_rule_empty"))
@@ -180,7 +180,7 @@ impl Oryxis {
         }
 
         for (idx, rule) in rules.iter().enumerate() {
-            let confirming = open_here && self.highlight_rule_form.confirm_delete == Some(idx);
+            let confirming = open_here && self.vaults.cur().highlight_rule_form.confirm_delete == Some(idx);
             let label = if rule.name.trim().is_empty() {
                 rule.pattern.clone()
             } else {

@@ -353,7 +353,7 @@ impl Oryxis {
         // other modal stacked below still wins, but in practice the
         // burger menu and the bigger modals (share dialog, picker, etc.)
         // never coexist on the user's screen at the same time.
-        if self.panels.burger_menu {
+        if self.vaults.cur().panels.burger_menu {
             let menu = self.view_burger_menu();
             return wrap_with_resize(
                 Stack::<iced::Element<'_, _>>::new()
@@ -368,7 +368,7 @@ impl Oryxis {
 
         // Vault sub-nav overflow ("…") dropdown, same overlay shape as
         // the burger menu.
-        if self.panels.subnav_overflow {
+        if self.vaults.cur().panels.subnav_overflow {
             let menu = self.view_subnav_overflow_menu();
             return wrap_with_resize(
                 Stack::<iced::Element<'_, _>>::new()
@@ -382,7 +382,7 @@ impl Oryxis {
         }
 
         // Share dialog overlay
-        if self.panels.share_dialog {
+        if self.vaults.cur().panels.share_dialog {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -396,7 +396,7 @@ impl Oryxis {
 
         // The one-entry Import hub: supported-format list + the
         // detect-on-pick file button.
-        if self.panels.import_hub {
+        if self.vaults.cur().panels.import_hub {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -411,7 +411,7 @@ impl Oryxis {
         // SSH config import preview. Lists every parsed host with a
         // checkbox so the user picks which to add; hosts whose label
         // already exists are flagged and start unticked.
-        if self.panels.ssh_import_dialog {
+        if self.vaults.cur().panels.ssh_import_dialog {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -445,7 +445,7 @@ impl Oryxis {
         // group from the same surface that already gates the
         // transport choice. Transport row hides itself when the
         // batch is ECS-only since dynamic groups always run ECS Exec.
-        if self.cloud_import_confirm_visible {
+        if self.vaults.cur().cloud_import_confirm_visible {
             return self.layer_cloud_import_confirm(base, resize_overlay);
         }
 
@@ -560,7 +560,7 @@ impl Oryxis {
 
         // Folder rename modal, shown after the user picks "Rename" from
         // the folder context menu.
-        if let Some((_gid, ref input)) = self.folder_rename {
+        if let Some((_gid, ref input)) = self.vaults.cur().folder_rename {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -575,7 +575,7 @@ impl Oryxis {
         // Folder delete confirmation, three-way choice instead of a yes/no
         // since destroying hosts vs only the folder are very different
         // intentions and deserve explicit affordances.
-        if let Some(gid) = self.folder_delete {
+        if let Some(gid) = self.vaults.cur().folder_delete {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -651,7 +651,7 @@ impl Oryxis {
         }
 
         // New-tab picker (opens via the "+" button in the tab bar).
-        if self.panels.new_tab_picker {
+        if self.vaults.cur().panels.new_tab_picker {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -665,7 +665,7 @@ impl Oryxis {
 
         // Tab-jump modal, Termius-style "Jump to" list. Opens via the
         // ⋯ button in the tab bar or the global Ctrl+J shortcut.
-        if self.panels.tab_jump {
+        if self.vaults.cur().panels.tab_jump {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -696,7 +696,7 @@ impl Oryxis {
         // through `widgets::modal_overlay`: it injects a color-popover layer
         // into its own Stack, which the simple helper can't host. Stays
         // mouse-safe via `opaque` and keyboard-safe via `any_modal_blocks_input`.
-        if self.panels.icon_picker {
+        if self.vaults.cur().panels.icon_picker {
             let picker = self.view_icon_picker();
             return wrap_with_resize(
                 Stack::<iced::Element<'_, _>>::new()
@@ -712,8 +712,8 @@ impl Oryxis {
         // Chain editor (from the host editor's "Host Chaining" row). Scrim
         // dismiss is context-dependent: pop the add-a-hop sub-view first,
         // else close the editor (mirrors Esc).
-        if self.panels.chain_editor {
-            let on_scrim = if self.chain_editor_adding {
+        if self.vaults.cur().panels.chain_editor {
+            let on_scrim = if self.vaults.cur().chain_editor_adding {
                 Message::Editor(EditorMessage::ChainEditorCancelAdd)
             } else {
                 Message::Editor(EditorMessage::CloseChainEditor)
@@ -730,7 +730,7 @@ impl Oryxis {
         }
 
         // Per-host terminal theme picker (from the host editor).
-        if self.panels.theme_picker {
+        if self.vaults.cur().panels.theme_picker {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -763,7 +763,7 @@ impl Oryxis {
         // in Settings -> Terminal). Exempt from `modal_overlay` (nested color
         // popover in its own Stack); mouse-safe via `opaque`, keyboard-safe
         // via `any_modal_blocks_input`.
-        if self.theme_ui.editor.is_some() {
+        if self.vaults.cur().theme_ui.editor.is_some() {
             let editor = self.view_theme_editor_modal();
             return wrap_with_resize(
                 Stack::<iced::Element<'_, _>>::new()
@@ -783,7 +783,7 @@ impl Oryxis {
         // nothing rendered (field report: "Import stopped working").
         // `ESC_ORDER` carries the same order so Esc answers what is
         // actually on screen.
-        if self.panels.theme_import {
+        if self.vaults.cur().panels.theme_import {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -797,7 +797,7 @@ impl Oryxis {
 
         // Global terminal-theme gallery (Settings -> Terminal). The grid
         // it holds used to sit inline and dominate the page.
-        if self.panels.terminal_theme_gallery {
+        if self.vaults.cur().panels.terminal_theme_gallery {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -812,7 +812,7 @@ impl Oryxis {
         // Custom UI (chrome) theme editor (Settings -> Interface). Exempt
         // from `modal_overlay` (nested color popover in its own Stack);
         // mouse-safe via `opaque`, keyboard-safe via `any_modal_blocks_input`.
-        if self.ui_theme_editor.is_some() {
+        if self.vaults.cur().ui_theme_editor.is_some() {
             let editor = self.view_ui_theme_editor_modal();
             return wrap_with_resize(
                 Stack::<iced::Element<'_, _>>::new()
@@ -826,7 +826,7 @@ impl Oryxis {
         }
 
         // Import-a-UI-theme modal (Settings -> Interface "Import" card).
-        if self.panels.ui_theme_import {
+        if self.vaults.cur().panels.ui_theme_import {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,
@@ -841,7 +841,7 @@ impl Oryxis {
         // App-theme gallery (Settings -> Interface). Last of the theme
         // modals: the UI editor and the UI import above are both opened
         // FROM it, so they have to win the chain.
-        if self.panels.ui_theme_gallery {
+        if self.vaults.cur().panels.ui_theme_gallery {
             return wrap_with_resize(
                 crate::widgets::modal_overlay(
                     base,

@@ -24,7 +24,7 @@ impl Oryxis {
 
         let selected = self.login_script_selected();
         let (prev, next) = crate::keynav::slots::cycle_pair(
-            self.editor_login_script_combo.options(),
+            self.vaults.cur().editor_login_script_combo.options(),
             &selected,
             |v| Message::Editor(EditorMessage::EditorLoginScriptChanged(v)),
         );
@@ -32,7 +32,7 @@ impl Oryxis {
             crate::keynav::RowAction::picker(prev, next),
             10.0,
             iced::widget::combo_box(
-                &self.editor_login_script_combo,
+                &self.vaults.cur().editor_login_script_combo,
                 // Owned placeholder (frame-local String); see auth.rs.
                 selected.clone(),
                 Some(&selected),
@@ -60,7 +60,7 @@ impl Oryxis {
             picker,
         ];
 
-        if let Some(draft) = &self.editor_form.login_script_draft {
+        if let Some(draft) = &self.vaults.cur().editor_form.login_script_draft {
             block = block.push(Space::new().height(ROW_GAP).boxed()).push(
                 self.hp_login_script_draft(draft),
             );
@@ -70,7 +70,7 @@ impl Oryxis {
             // the only face the feature showed, and it read as a fixed
             // three-field form instead of a generator for that list.
             if let Some(script) = self
-                .editor_form
+                .vaults.cur().editor_form
                 .login_script_id
                 .and_then(|id| self.vaults.cur().login_scripts.iter().find(|s| s.id == id))
             {
@@ -154,9 +154,9 @@ impl Oryxis {
 
             if self.login_script_uses_target_password() {
                 let placeholder: &'static str = if self
-                    .editor_form
+                    .vaults.cur().editor_form
                     .has_existing_target_password
-                    && !self.editor_form.target_password.touched()
+                    && !self.vaults.cur().editor_form.target_password.touched()
                 {
                     "••••••••"
                 } else {
@@ -168,10 +168,10 @@ impl Oryxis {
                     t("target_password"),
                     crate::widgets::password_input_with_eye_nav(
                         placeholder,
-                        self.editor_form.target_password.as_str(),
+                        self.vaults.cur().editor_form.target_password.as_str(),
                         |v| Message::Editor(EditorMessage::EditorTargetPasswordChanged(v.into())),
                         self.hp_submit(),
-                        self.editor_form.target_password_visible,
+                        self.vaults.cur().editor_form.target_password_visible,
                         Message::Editor(EditorMessage::EditorToggleTargetPasswordVisibility),
                         10.0,
                         Some(id),
@@ -204,7 +204,7 @@ impl Oryxis {
         }
         .to_string();
         let (tpl_prev, tpl_next) = crate::keynav::slots::cycle_pair(
-            self.editor_script_template_combo.options(),
+            self.vaults.cur().editor_script_template_combo.options(),
             &template_label,
             |v| Message::Editor(EditorMessage::EditorScriptDraftTemplateChanged(v)),
         );
@@ -212,7 +212,7 @@ impl Oryxis {
             crate::keynav::RowAction::picker(tpl_prev, tpl_next),
             10.0,
             iced::widget::combo_box(
-                &self.editor_script_template_combo,
+                &self.vaults.cur().editor_script_template_combo,
                 // Owned placeholder (frame-local String); see auth.rs.
                 template_label.clone(),
                 Some(&template_label),

@@ -11,10 +11,10 @@ impl Oryxis {
         // when empty. Hops pointing at a since-deleted host resolve to
         // a placeholder rather than vanishing, so the count stays
         // honest until the user opens the editor and prunes them.
-        let chain_summary = if self.editor_form.jump_chain.is_empty() {
+        let chain_summary = if self.vaults.cur().editor_form.jump_chain.is_empty() {
             t("disabled").to_string()
         } else {
-            self.editor_form
+            self.vaults.cur().editor_form
                 .jump_chain
                 .iter()
                 .map(|id| {
@@ -110,7 +110,7 @@ impl Oryxis {
                 .color(OryxisColors::t().text_muted).boxed(),
         );
 
-        for (i, pf) in self.editor_form.port_forwards.iter().enumerate() {
+        for (i, pf) in self.vaults.cur().editor_form.port_forwards.iter().enumerate() {
             let idx = i;
             pf_items = pf_items.push(Space::new().height(8).boxed());
             // The three per-rule inputs stay mouse-only: the fork's
@@ -160,7 +160,7 @@ impl Oryxis {
         // where the user goes looking, and it is the only place the two
         // systems are visible side by side. Editing them stays on their
         // own screen, one click away.
-        if let Some(id) = self.editor_form.editing_id {
+        if let Some(id) = self.vaults.cur().editor_form.editing_id {
             let mine: Vec<&oryxis_core::models::port_forward_rule::PortForwardRule> = self
                 .vaults.cur().port_forward_rules
                 .iter()
@@ -248,7 +248,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         &self.vaults.cur().prefs.keepalive_interval,
-                        &self.editor_form.keepalive_interval,
+                        &self.vaults.cur().editor_form.keepalive_interval,
                     )
                         .id(iced::widget::Id::new("editor-keepalive"))
                         .on_input(|v| Message::Editor(EditorMessage::EditorKeepaliveChanged(v)))
@@ -288,7 +288,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         "AA:BB:CC:DD:EE:FF",
-                        &self.editor_form.mac_address,
+                        &self.vaults.cur().editor_form.mac_address,
                     )
                         .id(iced::widget::Id::new("editor-mac-address"))
                         .on_input(|v| Message::Editor(EditorMessage::EditorMacAddressChanged(v)))
@@ -323,7 +323,7 @@ impl Oryxis {
                     crate::keynav::RowAction::input(iced::widget::Id::new("editor-pick-addr-family")),
                     crate::widgets::INPUT_RADIUS,
                     pick_list(
-                        Some(self.editor_form.address_family),
+                        Some(self.vaults.cur().editor_form.address_family),
                         vec![AddressFamily::Auto, AddressFamily::V4, AddressFamily::V6],
                         |f: &AddressFamily| f.to_string(),
                     )
@@ -347,7 +347,7 @@ impl Oryxis {
         // Per-host auto-title (OSC 0/2) override: Default (inherit global) /
         // Show (always use the shell title) / Hide (always keep this host's
         // curated label).
-        let auto_title_selected = match self.editor_form.auto_title {
+        let auto_title_selected = match self.vaults.cur().editor_form.auto_title {
             Some(true) => t("host_auto_title_show"),
             Some(false) => t("host_auto_title_hide"),
             None => t("host_auto_title_default"),
@@ -398,7 +398,7 @@ impl Oryxis {
             text(t("algo_overrides_desc")).size(11).color(c.text_muted),
         ];
         for cat in AlgoCategory::ALL {
-            let is_auto = self.editor_form.algo_list(cat).is_none();
+            let is_auto = self.vaults.cur().editor_form.algo_list(cat).is_none();
             col = col.push(Space::new().height(10).boxed());
             // Explicit "Auto / Custom" picker per category; choosing Custom
             // reveals the algorithm checklist below. Left/Right cycle the
@@ -434,7 +434,7 @@ impl Oryxis {
             ));
             if !is_auto {
                 let selected: Vec<String> =
-                    self.editor_form.algo_list(cat).clone().unwrap_or_default();
+                    self.vaults.cur().editor_form.algo_list(cat).clone().unwrap_or_default();
                 let mut checks = iced::widget::Column::<iced::Element<'_, _>>::new().spacing(4);
                 for algo in cat.supported() {
                     let name = algo.to_string();
@@ -472,7 +472,7 @@ impl Oryxis {
     /// saved `ProxyIdentity` entries, selecting an identity hides the
     /// inline fields and shows a readonly summary instead.
     pub(super) fn build_proxy_rows(&self) -> iced::widget::Column<iced::Element<'_, Message>> {
-        let kind = self.editor_form.proxy_kind;
+        let kind = self.vaults.cur().editor_form.proxy_kind;
 
         // Compose the picker option list. Identity entries come from
         // `self.vaults.cur().proxy_identities` so the user can pick any saved
@@ -561,7 +561,7 @@ impl Oryxis {
                         10.0,
                         text_input(
                             crate::i18n::t("proxy_command_placeholder"),
-                            &self.editor_form.proxy_command,
+                            &self.vaults.cur().editor_form.proxy_command,
                         )
                         .id(iced::widget::Id::new("editor-proxy-command"))
                         .on_input(|v| Message::Editor(EditorMessage::EditorProxyCommandChanged(v)))
@@ -584,7 +584,7 @@ impl Oryxis {
                         10.0,
                         text_input(
                             crate::i18n::t("proxy_host_placeholder"),
-                            &self.editor_form.proxy_host,
+                            &self.vaults.cur().editor_form.proxy_host,
                         )
                         .id(iced::widget::Id::new("editor-proxy-host"))
                         .on_input(|v| Message::Editor(EditorMessage::EditorProxyHostChanged(v)))
@@ -600,7 +600,7 @@ impl Oryxis {
                     self.panel_nav_slot(
                         crate::keynav::RowAction::input(iced::widget::Id::new("editor-proxy-port")),
                         10.0,
-                        text_input("1080", &self.editor_form.proxy_port)
+                        text_input("1080", &self.vaults.cur().editor_form.proxy_port)
                             .id(iced::widget::Id::new("editor-proxy-port"))
                             .on_input(|v| Message::Editor(EditorMessage::EditorProxyPortChanged(v)))
                             .on_submit_maybe(self.hp_submit())
@@ -618,7 +618,7 @@ impl Oryxis {
                         10.0,
                         text_input(
                             crate::i18n::t("proxy_username_placeholder"),
-                            &self.editor_form.proxy_username,
+                            &self.vaults.cur().editor_form.proxy_username,
                         )
                         .id(iced::widget::Id::new("editor-proxy-username"))
                         .on_input(|v| Message::Editor(EditorMessage::EditorProxyUsernameChanged(v)))
@@ -634,8 +634,8 @@ impl Oryxis {
             // Mirror the main connection-password UX: show a hint when
             // the encrypted column already holds a value, and let the
             // user clear or replace it via the touched flag.
-            let placeholder: &str = if self.editor_form.has_existing_proxy_password
-                && !self.editor_form.proxy_password.touched()
+            let placeholder: &str = if self.vaults.cur().editor_form.has_existing_proxy_password
+                && !self.vaults.cur().editor_form.proxy_password.touched()
             {
                 crate::i18n::t("proxy_password_existing")
             } else {
@@ -651,10 +651,10 @@ impl Oryxis {
                     crate::i18n::t("proxy_password"),
                     crate::widgets::password_input_with_eye_nav(
                         placeholder,
-                        self.editor_form.proxy_password.as_str(),
+                        self.vaults.cur().editor_form.proxy_password.as_str(),
                         |v| Message::Editor(EditorMessage::EditorProxyPasswordChanged(v.into())),
                         self.hp_submit(),
-                        self.editor_form.proxy_password_visible,
+                        self.vaults.cur().editor_form.proxy_password_visible,
                         Message::Editor(EditorMessage::EditorToggleProxyPasswordVisibility),
                         10.0,
                         Some(iced::widget::Id::new("editor-proxy-password")),

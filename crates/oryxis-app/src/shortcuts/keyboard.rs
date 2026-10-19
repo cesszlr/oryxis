@@ -96,12 +96,12 @@ impl Oryxis {
         //      editor). The next chord becomes the snippet's custom
         //      run hotkey; Esc cancels. Guarded on the editor being
         //      open so a stale flag can't eat keys elsewhere.
-        if self.snippet_form.hotkey_capturing {
-            if !self.panels.snippet_panel {
-                self.snippet_form.hotkey_capturing = false;
+        if self.vaults.cur().snippet_form.hotkey_capturing {
+            if !self.vaults.cur().panels.snippet_panel {
+                self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
             } else {
                 if matches!(key, Key::Named(Named::Escape)) {
-                    self.snippet_form.hotkey_capturing = false;
+                    self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
                     return Some(Task::none());
                 }
                 if matches!(
@@ -128,7 +128,7 @@ impl Oryxis {
                 // Conflicts: the static table and other snippets.
                 let in_table = self.hotkey_bindings.values().any(|b| b.shares_keypress(&binding));
                 let in_snippets = self.vaults.cur().snippets.iter().any(|sn| {
-                    self.snippet_form.editing_id != Some(sn.id)
+                    self.vaults.cur().snippet_form.editing_id != Some(sn.id)
                         && sn.hotkey.as_deref()
                             == Some(binding.serialize()).as_deref()
                 });
@@ -136,8 +136,8 @@ impl Oryxis {
                     self.set_toast(crate::i18n::t("snippet_hotkey_in_use").to_string());
                     return Some(super::toast_clear_after_secs(2));
                 }
-                self.snippet_form.hotkey = Some(binding);
-                self.snippet_form.hotkey_capturing = false;
+                self.vaults.cur_mut().snippet_form.hotkey = Some(binding);
+                self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
                 return Some(Task::none());
             }
         }
@@ -216,7 +216,7 @@ impl Oryxis {
         // pane, and the pending split would be taken by the queued
         // dial (`ConnectSsh` reads it) and fill the old tab instead.
         let picker_exempt = |a: HotkeyAction| {
-            self.panels.new_tab_picker
+            self.vaults.cur().panels.new_tab_picker
                 && match a {
                     HotkeyAction::OpenLocalShell => true,
                     HotkeyAction::OpenSftp | HotkeyAction::ConnectInNewWindow => {
@@ -310,7 +310,7 @@ impl Oryxis {
         //      the action types into the focused session; a hybrid tab
         //      in Files mode gates PTY writes off, so firing here would
         //      just dead-end (worst case through the vars modal).
-        if !modal_owns_keys && pty_owns_keys && !self.panels.snippet_panel {
+        if !modal_owns_keys && pty_owns_keys && !self.vaults.cur().panels.snippet_panel {
             let hit = self.vaults.cur().snippets.iter().position(|sn| {
                 sn.hotkey
                     .as_deref()
@@ -464,7 +464,7 @@ impl Oryxis {
             // (and dismiss the picker either way). The global action
             // opens a new tab and would quietly drop the split, so the
             // printed hint would lie about its own row.
-            OpenLocalShell if self.panels.new_tab_picker => {
+            OpenLocalShell if self.vaults.cur().panels.new_tab_picker => {
                 Task::done(Message::Tabs(TabsMessage::PickLocalShell))
             }
             OpenLocalShell => Task::done(Message::Settings(SettingsMessage::OpenLocalShell)),
@@ -859,11 +859,11 @@ impl Oryxis {
             // connects exactly that card; with no ringed card, the
             // dashboard selection in view order, the selection menu's
             // own list. The handler queues the dials like the menu rows.
-            ConnectInNewWindow if self.panels.new_tab_picker => {
+            ConnectInNewWindow if self.vaults.cur().panels.new_tab_picker => {
                 match self.new_tab_picker_highlighted_host() {
                     Some(id) => {
                         // `HideNewTabPicker`'s teardown, then the dial.
-                        self.panels.new_tab_picker = false;
+                        self.vaults.cur_mut().panels.new_tab_picker = false;
                         self.pending_pane_split = None;
                         self.new_tab_picker_group = None;
                         Task::done(Message::Tabs(TabsMessage::ConnectHostsInNewWindow(vec![id])))

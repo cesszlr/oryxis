@@ -157,18 +157,18 @@ impl crate::app::Oryxis {
                 // if the user had pasted the file: Apply -> editor ->
                 // Save keeps every existing validation and confirm.
                 let section = if ui {
-                    self.panels.ui_theme_import = true;
-                    self.ui_theme_import_content =
+                    self.vaults.cur_mut().panels.ui_theme_import = true;
+                    self.vaults.cur_mut().ui_theme_import_content =
                         iced::widget::text_editor::Content::with_text(&json);
-                    self.ui_theme_import_name.clear();
-                    self.ui_theme_import_error = None;
+                    self.vaults.cur_mut().ui_theme_import_name.clear();
+                    self.vaults.cur_mut().ui_theme_import_error = None;
                     crate::state::SettingsSection::Interface
                 } else {
-                    self.panels.theme_import = true;
-                    self.theme_ui.import_content =
+                    self.vaults.cur_mut().panels.theme_import = true;
+                    self.vaults.cur_mut().theme_ui.import_content =
                         iced::widget::text_editor::Content::with_text(&json);
-                    self.theme_ui.import_name.clear();
-                    self.theme_ui.import_error = None;
+                    self.vaults.cur_mut().theme_ui.import_name.clear();
+                    self.vaults.cur_mut().theme_ui.import_error = None;
                     crate::state::SettingsSection::Terminal
                 };
                 Task::done(Message::Tabs(TabsMessage::OpenSettingsSection(section)))

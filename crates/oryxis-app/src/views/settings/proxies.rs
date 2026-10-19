@@ -198,7 +198,7 @@ impl Oryxis {
         // Empty + no form open → polished centered empty state (matches
         // Hosts / Keychain / Snippets), no toolbar (search hidden + the
         // "+ New" lives in the CTA).
-        if self.vaults.cur().proxy_identities.is_empty() && !self.proxy_identity_form.visible {
+        if self.vaults.cur().proxy_identities.is_empty() && !self.vaults.cur().proxy_identity_form.visible {
             let empty = crate::widgets::empty_state(
                 iced_fonts::lucide::router()
                     .size(32)
@@ -237,7 +237,7 @@ impl Oryxis {
         } else {
             search_slot
         };
-        let trailing: Element<'_, Message> = if self.proxy_identity_form.visible {
+        let trailing: Element<'_, Message> = if self.vaults.cur().proxy_identity_form.visible {
             Space::new().height(Length::Fixed(32.0)).boxed()
         } else if buttons_overflow {
             self.keynav_toolbar_slot(
@@ -302,7 +302,7 @@ impl Oryxis {
         // Focusable select: Tab reaches it, Enter/Space open it, the
         // widget owns arrows/Esc while focused (fork support).
         let kind_picker = pick_list(
-            Some(self.proxy_identity_form.kind),
+            Some(self.vaults.cur().proxy_identity_form.kind),
             wire_kinds,
             |k: &ProxyKind| k.to_string(),
         )
@@ -314,13 +314,13 @@ impl Oryxis {
         .style(crate::widgets::rounded_pick_list_style);
 
         let pw_placeholder: &str = crate::widgets::password_placeholder(
-            self.proxy_identity_form.has_existing_password,
-            self.proxy_identity_form.password.touched(),
+            self.vaults.cur().proxy_identity_form.has_existing_password,
+            self.vaults.cur().proxy_identity_form.password.touched(),
             crate::i18n::t("proxy_password_placeholder"),
         );
 
 
-        let save_label = if self.proxy_identity_form.editing_id.is_some() {
+        let save_label = if self.vaults.cur().proxy_identity_form.editing_id.is_some() {
             crate::i18n::t("save")
         } else {
             crate::i18n::t("add")
@@ -342,7 +342,7 @@ impl Oryxis {
                         "panel-proxy-identity-label",
                     )),
                     10.0,
-                    text_input("home-bastion", &self.proxy_identity_form.label)
+                    text_input("home-bastion", &self.vaults.cur().proxy_identity_form.label)
                         .id(iced::widget::Id::new("panel-proxy-identity-label"))
                         .on_input(|v| Message::ProxyIdentity(ProxyIdentityMessage::ProxyIdentityFormLabelChanged(v)))
                         .padding(10)
@@ -371,7 +371,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         crate::i18n::t("proxy_host_placeholder"),
-                        &self.proxy_identity_form.host,
+                        &self.vaults.cur().proxy_identity_form.host,
                     )
                     .id(iced::widget::Id::new("panel-proxy-identity-host"))
                     .on_input(|v| Message::ProxyIdentity(ProxyIdentityMessage::ProxyIdentityFormHostChanged(v)))
@@ -388,7 +388,7 @@ impl Oryxis {
                         "panel-proxy-identity-port",
                     )),
                     10.0,
-                    text_input("1080", &self.proxy_identity_form.port)
+                    text_input("1080", &self.vaults.cur().proxy_identity_form.port)
                         .id(iced::widget::Id::new("panel-proxy-identity-port"))
                         .on_input(|v| Message::ProxyIdentity(ProxyIdentityMessage::ProxyIdentityFormPortChanged(v)))
                         .padding(6)
@@ -407,7 +407,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         crate::i18n::t("proxy_username_placeholder"),
-                        &self.proxy_identity_form.username,
+                        &self.vaults.cur().proxy_identity_form.username,
                     )
                     .id(iced::widget::Id::new("panel-proxy-identity-username"))
                     .on_input(|v| Message::ProxyIdentity(ProxyIdentityMessage::ProxyIdentityFormUsernameChanged(v)))
@@ -426,10 +426,10 @@ impl Oryxis {
                 ));
                 crate::widgets::password_input_with_eye_nav(
                     pw_placeholder,
-                    self.proxy_identity_form.password.as_str(),
+                    self.vaults.cur().proxy_identity_form.password.as_str(),
                     |v| Message::ProxyIdentity(ProxyIdentityMessage::ProxyIdentityFormPasswordChanged(v.into())),
                     Some(Message::ProxyIdentity(ProxyIdentityMessage::SaveProxyIdentity)),
-                    self.proxy_identity_form.password_visible,
+                    self.vaults.cur().proxy_identity_form.password_visible,
                     Message::ProxyIdentity(ProxyIdentityMessage::ProxyIdentityFormPasswordToggleVisibility),
                     10.0,
                     Some(iced::widget::Id::new("panel-proxy-identity-password")),
@@ -449,7 +449,7 @@ impl Oryxis {
         // ── Header (title + close), matching the host / session-group
         // side panels so every editor reads the same. The close (×) is
         // not a keyboard row: Esc already owns panel close. ──
-        let title = if self.proxy_identity_form.editing_id.is_some() {
+        let title = if self.vaults.cur().proxy_identity_form.editing_id.is_some() {
             crate::i18n::t("edit_proxy_identity")
         } else {
             crate::i18n::t("new_proxy_identity")
@@ -489,7 +489,7 @@ impl Oryxis {
 
         // Inline error sits OUTSIDE the scrollable, just above the footer,
         // so it stays visible regardless of scroll position.
-        let error_el = crate::widgets::form_error(self.proxy_identity_form.error.as_deref());
+        let error_el = crate::widgets::form_error(self.vaults.cur().proxy_identity_form.error.as_deref());
 
         // Footer rows are recorded here (not where the buttons are
         // built above) so they land after the form fields.

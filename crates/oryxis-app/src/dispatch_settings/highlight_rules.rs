@@ -50,7 +50,7 @@ impl Oryxis {
     fn rules_of(&mut self, scope: RuleScope) -> &mut Vec<HighlightRule> {
         match scope {
             RuleScope::Global => &mut self.vaults.cur_mut().prefs.highlight_rules,
-            RuleScope::Host => &mut self.editor_form.highlight_rules.rules,
+            RuleScope::Host => &mut self.vaults.cur_mut().editor_form.highlight_rules.rules,
         }
     }
 
@@ -70,7 +70,7 @@ impl Oryxis {
     /// which row is asking to be deleted), and answering one of those
     /// by closing the other surface would be a surprise.
     pub(crate) fn close_highlight_rule_editor(&mut self) {
-        let form = &mut self.highlight_rule_form;
+        let form = &mut self.vaults.cur_mut().highlight_rule_form;
         form.editing = None;
         form.creating = false;
         form.rule = HighlightRule::default();
@@ -100,7 +100,7 @@ impl Oryxis {
                     ));
                 }
                 let at = self.rules_of(scope).len();
-                self.highlight_rule_form = crate::state::HighlightRuleForm {
+                self.vaults.cur_mut().highlight_rule_form = crate::state::HighlightRuleForm {
                     scope,
                     editing: Some(at),
                     creating: true,
@@ -118,7 +118,7 @@ impl Oryxis {
             }
             SettingsMessage::HighlightRuleEdit(scope, idx) => {
                 if let Some(rule) = self.rules_of(scope).get(idx).cloned() {
-                    self.highlight_rule_form = crate::state::HighlightRuleForm {
+                    self.vaults.cur_mut().highlight_rule_form = crate::state::HighlightRuleForm {
                         scope,
                         editing: Some(idx),
                         creating: false,
@@ -132,31 +132,31 @@ impl Oryxis {
                 // Replace is the deliberate choice, so anything that is
                 // not it means append; that also makes an unknown label
                 // (a stale localized string) land on the safe side.
-                self.editor_form.highlight_rules.replace =
+                self.vaults.cur_mut().editor_form.highlight_rules.replace =
                     label == crate::i18n::t("hl_host_mode_replace");
             }
             SettingsMessage::HighlightRuleCancelEdit => self.close_highlight_rule_editor(),
             SettingsMessage::HighlightRuleNameChanged(v) => {
-                self.highlight_rule_form.rule.name = v;
+                self.vaults.cur_mut().highlight_rule_form.rule.name = v;
             }
             SettingsMessage::HighlightRulePatternChanged(v) => {
-                self.highlight_rule_form.rule.pattern =
+                self.vaults.cur_mut().highlight_rule_form.rule.pattern =
                     v.chars().filter(|c| *c != '\n' && *c != '\r').take(MAX_PATTERN_LEN).collect();
                 // Typing is how a bad pattern gets fixed, so the error
                 // clears as soon as it changes rather than sitting there
                 // until the next save attempt.
-                self.highlight_rule_form.error = None;
+                self.vaults.cur_mut().highlight_rule_form.error = None;
             }
             SettingsMessage::HighlightRuleToggleRegex => {
-                self.highlight_rule_form.rule.is_regex = !self.highlight_rule_form.rule.is_regex;
-                self.highlight_rule_form.error = None;
+                self.vaults.cur_mut().highlight_rule_form.rule.is_regex = !self.vaults.cur_mut().highlight_rule_form.rule.is_regex;
+                self.vaults.cur_mut().highlight_rule_form.error = None;
             }
             SettingsMessage::HighlightRuleToggleCaseSensitive => {
-                self.highlight_rule_form.rule.case_sensitive =
-                    !self.highlight_rule_form.rule.case_sensitive;
+                self.vaults.cur_mut().highlight_rule_form.rule.case_sensitive =
+                    !self.vaults.cur().highlight_rule_form.rule.case_sensitive;
             }
             SettingsMessage::HighlightRuleColorChanged(hex) => {
-                self.highlight_rule_form.rule.color = hex;
+                self.vaults.cur_mut().highlight_rule_form.rule.color = hex;
             }
             SettingsMessage::HighlightRuleActionChanged(label) => {
                 if let Some((action, _)) =
@@ -165,9 +165,9 @@ impl Oryxis {
                     // Picking "send a snippet" keeps whichever snippet was
                     // already chosen, so cycling through the list and back
                     // does not silently drop it.
-                    self.highlight_rule_form.rule.action = match action {
+                    self.vaults.cur_mut().highlight_rule_form.rule.action = match action {
                         TriggerAction::Snippet { .. } => {
-                            let id = match &self.highlight_rule_form.rule.action {
+                            let id = match &self.vaults.cur().highlight_rule_form.rule.action {
                                 TriggerAction::Snippet { id } => id.clone(),
                                 _ => self
                                     .vaults.cur().snippets
@@ -183,15 +183,15 @@ impl Oryxis {
             }
             SettingsMessage::HighlightRuleSnippetChanged(label) => {
                 if let Some(snippet) = self.vaults.cur().snippets.iter().find(|s| s.label == label) {
-                    self.highlight_rule_form.rule.action = TriggerAction::Snippet {
+                    self.vaults.cur_mut().highlight_rule_form.rule.action = TriggerAction::Snippet {
                         id: snippet.id.to_string(),
                     };
                 }
             }
             SettingsMessage::HighlightRuleSave => {
-                let rule = self.highlight_rule_form.rule.clone();
+                let rule = self.vaults.cur().highlight_rule_form.rule.clone();
                 if let Err(e) = crate::highlight_rules::validate(&rule.pattern, rule.is_regex) {
-                    self.highlight_rule_form.error = Some(if rule.pattern.trim().is_empty() {
+                    self.vaults.cur_mut().highlight_rule_form.error = Some(if rule.pattern.trim().is_empty() {
                         crate::i18n::t("hl_rule_pattern_required").to_string()
                     } else {
                         format!("{}: {e}", crate::i18n::t("hl_rule_bad_pattern"))
@@ -204,22 +204,22 @@ impl Oryxis {
                 if let TriggerAction::Snippet { id } = &rule.action
                     && !self.vaults.cur().snippets.iter().any(|s| s.id.to_string() == *id)
                 {
-                    self.highlight_rule_form.error =
+                    self.vaults.cur_mut().highlight_rule_form.error =
                         Some(crate::i18n::t("hl_rule_snippet_required").to_string());
                     return Ok(Task::none());
                 }
-                let Some(idx) = self.highlight_rule_form.editing else {
+                let Some(idx) = self.vaults.cur().highlight_rule_form.editing else {
                     return Ok(Task::none());
                 };
-                let scope = self.highlight_rule_form.scope;
-                let creating = self.highlight_rule_form.creating;
+                let scope = self.vaults.cur().highlight_rule_form.scope;
+                let creating = self.vaults.cur().highlight_rule_form.creating;
                 let list = self.rules_of(scope);
                 if creating {
                     list.push(rule);
                 } else if let Some(slot) = list.get_mut(idx) {
                     *slot = rule;
                 }
-                self.highlight_rule_form = crate::state::HighlightRuleForm {
+                self.vaults.cur_mut().highlight_rule_form = crate::state::HighlightRuleForm {
                     scope,
                     ..Default::default()
                 };
@@ -241,7 +241,7 @@ impl Oryxis {
                     list.swap(idx, other);
                     // The editor addresses rules by index, so a move
                     // under an open editor would retarget it.
-                    self.highlight_rule_form = crate::state::HighlightRuleForm {
+                    self.vaults.cur_mut().highlight_rule_form = crate::state::HighlightRuleForm {
                         scope,
                         ..Default::default()
                     };
@@ -249,17 +249,17 @@ impl Oryxis {
                 }
             }
             SettingsMessage::HighlightRuleRequestDelete(scope, idx) => {
-                self.highlight_rule_form.scope = scope;
-                self.highlight_rule_form.confirm_delete = Some(idx);
+                self.vaults.cur_mut().highlight_rule_form.scope = scope;
+                self.vaults.cur_mut().highlight_rule_form.confirm_delete = Some(idx);
             }
             SettingsMessage::HighlightRuleCancelDelete => {
-                self.highlight_rule_form.confirm_delete = None;
+                self.vaults.cur_mut().highlight_rule_form.confirm_delete = None;
             }
             SettingsMessage::HighlightRuleDelete(scope, idx) => {
                 let list = self.rules_of(scope);
                 if idx < list.len() {
                     list.remove(idx);
-                    self.highlight_rule_form = crate::state::HighlightRuleForm {
+                    self.vaults.cur_mut().highlight_rule_form = crate::state::HighlightRuleForm {
                         scope,
                         ..Default::default()
                     };

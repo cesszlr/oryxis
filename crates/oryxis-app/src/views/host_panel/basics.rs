@@ -12,7 +12,7 @@ impl Oryxis {
         let label_field: Element<'_, Message> = self.panel_nav_slot(
             crate::keynav::RowAction::input(iced::widget::Id::new("editor-label")),
             10.0,
-            text_input(t("my_server_placeholder"), &self.editor_form.label)
+            text_input(t("my_server_placeholder"), &self.vaults.cur().editor_form.label)
                 .id(iced::widget::Id::new("editor-label"))
                 .on_input(|v| Message::Editor(EditorMessage::EditorLabelChanged(v))).on_submit_maybe(self.hp_submit()).padding(10)
                 .style(crate::widgets::rounded_input_style).align_x(dir_align_x()).boxed(),
@@ -37,7 +37,7 @@ impl Oryxis {
         // old folder straight back. A text_input never shows a value it
         // does not hold.
         const PARENT_COMBO_HEIGHT: f32 = 36.0;
-        let has_group = !self.editor_form.group_name.trim().is_empty();
+        let has_group = !self.vaults.cur().editor_form.group_name.trim().is_empty();
         let rtl = crate::i18n::is_rtl_layout();
         // Trailing room for the clear button so it never covers typed
         // text; constant whether or not the button is live, so toggling
@@ -46,7 +46,7 @@ impl Oryxis {
         let (pad_left, pad_right) = if rtl { (trailing, 10.0) } else { (10.0, trailing) };
         let parent_input: Element<'_, Message> = text_input(
             t("group_placeholder"),
-            &self.editor_form.group_name,
+            &self.vaults.cur().editor_form.group_name,
         )
         .id(iced::widget::Id::new("editor-parent-group"))
         .on_input(|v| Message::Editor(EditorMessage::EditorGroupChanged(v)))
@@ -174,7 +174,7 @@ impl Oryxis {
         let tags_field: Element<'_, Message> = self.panel_nav_slot(
             crate::keynav::RowAction::input(iced::widget::Id::new("editor-tags")),
             10.0,
-            text_input(t("tags_placeholder"), &self.editor_form.tags_text)
+            text_input(t("tags_placeholder"), &self.vaults.cur().editor_form.tags_text)
                 .id(iced::widget::Id::new("editor-tags"))
                 .on_input(|v| Message::Editor(EditorMessage::EditorTagsChanged(v)))
                 .on_submit_maybe(self.hp_submit())
@@ -190,7 +190,7 @@ impl Oryxis {
         // ── Section: Address ──
         // Icon + color reflect the detected OS (once the silent probe has
         // run) or a user-picked override.
-        let editing_conn = self.editor_form.editing_id.and_then(|id| {
+        let editing_conn = self.vaults.cur().editor_form.editing_id.and_then(|id| {
             self.vaults.cur().connections.iter().find(|c| c.id == id)
         });
         let (addr_glyph, addr_color) = crate::os_icon::resolve_for(
@@ -204,7 +204,7 @@ impl Oryxis {
         // opens the icon/color picker so the user can override the OS mark.
         // For new (unsaved) hosts the id doesn't exist yet, so it's just a
         // static badge until the first save (and not a keyboard row).
-        let icon_element: Element<'_, Message> = if let Some(id) = self.editor_form.editing_id {
+        let icon_element: Element<'_, Message> = if let Some(id) = self.vaults.cur().editor_form.editing_id {
             self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::Tabs(TabsMessage::ShowIconPicker(id))),
                 8.0,
@@ -253,7 +253,7 @@ impl Oryxis {
                 10.0,
                 text_input(
                     if is_serial { t("serial_port_path_ph") } else { t("ip_or_hostname") },
-                    &self.editor_form.hostname,
+                    &self.vaults.cur().editor_form.hostname,
                 )
                     .id(iced::widget::Id::new("editor-hostname"))
                     .on_input(|v| Message::Editor(EditorMessage::EditorHostnameChanged(v)))
@@ -275,7 +275,7 @@ impl Oryxis {
         // It used to be a separate "Add remote desktop" entry in the add
         // menu, which meant a user looking for RDP opened this list,
         // failed to find it, and concluded the app had none.
-        let protocol_row: Option<Element<'_, Message>> = if self.editor_form.cloud_transport
+        let protocol_row: Option<Element<'_, Message>> = if self.vaults.cur().editor_form.cloud_transport
             .is_some()
         {
             None
@@ -286,13 +286,13 @@ impl Oryxis {
             // is offered only where it can actually be used; a host that
             // already IS one keeps the option visible, or editing it
             // would silently rewrite its protocol on the next pick.
-            if self.vaults.cur().remote_desktop_enabled || self.editor_form.protocol == Proto::RemoteDesktop {
+            if self.vaults.cur().remote_desktop_enabled || self.vaults.cur().editor_form.protocol == Proto::RemoteDesktop {
                 options.push(Proto::RemoteDesktop);
             }
             let picker = self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("editor-pick-protocol")),
                 crate::widgets::INPUT_RADIUS,
-                pick_list(Some(self.editor_form.protocol), options, |p| p.to_string())
+                pick_list(Some(self.vaults.cur().editor_form.protocol), options, |p| p.to_string())
                     .on_select(|v| Message::Editor(EditorMessage::EditorProtocolChanged(v)))
                     .id(iced::widget::Id::new("editor-pick-protocol"))
                     .on_open(Message::Navigation(NavigationMessage::PickOpenChanged(true)))
@@ -321,7 +321,7 @@ impl Oryxis {
         // Built here (before the SSH card widgets) so its keyboard row
         // records in visual order inside the Host card.
         let cloud_transport_row: Option<Element<'_, Message>> =
-            self.editor_form.cloud_transport.map(|current| {
+            self.vaults.cur().editor_form.cloud_transport.map(|current| {
                 use oryxis_core::models::cloud::TransportKind;
                 let options = vec![
                     TransportKind::Ssh,
@@ -380,7 +380,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("editor-port")),
                 10.0,
-                text_input("22", &self.editor_form.port)
+                text_input("22", &self.vaults.cur().editor_form.port)
                     .id(iced::widget::Id::new("editor-port"))
                     .on_input(|v| Message::Editor(EditorMessage::EditorPortChanged(v)))
                     .on_submit_maybe(self.hp_submit())
@@ -401,7 +401,7 @@ impl Oryxis {
     /// invalid certificate" on a plain-Telnet host reads as a setting
     /// that is protecting something.
     pub(super) fn hp_telnet_tls_block(&self) -> Element<'_, Message> {
-        let tls_on = self.editor_form.telnet_tls;
+        let tls_on = self.vaults.cur().editor_form.telnet_tls;
         let tls_row = self.panel_nav_slot(
             crate::keynav::RowAction::activate(Message::Editor(
                 EditorMessage::EditorToggleTelnetTls,
@@ -424,7 +424,7 @@ impl Oryxis {
                     iced_fonts::lucide::shield_alert(),
                     t("telnet_tls_insecure"),
                     hp_toggle_button(
-                        self.editor_form.telnet_tls_insecure,
+                        self.vaults.cur().editor_form.telnet_tls_insecure,
                         Message::Editor(EditorMessage::EditorToggleTelnetTlsInsecure),
                     ),
                 ),
@@ -473,7 +473,7 @@ impl Oryxis {
     /// escape is: a server path on a host that does not use mosh reads
     /// as a setting that is doing something.
     pub(super) fn hp_mosh_block(&self) -> Element<'_, Message> {
-        let on = self.editor_form.mosh_enabled;
+        let on = self.vaults.cur().editor_form.mosh_enabled;
         let toggle_row = self.panel_nav_slot(
             crate::keynav::RowAction::activate(Message::Editor(EditorMessage::EditorToggleMosh)),
             8.0,
@@ -498,7 +498,7 @@ impl Oryxis {
                 t("mosh_server_path"),
                 self.hp_mosh_field(
                     "editor-mosh-server-path",
-                    &self.editor_form.mosh_server_path,
+                    &self.vaults.cur().editor_form.mosh_server_path,
                     "mosh_server_path_placeholder",
                     EditorMessage::EditorMoshServerPathChanged,
                 ),
@@ -508,7 +508,7 @@ impl Oryxis {
                 t("mosh_port_range"),
                 self.hp_mosh_field(
                     "editor-mosh-port-range",
-                    &self.editor_form.mosh_port_range,
+                    &self.vaults.cur().editor_form.mosh_port_range,
                     "mosh_port_range_placeholder",
                     EditorMessage::EditorMoshPortRangeChanged,
                 ),
@@ -521,7 +521,7 @@ impl Oryxis {
                 t("mosh_command"),
                 self.hp_mosh_field(
                     "editor-mosh-command",
-                    &self.editor_form.mosh_command,
+                    &self.vaults.cur().editor_form.mosh_command,
                     "mosh_command_placeholder",
                     EditorMessage::EditorMoshCommandChanged,
                 ),
@@ -546,7 +546,7 @@ impl Oryxis {
         let mut labels: Vec<String> = vec![t("local_default_shell").to_string()];
         labels.extend(entries.iter().map(|e| e.label.clone()));
         let selected = self
-            .editor_form
+            .vaults.cur().editor_form
             .local_terminal_id
             .and_then(|id| entries.iter().find(|e| e.id == id))
             .map(|e| e.label.clone())
@@ -581,7 +581,7 @@ impl Oryxis {
         let cwd_field = self.panel_nav_slot(
             crate::keynav::RowAction::input(iced::widget::Id::new("editor-local-cwd")),
             10.0,
-            text_input(t("local_cwd_placeholder"), &self.editor_form.local_cwd)
+            text_input(t("local_cwd_placeholder"), &self.vaults.cur().editor_form.local_cwd)
                 .id(iced::widget::Id::new("editor-local-cwd"))
                 .on_input(|v| Message::Editor(EditorMessage::EditorLocalCwdChanged(v)))
                 .on_submit_maybe(self.hp_submit())

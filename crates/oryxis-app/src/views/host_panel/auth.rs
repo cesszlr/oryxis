@@ -11,7 +11,7 @@ impl Oryxis {
             t("auth_password").to_string(),
             t("auth_key").to_string(),
         ];
-        if crate::util::security_key_method_offered(&self.editor_form.auth_method) {
+        if crate::util::security_key_method_offered(&self.vaults.cur().editor_form.auth_method) {
             auth_options.push(t("auth_security_key").to_string());
         }
         auth_options.extend([
@@ -20,7 +20,7 @@ impl Oryxis {
             t("auth_interactive").to_string(),
             t("auth_password_prompt").to_string(),
         ]);
-        let auth_selected = crate::util::auth_method_label(&self.editor_form.auth_method);
+        let auth_selected = crate::util::auth_method_label(&self.vaults.cur().editor_form.auth_method);
         // Focusable select: Tab reaches it, Enter/Space open it, the
         // widget owns arrows/Esc while focused (fork support).
         let row_auth_method: Element<'_, Message> = if is_ssh {
@@ -63,12 +63,12 @@ impl Oryxis {
         // is the preferred agent identity (B3: offered first, security
         // keys sorted to the top) with a delegation help line; under
         // `Key` no hint is shown, the method is strictly the bare key.
-        let cert_mode = self.editor_form.auth_method == AuthMethod::Certificate;
-        let agent_mode = self.editor_form.auth_method == AuthMethod::Agent;
-        let hardware_mode = self.editor_form.auth_method == AuthMethod::SecurityKey;
+        let cert_mode = self.vaults.cur().editor_form.auth_method == AuthMethod::Certificate;
+        let agent_mode = self.vaults.cur().editor_form.auth_method == AuthMethod::Agent;
+        let hardware_mode = self.vaults.cur().editor_form.auth_method == AuthMethod::SecurityKey;
         let ssh_key_row: Option<Element<'_, Message>> = if is_ssh
-            && self.editor_form.selected_identity.is_none()
-            && (self.editor_form.auth_method == AuthMethod::Key
+            && self.vaults.cur().editor_form.selected_identity.is_none()
+            && (self.vaults.cur().editor_form.auth_method == AuthMethod::Key
                 || cert_mode
                 || agent_mode
                 || hardware_mode)
@@ -107,14 +107,14 @@ impl Oryxis {
             // startup combo): options + clear-on-focus built in
             // `rebuild_editor_combos` / `EditorKeyComboOpened`.
             let key_selected = self
-                .editor_form
+                .vaults.cur().editor_form
                 .selected_key
                 .clone()
                 .unwrap_or_else(|| "(none)".into());
             // Keyboard row: Left/Right cycle the saved keys (the combo
             // itself cannot be focused by id in the fork).
             let (key_prev, key_next) = crate::keynav::slots::cycle_pair(
-                self.editor_key_combo.options(),
+                self.vaults.cur().editor_key_combo.options(),
                 &key_selected,
                 |v| Message::Editor(EditorMessage::EditorKeyChanged(v)),
             );
@@ -122,7 +122,7 @@ impl Oryxis {
                 crate::keynav::RowAction::picker(key_prev, key_next),
                 10.0,
                 iced::widget::combo_box(
-                    &self.editor_key_combo,
+                    &self.vaults.cur().editor_key_combo,
                     // Owned placeholder: post-refactor it is an 'a
                     // fragment, and this String is frame-local. The
                     // selection stays a borrow (cloned by the widget).
@@ -207,7 +207,7 @@ impl Oryxis {
                     .iter()
                     .any(|k| k.algorithm.is_security_key() && k.has_private)
                     || matches!(
-                        self.editor_form.disk_key_status,
+                        self.vaults.cur().editor_form.disk_key_status,
                         oryxis_vault::DiskKeyStatus::Ready { .. }
                     );
                 let mut col = iced::widget::Column::<iced::Element<'_, _>>::new();
@@ -260,7 +260,7 @@ impl Oryxis {
                 // the vault carries one" warning would contradict the
                 // disk block right below it.
                 && !matches!(
-                    self.editor_form.disk_key_status,
+                    self.vaults.cur().editor_form.disk_key_status,
                     oryxis_vault::DiskKeyStatus::Ready { certificate: true, .. }
                 )
             {
@@ -370,12 +370,12 @@ impl Oryxis {
     /// obstacle rather than just going quiet.
     pub(super) fn hp_disk_key_block(&self, is_ssh: bool) -> Element<'_, Message> {
         use oryxis_vault::DiskKeyStatus as St;
-        let cert_mode = self.editor_form.auth_method == AuthMethod::Certificate;
+        let cert_mode = self.vaults.cur().editor_form.auth_method == AuthMethod::Certificate;
         let offers_key = matches!(
-            self.editor_form.auth_method,
+            self.vaults.cur().editor_form.auth_method,
             AuthMethod::Key | AuthMethod::Auto | AuthMethod::Certificate | AuthMethod::SecurityKey
         );
-        if !is_ssh || !offers_key || self.editor_form.selected_identity.is_some() {
+        if !is_ssh || !offers_key || self.vaults.cur().editor_form.selected_identity.is_some() {
             return empty();
         }
         let mut items = iced::widget::Column::<iced::Element<'_, _>>::new().push(self.panel_nav_slot(
@@ -396,7 +396,7 @@ impl Oryxis {
                         .boxed(),
                     Space::new().width(Length::Fill).boxed(),
                     {
-                        let on = self.editor_form.use_disk_key;
+                        let on = self.vaults.cur().editor_form.use_disk_key;
                         let bg = if on {
                             OryxisColors::t().success
                         } else {
@@ -435,7 +435,7 @@ impl Oryxis {
             })
             .boxed(),
         ));
-        if !self.editor_form.use_disk_key {
+        if !self.vaults.cur().editor_form.use_disk_key {
             return items.boxed();
         }
         // Keyboard rows: the field first (Tab focuses the input by id),
@@ -482,7 +482,7 @@ impl Oryxis {
         items = items.push(
             dir_row(vec![
                 Space::new().width(23).boxed(),
-                text_input(t("disk_key_path"), &self.editor_form.identity_file)
+                text_input(t("disk_key_path"), &self.vaults.cur().editor_form.identity_file)
                     .id(iced::widget::Id::new("editor-identity-file"))
                     .on_input(|v| Message::Editor(EditorMessage::EditorIdentityFileChanged(v)))
                     .on_submit_maybe(self.hp_submit())
@@ -495,7 +495,7 @@ impl Oryxis {
             ])
             .align_y(iced::Alignment::Center).boxed(),
         );
-        let (hint, color) = match &self.editor_form.disk_key_status {
+        let (hint, color) = match &self.vaults.cur().editor_form.disk_key_status {
             // The toggle is on, so `Off` cannot happen here; treat it
             // like "nothing resolved" rather than inventing a state.
             St::Off | St::NotFound => (
@@ -560,7 +560,7 @@ impl Oryxis {
                     text(t("forward_ssh_agent")).size(13).color(OryxisColors::t().text_secondary).boxed(),
                     Space::new().width(Length::Fill).boxed(),
                     {
-                        let on = self.editor_form.agent_forwarding;
+                        let on = self.vaults.cur().editor_form.agent_forwarding;
                         let bg = if on { OryxisColors::t().success } else { OryxisColors::t().bg_hover };
                         let fg = crate::theme::contrast_text_for(bg);
                         button(text(if on { crate::i18n::t("toggle_on") } else { crate::i18n::t("toggle_off") }).size(12).color(fg))
@@ -598,7 +598,7 @@ impl Oryxis {
                     text(t("forward_x11")).size(13).color(OryxisColors::t().text_secondary).boxed(),
                     Space::new().width(Length::Fill).boxed(),
                     {
-                        let on = self.editor_form.x11_forwarding;
+                        let on = self.vaults.cur().editor_form.x11_forwarding;
                         let bg = if on { OryxisColors::t().success } else { OryxisColors::t().bg_hover };
                         let fg = crate::theme::contrast_text_for(bg);
                         button(text(if on { crate::i18n::t("toggle_on") } else { crate::i18n::t("toggle_off") }).size(12).color(fg))

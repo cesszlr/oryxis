@@ -15,7 +15,7 @@ impl Oryxis {
                 // tab, never a split (only SplitPane sets that).
                 self.overlay = None; // dismiss the `+` hover popover if open
                 self.pending_pane_split = None;
-                self.panels.new_tab_picker = true;
+                self.vaults.cur_mut().panels.new_tab_picker = true;
                 self.new_tab_picker_search.clear();
                 self.new_tab_picker_group = None;
                 // Land focus on the search so the picker is
@@ -25,7 +25,7 @@ impl Oryxis {
                 ));
             }
             TabsMessage::HideNewTabPicker => {
-                self.panels.new_tab_picker = false;
+                self.vaults.cur_mut().panels.new_tab_picker = false;
                 self.pending_pane_split = None;
                 self.new_tab_picker_group = None;
             }
@@ -79,7 +79,7 @@ impl Oryxis {
                 }
             }
             TabsMessage::PickLocalShell => {
-                self.panels.new_tab_picker = false;
+                self.vaults.cur_mut().panels.new_tab_picker = false;
                 // Both destinations (a pending split pane and a new tab)
                 // take the same route: the local-shell decision applies the
                 // user's curated list / "always open X" default and raises
@@ -91,7 +91,7 @@ impl Oryxis {
                 return self.update(Message::Settings(SettingsMessage::OpenLocalShell));
             }
             TabsMessage::ShowTabJump => {
-                self.panels.tab_jump = true;
+                self.vaults.cur_mut().panels.tab_jump = true;
                 self.tab_jump_search.clear();
                 // Land focus on the search so the modal is
                 // type-to-filter from the first keystroke, matching the
@@ -103,7 +103,7 @@ impl Oryxis {
                 ));
             }
             TabsMessage::HideTabJump => {
-                self.panels.tab_jump = false;
+                self.vaults.cur_mut().panels.tab_jump = false;
             }
             TabsMessage::TabJumpSearchChanged(v) => {
                 self.tab_jump_search = v;
@@ -111,7 +111,7 @@ impl Oryxis {
                 self.keynav.modal.selected = None;
             }
             TabsMessage::TabJumpSelect(inner) => {
-                self.panels.tab_jump = false;
+                self.vaults.cur_mut().panels.tab_jump = false;
                 return Task::done(*inner);
             }
             TabsMessage::ShowCommandPalette => {
@@ -160,36 +160,37 @@ impl Oryxis {
                 // user clicking Save (even just to change the color)
                 // accidentally overrode the auto-detected icon with
                 // the generic stack glyph.
-                if let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == conn_id) {
-                    self.icon_picker.icon = conn
+                let ov = self.vaults.cur_mut();
+                if let Some(conn) = ov.connections.iter().find(|c| c.id == conn_id) {
+                    ov.icon_picker.icon = conn
                         .custom_icon
                         .clone()
                         .or_else(|| conn.detected_os.clone())
                         .or_else(|| Some("server".to_string()));
-                    self.icon_picker.color = conn.custom_color.clone();
-                    self.icon_picker.hex_input = conn.custom_color.clone().unwrap_or_default();
+                    ov.icon_picker.color = conn.custom_color.clone();
+                    ov.icon_picker.hex_input = conn.custom_color.clone().unwrap_or_default();
                 }
-                self.icon_picker.icon_search.clear();
+                self.vaults.cur_mut().icon_picker.icon_search.clear();
                 self.icon_color_popover = None;
-                self.icon_picker.for_id = Some(conn_id);
-                self.icon_picker.for_local_terminal = false;
-                self.panels.icon_picker = true;
+                self.vaults.cur_mut().icon_picker.for_id = Some(conn_id);
+                self.vaults.cur_mut().icon_picker.for_local_terminal = false;
+                self.vaults.cur_mut().panels.icon_picker = true;
             }
             TabsMessage::HideIconPicker => {
-                self.panels.icon_picker = false;
-                self.icon_picker.for_id = None;
-                self.icon_picker.for_group_form = false;
-                self.icon_picker.for_session_group = false;
-                self.icon_picker.for_group_edit = false;
-                self.icon_picker.for_local_terminal = false;
-                self.icon_picker.icon_search.clear();
+                self.vaults.cur_mut().panels.icon_picker = false;
+                self.vaults.cur_mut().icon_picker.for_id = None;
+                self.vaults.cur_mut().icon_picker.for_group_form = false;
+                self.vaults.cur_mut().icon_picker.for_session_group = false;
+                self.vaults.cur_mut().icon_picker.for_group_edit = false;
+                self.vaults.cur_mut().icon_picker.for_local_terminal = false;
+                self.vaults.cur_mut().icon_picker.icon_search.clear();
                 self.icon_color_popover = None;
             }
             TabsMessage::IconPickerSelectIcon(name) => {
-                self.icon_picker.icon = Some(name);
+                self.vaults.cur_mut().icon_picker.icon = Some(name);
             }
             TabsMessage::IconPickerIconSearchChanged(q) => {
-                self.icon_picker.icon_search = q;
+                self.vaults.cur_mut().icon_picker.icon_search = q;
             }
             TabsMessage::IconPickerOpenColorPopover => {
                 self.icon_color_popover = Some(self.cur_mouse());
@@ -198,15 +199,15 @@ impl Oryxis {
                 self.icon_color_popover = None;
             }
             TabsMessage::IconPickerSelectColor(hex) => {
-                self.icon_picker.hex_input = hex.clone();
-                self.icon_picker.color = Some(hex);
+                self.vaults.cur_mut().icon_picker.hex_input = hex.clone();
+                self.vaults.cur_mut().icon_picker.color = Some(hex);
             }
             TabsMessage::IconPickerHexInputChanged(v) => {
-                self.icon_picker.hex_input = v.clone();
+                self.vaults.cur_mut().icon_picker.hex_input = v.clone();
                 // Validate + commit only on well-formed #RRGGBB.
                 let trimmed = v.trim().trim_start_matches('#');
                 if trimmed.len() == 6 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
-                    self.icon_picker.color = Some(format!("#{}", trimmed.to_uppercase()));
+                    self.vaults.cur_mut().icon_picker.color = Some(format!("#{}", trimmed.to_uppercase()));
                 }
             }
             TabsMessage::IconPickerSave => return self.handle_icon_picker_save(),

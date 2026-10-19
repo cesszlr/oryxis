@@ -359,7 +359,7 @@ impl Oryxis {
         // Grid/List toggle, hidden once the window is so narrow that the
         // grid already renders as a single column (list == grid there).
         let nav_width = self.vault_rail_width();
-        let panel_open = self.cloud_discover.visible || self.panels.host_panel;
+        let panel_open = self.vaults.cur().cloud_discover.visible || self.vaults.cur().panels.host_panel;
         let panel_width = if panel_open { self.vaults.cur().panel_width } else { 0.0 };
         let available = (self.cur_window_size().width
             - nav_width

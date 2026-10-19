@@ -34,7 +34,7 @@ impl Oryxis {
         // views below (list mode = row menu, add mode = search picker,
         // see `modal_nav_surface`); Up/Down move, Enter/Space activate.
         self.modal_nav_reset();
-        let inner: Element<'_, Message> = if self.chain_editor_adding {
+        let inner: Element<'_, Message> = if self.vaults.cur().chain_editor_adding {
             self.chain_editor_add_view()
         } else {
             self.chain_editor_list_view()
@@ -85,7 +85,7 @@ impl Oryxis {
             .color(OryxisColors::t().text_muted);
 
         let mut items: Vec<Element<'_, Message>> = Vec::new();
-        let total = self.editor_form.jump_chain.len();
+        let total = self.vaults.cur().editor_form.jump_chain.len();
 
         if total == 0 {
             items.push(
@@ -105,7 +105,7 @@ impl Oryxis {
             );
         }
 
-        for (idx, id) in self.editor_form.jump_chain.iter().enumerate() {
+        for (idx, id) in self.vaults.cur().editor_form.jump_chain.iter().enumerate() {
             let conn = self.vaults.cur().connections.iter().find(|c| c.id == *id);
             let badge = self.chain_host_badge(conn);
             let (label, breadcrumb) = match conn {
@@ -121,14 +121,14 @@ impl Oryxis {
         // Resolve its badge from the saved host (a brand-new host has no
         // id yet, so it falls back to the generic badge).
         let dest_conn = self
-            .editor_form
+            .vaults.cur().editor_form
             .editing_id
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id));
         let dest_badge = self.chain_host_badge(dest_conn);
-        let dest_label = if self.editor_form.label.trim().is_empty() {
+        let dest_label = if self.vaults.cur().editor_form.label.trim().is_empty() {
             t("new_host").to_string()
         } else {
-            self.editor_form.label.clone()
+            self.vaults.cur().editor_form.label.clone()
         };
         items.push(destination_card(dest_badge, dest_label));
 
@@ -219,7 +219,7 @@ impl Oryxis {
         ])
         .align_y(iced::Alignment::Center);
 
-        let search = text_input(t("search_hosts_or_tabs"), &self.chain_editor_search)
+        let search = text_input(t("search_hosts_or_tabs"), &self.vaults.cur().chain_editor_search)
             .on_input(|v| Message::Editor(EditorMessage::ChainEditorSearchChanged(v)))
             .padding(Padding {
                 top: 14.0,
@@ -231,8 +231,8 @@ impl Oryxis {
             .style(crate::widgets::rounded_input_style)
             .align_x(dir_align_x());
 
-        let needle = self.chain_editor_search.to_lowercase();
-        let editing_id = self.editor_form.editing_id;
+        let needle = self.vaults.cur().chain_editor_search.to_lowercase();
+        let editing_id = self.vaults.cur().editor_form.editing_id;
 
         let mut idxs: Vec<usize> = (0..self.vaults.cur().connections.len())
             .filter(|&i| {
@@ -242,7 +242,7 @@ impl Oryxis {
                 if Some(c.id) == editing_id {
                     return false;
                 }
-                if self.editor_form.jump_chain.contains(&c.id) {
+                if self.vaults.cur().editor_form.jump_chain.contains(&c.id) {
                     return false;
                 }
                 if needle.is_empty() {

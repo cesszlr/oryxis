@@ -65,37 +65,37 @@ impl Oryxis {
         match message {
             // ── Export / Import ──
             ShareMessage::ExportVault => {
-                self.panels.export_dialog = true;
-                self.export_password = String::new();
-                self.export_include_keys = true;
-                self.export_selection = oryxis_vault::ExportSelection::all();
-                self.export_status = None;
+                self.vaults.cur_mut().panels.export_dialog = true;
+                self.vaults.cur_mut().export_password = String::new();
+                self.vaults.cur_mut().export_include_keys = true;
+                self.vaults.cur_mut().export_selection = oryxis_vault::ExportSelection::all();
+                self.vaults.cur_mut().export_status = None;
             }
             ShareMessage::ExportPasswordChanged(v) => {
-                self.export_password = v.into_inner();
+                self.vaults.cur_mut().export_password = v.into_inner();
             }
             ShareMessage::ExportToggleKeys => {
-                self.export_include_keys = !self.export_include_keys;
+                self.vaults.cur_mut().export_include_keys = !self.vaults.cur_mut().export_include_keys;
             }
             ShareMessage::ExportToggleCategory(cat) => {
-                self.export_selection.toggle(cat);
+                self.vaults.cur_mut().export_selection.toggle(cat);
             }
             ShareMessage::ExportConfirm => {
-                if self.export_password.is_empty() {
-                    self.export_status = Some(Err("Password is required".into()));
+                if self.vaults.cur().export_password.is_empty() {
+                    self.vaults.cur_mut().export_status = Some(Err("Password is required".into()));
                     return Task::none();
                 }
                 if !self.vault_usable() {
-                    self.export_status = Some(Self::vault_locked_status("vault export"));
+                    self.vaults.cur_mut().export_status = Some(Self::vault_locked_status("vault export"));
                     return Task::none();
                 }
                 if let Some(vault) = &self.vaults.cur().store {
                     let options = oryxis_vault::ExportOptions {
-                        include_private_keys: self.export_include_keys,
+                        include_private_keys: self.vaults.cur().export_include_keys,
                         filter: oryxis_vault::ExportFilter::All,
-                        selection: self.export_selection,
+                        selection: self.vaults.cur().export_selection,
                     };
-                    match oryxis_vault::export_vault(vault, &self.export_password, options) {
+                    match oryxis_vault::export_vault(vault, &self.vaults.cur().export_password, options) {
                         Ok(data) => {
                             // The native save dialog blocks its thread for as
                             // long as the user browses; run it (and the write)
@@ -118,13 +118,13 @@ impl Oryxis {
                             );
                         }
                         Err(e) => {
-                            self.export_status = Some(Err(e.to_string()));
+                            self.vaults.cur_mut().export_status = Some(Err(e.to_string()));
                         }
                     }
                 }
             }
             ShareMessage::ExportCompleted(result) => {
-                self.export_status = Some(result);
+                self.vaults.cur_mut().export_status = Some(result);
             }
             ShareMessage::ExportHostsCsv => {
                 // Rendered here, on live state: only plaintext fields
@@ -176,10 +176,10 @@ impl Oryxis {
             },
             ShareMessage::ImportSshConfig => {
                 self.overlay = None;
-                self.ssh_config_import_status = None;
+                self.vaults.cur_mut().ssh_config_import_status = None;
                 // Started from Settings > Security: no folder is open
                 // there, whatever `active_group` still remembers.
-                self.import_target_group = None;
+                self.vaults.cur_mut().import_target_group = None;
                 return Task::perform(
                     tokio::task::spawn_blocking(|| {
                         let mut dialog = rfd::FileDialog::new()
@@ -204,9 +204,9 @@ impl Oryxis {
             }
             ShareMessage::ShowImportHub => {
                 self.overlay = None;
-                self.import_hub_error = None;
-                self.import_hub_pending = None;
-                self.import_hub_password = String::new();
+                self.vaults.cur_mut().import_hub_error = None;
+                self.vaults.cur_mut().import_hub_pending = None;
+                self.vaults.cur_mut().import_hub_password = String::new();
                 // The hub only opens from the dashboard (its add menu
                 // and empty state) and from the onboarding, where no
                 // folder exists yet, so `active_group` IS the folder
@@ -214,29 +214,29 @@ impl Oryxis {
                 // take hosts (the same guard the host editor's group
                 // prefill applies): a dynamic group's contents come
                 // from its query.
-                self.import_target_group = self.cur_nav().active_group.filter(|gid| {
+                self.vaults.cur_mut().import_target_group = self.cur_nav().active_group.filter(|gid| {
                     self.vaults.cur().groups
                         .iter()
                         .any(|g| g.id == *gid && g.cloud_query.is_none())
                 });
-                self.panels.import_hub = true;
+                self.vaults.cur_mut().panels.import_hub = true;
             }
             ShareMessage::ImportHubDismiss => {
-                self.panels.import_hub = false;
-                self.import_hub_pending = None;
-                self.import_hub_password = String::new();
-                self.import_target_group = None;
+                self.vaults.cur_mut().panels.import_hub = false;
+                self.vaults.cur_mut().import_hub_pending = None;
+                self.vaults.cur_mut().import_hub_password = String::new();
+                self.vaults.cur_mut().import_target_group = None;
             }
             ShareMessage::ImportHubPasswordChanged(v) => {
-                self.import_hub_password = v.into_inner();
+                self.vaults.cur_mut().import_hub_password = v.into_inner();
             }
             ShareMessage::ImportHubUnlock => {
-                let Some(bytes) = self.import_hub_pending.clone() else {
+                let Some(bytes) = self.vaults.cur().import_hub_pending.clone() else {
                     return Task::none();
                 };
                 return self.import_hub_try_mremoteng(
                     bytes,
-                    Some(self.import_hub_password.clone()),
+                    Some(self.vaults.cur().import_hub_password.clone()),
                 );
             }
             ShareMessage::ImportHubPick => {
@@ -293,18 +293,18 @@ impl Oryxis {
             ShareMessage::ImportHubFolderScanned(import) => {
                 let import = *import;
                 if import.hosts.is_empty() {
-                    self.import_hub_error =
+                    self.vaults.cur_mut().import_hub_error =
                         Some(crate::i18n::t("import_hub_folder_empty").to_string());
                     return Task::none();
                 }
-                self.panels.import_hub = false;
+                self.vaults.cur_mut().panels.import_hub = false;
                 return self.open_direct_preview(import);
             }
             ShareMessage::ImportHubMrngParsed(parsed, had_password) => {
                 return self.handle_import_hub_mrng_parsed(*parsed, had_password);
             }
             ShareMessage::ImportHubLoaded(Err(e)) => {
-                self.import_hub_error = Some(e);
+                self.vaults.cur_mut().import_hub_error = Some(e);
             }
             ShareMessage::ImportHubLoaded(Ok((bytes, stem))) => {
                 use crate::importers::detect::Detected;
@@ -312,14 +312,14 @@ impl Oryxis {
                     Detected::OryxisExport => {
                         // Hand off to the vault-import dialog with the
                         // same field resets its own picker path does.
-                        self.panels.import_hub = false;
-                        self.vault_import.status = None;
-                        self.vault_import.password = String::new();
-                        self.vault_import.summary = None;
-                        self.vault_import.selection =
+                        self.vaults.cur_mut().panels.import_hub = false;
+                        self.vaults.cur_mut().vault_import.status = None;
+                        self.vaults.cur_mut().vault_import.password = String::new();
+                        self.vaults.cur_mut().vault_import.summary = None;
+                        self.vaults.cur_mut().vault_import.selection =
                             oryxis_vault::ExportSelection::all();
-                        self.vault_import.file_data = Some(bytes);
-                        self.panels.import_dialog = true;
+                        self.vaults.cur_mut().vault_import.file_data = Some(bytes);
+                        self.vaults.cur_mut().panels.import_dialog = true;
                         // The vault-import dialog renders inline in
                         // Settings > Security ONLY, while the hub opens
                         // from the dashboard and the onboarding
@@ -339,7 +339,7 @@ impl Oryxis {
                     Detected::SshConfig(text) => {
                         // The ssh_config flow keeps its alias-linking
                         // pass; enter it exactly as its own loader does.
-                        self.panels.import_hub = false;
+                        self.vaults.cur_mut().panels.import_hub = false;
                         return self.update(Message::Share(
                             ShareMessage::SshConfigFileLoaded(Ok(text)),
                         ));
@@ -348,7 +348,7 @@ impl Oryxis {
                         if parsed.hosts.is_empty() {
                             // Recognized but nothing importable: say so
                             // inside the hub (named skips beat a shrug).
-                            self.import_hub_error =
+                            self.vaults.cur_mut().import_hub_error =
                                 Some(if parsed.skipped.is_empty() {
                                     crate::i18n::t("ssh_import_none_found").to_string()
                                 } else {
@@ -360,26 +360,26 @@ impl Oryxis {
                                 });
                             return Task::none();
                         }
-                        self.panels.import_hub = false;
+                        self.vaults.cur_mut().panels.import_hub = false;
                         return self.open_direct_preview(parsed);
                     }
                     Detected::MRemoteNg => {
                         return self.import_hub_try_mremoteng(bytes, None);
                     }
                     Detected::Unknown => {
-                        self.import_hub_error =
+                        self.vaults.cur_mut().import_hub_error =
                             Some(crate::i18n::t("import_hub_unrecognized").to_string());
                     }
                 }
             }
             ShareMessage::SshConfigFileLoaded(Err(e)) => {
-                self.ssh_config_import_status = Some(Err(e));
+                self.vaults.cur_mut().ssh_config_import_status = Some(Err(e));
             }
             ShareMessage::SshConfigFileLoaded(Ok(text)) => {
                 let parsed = crate::ssh_config::parse(&text);
                 if parsed.is_empty() {
                     let msg = crate::i18n::t("ssh_import_none_found").to_string();
-                    self.ssh_config_import_status = Some(Err(msg.clone()));
+                    self.vaults.cur_mut().ssh_config_import_status = Some(Err(msg.clone()));
                     return self.show_toast(msg);
                 }
                 // Flag aliases that already exist as a connection label so
@@ -391,38 +391,38 @@ impl Oryxis {
                     .iter()
                     .map(|c| c.label.clone())
                     .collect();
-                self.ssh_import_existing = parsed
+                self.vaults.cur_mut().ssh_import_existing = parsed
                     .iter()
                     .map(|h| existing_labels.contains(&h.alias))
                     .collect();
                 // New hosts start ticked; known ones start unticked.
-                self.ssh_import_selected =
-                    self.ssh_import_existing.iter().map(|e| !e).collect();
-                self.ssh_import_hosts = parsed;
-                self.ssh_import_direct = None;
-                self.ssh_config_import_status = None;
-                self.panels.ssh_import_dialog = true;
+                self.vaults.cur_mut().ssh_import_selected =
+                    self.vaults.cur().ssh_import_existing.iter().map(|e| !e).collect();
+                self.vaults.cur_mut().ssh_import_hosts = parsed;
+                self.vaults.cur_mut().ssh_import_direct = None;
+                self.vaults.cur_mut().ssh_config_import_status = None;
+                self.vaults.cur_mut().panels.ssh_import_dialog = true;
             }
             ShareMessage::SshImportToggle(i) => {
-                if let Some(sel) = self.ssh_import_selected.get_mut(i) {
+                if let Some(sel) = self.vaults.cur_mut().ssh_import_selected.get_mut(i) {
                     *sel = !*sel;
                 }
             }
             ShareMessage::SshImportSelectAll(on) => {
-                self.ssh_import_selected.fill(on);
+                self.vaults.cur_mut().ssh_import_selected.fill(on);
             }
             ShareMessage::SshImportDismiss => {
-                self.panels.ssh_import_dialog = false;
-                self.ssh_import_hosts.clear();
-                self.ssh_import_direct = None;
-                self.ssh_import_selected.clear();
-                self.ssh_import_existing.clear();
-                self.import_target_group = None;
+                self.vaults.cur_mut().panels.ssh_import_dialog = false;
+                self.vaults.cur_mut().ssh_import_hosts.clear();
+                self.vaults.cur_mut().ssh_import_direct = None;
+                self.vaults.cur_mut().ssh_import_selected.clear();
+                self.vaults.cur_mut().ssh_import_existing.clear();
+                self.vaults.cur_mut().import_target_group = None;
             }
             ShareMessage::SshImportConfirm => {
                 if !self.vault_usable() {
-                    self.panels.ssh_import_dialog = false;
-                    self.ssh_config_import_status =
+                    self.vaults.cur_mut().panels.ssh_import_dialog = false;
+                    self.vaults.cur_mut().ssh_config_import_status =
                         Some(Self::vault_locked_status("ssh config import"));
                     return Task::none();
                 }
@@ -439,16 +439,17 @@ impl Oryxis {
                 // group column ride `notes`), so there is nothing to
                 // out-rank.
                 let target_group = self.take_import_target_group();
-                let Some(vault) = &self.vaults.cur().store else {
+                let ov = self.vaults.cur_mut();
+                let Some(vault) = &ov.store else {
                     return Task::none();
                 };
                 // Third-party batch (PuTTY, ...): already Connections,
                 // no alias pass; same transaction shape as below.
-                if let Some(direct) = self.ssh_import_direct.take() {
+                if let Some(direct) = ov.ssh_import_direct.take() {
                     let picked: Vec<&crate::importers::DirectHost> = direct
                         .hosts
                         .iter()
-                        .zip(self.ssh_import_selected.iter())
+                        .zip(ov.ssh_import_selected.iter())
                         .filter(|(_, sel)| **sel)
                         .map(|(h, _)| h)
                         .collect();
@@ -480,10 +481,10 @@ impl Oryxis {
                         errors.push(format!("commit: {e}"));
                     }
                     let imported = saved.len();
-                    self.vaults.cur_mut().connections.extend(saved);
-                    self.panels.ssh_import_dialog = false;
-                    self.ssh_import_selected.clear();
-                    self.ssh_import_existing.clear();
+                    ov.connections.extend(saved);
+                    ov.panels.ssh_import_dialog = false;
+                    ov.ssh_import_selected.clear();
+                    ov.ssh_import_existing.clear();
                     let mut summary = format!(
                         "{} {} / {}",
                         crate::i18n::t("import_summary_imported"),
@@ -491,20 +492,20 @@ impl Oryxis {
                         total,
                     );
                     if errors.is_empty() {
-                        self.ssh_config_import_status = Some(Ok(summary.clone()));
+                        ov.ssh_config_import_status = Some(Ok(summary.clone()));
                     } else {
                         summary.push_str("; ");
                         summary.push_str(&errors.join("; "));
-                        self.ssh_config_import_status = Some(Err(summary.clone()));
+                        ov.ssh_config_import_status = Some(Err(summary.clone()));
                     }
                     return self.show_toast(summary);
                 }
                 // Ticked hosts, in original order so `link_proxy_jumps`
                 // can resolve sibling aliases to freshly-assigned ids.
-                let picked: Vec<crate::ssh_config::SshConfigHost> = self
+                let picked: Vec<crate::ssh_config::SshConfigHost> = ov
                     .ssh_import_hosts
                     .iter()
-                    .zip(self.ssh_import_selected.iter())
+                    .zip(ov.ssh_import_selected.iter())
                     .filter(|(_, sel)| **sel)
                     .map(|(h, _)| h.clone())
                     .collect();
@@ -540,10 +541,10 @@ impl Oryxis {
                 }
                 let imported = saved.len();
                 self.vaults.cur_mut().connections.extend(saved);
-                self.panels.ssh_import_dialog = false;
-                self.ssh_import_hosts.clear();
-                self.ssh_import_selected.clear();
-                self.ssh_import_existing.clear();
+                self.vaults.cur_mut().panels.ssh_import_dialog = false;
+                self.vaults.cur_mut().ssh_import_hosts.clear();
+                self.vaults.cur_mut().ssh_import_selected.clear();
+                self.vaults.cur_mut().ssh_import_existing.clear();
                 let mut summary = format!(
                     "{} {} / {}",
                     crate::i18n::t("import_summary_imported"),
@@ -551,11 +552,11 @@ impl Oryxis {
                     total,
                 );
                 if errors.is_empty() {
-                    self.ssh_config_import_status = Some(Ok(summary.clone()));
+                    self.vaults.cur_mut().ssh_config_import_status = Some(Ok(summary.clone()));
                 } else {
                     summary.push_str("; ");
                     summary.push_str(&errors.join("; "));
-                    self.ssh_config_import_status = Some(Err(summary.clone()));
+                    self.vaults.cur_mut().ssh_config_import_status = Some(Err(summary.clone()));
                 }
                 return self.show_toast(summary);
             }
@@ -564,12 +565,12 @@ impl Oryxis {
                 self.overlay = None;
                 // Started from Settings > Security: no folder is open
                 // there, whatever `active_group` still remembers.
-                self.import_target_group = None;
-                self.vault_import.status = None;
-                self.vault_import.password = String::new();
-                self.vault_import.file_data = None;
-                self.vault_import.summary = None;
-                self.vault_import.selection = oryxis_vault::ExportSelection::all();
+                self.vaults.cur_mut().import_target_group = None;
+                self.vaults.cur_mut().vault_import.status = None;
+                self.vaults.cur_mut().vault_import.password = String::new();
+                self.vaults.cur_mut().vault_import.file_data = None;
+                self.vaults.cur_mut().vault_import.summary = None;
+                self.vaults.cur_mut().vault_import.selection = oryxis_vault::ExportSelection::all();
                 // Picker + read off the event loop; the follow-up
                 // messages route back into the dialog state.
                 return Task::perform(
@@ -592,31 +593,31 @@ impl Oryxis {
                 );
             }
             ShareMessage::ImportFileLoaded(data) => {
-                self.vault_import.file_data = Some(data);
-                self.panels.import_dialog = true;
+                self.vaults.cur_mut().vault_import.file_data = Some(data);
+                self.vaults.cur_mut().panels.import_dialog = true;
             }
             ShareMessage::ImportPasswordChanged(v) => {
-                self.vault_import.password = v.into_inner();
+                self.vaults.cur_mut().vault_import.password = v.into_inner();
             }
             ShareMessage::ImportInspect => {
-                if self.vault_import.password.is_empty() {
-                    self.vault_import.status = Some(Err(crate::i18n::t("password_required").to_string()));
+                if self.vaults.cur().vault_import.password.is_empty() {
+                    self.vaults.cur_mut().vault_import.status = Some(Err(crate::i18n::t("password_required").to_string()));
                     return Task::none();
                 }
-                if let Some(data) = &self.vault_import.file_data {
-                    match oryxis_vault::inspect_export(data, &self.vault_import.password) {
+                if let Some(data) = &self.vaults.cur().vault_import.file_data {
+                    match oryxis_vault::inspect_export(data, &self.vaults.cur().vault_import.password) {
                         Ok(summary) => {
                             // Pre-check every category the file carries;
                             // the user unchecks to narrow.
-                            self.vault_import.selection = summary.default_selection();
-                            self.vault_import.summary = Some(summary);
-                            self.vault_import.status = None;
+                            self.vaults.cur_mut().vault_import.selection = summary.default_selection();
+                            self.vaults.cur_mut().vault_import.summary = Some(summary);
+                            self.vaults.cur_mut().vault_import.status = None;
                         }
                         Err(oryxis_vault::VaultError::InvalidPassword) => {
-                            self.vault_import.status = Some(Err(crate::i18n::t("import_wrong_password").to_string()));
+                            self.vaults.cur_mut().vault_import.status = Some(Err(crate::i18n::t("import_wrong_password").to_string()));
                         }
                         Err(e) => {
-                            self.vault_import.status = Some(Err(e.to_string()));
+                            self.vaults.cur_mut().vault_import.status = Some(Err(e.to_string()));
                         }
                     }
                 }
@@ -625,23 +626,23 @@ impl Oryxis {
                 // Only categories present in the file are interactive in
                 // the UI, but guard anyway, toggling an absent one is a
                 // no-op since it stays empty in the payload.
-                self.vault_import.selection.toggle(cat);
+                self.vaults.cur_mut().vault_import.selection.toggle(cat);
             }
             ShareMessage::ImportConfirm => {
-                if self.vault_import.password.is_empty() {
-                    self.vault_import.status = Some(Err(crate::i18n::t("password_required").to_string()));
+                if self.vaults.cur().vault_import.password.is_empty() {
+                    self.vaults.cur_mut().vault_import.status = Some(Err(crate::i18n::t("password_required").to_string()));
                     return Task::none();
                 }
                 // Confirm only acts after a successful inspection, the UI
                 // hides the button until then, this guards the message path.
-                if self.vault_import.summary.is_none() {
+                if self.vaults.cur().vault_import.summary.is_none() {
                     return Task::none();
                 }
                 if !self.vault_usable() {
-                    self.vault_import.status = Some(Self::vault_locked_status("vault import"));
+                    self.vaults.cur_mut().vault_import.status = Some(Self::vault_locked_status("vault import"));
                     return Task::none();
                 }
-                if let (Some(vault), Some(data)) = (&self.vaults.cur().store, &self.vault_import.file_data) {
+                if let (Some(vault), Some(data)) = (&self.vaults.cur().store, &self.vaults.cur().vault_import.file_data) {
                     // The folder the hub was opened in, when the file
                     // arrived through it (issue #230); `None` from the
                     // Security cards. Consumed only by an import that
@@ -651,9 +652,9 @@ impl Oryxis {
                     // dialog clears it, so a later import cannot inherit
                     // it.
                     let target_group = self.live_import_target_group();
-                    match oryxis_vault::import_vault(vault, data, &self.vault_import.password, &self.vault_import.selection, target_group) {
+                    match oryxis_vault::import_vault(vault, data, &self.vaults.cur().vault_import.password, &self.vaults.cur().vault_import.selection, target_group) {
                         Ok(result) => {
-                            self.import_target_group = None;
+                            self.vaults.cur_mut().import_target_group = None;
                             // Fully translated summary, built from the
                             // same category labels the dialog uses. Only
                             // non-zero families are listed to keep it short.
@@ -698,17 +699,17 @@ impl Oryxis {
                                     crate::i18n::t("import_forwards_disarmed")
                                 ));
                             }
-                            self.vault_import.status = Some(Ok(msg));
-                            self.panels.import_dialog = false;
-                            self.vault_import.file_data = None;
-                            self.vault_import.summary = None;
+                            self.vaults.cur_mut().vault_import.status = Some(Ok(msg));
+                            self.vaults.cur_mut().panels.import_dialog = false;
+                            self.vaults.cur_mut().vault_import.file_data = None;
+                            self.vaults.cur_mut().vault_import.summary = None;
                             self.load_data_from_vault();
                         }
                         Err(oryxis_vault::VaultError::InvalidPassword) => {
-                            self.vault_import.status = Some(Err(crate::i18n::t("import_wrong_password").to_string()));
+                            self.vaults.cur_mut().vault_import.status = Some(Err(crate::i18n::t("import_wrong_password").to_string()));
                         }
                         Err(e) => {
-                            self.vault_import.status = Some(Err(e.to_string()));
+                            self.vaults.cur_mut().vault_import.status = Some(Err(e.to_string()));
                         }
                     }
                 } else {
@@ -721,28 +722,28 @@ impl Oryxis {
                 }
             }
             ShareMessage::ImportCompleted(result) => {
-                self.vault_import.status = Some(result);
-                if self.vault_import.status.as_ref().is_some_and(|r| r.is_ok()) {
-                    self.panels.import_dialog = false;
-                    self.vault_import.file_data = None;
+                self.vaults.cur_mut().vault_import.status = Some(result);
+                if self.vaults.cur().vault_import.status.as_ref().is_some_and(|r| r.is_ok()) {
+                    self.vaults.cur_mut().panels.import_dialog = false;
+                    self.vaults.cur_mut().vault_import.file_data = None;
                     self.load_data_from_vault();
                 }
             }
             ShareMessage::ExportImportDismiss => {
-                self.panels.export_dialog = false;
-                self.panels.import_dialog = false;
-                self.import_target_group = None;
-                self.export_status = None;
-                self.vault_import.status = None;
-                self.vault_import.file_data = None;
-                self.vault_import.summary = None;
-                self.sftp_backup.open = false;
+                self.vaults.cur_mut().panels.export_dialog = false;
+                self.vaults.cur_mut().panels.import_dialog = false;
+                self.vaults.cur_mut().import_target_group = None;
+                self.vaults.cur_mut().export_status = None;
+                self.vaults.cur_mut().vault_import.status = None;
+                self.vaults.cur_mut().vault_import.file_data = None;
+                self.vaults.cur_mut().vault_import.summary = None;
+                self.vaults.cur_mut().sftp_backup.open = false;
             }
 
             // ── Backup / Restore over SFTP ──
             ShareMessage::ExportToSftp => {
-                if self.export_password.is_empty() {
-                    self.export_status =
+                if self.vaults.cur().export_password.is_empty() {
+                    self.vaults.cur_mut().export_status =
                         Some(Err(crate::i18n::t("password_required").to_string()));
                     return Task::none();
                 }
@@ -754,38 +755,38 @@ impl Oryxis {
                 self.overlay = None;
                 // Started from Settings > Security: no folder is open
                 // there, whatever `active_group` still remembers.
-                self.import_target_group = None;
-                self.vault_import.status = None;
-                self.vault_import.password = String::new();
-                self.vault_import.file_data = None;
-                self.vault_import.summary = None;
-                self.vault_import.selection = oryxis_vault::ExportSelection::all();
+                self.vaults.cur_mut().import_target_group = None;
+                self.vaults.cur_mut().vault_import.status = None;
+                self.vaults.cur_mut().vault_import.password = String::new();
+                self.vaults.cur_mut().vault_import.file_data = None;
+                self.vaults.cur_mut().vault_import.summary = None;
+                self.vaults.cur_mut().vault_import.selection = oryxis_vault::ExportSelection::all();
                 self.open_sftp_backup_picker(true);
             }
             ShareMessage::SftpBackupHostSelected(idx) => {
-                self.sftp_backup.host = Some(idx);
+                self.vaults.cur_mut().sftp_backup.host = Some(idx);
             }
             ShareMessage::SftpBackupPathChanged(v) => {
-                self.sftp_backup.path = v;
+                self.vaults.cur_mut().sftp_backup.path = v;
             }
             ShareMessage::SftpBackupCancel => {
-                self.sftp_backup.open = false;
-                self.sftp_backup.busy = false;
-                self.sftp_backup.status = None;
+                self.vaults.cur_mut().sftp_backup.open = false;
+                self.vaults.cur_mut().sftp_backup.busy = false;
+                self.vaults.cur_mut().sftp_backup.status = None;
             }
             ShareMessage::SftpBackupConfirm => {
                 return self.run_sftp_backup();
             }
             ShareMessage::SftpBackupExportDone(res) => {
-                self.sftp_backup.busy = false;
+                self.vaults.cur_mut().sftp_backup.busy = false;
                 self.host_key_response_tx = None;
                 match res {
-                    Ok(msg) => self.sftp_backup.status = Some(Ok(msg)),
-                    Err(e) => self.sftp_backup.status = Some(Err(e)),
+                    Ok(msg) => self.vaults.cur_mut().sftp_backup.status = Some(Ok(msg)),
+                    Err(e) => self.vaults.cur_mut().sftp_backup.status = Some(Err(e)),
                 }
             }
             ShareMessage::SftpBackupImportDone(res) => {
-                self.sftp_backup.busy = false;
+                self.vaults.cur_mut().sftp_backup.busy = false;
                 self.host_key_response_tx = None;
                 match res {
                     Ok(data) => {
@@ -793,118 +794,119 @@ impl Oryxis {
                         // picker, so open the import dialog and inspect the
                         // blob straight away (jumps to category selection;
                         // a wrong password surfaces its error there).
-                        self.sftp_backup.open = false;
-                        self.sftp_backup.status = None;
-                        self.vault_import.file_data = Some(data);
-                        self.panels.import_dialog = true;
+                        self.vaults.cur_mut().sftp_backup.open = false;
+                        self.vaults.cur_mut().sftp_backup.status = None;
+                        self.vaults.cur_mut().vault_import.file_data = Some(data);
+                        self.vaults.cur_mut().panels.import_dialog = true;
                         return Task::done(Message::Share(ShareMessage::ImportInspect));
                     }
-                    Err(e) => self.sftp_backup.status = Some(Err(e)),
+                    Err(e) => self.vaults.cur_mut().sftp_backup.status = Some(Err(e)),
                 }
             }
 
             // ── Share ──
             ShareMessage::ShareConnection(idx) => {
                 self.overlay = None;
-                if let Some(conn) = self.vaults.cur().connections.get(idx) {
-                    self.share.group_mode = false;
-                    self.share.filter = Some(oryxis_vault::ExportFilter::Hosts(vec![conn.id]));
-                    self.share.suggested_name = Some(share_file_name(&conn.label));
-                    self.panels.share_dialog = true;
-                    self.share.password = String::new();
-                    self.share.include_keys = false;
-                    self.share.status = None;
+                let ov = self.vaults.cur_mut();
+                if let Some(conn) = ov.connections.get(idx) {
+                    ov.share.group_mode = false;
+                    ov.share.filter = Some(oryxis_vault::ExportFilter::Hosts(vec![conn.id]));
+                    ov.share.suggested_name = Some(share_file_name(&conn.label));
+                    ov.panels.share_dialog = true;
+                    ov.share.password = String::new();
+                    ov.share.include_keys = false;
+                    ov.share.status = None;
                 }
             }
             ShareMessage::ShowExportHosts(scope) => {
                 self.overlay = None;
-                self.share.group_mode = true;
+                self.vaults.cur_mut().share.group_mode = true;
                 // Pre-tick the in-scope folders. Inside a folder, tick it
                 // and its descendants (mirroring the old group + subgroup
                 // export); at root, tick every folder plus the ungrouped
                 // hosts so a no-op confirm exports everything.
                 match scope {
                     Some(gid) => {
-                        self.share.groups = self.group_with_descendants(gid);
-                        self.share.include_ungrouped = false;
-                        self.share.suggested_name = self
+                        self.vaults.cur_mut().share.groups = self.group_with_descendants(gid);
+                        self.vaults.cur_mut().share.include_ungrouped = false;
+                        self.vaults.cur_mut().share.suggested_name = self
                             .vaults.cur().groups
                             .iter()
                             .find(|g| g.id == gid)
                             .map(|g| share_file_name(&g.label));
                     }
                     None => {
-                        self.share.groups =
+                        self.vaults.cur_mut().share.groups =
                             self.vaults.cur().groups.iter().map(|g| g.id).collect();
-                        self.share.include_ungrouped = true;
-                        self.share.suggested_name = Some(share_file_name("hosts"));
+                        self.vaults.cur_mut().share.include_ungrouped = true;
+                        self.vaults.cur_mut().share.suggested_name = Some(share_file_name("hosts"));
                     }
                 }
-                self.share.filter = None;
-                self.panels.share_dialog = true;
-                self.share.password = String::new();
-                self.share.include_keys = false;
-                self.share.status = None;
+                self.vaults.cur_mut().share.filter = None;
+                self.vaults.cur_mut().panels.share_dialog = true;
+                self.vaults.cur_mut().share.password = String::new();
+                self.vaults.cur_mut().share.include_keys = false;
+                self.vaults.cur_mut().share.status = None;
             }
             ShareMessage::ShareToggleGroup(gid) => {
-                if !self.share.groups.remove(&gid) {
-                    self.share.groups.insert(gid);
+                if !self.vaults.cur_mut().share.groups.remove(&gid) {
+                    self.vaults.cur_mut().share.groups.insert(gid);
                 }
             }
             ShareMessage::ShareToggleUngrouped => {
-                self.share.include_ungrouped = !self.share.include_ungrouped;
+                self.vaults.cur_mut().share.include_ungrouped = !self.vaults.cur_mut().share.include_ungrouped;
             }
             ShareMessage::SharePasswordChanged(v) => {
-                self.share.password = v.into_inner();
+                self.vaults.cur_mut().share.password = v.into_inner();
             }
             ShareMessage::ShareToggleKeys => {
-                self.share.include_keys = !self.share.include_keys;
+                self.vaults.cur_mut().share.include_keys = !self.vaults.cur_mut().share.include_keys;
             }
             ShareMessage::ShareConfirm => {
                 // In group mode the filter is derived from the ticked
                 // folders just before export, so a mid-dialog tick is
                 // always reflected.
-                if self.share.group_mode {
+                if self.vaults.cur().share.group_mode {
                     let ids: Vec<uuid::Uuid> = self
                         .vaults.cur().connections
                         .iter()
                         .filter(|c| match c.group_id {
-                            Some(g) => self.share.groups.contains(&g),
-                            None => self.share.include_ungrouped,
+                            Some(g) => self.vaults.cur().share.groups.contains(&g),
+                            None => self.vaults.cur().share.include_ungrouped,
                         })
                         .map(|c| c.id)
                         .collect();
                     if ids.is_empty() {
-                        self.share.status = Some(Err(
+                        self.vaults.cur_mut().share.status = Some(Err(
                             crate::i18n::t("export_nothing_selected").to_string(),
                         ));
                         return Task::none();
                     }
-                    self.share.filter =
+                    self.vaults.cur_mut().share.filter =
                         Some(oryxis_vault::ExportFilter::Hosts(ids));
                 }
-                if self.share.password.is_empty() {
-                    self.share.status = Some(Err("Password is required".into()));
+                if self.vaults.cur().share.password.is_empty() {
+                    self.vaults.cur_mut().share.status = Some(Err("Password is required".into()));
                     return Task::none();
                 }
                 if !self.vault_usable() {
-                    self.share.status = Some(Self::vault_locked_status("share export"));
+                    self.vaults.cur_mut().share.status = Some(Self::vault_locked_status("share export"));
                     return Task::none();
                 }
-                if self.share.filter.is_some() {
+                if self.vaults.cur().share.filter.is_some() {
                     // Open the save dialog FIRST (off the event loop), then
                     // encrypt on the follow-up message. Argon2 takes tens of
                     // ms and the dialog can block for as long as the user
                     // browses; picking the path first also skips the work
                     // entirely when the user cancels.
                     let default_name = self
-                        .share.suggested_name
+                        .vaults.cur().share.suggested_name
                         .clone()
                         .unwrap_or_else(|| "shared.oryxis".to_string());
                     // The save dialog is titled the way the modal that
                     // opened it is: a group export reads "Export hosts",
                     // a single host reads "Share".
-                    let title = if self.share.group_mode {
+                    let title = if self.vaults.cur().share.group_mode {
                         crate::i18n::t("export_hosts")
                     } else {
                         crate::i18n::t("share")
@@ -933,19 +935,19 @@ impl Oryxis {
                 // record while decrypting nothing, and the share would
                 // be written with every password silently missing.
                 if !self.vault_usable() {
-                    self.share.status = Some(Self::vault_locked_status("share export"));
+                    self.vaults.cur_mut().share.status = Some(Self::vault_locked_status("share export"));
                     return Task::none();
                 }
-                if let (Some(vault), Some(filter)) = (&self.vaults.cur().store, &self.share.filter) {
+                if let (Some(vault), Some(filter)) = (&self.vaults.cur().store, &self.vaults.cur().share.filter) {
                     let options = oryxis_vault::ExportOptions {
-                        include_private_keys: self.share.include_keys,
+                        include_private_keys: self.vaults.cur().share.include_keys,
                         filter: filter.clone(),
                         // A host/group share carries everything in scope,
                         // settings + cross-cutting families are withheld
                         // anyway because the filter is not `All`.
                         selection: oryxis_vault::ExportSelection::all(),
                     };
-                    match oryxis_vault::export_vault(vault, &self.share.password, options) {
+                    match oryxis_vault::export_vault(vault, &self.vaults.cur().share.password, options) {
                         Ok(data) => {
                             match std::fs::write(&path, &data) {
                                 Ok(()) => {
@@ -962,14 +964,14 @@ impl Oryxis {
                                             std::fs::Permissions::from_mode(0o600),
                                         );
                                     }
-                                    self.share.status = Some(Ok(format!("Saved to {}", path.display())));
-                                    self.panels.share_dialog = false;
+                                    self.vaults.cur_mut().share.status = Some(Ok(format!("Saved to {}", path.display())));
+                                    self.vaults.cur_mut().panels.share_dialog = false;
                                     // Count exported hosts for the toast.
                                     // `Hosts` covers the per-host share and
                                     // the group-mode export (the only ways
                                     // the dialog opens); other variants fall
                                     // back to a generic confirmation.
-                                    let n = match &self.share.filter {
+                                    let n = match &self.vaults.cur().share.filter {
                                         Some(oryxis_vault::ExportFilter::Hosts(ids)) => Some(ids.len()),
                                         _ => None,
                                     };
@@ -985,24 +987,24 @@ impl Oryxis {
                                     return self.show_toast(toast);
                                 }
                                 Err(e) => {
-                                    self.share.status = Some(Err(format!("Write failed: {}", e)));
+                                    self.vaults.cur_mut().share.status = Some(Err(format!("Write failed: {}", e)));
                                 }
                             }
                         }
                         Err(e) => {
-                            self.share.status = Some(Err(e.to_string()));
+                            self.vaults.cur_mut().share.status = Some(Err(e.to_string()));
                         }
                     }
                 }
             }
             ShareMessage::ShareDismiss => {
-                self.panels.share_dialog = false;
-                self.share.filter = None;
-                self.share.status = None;
-                self.share.suggested_name = None;
-                self.share.group_mode = false;
-                self.share.groups.clear();
-                self.share.include_ungrouped = false;
+                self.vaults.cur_mut().panels.share_dialog = false;
+                self.vaults.cur_mut().share.filter = None;
+                self.vaults.cur_mut().share.status = None;
+                self.vaults.cur_mut().share.suggested_name = None;
+                self.vaults.cur_mut().share.group_mode = false;
+                self.vaults.cur_mut().share.groups.clear();
+                self.vaults.cur_mut().share.include_ungrouped = false;
             }
         }
         Task::none()
@@ -1099,7 +1101,7 @@ impl Oryxis {
     /// imported hosts invisible on the dashboard. The dialogs' "Into
     /// folder" line and the confirm read the same answer.
     pub(crate) fn live_import_target_group(&self) -> Option<uuid::Uuid> {
-        self.import_target_group.filter(|gid| {
+        self.vaults.cur().import_target_group.filter(|gid| {
             self.vaults.cur().groups
                 .iter()
                 .any(|g| g.id == *gid && g.cloud_query.is_none())
@@ -1110,20 +1112,20 @@ impl Oryxis {
     /// (`live_import_target_group`).
     fn take_import_target_group(&mut self) -> Option<uuid::Uuid> {
         let live = self.live_import_target_group();
-        self.import_target_group = None;
+        self.vaults.cur_mut().import_target_group = None;
         live
     }
 
     fn open_sftp_backup_picker(&mut self, is_import: bool) {
-        self.sftp_backup.is_import = is_import;
-        self.sftp_backup.open = true;
-        self.sftp_backup.busy = false;
-        self.sftp_backup.status = None;
-        if self.sftp_backup.path.trim().is_empty() {
-            self.sftp_backup.path = "vault.oryxis".to_string();
+        self.vaults.cur_mut().sftp_backup.is_import = is_import;
+        self.vaults.cur_mut().sftp_backup.open = true;
+        self.vaults.cur_mut().sftp_backup.busy = false;
+        self.vaults.cur_mut().sftp_backup.status = None;
+        if self.vaults.cur().sftp_backup.path.trim().is_empty() {
+            self.vaults.cur_mut().sftp_backup.path = "vault.oryxis".to_string();
         }
-        if self.sftp_backup.host.is_none() && !self.vaults.cur().connections.is_empty() {
-            self.sftp_backup.host = Some(0);
+        if self.vaults.cur().sftp_backup.host.is_none() && !self.vaults.cur().connections.is_empty() {
+            self.vaults.cur_mut().sftp_backup.host = Some(0);
         }
     }
 
@@ -1132,15 +1134,15 @@ impl Oryxis {
     /// with the shared host-key modal) and transfer the encrypted blob.
     fn run_sftp_backup(&mut self) -> Task<Message> {
         // Guard against a second confirm while a transfer is in flight.
-        if self.sftp_backup.busy {
+        if self.vaults.cur().sftp_backup.busy {
             return Task::none();
         }
         let Some(mut conn) = self
-            .sftp_backup.host
+            .vaults.cur().sftp_backup.host
             .and_then(|i| self.vaults.cur().connections.get(i))
             .cloned()
         else {
-            self.sftp_backup.status =
+            self.vaults.cur_mut().sftp_backup.status =
                 Some(Err(crate::i18n::t("sftp_backup_pick_host").to_string()));
             return Task::none();
         };
@@ -1148,18 +1150,18 @@ impl Oryxis {
         // (D4) and the effective proxy, so the backup host authenticates
         // exactly like a terminal tab to it would.
         self.apply_group_inheritance(&mut conn);
-        let path = self.sftp_backup.path.trim().to_string();
+        let path = self.vaults.cur().sftp_backup.path.trim().to_string();
         if path.is_empty() {
-            self.sftp_backup.status =
+            self.vaults.cur_mut().sftp_backup.status =
                 Some(Err(crate::i18n::t("sftp_backup_path_required").to_string()));
             return Task::none();
         }
-        let is_import = self.sftp_backup.is_import;
+        let is_import = self.vaults.cur().sftp_backup.is_import;
         // Restore needs the decrypt password up front (mirrors export, which
         // collects the encrypt password before the picker opens). The fetched
         // blob is inspected with it as soon as it lands.
-        if is_import && self.vault_import.password.is_empty() {
-            self.sftp_backup.status =
+        if is_import && self.vaults.cur().vault_import.password.is_empty() {
+            self.vaults.cur_mut().sftp_backup.status =
                 Some(Err(crate::i18n::t("password_required").to_string()));
             return Task::none();
         }
@@ -1171,7 +1173,7 @@ impl Oryxis {
             None
         } else {
             if !self.vault_usable() {
-                self.sftp_backup.status =
+                self.vaults.cur_mut().sftp_backup.status =
                     Some(Self::vault_locked_status("sftp backup export"));
                 return Task::none();
             }
@@ -1179,21 +1181,21 @@ impl Oryxis {
                 return Task::none();
             };
             let options = oryxis_vault::ExportOptions {
-                include_private_keys: self.export_include_keys,
+                include_private_keys: self.vaults.cur().export_include_keys,
                 filter: oryxis_vault::ExportFilter::All,
-                selection: self.export_selection,
+                selection: self.vaults.cur().export_selection,
             };
-            match oryxis_vault::export_vault(vault, &self.export_password, options) {
+            match oryxis_vault::export_vault(vault, &self.vaults.cur().export_password, options) {
                 Ok(d) => Some(d),
                 Err(e) => {
-                    self.sftp_backup.status = Some(Err(e.to_string()));
+                    self.vaults.cur_mut().sftp_backup.status = Some(Err(e.to_string()));
                     return Task::none();
                 }
             }
         };
 
-        self.sftp_backup.busy = true;
-        self.sftp_backup.status = None;
+        self.vaults.cur_mut().sftp_backup.busy = true;
+        self.vaults.cur_mut().sftp_backup.status = None;
 
         // Status formatter shared by both connect paths. Captures clones so
         // `path` stays owned for the remote-path bindings below.
@@ -1221,7 +1223,7 @@ impl Oryxis {
         });
 
         if let Some(session) = existing {
-            let remote = self.sftp_backup.path.trim().to_string();
+            let remote = self.vaults.cur().sftp_backup.path.trim().to_string();
             let data = export_data;
             return Task::perform(
                 async move {
@@ -1455,7 +1457,7 @@ impl Oryxis {
         let had_password = password.is_some();
         // Keep the bytes for a possible password retry; cleared on a
         // Ready / Invalid result in the parsed handler.
-        self.import_hub_pending = Some(bytes.clone());
+        self.vaults.cur_mut().import_hub_pending = Some(bytes.clone());
         Task::perform(
             tokio::task::spawn_blocking(move || {
                 crate::importers::mremoteng::parse(&bytes, password.as_deref())
@@ -1478,10 +1480,10 @@ impl Oryxis {
         use crate::importers::mremoteng::MrngParse;
         match parsed {
             MrngParse::Ready(parsed) => {
-                self.import_hub_pending = None;
-                self.import_hub_password = String::new();
+                self.vaults.cur_mut().import_hub_pending = None;
+                self.vaults.cur_mut().import_hub_password = String::new();
                 if parsed.hosts.is_empty() {
-                    self.import_hub_error = Some(if parsed.skipped.is_empty() {
+                    self.vaults.cur_mut().import_hub_error = Some(if parsed.skipped.is_empty() {
                         crate::i18n::t("ssh_import_none_found").to_string()
                     } else {
                         format!(
@@ -1492,7 +1494,7 @@ impl Oryxis {
                     });
                     return Task::none();
                 }
-                self.panels.import_hub = false;
+                self.vaults.cur_mut().panels.import_hub = false;
                 self.open_direct_preview(parsed)
             }
             MrngParse::NeedsPassword => {
@@ -1500,7 +1502,7 @@ impl Oryxis {
                 // from the first (the silent default-password try). The
                 // held bytes stay in `import_hub_pending` (stashed at
                 // dispatch) so the unlock retry can reuse them.
-                self.import_hub_error = if had_password {
+                self.vaults.cur_mut().import_hub_error = if had_password {
                     Some(crate::i18n::t("import_hub_wrong_password").to_string())
                 } else {
                     None
@@ -1508,8 +1510,8 @@ impl Oryxis {
                 Task::none()
             }
             MrngParse::Invalid => {
-                self.import_hub_pending = None;
-                self.import_hub_error =
+                self.vaults.cur_mut().import_hub_pending = None;
+                self.vaults.cur_mut().import_hub_error =
                     Some(crate::i18n::t("import_hub_unrecognized").to_string());
                 Task::none()
             }
@@ -1546,7 +1548,7 @@ impl Oryxis {
                     parsed.skipped.join(", ")
                 )
             };
-            self.ssh_config_import_status = Some(Err(msg.clone()));
+            self.vaults.cur_mut().ssh_config_import_status = Some(Err(msg.clone()));
             return self.show_toast(msg);
         }
         let existing_labels: std::collections::HashSet<String> = self
@@ -1554,17 +1556,17 @@ impl Oryxis {
             .iter()
             .map(|c| c.label.clone())
             .collect();
-        self.ssh_import_existing = parsed
+        self.vaults.cur_mut().ssh_import_existing = parsed
             .hosts
             .iter()
             .map(|h| existing_labels.contains(&h.conn.label))
             .collect();
-        self.ssh_import_selected =
-            self.ssh_import_existing.iter().map(|e| !e).collect();
-        self.ssh_import_hosts.clear();
-        self.ssh_import_direct = Some(parsed);
-        self.ssh_config_import_status = None;
-        self.panels.ssh_import_dialog = true;
+        self.vaults.cur_mut().ssh_import_selected =
+            self.vaults.cur().ssh_import_existing.iter().map(|e| !e).collect();
+        self.vaults.cur_mut().ssh_import_hosts.clear();
+        self.vaults.cur_mut().ssh_import_direct = Some(parsed);
+        self.vaults.cur_mut().ssh_config_import_status = None;
+        self.vaults.cur_mut().panels.ssh_import_dialog = true;
         Task::none()
     }
 }

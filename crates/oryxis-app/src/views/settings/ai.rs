@@ -141,7 +141,7 @@ impl Oryxis {
                         &self.vaults.cur().ai.api_key,
                         |v| Message::Ai(AiMessage::AiApiKeyChanged(v.into())),
                         Some(Message::Ai(AiMessage::SaveAiApiKey)),
-                        self.revealed_secrets
+                        self.vaults.cur().revealed_secrets
                             .contains(&crate::state::SecretField::AiApiKey),
                         Message::Settings(SettingsMessage::ToggleSecretVisibility(
                             crate::state::SecretField::AiApiKey,

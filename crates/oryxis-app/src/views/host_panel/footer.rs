@@ -13,7 +13,7 @@ impl Oryxis {
         // re-dials) and Save becomes the explicit persist opt-in. Both
         // buttons are closures so each arrangement constructs them in
         // its own visual order (recording happens at construction).
-        let quick_flow = self.editor_form.quick_flow;
+        let quick_flow = self.vaults.cur().editor_form.quick_flow;
         let save_primary = !quick_flow;
         let save_btn_bg = if save_primary && has_address {
             OryxisColors::t().accent
@@ -140,7 +140,7 @@ impl Oryxis {
             )
             .boxed()
         };
-        let actions_row: Element<'_, Message> = if self.editor_form.editing_id.is_none() {
+        let actions_row: Element<'_, Message> = if self.vaults.cur().editor_form.editing_id.is_none() {
             let (leading, trailing) = if quick_flow {
                 // Connect is the primary: it takes the trailing slot Save
                 // holds in the normal flow.

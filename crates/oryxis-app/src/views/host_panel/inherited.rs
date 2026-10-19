@@ -42,7 +42,7 @@ impl Oryxis {
         // unmatched value is the vault root, which inherits nothing.
         let Some(gid) = oryxis_core::models::Group::resolve_path_or_label(
             &self.vaults.cur().groups,
-            &self.editor_form.group_name,
+            &self.vaults.cur().editor_form.group_name,
             &Default::default(),
         ) else {
             return ctx;
@@ -65,7 +65,7 @@ impl Oryxis {
     /// `key_id` block a group identity default), read off form state so
     /// the hint updates in the same frame as the field.
     fn editor_form_answers_credentials(&self) -> bool {
-        let form = &self.editor_form;
+        let form = &self.vaults.cur().editor_form;
         let password_will_exist = match form.password.resolve() {
             // Edited: stores when non-empty, clears when empty.
             Some(typed) => !typed.is_empty(),

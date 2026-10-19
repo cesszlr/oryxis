@@ -8,7 +8,7 @@ impl Oryxis {
     pub(crate) fn view_identity_panel(&self) -> Element<'_, Message> {
         // Keyboard rows are recorded in visual order (row mode: Up/Down from any input).
         self.panel_nav_reset();
-        let panel_title = if self.identity_form.editing_id.is_some() { t("edit_identity") } else { t("new_identity") };
+        let panel_title = if self.vaults.cur().identity_form.editing_id.is_some() { t("edit_identity") } else { t("new_identity") };
 
         // Panel header
         let panel_header = container(
@@ -35,7 +35,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("panel-identity-label")),
                 10.0,
-                text_input(t("my_identity_placeholder"), &self.identity_form.label)
+                text_input(t("my_identity_placeholder"), &self.vaults.cur().identity_form.label)
                     .id(iced::widget::Id::new("panel-identity-label"))
                     .on_input(|v| Message::Keys(KeysMessage::IdentityLabelChanged(v)))
                     .padding(10)
@@ -56,7 +56,7 @@ impl Oryxis {
                 self.panel_nav_slot(
                     crate::keynav::RowAction::input(iced::widget::Id::new("panel-identity-username")),
                     10.0,
-                    text_input("root", &self.identity_form.username)
+                    text_input("root", &self.vaults.cur().identity_form.username)
                         .id(iced::widget::Id::new("panel-identity-username"))
                         .on_input(|v| Message::Keys(KeysMessage::IdentityUsernameChanged(v)))
                         .padding(10)
@@ -70,8 +70,8 @@ impl Oryxis {
 
         // Password field with eye toggle. Keyboard row: Tab focuses the
         // inner input via its id.
-        let identity_pw_placeholder: &'static str = if self.identity_form.has_existing_password
-            && !self.identity_form.password.touched()
+        let identity_pw_placeholder: &'static str = if self.vaults.cur().identity_form.has_existing_password
+            && !self.vaults.cur().identity_form.password.touched()
         {
             "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}"
         } else {
@@ -89,10 +89,10 @@ impl Oryxis {
                 Space::new().width(10).boxed(),
                 crate::widgets::password_input_with_eye_nav(
                     identity_pw_placeholder,
-                    self.identity_form.password.as_str(),
+                    self.vaults.cur().identity_form.password.as_str(),
                     |v| Message::Keys(KeysMessage::IdentityPasswordChanged(v.into())),
                     None,
-                    self.identity_form.password_visible,
+                    self.vaults.cur().identity_form.password_visible,
                     Message::Keys(KeysMessage::IdentityTogglePasswordVisibility),
                     10.0,
                     Some(iced::widget::Id::new("panel-identity-password")),
@@ -116,7 +116,7 @@ impl Oryxis {
             opts.extend(self.vaults.cur().keys.iter().map(|k| k.label.clone()));
             opts
         };
-        let key_selected = self.identity_form.key.clone().unwrap_or_else(|| "(none)".into());
+        let key_selected = self.vaults.cur().identity_form.key.clone().unwrap_or_else(|| "(none)".into());
         let key_field = column![
             text(t("ssh_key")).size(12).color(OryxisColors::t().text_secondary),
             Space::new().height(6),
@@ -144,7 +144,7 @@ impl Oryxis {
         .align_x(dir_align_x());
 
         // Linked connections (only when editing)
-        let linked_section: Element<'_, Message> = if let Some(editing_id) = self.identity_form.editing_id {
+        let linked_section: Element<'_, Message> = if let Some(editing_id) = self.vaults.cur().identity_form.editing_id {
             let linked: Vec<&Connection> = self.vaults.cur().connections.iter()
                 .filter(|c| c.identity_id == Some(editing_id))
                 .collect();
@@ -183,8 +183,8 @@ impl Oryxis {
         // Shared form footer: disabled Save while the label is empty
         // (structural gating instead of the old color-only hint that
         // still accepted clicks), Cancel closes the panel like Esc.
-        let save_label = if self.identity_form.editing_id.is_some() { crate::i18n::t("update_identity") } else { crate::i18n::t("save_identity") };
-        let has_label = !self.identity_form.label.trim().is_empty();
+        let save_label = if self.vaults.cur().identity_form.editing_id.is_some() { crate::i18n::t("update_identity") } else { crate::i18n::t("save_identity") };
+        let has_label = !self.vaults.cur().identity_form.label.trim().is_empty();
         let footer = crate::widgets::form_footer(
             self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::Keys(KeysMessage::HideIdentityPanel)),

@@ -121,7 +121,7 @@ impl Oryxis {
     /// languages). Order follows the rows inside the section.
     pub(super) fn hp_section_summary(&self, section: HostEditorSection) -> Vec<String> {
         use oryxis_core::models::connection::{AddressFamily, AuthMethod};
-        let form = &self.editor_form;
+        let form = &self.vaults.cur().editor_form;
         let mut tokens: Vec<String> = Vec::new();
         match section {
             HostEditorSection::Authentication => {
@@ -231,7 +231,7 @@ impl Oryxis {
                 if !form.env_vars.is_empty() {
                     tokens.push(format!("{} ({})", t("env_vars"), form.env_vars.len()));
                 }
-                if !matches!(self.editor_startup_choice, crate::state::StartupChoice::None) {
+                if !matches!(self.vaults.cur().editor_startup_choice, crate::state::StartupChoice::None) {
                     tokens.push(t("initial_command_label").into());
                 }
                 if form.login_script_id.is_some() {

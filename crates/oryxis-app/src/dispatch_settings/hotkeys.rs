@@ -40,8 +40,8 @@ impl Oryxis {
                 }
             }
             SettingsMessage::ToggleSecretVisibility(field) => {
-                if !self.revealed_secrets.remove(&field) {
-                    self.revealed_secrets.insert(field);
+                if !self.vaults.cur_mut().revealed_secrets.remove(&field) {
+                    self.vaults.cur_mut().revealed_secrets.insert(field);
                 }
             }
             m => return Err(m),

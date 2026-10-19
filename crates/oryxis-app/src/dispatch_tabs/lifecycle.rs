@@ -35,7 +35,7 @@ impl Oryxis {
             }
             // Switching tabs dismisses the session-group editor (it's
             // tied to the tab it was opened from).
-            self.panels.session_group_panel = false;
+            self.vaults.cur_mut().panels.session_group_panel = false;
             // Leaving a tab mid-composition clears its preedit so a stale
             // IME overlay can't re-show when the user tabs back.
             if let Some(old_idx) = self.cur_active_tab()
@@ -484,7 +484,7 @@ impl Oryxis {
         // after the user clicks Close from it.
         self.overlay = None;
         // Closing a tab dismisses the session-group editor it spawned.
-        self.panels.session_group_panel = false;
+        self.vaults.cur_mut().panels.session_group_panel = false;
         if idx < self.tabs.len() {
             // Before the teardown, which is also the reconnect rebuild's
             // path: the remembering lives here, on the user close, so a

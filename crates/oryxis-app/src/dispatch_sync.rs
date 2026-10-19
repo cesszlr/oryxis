@@ -115,7 +115,7 @@ impl Oryxis {
         // showed it: the next edit opens masked again. The stored value
         // is never revealed, so there is nothing else to sweep here (a
         // locked vault clears the whole set).
-        self.revealed_secrets
+        self.vaults.cur_mut().revealed_secrets
             .remove(&crate::state::SecretField::SyncPassphrase);
     }
 

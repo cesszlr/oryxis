@@ -104,7 +104,7 @@ impl Oryxis {
         .padding(Padding { top: 16.0, right: 24.0, bottom: 16.0, left: 24.0 })
         .width(Length::Fill);
 
-        let status: Element<'_, Message> = if let Some(err) = &self.port_forward_form.error {
+        let status: Element<'_, Message> = if let Some(err) = &self.vaults.cur().port_forward_form.error {
             container(text(err.clone()).size(12).color(OryxisColors::t().error).boxed())
                 .padding(Padding { top: 0.0, right: 24.0, bottom: 8.0, left: 24.0 }).boxed()
         } else {
@@ -255,7 +255,7 @@ impl Oryxis {
             // pointer can travel to it.
             const DOTS_SLOT_W: f32 = 22.0;
             let show_dots = self.cur_nav().hover.port_forward_card == Some(idx)
-                || self.port_forward_context_menu == Some(idx)
+                || self.vaults.cur().port_forward_context_menu == Some(idx)
                 || kb_selected;
             let dots: Element<'_, Message> = if show_dots {
                 crate::widgets::card_kebab_button(
@@ -330,7 +330,7 @@ impl Oryxis {
         }
 
         let nav_width = self.vault_rail_width();
-        let panel_width = if self.panels.port_forward_panel { self.vaults.cur().panel_width } else { 0.0 };
+        let panel_width = if self.vaults.cur().panels.port_forward_panel { self.vaults.cur().panel_width } else { 0.0 };
         let available = (self.cur_window_size().width
             - nav_width
             - self.side_strip_reserve()
@@ -370,7 +370,7 @@ impl Oryxis {
         // form column (not at construction) so recording follows the on-screen
         // order: name, kind, host, listen fields, target fields, toggle.
         self.panel_nav_reset();
-        let is_editing = self.port_forward_form.editing_id.is_some();
+        let is_editing = self.vaults.cur().port_forward_form.editing_id.is_some();
         let title = if is_editing { t("edit_port_forward") } else { t("new_port_forward") };
 
         let panel_header = container(
@@ -393,7 +393,7 @@ impl Oryxis {
         // select: Tab reaches it, Enter/Space open it, the widget owns
         // arrows/Esc while focused (fork support).
         let kind_options = ForwardKind::ALL.to_vec();
-        let kind_picker = pick_list(Some(self.port_forward_form.kind), kind_options, |k: &ForwardKind| k.to_string())
+        let kind_picker = pick_list(Some(self.vaults.cur().port_forward_form.kind), kind_options, |k: &ForwardKind| k.to_string())
             .on_select(|v| Message::PortForward(PortForwardMessage::PfKindChanged(v)))
             .id(iced::widget::Id::new("panel-pf-kind"))
             .on_open(Message::Navigation(NavigationMessage::PickOpenChanged(true)))
@@ -405,7 +405,7 @@ impl Oryxis {
         // resolves the label back to the connection id.
         let host_options: Vec<String> = self.vaults.cur().connections.iter().map(|c| c.label.clone()).collect();
         let selected_host_label = self
-            .port_forward_form.host_id
+            .vaults.cur().port_forward_form.host_id
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .map(|c| c.label.clone());
         let host_lookup: std::collections::HashMap<String, uuid::Uuid> = self
@@ -445,7 +445,7 @@ impl Oryxis {
         };
 
         let mut form = column![
-            label_field(t("name"), &self.port_forward_form.label, "my-db-tunnel", "panel-pf-name", |v| Message::PortForward(PortForwardMessage::PfLabelChanged(v))),
+            label_field(t("name"), &self.vaults.cur().port_forward_form.label, "my-db-tunnel", "panel-pf-name", |v| Message::PortForward(PortForwardMessage::PfLabelChanged(v))),
             Space::new().height(14),
             text(t("pf_kind")).size(12).color(OryxisColors::t().text_secondary),
             Space::new().height(4),
@@ -463,25 +463,25 @@ impl Oryxis {
                 host_picker.boxed(),
             ),
             Space::new().height(14),
-            label_field(t("pf_listen_host"), &self.port_forward_form.listen_host, "127.0.0.1", "panel-pf-listen-host", |v| Message::PortForward(PortForwardMessage::PfListenHostChanged(v))),
+            label_field(t("pf_listen_host"), &self.vaults.cur().port_forward_form.listen_host, "127.0.0.1", "panel-pf-listen-host", |v| Message::PortForward(PortForwardMessage::PfListenHostChanged(v))),
             Space::new().height(14),
-            label_field(t("pf_listen_port"), &self.port_forward_form.listen_port, "8080", "panel-pf-listen-port", |v| Message::PortForward(PortForwardMessage::PfListenPortChanged(v))),
+            label_field(t("pf_listen_port"), &self.vaults.cur().port_forward_form.listen_port, "8080", "panel-pf-listen-port", |v| Message::PortForward(PortForwardMessage::PfListenPortChanged(v))),
         ]
         .width(Length::Fill)
         .align_x(dir_align_x());
 
         // Target fields hidden for Dynamic (the SOCKS client picks the dest).
         // Their keyboard rows record here too, only when rendered.
-        if self.port_forward_form.kind.has_target() {
+        if self.vaults.cur().port_forward_form.kind.has_target() {
             form = form
                 .push(Space::new().height(14).boxed())
-                .push(label_field(t("pf_target_host"), &self.port_forward_form.target_host, "10.0.0.5", "panel-pf-target-host", |v| Message::PortForward(PortForwardMessage::PfTargetHostChanged(v))).boxed())
+                .push(label_field(t("pf_target_host"), &self.vaults.cur().port_forward_form.target_host, "10.0.0.5", "panel-pf-target-host", |v| Message::PortForward(PortForwardMessage::PfTargetHostChanged(v))).boxed())
                 .push(Space::new().height(14).boxed())
-                .push(label_field(t("pf_target_port"), &self.port_forward_form.target_port, "5432", "panel-pf-target-port", |v| Message::PortForward(PortForwardMessage::PfTargetPortChanged(v))).boxed());
+                .push(label_field(t("pf_target_port"), &self.vaults.cur().port_forward_form.target_port, "5432", "panel-pf-target-port", |v| Message::PortForward(PortForwardMessage::PfTargetPortChanged(v))).boxed());
         }
 
         // Remote bind on 0.0.0.0 needs `GatewayPorts yes` on the server.
-        if self.port_forward_form.kind == ForwardKind::Remote && self.port_forward_form.listen_host.trim() == "0.0.0.0" {
+        if self.vaults.cur().port_forward_form.kind == ForwardKind::Remote && self.vaults.cur().port_forward_form.listen_host.trim() == "0.0.0.0" {
             form = form
                 .push(Space::new().height(10).boxed())
                 .push(text(t("gateway_ports_hint")).size(11).color(OryxisColors::t().warning).boxed());
@@ -490,8 +490,8 @@ impl Oryxis {
         // A dynamic SOCKS forward is an unauthenticated proxy. Bound to a
         // non-loopback address it becomes an open proxy into the remote
         // network for anyone who can reach this host. Warn explicitly.
-        let exposed = !LocalBind::parse(&self.port_forward_form.listen_host).is_loopback();
-        if self.port_forward_form.kind == ForwardKind::Dynamic && exposed {
+        let exposed = !LocalBind::parse(&self.vaults.cur().port_forward_form.listen_host).is_loopback();
+        if self.vaults.cur().port_forward_form.kind == ForwardKind::Dynamic && exposed {
             form = form
                 .push(Space::new().height(10).boxed())
                 .push(text(t("socks_open_proxy_hint")).size(11).color(OryxisColors::t().warning).boxed());
@@ -501,10 +501,10 @@ impl Oryxis {
             .push(Space::new().height(14).boxed())
             .push(self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::PortForward(PortForwardMessage::PfAutoStartToggled(
-                    !self.port_forward_form.auto_start,
+                    !self.vaults.cur().port_forward_form.auto_start,
                 ))),
                 8.0,
-                checkbox(self.port_forward_form.auto_start)
+                checkbox(self.vaults.cur().port_forward_form.auto_start)
                     .label(t("pf_auto_start"))
                     .on_toggle(|v| Message::PortForward(PortForwardMessage::PfAutoStartToggled(v)))
                     .size(16)
@@ -514,7 +514,7 @@ impl Oryxis {
 
         // Document the self-healing behavior so the KeePassXC-key-not-ready
         // ordering problem has an in-product answer.
-        if self.port_forward_form.auto_start {
+        if self.vaults.cur().port_forward_form.auto_start {
             form = form
                 .push(Space::new().height(6).boxed())
                 .push(text(t("pf_auto_start_hint")).size(11).color(OryxisColors::t().text_muted).boxed());
@@ -524,7 +524,7 @@ impl Oryxis {
         // outlined-danger row inside the body (it is not part of the
         // Cancel/Save pair).
         let mut body = column![form];
-        if let Some(edit_id) = self.port_forward_form.editing_id
+        if let Some(edit_id) = self.vaults.cur().port_forward_form.editing_id
             && let Some(idx) = self.vaults.cur().port_forward_rules.iter().position(|r| r.id == edit_id)
         {
             let del_btn = self.panel_nav_slot(
@@ -550,7 +550,7 @@ impl Oryxis {
 
         // Shared form chrome: error outside the scrollable, above the
         // footer, so it stays visible regardless of scroll position.
-        let panel_error = crate::widgets::form_error(self.port_forward_form.error.as_deref());
+        let panel_error = crate::widgets::form_error(self.vaults.cur().port_forward_form.error.as_deref());
         let footer = crate::widgets::form_footer(
             self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::PortForward(PortForwardMessage::HidePortForwardPanel)),

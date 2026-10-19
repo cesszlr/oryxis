@@ -148,8 +148,8 @@ impl Oryxis {
                 // Burger menu auto-dismisses on navigation: the user
                 // picked a destination, leaving the overlay open is
                 // visual noise.
-                self.panels.burger_menu = false;
-                self.panels.subnav_overflow = false;
+                self.vaults.cur_mut().panels.burger_menu = false;
+                self.vaults.cur_mut().panels.subnav_overflow = false;
                 // Any floating overlay menu (kebab, sort, the
                 // multi-select tag filters, which STAY open by design)
                 // dies with its view: a stale `overlay` keeps the modal
@@ -361,7 +361,7 @@ impl Oryxis {
                         // a combo; an empty rect falls back to the cursor.
                         GroupPickerTarget::MoveHosts => iced::Rectangle::default(),
                     };
-                    self.group_picker_search.clear();
+                    self.vaults.cur_mut().group_picker_search.clear();
                     // 6 px gap below the combo. Falls back to mouse
                     // coords if the cell hasn't been populated yet
                     // (first ever open before any draw pass).
@@ -381,25 +381,25 @@ impl Oryxis {
                 }
             }
             NavigationMessage::GroupPickerSearchChanged(v) => {
-                self.group_picker_search = v;
+                self.vaults.cur_mut().group_picker_search = v;
             }
             NavigationMessage::GroupPickerPick(target, label) => {
                 use crate::state::{GroupPickerTarget, OverlayContent};
                 match target {
                     GroupPickerTarget::DynamicFormParent => {
-                        self.cloud_dynamic_form.parent_label = label;
+                        self.vaults.cur_mut().cloud_dynamic_form.parent_label = label;
                     }
                     GroupPickerTarget::SessionGroupFolder => {
-                        self.editor_session_group.group_name = label;
+                        self.vaults.cur_mut().editor_session_group.group_name = label;
                     }
                     GroupPickerTarget::GroupEditParent => {
-                        self.group_edit.parent_label = label;
+                        self.vaults.cur_mut().group_edit.parent_label = label;
                     }
                     // The "Top level" row arrives as an empty path, the
                     // value a cleared field means on save; nothing is
                     // written here, the drawer's closing flush is.
                     GroupPickerTarget::HostEditorParent => {
-                        self.editor_form.group_name = label;
+                        self.vaults.cur_mut().editor_form.group_name = label;
                     }
                     GroupPickerTarget::MoveHosts => {
                         // The picker sends the breadcrumb path it showed,
@@ -417,7 +417,7 @@ impl Oryxis {
                             .map(Some)
                         };
                         self.overlay = None;
-                        let ids = std::mem::take(&mut self.move_hosts_pending);
+                        let ids = std::mem::take(&mut self.vaults.cur_mut().move_hosts_pending);
                         return match target {
                             Some(target) => self.move_hosts_to_group(&ids, target),
                             None => Task::none(),
@@ -448,12 +448,12 @@ impl Oryxis {
                     // content's right edge.
                     let panel_width = match kind {
                         SortMenuKind::Hosts => {
-                            if self.panels.host_panel { self.vaults.cur().panel_width } else { 0.0 }
+                            if self.vaults.cur().panels.host_panel { self.vaults.cur().panel_width } else { 0.0 }
                         }
                         SortMenuKind::Keys => {
-                            if self.panels.key_panel
-                                || self.panels.identity_panel
-                                || self.panels.key_generate_panel
+                            if self.vaults.cur().panels.key_panel
+                                || self.vaults.cur().panels.identity_panel
+                                || self.vaults.cur().panels.key_generate_panel
                             {
                                 self.vaults.cur().panel_width
                             } else {
@@ -461,7 +461,7 @@ impl Oryxis {
                             }
                         }
                         SortMenuKind::Snippets => {
-                            if self.panels.snippet_panel { self.vaults.cur().panel_width } else { 0.0 }
+                            if self.vaults.cur().panels.snippet_panel { self.vaults.cur().panel_width } else { 0.0 }
                         }
                     };
                     // Must match the `OverlayContent::SortMenu` width in
@@ -636,7 +636,7 @@ impl Oryxis {
                 // lands here on purpose, so the user sees what they
                 // typed; the editor's own split is what cleans it on
                 // the way to the vault.
-                self.editor_form.hostname = input;
+                self.vaults.cur_mut().editor_form.hostname = input;
                 // Hostname came in pre-filled, so the cursor belongs on
                 // the one field still required: the label.
                 return crate::widgets::focus_input(iced::widget::Id::new(

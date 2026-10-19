@@ -110,8 +110,8 @@ impl Oryxis {
                 // already gone and the editor is open, so this error is
                 // expected teardown noise. Requiring `connecting == None`
                 // keeps a fresh connect's genuine error from being eaten.
-                if self.pending_edit_cancel && self.connecting.is_none() {
-                    self.pending_edit_cancel = false;
+                if self.vaults.cur().pending_edit_cancel && self.connecting.is_none() {
+                    self.vaults.cur_mut().pending_edit_cancel = false;
                     tracing::debug!("swallowing edit-host-provoked connect error: {err}");
                     return Task::none();
                 }
@@ -201,7 +201,7 @@ impl Oryxis {
                     // own terminal (mirrors `PaneConnectError`).
                     state.process(format!("\r\nConnection failed: {err}\r\n").as_bytes());
                 } else {
-                    self.host_panel_error = Some(format!("SSH: {}", err));
+                    self.vaults.cur_mut().host_panel_error = Some(format!("SSH: {}", err));
                 }
             }
             // The router sends only this family here, so anything

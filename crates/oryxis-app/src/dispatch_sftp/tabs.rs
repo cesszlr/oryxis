@@ -36,7 +36,7 @@ impl Oryxis {
                     self.focus_sftp_tab(idx);
                     self.active_tab = None;
                     self.active_view = crate::state::View::Sftp;
-                    self.panels.burger_menu = false;
+                    self.vaults.cur_mut().panels.burger_menu = false;
                     // Dormant pinned tab (restored at boot): re-mount its remote
                     // pane on first focus. Single-remote case (the common
                     // left=Local / right=Remote); a dual-remote tab re-mounts
@@ -190,12 +190,12 @@ impl Oryxis {
             SftpMessage::NewSftpTab => {
                 self.overlay = None;
                 // Dismiss the new-tab picker too: SFTP is selectable from it.
-                self.panels.new_tab_picker = false;
+                self.vaults.cur_mut().panels.new_tab_picker = false;
                 // ...and the burger menu, the other entry point (its own
                 // flag, so clearing `overlay` above isn't enough); without
                 // this it lingers over the freshly-opened SFTP tab and the
                 // host picker until an extra click.
-                self.panels.burger_menu = false;
+                self.vaults.cur_mut().panels.burger_menu = false;
                 self.open_new_sftp_tab();
                 // Empty tab: open the host picker for the remote pane.
                 self.sftp.picker_open = true;

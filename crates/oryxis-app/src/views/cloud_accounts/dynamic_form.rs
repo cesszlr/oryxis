@@ -68,7 +68,7 @@ impl Oryxis {
             TransportKind::KubectlExec,
         ];
         let transport_pick = pick_list(
-            Some(self.cloud_dynamic_form.transport),
+            Some(self.vaults.cur().cloud_dynamic_form.transport),
             transports,
             |t| match t {
                 TransportKind::Ssh => "SSH".to_string(),
@@ -92,7 +92,7 @@ impl Oryxis {
         };
         let key_pick = pick_list(
             Some(
-                self.cloud_dynamic_form.selected_key
+                self.vaults.cur().cloud_dynamic_form.selected_key
                     .clone()
                     .unwrap_or_else(|| "(none)".to_string()),
             ),
@@ -113,7 +113,7 @@ impl Oryxis {
         };
         let identity_pick = pick_list(
             Some(
-                self.cloud_dynamic_form.selected_identity
+                self.vaults.cur().cloud_dynamic_form.selected_identity
                     .clone()
                     .unwrap_or_else(|| "(none)".to_string()),
             ),
@@ -133,15 +133,15 @@ impl Oryxis {
         // `cloud_dynamic_form.icon` / `_color` instead of persisting
         // straight to the vault, so the form's Save button stays the
         // single commit point.
-        let icon_id_for_preview = if self.cloud_dynamic_form.icon.trim().is_empty() {
+        let icon_id_for_preview = if self.vaults.cur().cloud_dynamic_form.icon.trim().is_empty() {
             "server"
         } else {
-            self.cloud_dynamic_form.icon.trim()
+            self.vaults.cur().cloud_dynamic_form.icon.trim()
         };
-        let preview_color = if self.cloud_dynamic_form.color.trim().is_empty() {
+        let preview_color = if self.vaults.cur().cloud_dynamic_form.color.trim().is_empty() {
             OryxisColors::t().accent
         } else {
-            crate::widgets::parse_hex_color(self.cloud_dynamic_form.color.trim())
+            crate::widgets::parse_hex_color(self.vaults.cur().cloud_dynamic_form.color.trim())
                 .unwrap_or(OryxisColors::t().accent)
         };
         let preview_glyph = crate::os_icon::custom_icon_glyph(icon_id_for_preview);
@@ -178,7 +178,7 @@ impl Oryxis {
         const PARENT_COMBO_HEIGHT: f32 = 36.0;
         let parent_input = text_input(
             t("group_placeholder"),
-            &self.cloud_dynamic_form.parent_label,
+            &self.vaults.cur().cloud_dynamic_form.parent_label,
         )
         .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormParentChanged(v)))
         .padding(10)
@@ -240,7 +240,7 @@ impl Oryxis {
             dir_row(vec![
                 preview_box,
                 Space::new().width(10).boxed(),
-                text_input("group label", &self.cloud_dynamic_form.label)
+                text_input("group label", &self.vaults.cur().cloud_dynamic_form.label)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormLabelChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -265,9 +265,9 @@ impl Oryxis {
         // Source query fields differ by kind: ECS groups edit
         // cluster/service/container, K8s groups edit context/namespace and a
         // pod selector (label string or a Deployment/StatefulSet/pod name).
-        let kind_fields: Element<'_, Message> = if self.cloud_dynamic_form.is_k8s {
+        let kind_fields: Element<'_, Message> = if self.vaults.cur().cloud_dynamic_form.is_k8s {
             use crate::state::K8sSelectorKind;
-            let selector_kind = self.cloud_dynamic_form.k8s_selector_kind;
+            let selector_kind = self.vaults.cur().cloud_dynamic_form.k8s_selector_kind;
             let selector_pick = pick_list(
                 Some(selector_kind),
                 K8sSelectorKind::ALL.to_vec(),
@@ -293,7 +293,7 @@ impl Oryxis {
                     .size(12)
                     .color(OryxisColors::t().text_secondary),
                 Space::new().height(4),
-                text_input(t("cloud_k8s_context_ph"), &self.cloud_dynamic_form.k8s_context)
+                text_input(t("cloud_k8s_context_ph"), &self.vaults.cur().cloud_dynamic_form.k8s_context)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormK8sContextChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -303,7 +303,7 @@ impl Oryxis {
                     .size(12)
                     .color(OryxisColors::t().text_secondary),
                 Space::new().height(4),
-                text_input("default", &self.cloud_dynamic_form.namespace)
+                text_input("default", &self.vaults.cur().cloud_dynamic_form.namespace)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormNamespaceChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -315,7 +315,7 @@ impl Oryxis {
                 Space::new().height(4),
                 selector_pick,
                 Space::new().height(8),
-                text_input(value_ph, &self.cloud_dynamic_form.k8s_selector_value)
+                text_input(value_ph, &self.vaults.cur().cloud_dynamic_form.k8s_selector_value)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormK8sSelectorValueChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -334,7 +334,7 @@ impl Oryxis {
                     .size(12)
                     .color(OryxisColors::t().text_secondary),
                 Space::new().height(4),
-                text_input("my-cluster", &self.cloud_dynamic_form.cluster)
+                text_input("my-cluster", &self.vaults.cur().cloud_dynamic_form.cluster)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormClusterChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -344,7 +344,7 @@ impl Oryxis {
                     .size(12)
                     .color(OryxisColors::t().text_secondary),
                 Space::new().height(4),
-                text_input("my-service", &self.cloud_dynamic_form.service)
+                text_input("my-service", &self.vaults.cur().cloud_dynamic_form.service)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormServiceChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -354,7 +354,7 @@ impl Oryxis {
                     .size(12)
                     .color(OryxisColors::t().text_secondary),
                 Space::new().height(4),
-                text_input(t("cloud_dynamic_form_container_ph"), &self.cloud_dynamic_form.container)
+                text_input(t("cloud_dynamic_form_container_ph"), &self.vaults.cur().cloud_dynamic_form.container)
                     .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormContainerChanged(v)))
                     .padding(10)
                     .style(crate::widgets::rounded_input_style)
@@ -386,7 +386,7 @@ impl Oryxis {
                 .size(12)
                 .color(OryxisColors::t().text_secondary),
             Space::new().height(4),
-            text_input("ec2-user", &self.cloud_dynamic_form.username)
+            text_input("ec2-user", &self.vaults.cur().cloud_dynamic_form.username)
                 .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormUsernameChanged(v)))
                 .padding(10)
                 .style(crate::widgets::rounded_input_style)
@@ -396,7 +396,7 @@ impl Oryxis {
                 .size(12)
                 .color(OryxisColors::t().text_secondary),
             Space::new().height(4),
-            text_input("exec bash", &self.cloud_dynamic_form.initial_command)
+            text_input("exec bash", &self.vaults.cur().cloud_dynamic_form.initial_command)
                 .on_input(|v| Message::Cloud(CloudMessage::DynamicGroupFormInitialCommandChanged(v)))
                 .padding(10)
                 .style(crate::widgets::rounded_input_style)

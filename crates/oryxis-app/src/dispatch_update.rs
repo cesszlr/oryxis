@@ -115,7 +115,7 @@ impl Oryxis {
                 // (up-to-date / error + retry) is on screen regardless
                 // of where the check was fired from (issue #38: the
                 // burger-menu path previously looked like a no-op).
-                self.panels.burger_menu = false;
+                self.vaults.cur_mut().panels.burger_menu = false;
                 self.editing_hotkey = None;
                 self.active_view = crate::state::View::Settings;
                 self.settings_section = crate::state::SettingsSection::About;

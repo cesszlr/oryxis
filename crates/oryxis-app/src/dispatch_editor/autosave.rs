@@ -47,13 +47,13 @@ impl Oryxis {
         let json = serde_json::to_string(&conn).ok()?;
         Some(format!(
             "{json}|{}|{}",
-            self.editor_form.group_name.trim(),
-            self.editor_form.use_totp
+            self.vaults.cur().editor_form.group_name.trim(),
+            self.vaults.cur().editor_form.use_totp
         ))
     }
 
     fn editor_secrets_touched(&self) -> bool {
-        let f = &self.editor_form;
+        let f = &self.vaults.cur().editor_form;
         f.password.touched()
             || f.proxy_password.touched()
             || f.totp_secret.touched()
@@ -82,10 +82,10 @@ impl Oryxis {
     /// back on every delete-from-the-editor. Reproduced in the harness
     /// before this guard, gone after.
     fn editor_owns_write(&self) -> bool {
-        self.editor_form
+        self.vaults.cur().editor_form
             .editing_id
             .is_some_and(|id| self.vaults.cur().connections.iter().any(|c| c.id == id))
-            && self.editor_saved_snapshot.is_some()
+            && self.vaults.cur().editor_saved_snapshot.is_some()
     }
 
     /// Whether the host editor is ACTUALLY on screen, which is what the
@@ -96,13 +96,13 @@ impl Oryxis {
     /// group editor opening takes the slot while `host_panel` stays
     /// true. Mirrors that chain; a condition added there belongs here.
     pub(crate) fn host_editor_visible(&self) -> bool {
-        self.panels.host_panel
+        self.vaults.cur().panels.host_panel
             && self.side_panel_here()
             && self.cur_active_tab().is_none()
             && self.cur_view() == crate::state::View::Dashboard
-            && !self.cloud_discover.visible
-            && !self.cloud_dynamic_form.visible
-            && !self.group_edit.visible
+            && !self.vaults.cur().cloud_discover.visible
+            && !self.vaults.cur().cloud_dynamic_form.visible
+            && !self.vaults.cur().group_edit.visible
     }
 
     /// Whether the open editor holds changes the vault does not.
@@ -113,7 +113,7 @@ impl Oryxis {
         if self.editor_secrets_touched() {
             return true;
         }
-        match (self.editor_form_signature(), &self.editor_saved_snapshot) {
+        match (self.editor_form_signature(), &self.vaults.cur().editor_saved_snapshot) {
             (Some(sig), Some(snap)) => sig != *snap,
             // An unbuildable form (half-typed port, cleared hostname):
             // nothing coherent to persist.
@@ -126,16 +126,16 @@ impl Oryxis {
     /// open. Over-calling is safe: it only ever writes the snapshot
     /// once per opened host.
     pub(crate) fn editor_autosave_kick(&mut self) {
-        if !self.panels.host_panel
-            || self.editor_form.editing_id.is_none()
-            || self.editor_saved_snapshot.is_some()
+        if !self.vaults.cur().panels.host_panel
+            || self.vaults.cur().editor_form.editing_id.is_none()
+            || self.vaults.cur().editor_saved_snapshot.is_some()
         {
             return;
         }
         // The open arm cleared the snapshot; this very message is the
         // first one after it (usually the open itself), so the form
         // still equals the stored row.
-        self.editor_saved_snapshot = self.editor_form_signature();
+        self.vaults.cur_mut().editor_saved_snapshot = self.editor_form_signature();
     }
 
     /// The host the editor is open on was just moved to another folder
@@ -152,19 +152,19 @@ impl Oryxis {
     /// keeps its baseline so those edits are written on the next flush,
     /// now carrying the folder the host actually lives in.
     pub(crate) fn editor_follow_moved_host(&mut self, was_dirty: bool) {
-        let Some(id) = self.editor_form.editing_id else {
+        let Some(id) = self.vaults.cur().editor_form.editing_id else {
             return;
         };
         let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == id) else {
             return;
         };
-        self.editor_form.group_name = conn
+        self.vaults.cur_mut().editor_form.group_name = conn
             .group_id
             .filter(|gid| self.vaults.cur().groups.iter().any(|g| g.id == *gid))
             .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
             .unwrap_or_default();
-        if !was_dirty && self.editor_saved_snapshot.is_some() {
-            self.editor_saved_snapshot = self.editor_form_signature();
+        if !was_dirty && self.vaults.cur().editor_saved_snapshot.is_some() {
+            self.vaults.cur_mut().editor_saved_snapshot = self.editor_form_signature();
         }
     }
 
@@ -177,10 +177,10 @@ impl Oryxis {
     /// A host that vanished meanwhile keeps its drawer: `editor_owns_write`
     /// is false for it, so the closing flush writes nothing back.
     pub(crate) fn editor_refresh_from_vault(&mut self) {
-        let Some(id) = self.editor_form.editing_id else {
+        let Some(id) = self.vaults.cur().editor_form.editing_id else {
             return;
         };
-        if !self.panels.host_panel {
+        if !self.vaults.cur().panels.host_panel {
             return;
         }
         self.editor_prefill_existing(id);
@@ -192,42 +192,38 @@ impl Oryxis {
     /// user off the surface they are on. Leaves the baseline empty; the
     /// post-dispatch kick records it from this very form.
     pub(crate) fn editor_prefill_existing(&mut self, id: uuid::Uuid) {
-        let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == id) else {
+        // A copy: the form is written into the same vault the row lives in.
+        let Some(conn) = self.vaults.cur().connections.iter().find(|c| c.id == id).cloned() else {
             return;
         };
-        self.host_panel_error = None;
-        let has_pw = self.vaults.cur().store.as_ref()
-            .and_then(|v| v.get_connection_password(&conn.id).ok())
-            .flatten()
-            .is_some();
-        let has_proxy_pw = self.vaults.cur().store.as_ref()
-            .and_then(|v| v.get_proxy_password(&conn.id).ok())
-            .flatten()
-            .is_some();
-        let has_totp = self.vaults.cur().store.as_ref()
-            .and_then(|v| v.get_connection_totp_secret(&conn.id).ok())
-            .flatten()
-            .is_some();
-        let has_target_pw = self.vaults.cur().store.as_ref()
-            .and_then(|v| v.get_connection_target_password(&conn.id).ok())
-            .flatten()
-            .is_some();
-        self.editor_form = self.form_from_connection(
-            conn,
+        self.vaults.cur_mut().host_panel_error = None;
+        let (has_pw, has_proxy_pw, has_totp, has_target_pw) = match self.vaults.cur().store.as_ref() {
+            Some(v) => (
+                v.get_connection_password(&conn.id).ok().flatten().is_some(),
+                v.get_proxy_password(&conn.id).ok().flatten().is_some(),
+                v.get_connection_totp_secret(&conn.id).ok().flatten().is_some(),
+                v.get_connection_target_password(&conn.id).ok().flatten().is_some(),
+            ),
+            None => (false, false, false, false),
+        };
+        let form = self.form_from_connection(
+            &conn,
             has_pw,
             has_proxy_pw,
             has_totp,
             has_target_pw,
         );
+        let ov = self.vaults.cur_mut();
+        ov.editor_form = form;
         let cmd = conn.initial_command.as_deref().unwrap_or_default();
-        self.editor_initial_command =
+        ov.editor_initial_command =
             iced::widget::text_editor::Content::with_text(cmd);
         // Recover the startup source: a live snippet reference
         // (whose snippet still exists) wins; else a non-empty
         // literal command is Custom; else None. A dangling
         // snippet id falls back to None.
-        self.editor_startup_choice = match conn.startup_snippet_id {
-            Some(id) if self.vaults.cur().snippets.iter().any(|s| s.id == id) => {
+        ov.editor_startup_choice = match conn.startup_snippet_id {
+            Some(id) if ov.snippets.iter().any(|s| s.id == id) => {
                 crate::state::StartupChoice::Snippet(id)
             }
             _ if !cmd.trim().is_empty() => crate::state::StartupChoice::Custom,
@@ -237,7 +233,7 @@ impl Oryxis {
         // Fresh host in the form: drop the previous
         // baseline; the post-dispatch kick records the new
         // one before any edit can land.
-        self.editor_saved_snapshot = None;
+        self.vaults.cur_mut().editor_saved_snapshot = None;
     }
 
     /// Whether the typed Parent Group value differs from the host's
@@ -250,13 +246,13 @@ impl Oryxis {
             return false;
         }
         let stored = self
-            .editor_form
+            .vaults.cur().editor_form
             .editing_id
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id))
             .and_then(|c| c.group_id)
             .map(|gid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid))
             .unwrap_or_default();
-        self.editor_form.group_name.trim() != stored.trim()
+        self.vaults.cur().editor_form.group_name.trim() != stored.trim()
     }
 
     /// Persist the open editor NOW, on a path the USER concluded: the
@@ -282,7 +278,7 @@ impl Oryxis {
     /// nobody can see from ever being written again.
     pub(crate) fn editor_flush_on_close(&mut self) {
         self.editor_flush_with(super::GroupWrite::Create);
-        self.editor_saved_snapshot = None;
+        self.vaults.cur_mut().editor_saved_snapshot = None;
     }
 
     /// Shared body. Silent on an invalid form: the vault keeps the last
@@ -301,7 +297,7 @@ impl Oryxis {
             Err(super::PersistError::Invalid(_)) => {}
             Err(super::PersistError::Vault(e)) => {
                 tracing::warn!("host editor flush failed: {e}");
-                self.host_panel_error = Some(e.clone());
+                self.vaults.cur_mut().host_panel_error = Some(e.clone());
                 self.set_toast(format!("{}: {e}", crate::i18n::t("editor_autosave_failed")));
             }
         }
@@ -324,8 +320,8 @@ impl Oryxis {
     /// has_existing back to true, so re-enabling wrote nothing while
     /// the field still showed the secret.
     fn editor_autosave_settle(&mut self) {
-        self.editor_saved_snapshot = self.editor_form_signature();
-        let f = &mut self.editor_form;
+        self.vaults.cur_mut().editor_saved_snapshot = self.editor_form_signature();
+        let f = &mut self.vaults.cur_mut().editor_form;
         // The main password has no derived clear (no toggle governs it),
         // so the buffer IS the authority for its flag.
         if f.password.touched() {

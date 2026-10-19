@@ -23,7 +23,7 @@ impl Oryxis {
                 // burger menu; the palette already closes on activate) so
                 // the confirm layers over a plain view, mirroring
                 // RequestClearHistory's overlay close.
-                self.panels.burger_menu = false;
+                self.vaults.cur_mut().panels.burger_menu = false;
                 if self.vaults.cur().vault_ui.has_user_password {
                     // A standing choice saved from the dialog's "always
                     // use the selected option" opt-in commits directly;
@@ -110,7 +110,7 @@ impl Oryxis {
                     self.vaults.cur_mut().vault_ui.lock_confirm = false;
                     // Sweep UI that may hold typed or revealed secrets;
                     // everything else (tabs, terminals) stays.
-                    self.revealed_secrets.clear();
+                    self.vaults.cur_mut().revealed_secrets.clear();
                     // A confirm dialog from the unlocked app must not
                     // outlive the lock: the lock screen now renders a
                     // dialog that exists (so the close-window guard can
@@ -118,9 +118,9 @@ impl Oryxis {
                     // would be one click from acting on a vault whose
                     // owner walked away.
                     self.error_dialog = None;
-                    self.panels.host_panel = false;
-                    self.host_panel_error = None;
-                    self.editor_form = crate::state::ConnectionForm::default();
+                    self.vaults.cur_mut().panels.host_panel = false;
+                    self.vaults.cur_mut().host_panel_error = None;
+                    self.vaults.cur_mut().editor_form = crate::state::ConnectionForm::default();
                     // The highlight-rule editor edits a copy of a row in
                     // one of those lists; with its list gone, close it so
                     // nothing reopens over the unlocked screen.
@@ -129,18 +129,18 @@ impl Oryxis {
                     // passphrases and a public-key view; sweep it (a
                     // still-running generation task is dropped on
                     // completion by the locked-vault check).
-                    self.panels.key_generate_panel = false;
-                    self.keys_ui.generate_form = crate::state::KeyGenerateForm::default();
+                    self.vaults.cur_mut().panels.key_generate_panel = false;
+                    self.vaults.cur_mut().keys_ui.generate_form = crate::state::KeyGenerateForm::default();
                     // The key import panel (holds a pasted cert / PEM) and
                     // the cert viewer are vault-area surfaces; drop them.
                     // The live PEM editor buffer is private material, so it
                     // is reset too, matching the generate-panel sweep.
-                    self.panels.key_panel = false;
-                    self.keys_ui.import_form = crate::state::KeyImportForm::default();
-                    self.keys_ui.import_content = iced::widget::text_editor::Content::new();
-                    self.keys_ui.import_public_content = iced::widget::text_editor::Content::new();
-                    self.keys_ui.import_cert_content = iced::widget::text_editor::Content::new();
-                    self.cert_viewer = None;
+                    self.vaults.cur_mut().panels.key_panel = false;
+                    self.vaults.cur_mut().keys_ui.import_form = crate::state::KeyImportForm::default();
+                    self.vaults.cur_mut().keys_ui.import_content = iced::widget::text_editor::Content::new();
+                    self.vaults.cur_mut().keys_ui.import_public_content = iced::widget::text_editor::Content::new();
+                    self.vaults.cur_mut().keys_ui.import_cert_content = iced::widget::text_editor::Content::new();
+                    self.vaults.cur_mut().cert_viewer = None;
                     // The session player / log viewer hold DECRYPTED
                     // recording bytes (a session that ran `cat
                     // /etc/shadow` keeps that output in the emulator grid
@@ -168,7 +168,7 @@ impl Oryxis {
                     // its stale pre-lock recording (issue #169, the unlock
                     // that landed on a fresh SFTP tab with the host picker
                     // up, because the SFTP row recorded slot 0).
-                    self.panels.burger_menu = false;
+                    self.vaults.cur_mut().panels.burger_menu = false;
                     self.sftp.row_menu = None;
                     // Top-strip pickers (command palette, tab-jump,
                     // new-tab picker) are NOT rendered over the lock
@@ -425,7 +425,7 @@ impl Oryxis {
                         // late async completion could act on, and typed
                         // or revealed secrets have no business surviving
                         // an explicit "I'm done").
-                        self.revealed_secrets.clear();
+                        self.vaults.cur_mut().revealed_secrets.clear();
                         // History content-search results hold decrypted
                         // command lines / output excerpts; sweep like the
                         // soft lock does.
@@ -438,7 +438,7 @@ impl Oryxis {
                         // trigger site can leave the menu armed behind the
                         // lock screen (issue #169). The SFTP row menu dies
                         // with the buffer reset above.
-                        self.panels.burger_menu = false;
+                        self.vaults.cur_mut().panels.burger_menu = false;
                         // Top-strip pickers: same reason as the soft lock,
                         // a stray key must not drive the hidden surface (the
                         // command palette could dispatch an action) behind
@@ -458,17 +458,17 @@ impl Oryxis {
                         self.pending_paste_snippet = None;
                         self.modal_nav_reset();
                         self.error_dialog = None;
-                        self.panels.host_panel = false;
-                        self.host_panel_error = None;
-                        self.editor_form = crate::state::ConnectionForm::default();
-                        self.panels.key_generate_panel = false;
-                        self.keys_ui.generate_form = crate::state::KeyGenerateForm::default();
-                        self.panels.key_panel = false;
-                        self.keys_ui.import_form = crate::state::KeyImportForm::default();
-                        self.keys_ui.import_content = iced::widget::text_editor::Content::new();
-                        self.keys_ui.import_public_content = iced::widget::text_editor::Content::new();
-                        self.keys_ui.import_cert_content = iced::widget::text_editor::Content::new();
-                        self.cert_viewer = None;
+                        self.vaults.cur_mut().panels.host_panel = false;
+                        self.vaults.cur_mut().host_panel_error = None;
+                        self.vaults.cur_mut().editor_form = crate::state::ConnectionForm::default();
+                        self.vaults.cur_mut().panels.key_generate_panel = false;
+                        self.vaults.cur_mut().keys_ui.generate_form = crate::state::KeyGenerateForm::default();
+                        self.vaults.cur_mut().panels.key_panel = false;
+                        self.vaults.cur_mut().keys_ui.import_form = crate::state::KeyImportForm::default();
+                        self.vaults.cur_mut().keys_ui.import_content = iced::widget::text_editor::Content::new();
+                        self.vaults.cur_mut().keys_ui.import_public_content = iced::widget::text_editor::Content::new();
+                        self.vaults.cur_mut().keys_ui.import_cert_content = iced::widget::text_editor::Content::new();
+                        self.vaults.cur_mut().cert_viewer = None;
                         // Decrypted session-recording bytes (player grid /
                         // rendered viewer spans) are secret-bearing and
                         // have no business surviving an explicit "I'm

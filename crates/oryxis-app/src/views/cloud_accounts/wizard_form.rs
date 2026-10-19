@@ -18,7 +18,7 @@ impl Oryxis {
     pub(crate) fn view_cloud_form_panel(&self) -> Element<'_, Message> {
         // Keyboard rows are recorded in visual order (row mode: Up/Down from any input).
         self.panel_nav_reset();
-        let is_editing = self.cloud_form.editing_id.is_some();
+        let is_editing = self.vaults.cur().cloud_form.editing_id.is_some();
         let title = if is_editing {
             t("cloud_edit_account")
         } else {
@@ -68,9 +68,9 @@ impl Oryxis {
         // surface the install banner above. Computed before the form
         // widgets because the banner renders (and records its keyboard
         // row) above them.
-        let plugin_missing = !self.is_plugin_ready(self.cloud_form.provider);
+        let plugin_missing = !self.is_plugin_ready(self.vaults.cur().cloud_form.provider);
         let test_button_disabled =
-            matches!(self.cloud_form.test_state, CloudTestState::Running) || plugin_missing;
+            matches!(self.vaults.cur().cloud_form.test_state, CloudTestState::Running) || plugin_missing;
 
         // Plugin-missing banner: pinned *above* the scrollable form
         // when the provider chosen above has no installed plugin, so
@@ -81,11 +81,11 @@ impl Oryxis {
         // Built before the form fields so the Install button's keyboard
         // row records first, matching its on-screen position.
         let plugin_banner: Element<'_, Message> = if plugin_missing {
-            let provider_id_str = self.cloud_form.provider.id();
+            let provider_id_str = self.vaults.cur().cloud_form.provider.id();
             // Brand name (not translated) for the title prefix, so the
             // banner reads "AWS plugin not installed" / "Kubernetes
             // plugin not installed" per the selected provider.
-            let provider_display = match self.cloud_form.provider {
+            let provider_display = match self.vaults.cur().cloud_form.provider {
                 CloudProviderChoice::Aws => "AWS",
                 CloudProviderChoice::K8s => "Kubernetes",
                 CloudProviderChoice::Gcp => "GCP",
@@ -178,7 +178,7 @@ impl Oryxis {
         let name_field: Element<'_, Message> = self.panel_nav_slot(
             crate::keynav::RowAction::input(iced::widget::Id::new("panel-cloud-name")),
             10.0,
-            text_input("prod-aws", &self.cloud_form.label)
+            text_input("prod-aws", &self.vaults.cur().cloud_form.label)
                 .id(iced::widget::Id::new("panel-cloud-name"))
                 .on_input(|v| Message::Cloud(CloudMessage::CloudFormLabelChanged(v)))
                 .padding(10)
@@ -201,7 +201,7 @@ impl Oryxis {
             crate::keynav::RowAction::input(iced::widget::Id::new("cloud-pick-provider")),
             10.0,
             pick_list(
-                Some(self.cloud_form.provider),
+                Some(self.vaults.cur().cloud_form.provider),
                 provider_options,
                 |c| match c {
                     CloudProviderChoice::Aws => "AWS".to_string(),
@@ -222,7 +222,7 @@ impl Oryxis {
         );
 
         // ── Auth picker ── (only Profile is implemented today.)
-        let auth_options = match self.cloud_form.provider {
+        let auth_options = match self.vaults.cur().cloud_form.provider {
             CloudProviderChoice::Aws => vec![
                 CloudAuthChoice::Profile,
                 CloudAuthChoice::AccessKey,
@@ -238,7 +238,7 @@ impl Oryxis {
             crate::keynav::RowAction::input(iced::widget::Id::new("cloud-pick-auth")),
             10.0,
             pick_list(
-                Some(self.cloud_form.auth_kind),
+                Some(self.vaults.cur().cloud_form.auth_kind),
                 auth_options,
                 |a| match a {
                     CloudAuthChoice::Profile => t("cloud_auth_profile").to_string(),
@@ -269,7 +269,7 @@ impl Oryxis {
         // auth fields, keeping recording order equal to visual order.
         let region_field = || {
             let chips: Vec<Element<'_, Message>> = self
-                .cloud_form.aws_regions
+                .vaults.cur().cloud_form.aws_regions
                 .iter()
                 .enumerate()
                 .map(|(i, r)| {
@@ -308,7 +308,7 @@ impl Oryxis {
                         "panel-cloud-region-draft",
                     )),
                     10.0,
-                    text_input("us-east-1", &self.cloud_form.aws_region_draft)
+                    text_input("us-east-1", &self.vaults.cur().cloud_form.aws_region_draft)
                         .id(iced::widget::Id::new("panel-cloud-region-draft"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsRegionDraftChanged(v)))
                         .on_submit(Message::Cloud(CloudMessage::CloudFormAwsRegionAdd))
@@ -327,7 +327,7 @@ impl Oryxis {
         // Auth-kind-specific fields. We render only the ones that
         // apply to the current pick so the form doesn't sprawl with
         // irrelevant inputs.
-        let aws_fields: Element<'_, Message> = match self.cloud_form.auth_kind {
+        let aws_fields: Element<'_, Message> = match self.vaults.cur().cloud_form.auth_kind {
             CloudAuthChoice::Profile => column![
                 text(t("cloud_aws_profile_name"))
                     .size(12)
@@ -338,7 +338,7 @@ impl Oryxis {
                         "panel-cloud-aws-profile",
                     )),
                     10.0,
-                    text_input("default", &self.cloud_form.aws_profile_name)
+                    text_input("default", &self.vaults.cur().cloud_form.aws_profile_name)
                         .id(iced::widget::Id::new("panel-cloud-aws-profile"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsProfileNameChanged(v)))
                         .padding(10)
@@ -349,7 +349,7 @@ impl Oryxis {
                 region_field(),
             ].boxed(),
             CloudAuthChoice::AccessKey => {
-                let secret_placeholder = if self.cloud_form.aws_has_existing_secret {
+                let secret_placeholder = if self.vaults.cur().cloud_form.aws_has_existing_secret {
                     t("cloud_aws_access_key_secret_kept")
                 } else {
                     t("cloud_aws_access_key_secret_ph")
@@ -364,7 +364,7 @@ impl Oryxis {
                             "panel-cloud-aws-key-id",
                         )),
                         10.0,
-                        text_input("AKIAIOSFODNN7EXAMPLE", &self.cloud_form.aws_access_key_id)
+                        text_input("AKIAIOSFODNN7EXAMPLE", &self.vaults.cur().cloud_form.aws_access_key_id)
                             .id(iced::widget::Id::new("panel-cloud-aws-key-id"))
                             .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsAccessKeyIdChanged(v)))
                             .padding(10)
@@ -383,10 +383,10 @@ impl Oryxis {
                         ));
                         crate::widgets::password_input_with_eye_nav(
                             secret_placeholder,
-                            &self.cloud_form.aws_access_key_secret,
+                            &self.vaults.cur().cloud_form.aws_access_key_secret,
                             |v| Message::Cloud(CloudMessage::CloudFormAwsAccessKeySecretChanged(v.into())),
                             None,
-                            self.cloud_form.aws_access_key_secret_visible,
+                            self.vaults.cur().cloud_form.aws_access_key_secret_visible,
                             Message::Cloud(CloudMessage::CloudFormAwsAccessKeySecretToggleVisibility),
                             10.0,
                             Some(iced::widget::Id::new("panel-cloud-aws-key-secret")),
@@ -411,7 +411,7 @@ impl Oryxis {
                             "panel-cloud-aws-session-token",
                         )),
                         10.0,
-                        text_input(t("cloud_aws_access_key_session_token_ph"), &self.cloud_form.aws_access_key_session_token)
+                        text_input(t("cloud_aws_access_key_session_token_ph"), &self.vaults.cur().cloud_form.aws_access_key_session_token)
                             .id(iced::widget::Id::new("panel-cloud-aws-session-token"))
                             .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsAccessKeySessionTokenChanged(v.into())))
                             .padding(10)
@@ -432,7 +432,7 @@ impl Oryxis {
                         "panel-cloud-sso-start-url",
                     )),
                     10.0,
-                    text_input("https://acme.awsapps.com/start", &self.cloud_form.aws_sso_start_url)
+                    text_input("https://acme.awsapps.com/start", &self.vaults.cur().cloud_form.aws_sso_start_url)
                         .id(iced::widget::Id::new("panel-cloud-sso-start-url"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsSsoStartUrlChanged(v)))
                         .padding(10)
@@ -449,7 +449,7 @@ impl Oryxis {
                         "panel-cloud-sso-region",
                     )),
                     10.0,
-                    text_input("us-east-1", &self.cloud_form.aws_sso_region)
+                    text_input("us-east-1", &self.vaults.cur().cloud_form.aws_sso_region)
                         .id(iced::widget::Id::new("panel-cloud-sso-region"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsSsoRegionChanged(v)))
                         .padding(10)
@@ -466,7 +466,7 @@ impl Oryxis {
                         "panel-cloud-sso-account",
                     )),
                     10.0,
-                    text_input("123456789012", &self.cloud_form.aws_sso_account_id)
+                    text_input("123456789012", &self.vaults.cur().cloud_form.aws_sso_account_id)
                         .id(iced::widget::Id::new("panel-cloud-sso-account"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsSsoAccountIdChanged(v)))
                         .padding(10)
@@ -483,7 +483,7 @@ impl Oryxis {
                         "panel-cloud-sso-role",
                     )),
                     10.0,
-                    text_input("AdministratorAccess", &self.cloud_form.aws_sso_role_name)
+                    text_input("AdministratorAccess", &self.vaults.cur().cloud_form.aws_sso_role_name)
                         .id(iced::widget::Id::new("panel-cloud-sso-role"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormAwsSsoRoleNameChanged(v)))
                         .padding(10)
@@ -507,7 +507,7 @@ impl Oryxis {
                         "panel-cloud-kubeconfig-path",
                     )),
                     10.0,
-                    text_input(t("cloud_k8s_kubeconfig_ph"), &self.cloud_form.kubeconfig_path)
+                    text_input(t("cloud_k8s_kubeconfig_ph"), &self.vaults.cur().cloud_form.kubeconfig_path)
                         .id(iced::widget::Id::new("panel-cloud-kubeconfig-path"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormKubeconfigPathChanged(v)))
                         .padding(10)
@@ -529,7 +529,7 @@ impl Oryxis {
                         "panel-cloud-k8s-context",
                     )),
                     10.0,
-                    text_input(t("cloud_k8s_context_ph"), &self.cloud_form.context)
+                    text_input(t("cloud_k8s_context_ph"), &self.vaults.cur().cloud_form.context)
                         .id(iced::widget::Id::new("panel-cloud-k8s-context"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormContextChanged(v)))
                         .padding(10)
@@ -558,7 +558,7 @@ impl Oryxis {
                         "panel-cloud-gcp-project",
                     )),
                     10.0,
-                    text_input(t("cloud_gcp_project_ph"), &self.cloud_form.gcp_project)
+                    text_input(t("cloud_gcp_project_ph"), &self.vaults.cur().cloud_form.gcp_project)
                         .id(iced::widget::Id::new("panel-cloud-gcp-project"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormGcpProjectChanged(v)))
                         .padding(10)
@@ -589,7 +589,7 @@ impl Oryxis {
                     10.0,
                     text_input(
                         t("cloud_azure_subscription_ph"),
-                        &self.cloud_form.azure_subscription,
+                        &self.vaults.cur().cloud_form.azure_subscription,
                     )
                     .id(iced::widget::Id::new("panel-cloud-azure-subscription"))
                     .on_input(|v| Message::Cloud(CloudMessage::CloudFormAzureSubscriptionChanged(v)))
@@ -619,7 +619,7 @@ impl Oryxis {
                         "panel-cloud-cli-profile",
                     )),
                     10.0,
-                    text_input(t("cloud_cli_profile_ph"), &self.cloud_form.cli_profile)
+                    text_input(t("cloud_cli_profile_ph"), &self.vaults.cur().cloud_form.cli_profile)
                         .id(iced::widget::Id::new("panel-cloud-cli-profile"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormCliProfileChanged(v)))
                         .padding(10)
@@ -641,7 +641,7 @@ impl Oryxis {
                         "panel-cloud-cli-region",
                     )),
                     10.0,
-                    text_input(t("cloud_aliyun_region_ph"), &self.cloud_form.cli_region)
+                    text_input(t("cloud_aliyun_region_ph"), &self.vaults.cur().cloud_form.cli_region)
                         .id(iced::widget::Id::new("panel-cloud-cli-region"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormCliRegionChanged(v)))
                         .padding(10)
@@ -670,7 +670,7 @@ impl Oryxis {
                         "panel-cloud-cli-profile",
                     )),
                     10.0,
-                    text_input(t("cloud_cli_profile_ph"), &self.cloud_form.cli_profile)
+                    text_input(t("cloud_cli_profile_ph"), &self.vaults.cur().cloud_form.cli_profile)
                         .id(iced::widget::Id::new("panel-cloud-cli-profile"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormCliProfileChanged(v)))
                         .padding(10)
@@ -692,7 +692,7 @@ impl Oryxis {
                         "panel-cloud-cli-region",
                     )),
                     10.0,
-                    text_input(t("cloud_tencent_region_ph"), &self.cloud_form.cli_region)
+                    text_input(t("cloud_tencent_region_ph"), &self.vaults.cur().cloud_form.cli_region)
                         .id(iced::widget::Id::new("panel-cloud-cli-region"))
                         .on_input(|v| Message::Cloud(CloudMessage::CloudFormCliRegionChanged(v)))
                         .padding(10)
@@ -708,7 +708,7 @@ impl Oryxis {
         };
 
         // ── Test credentials button + result line ──
-        let test_status: Element<'_, Message> = match &self.cloud_form.test_state {
+        let test_status: Element<'_, Message> = match &self.vaults.cur().cloud_form.test_state {
             CloudTestState::Idle => Space::new().boxed(),
             CloudTestState::Running => text(t("cloud_test_running"))
                 .size(11)
@@ -801,7 +801,7 @@ impl Oryxis {
         // Shared form chrome: inline error + Cancel/Save footer. The
         // Delete row (editing only) keeps its outlined-danger style in
         // the body, above the footer.
-        let panel_error = crate::widgets::form_error(self.cloud_form.error.as_deref());
+        let panel_error = crate::widgets::form_error(self.vaults.cur().cloud_form.error.as_deref());
         let footer = crate::widgets::form_footer(
             self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::Cloud(CloudMessage::HideCloudForm)),
@@ -816,7 +816,7 @@ impl Oryxis {
         );
 
         let mut bottom = iced::widget::Column::<iced::Element<'_, _>>::new();
-        if let Some(edit_id) = self.cloud_form.editing_id {
+        if let Some(edit_id) = self.vaults.cur().cloud_form.editing_id {
             let del_btn = self.panel_nav_slot(
                 crate::keynav::RowAction::activate(Message::Cloud(CloudMessage::DeleteCloudProfile(edit_id))),
                 8.0,

@@ -87,7 +87,7 @@ impl Oryxis {
     pub(super) fn toggle_editor_secret(&mut self, which: EditorSecret) {
         // Disjoint field borrows: the buffer below is borrowed out of
         // the form, so anything else the form knows is read first.
-        let Self { editor_form: form, vaults, .. } = self;
+        let crate::vault_slots::OpenVault { editor_form: form, store, .. } = self.vaults.cur_mut();
         let editing_id = form.editing_id;
         let (buffer, visible) = match which {
             EditorSecret::Password => (&mut form.password, &mut form.password_visible),
@@ -111,7 +111,7 @@ impl Oryxis {
         // already showed.
         if !buffer.touched()
             && let Some(id) = editing_id
-            && let Some(store) = vaults.cur().store.as_ref()
+            && let Some(store) = store.as_ref()
             && let Ok(Some(secret)) = match which {
                 EditorSecret::Password => store.get_connection_password(&id),
                 EditorSecret::ProxyPassword => store.get_proxy_password(&id),
@@ -141,27 +141,27 @@ impl Oryxis {
         self.overlay = None;
         // Mutually exclusive right-panel slot, close any other panel
         // before opening the host editor.
-        self.cloud_form.visible = false;
-        self.cloud_dynamic_form.visible = false;
-        self.cloud_discover.visible = false;
-        self.panels.session_group_panel = false;
-        self.group_edit.visible = false;
-        self.panels.host_panel = true;
+        self.vaults.cur_mut().cloud_form.visible = false;
+        self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+        self.vaults.cur_mut().cloud_discover.visible = false;
+        self.vaults.cur_mut().panels.session_group_panel = false;
+        self.vaults.cur_mut().group_edit.visible = false;
+        self.vaults.cur_mut().panels.host_panel = true;
         self.panel_nav_clear();
-        self.editor_form = self.new_connection_form();
-        self.editor_form.protocol = protocol;
+        self.vaults.cur_mut().editor_form = self.new_connection_form();
+        self.vaults.cur_mut().editor_form.protocol = protocol;
         if let Some(p) = protocol.default_port() {
-            self.editor_form.port = p.to_string();
+            self.vaults.cur_mut().editor_form.port = p.to_string();
         }
-        self.editor_initial_command = iced::widget::text_editor::Content::new();
-        self.editor_startup_choice = crate::state::StartupChoice::None;
+        self.vaults.cur_mut().editor_initial_command = iced::widget::text_editor::Content::new();
+        self.vaults.cur_mut().editor_startup_choice = crate::state::StartupChoice::None;
         // Creating a host while inside a folder (root or subgroup)
         // lands it there: prefill with the full breadcrumb path, which
         // is what the field displays and what the save resolves first.
         if let Some(gid) = self.cur_nav().active_group
             && self.vaults.cur().groups.iter().any(|g| g.id == gid && g.cloud_query.is_none())
         {
-            self.editor_form.group_name =
+            self.vaults.cur_mut().editor_form.group_name =
                 oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid);
             // The group's default port (D4) prefills a host born here,
             // and this is the ONLY place it applies: resolving it at
@@ -172,10 +172,10 @@ impl Oryxis {
             if protocol.default_port().is_none()
                 && let Some(port) = self.group_default_port(Some(gid))
             {
-                self.editor_form.port = port.to_string();
+                self.vaults.cur_mut().editor_form.port = port.to_string();
             }
         }
-        self.host_panel_error = None;
+        self.vaults.cur_mut().host_panel_error = None;
         self.rebuild_editor_combos();
         // Land the cursor in the first field so the very first Tab keypress
         // walks the form (focus_next with nothing focused would otherwise
@@ -258,9 +258,9 @@ impl Oryxis {
     pub(crate) fn rebuild_editor_combos(&mut self) {
         self.reset_editor_startup_combo();
         self.reset_editor_key_combo();
-        self.editor_login_script_combo =
+        self.vaults.cur_mut().editor_login_script_combo =
             iced::widget::combo_box::State::new(self.login_script_options());
-        self.editor_script_template_combo = iced::widget::combo_box::State::new(vec![
+        self.vaults.cur_mut().editor_script_template_combo = iced::widget::combo_box::State::new(vec![
             crate::i18n::t("login_script_tpl_jumpserver").to_string(),
             crate::i18n::t("login_script_tpl_bastion").to_string(),
         ]);
@@ -286,7 +286,7 @@ impl Oryxis {
     /// list. Called on editor-open and again on every focus (`on_open`)
     /// so a previous abandoned search doesn't pre-filter the list.
     pub(crate) fn reset_editor_startup_combo(&mut self) {
-        self.editor_startup_combo =
+        self.vaults.cur_mut().editor_startup_combo =
             iced::widget::combo_box::State::new(self.editor_startup_options());
     }
 
@@ -301,7 +301,7 @@ impl Oryxis {
     /// the pin exists.
     fn editor_key_options(&self) -> Vec<String> {
         use oryxis_core::models::connection::AuthMethod;
-        let filter = match self.editor_form.auth_method {
+        let filter = match self.vaults.cur().editor_form.auth_method {
             AuthMethod::Certificate => KeyComboFilter::CertificateOnly,
             AuthMethod::SecurityKey => KeyComboFilter::SecurityKeyOnly,
             AuthMethod::Agent => KeyComboFilter::SecurityKeysFirst,
@@ -316,7 +316,7 @@ impl Oryxis {
     /// the widget's `selection` prop, so focusing clears the input for a
     /// fresh search while the current pick is preserved.
     pub(crate) fn reset_editor_key_combo(&mut self) {
-        self.editor_key_combo =
+        self.vaults.cur_mut().editor_key_combo =
             iced::widget::combo_box::State::new(self.editor_key_options());
     }
 
@@ -348,7 +348,7 @@ impl Oryxis {
     /// Shared by the combo's selection prop and its rebuild seed; a
     /// dangling snippet id falls back to `Custom`.
     pub(crate) fn editor_startup_label(&self) -> String {
-        match &self.editor_startup_choice {
+        match &self.vaults.cur().editor_startup_choice {
             crate::state::StartupChoice::None => crate::i18n::t("startup_none").to_string(),
             crate::state::StartupChoice::Custom => crate::i18n::t("startup_custom").to_string(),
             crate::state::StartupChoice::Snippet(id) => self
@@ -372,7 +372,7 @@ impl Oryxis {
         &mut self,
         groups: GroupWrite,
     ) -> Result<Connection, String> {
-        let port: u16 = self.editor_form.port.parse().unwrap_or(22);
+        let port: u16 = self.vaults.cur().editor_form.port.parse().unwrap_or(22);
 
         // Group resolution. The combo displays breadcrumb paths, so it
         // tries the full path first, then a bare label (typed by
@@ -381,7 +381,7 @@ impl Oryxis {
         // (reusing existing segments), never a single root group named
         // with the separator inside it (which would then impersonate a
         // real path).
-        let group_name = self.editor_form.group_name.trim().to_string();
+        let group_name = self.vaults.cur().editor_form.group_name.trim().to_string();
         let group_id = match groups {
             GroupWrite::Skip => None,
             _ if group_name.is_empty() => None,
@@ -396,7 +396,7 @@ impl Oryxis {
                 }
                 gid
             }
-            GroupWrite::Keep => self.editor_form.editing_id.and_then(|id| {
+            GroupWrite::Keep => self.vaults.cur().editor_form.editing_id.and_then(|id| {
                 self.vaults.cur().connections
                     .iter()
                     .find(|c| c.id == id)
@@ -410,7 +410,7 @@ impl Oryxis {
         // `customized_fields`, which the cloud reimport flow
         // honours to leave user-edited values alone on refresh.
         let original: Option<Connection> = self
-            .editor_form
+            .vaults.cur().editor_form
             .editing_id
             .and_then(|id| self.vaults.cur().connections.iter().find(|c| c.id == id).cloned());
 
@@ -418,26 +418,26 @@ impl Oryxis {
             .clone()
             .unwrap_or_else(|| Connection::new("", ""));
 
-        conn.label = self.editor_form.label.clone();
-        conn.protocol = self.editor_form.protocol;
+        conn.label = self.vaults.cur().editor_form.label.clone();
+        conn.protocol = self.vaults.cur().editor_form.protocol;
         // Serial params are only meaningful on a Serial host; clear them
         // otherwise so a host switched away from Serial doesn't carry a
         // stale config.
-        conn.serial = if self.editor_form.protocol
+        conn.serial = if self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Serial
         {
-            Some(self.editor_form.serial.unwrap_or_default())
+            Some(self.vaults.cur().editor_form.serial.unwrap_or_default())
         } else {
             None
         };
         // Remote-desktop fields: kind rides on every host (harmless
         // scalar); the SSH gateway is meaningful only for a RemoteDesktop
         // host, cleared on any other protocol.
-        conn.rd_kind = self.editor_form.rd_kind;
-        conn.rd_gateway_id = if self.editor_form.protocol
+        conn.rd_kind = self.vaults.cur().editor_form.rd_kind;
+        conn.rd_gateway_id = if self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::RemoteDesktop
         {
-            self.editor_form.rd_gateway_id
+            self.vaults.cur().editor_form.rd_gateway_id
         } else {
             None
         };
@@ -445,15 +445,15 @@ impl Oryxis {
         // as `None` when they are all default, so a host that never
         // touched TLS stays byte-identical to one saved before the
         // field existed.
-        conn.telnet = if self.editor_form.protocol
+        conn.telnet = if self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Telnet
         {
             let opts = oryxis_core::models::telnet::TelnetOptions {
-                tls: self.editor_form.telnet_tls,
+                tls: self.vaults.cur().editor_form.telnet_tls,
                 // The escape is meaningless without TLS, and leaving it
                 // set would silently arm "skip verification" for a
                 // later re-enable the user never confirmed.
-                tls_insecure: self.editor_form.telnet_tls && self.editor_form.telnet_tls_insecure,
+                tls_insecure: self.vaults.cur().editor_form.telnet_tls && self.vaults.cur().editor_form.telnet_tls_insecure,
             };
             (!opts.is_default()).then_some(opts)
         } else {
@@ -470,14 +470,14 @@ impl Oryxis {
         // than a trust decision, so nothing is armed by remembering
         // them, and a server path somebody had to look up is not
         // something to make them find again.
-        conn.mosh = if self.editor_form.protocol
+        conn.mosh = if self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Ssh
         {
             let opts = oryxis_core::models::mosh::MoshOptions {
-                enabled: self.editor_form.mosh_enabled,
-                server_path: self.editor_form.mosh_server_path.trim().to_string(),
-                port_range: self.editor_form.mosh_port_range.trim().to_string(),
-                command: self.editor_form.mosh_command.trim().to_string(),
+                enabled: self.vaults.cur().editor_form.mosh_enabled,
+                server_path: self.vaults.cur().editor_form.mosh_server_path.trim().to_string(),
+                port_range: self.vaults.cur().editor_form.mosh_port_range.trim().to_string(),
+                command: self.vaults.cur().editor_form.mosh_command.trim().to_string(),
             };
             (!opts.is_default()).then_some(opts)
         } else {
@@ -486,13 +486,13 @@ impl Oryxis {
         // Local-shell settings, same rule: cleared on any other
         // protocol, and `None` when the host just takes the default
         // shell in the default directory.
-        conn.local = if self.editor_form.protocol
+        conn.local = if self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Local
         {
             // The label is saved beside the id as the cross-machine
             // fallback: ids are minted per machine, so a synced host
             // would otherwise resolve to nothing on the second one.
-            let label = self.editor_form.local_terminal_id.and_then(|id| {
+            let label = self.vaults.cur().editor_form.local_terminal_id.and_then(|id| {
                 self.local_terminals
                     .as_deref()
                     .unwrap_or(&[])
@@ -501,9 +501,9 @@ impl Oryxis {
                     .map(|e| e.label.clone())
             });
             let cfg = oryxis_core::models::local::LocalConfig {
-                terminal_id: self.editor_form.local_terminal_id,
+                terminal_id: self.vaults.cur().editor_form.local_terminal_id,
                 terminal_label: label,
-                cwd: Some(self.editor_form.local_cwd.trim().to_string())
+                cwd: Some(self.vaults.cur().editor_form.local_cwd.trim().to_string())
                     .filter(|c| !c.is_empty()),
             };
             (!cfg.is_default()).then_some(cfg)
@@ -512,41 +512,41 @@ impl Oryxis {
         };
         // Address-family preference rides on every host (harmless scalar;
         // only the SSH dial paths read it today).
-        conn.address_family = self.editor_form.address_family;
-        conn.hostname = self.editor_form.hostname.clone();
+        conn.address_family = self.vaults.cur().editor_form.address_family;
+        conn.hostname = self.vaults.cur().editor_form.hostname.clone();
         conn.port = port;
-        conn.username = if self.editor_form.username.is_empty() {
+        conn.username = if self.vaults.cur().editor_form.username.is_empty() {
             None
         } else {
-            Some(self.editor_form.username.clone())
+            Some(self.vaults.cur().editor_form.username.clone())
         };
-        conn.auth_method = self.editor_form.auth_method.clone();
+        conn.auth_method = self.vaults.cur().editor_form.auth_method.clone();
         conn.group_id = group_id;
-        conn.key_id = self.editor_form.selected_key.as_ref().and_then(|label| {
+        conn.key_id = self.vaults.cur().editor_form.selected_key.as_ref().and_then(|label| {
             self.vaults.cur().keys.iter().find(|k| k.label == *label).map(|k| k.id)
         });
-        conn.use_disk_key = self.editor_form.use_disk_key;
+        conn.use_disk_key = self.vaults.cur().editor_form.use_disk_key;
         // Blank is "scan the default names", which is what the field's
         // placeholder promises, so an emptied path is not a path.
-        conn.identity_file = Some(self.editor_form.identity_file.trim().to_string())
+        conn.identity_file = Some(self.vaults.cur().editor_form.identity_file.trim().to_string())
             .filter(|p| !p.is_empty());
-        conn.identity_id = self.editor_form.selected_identity.as_ref().and_then(|label| {
+        conn.identity_id = self.vaults.cur().editor_form.selected_identity.as_ref().and_then(|label| {
             self.vaults.cur().identities.iter().find(|i| i.label == *label).map(|i| i.id)
         });
         // Persist the full ordered chain. Drop any hop pointing
         // at a host that no longer exists or at this host itself
         // (a self-reference would be a connect-time loop), so a
         // stale form never writes a broken chain.
-        let self_id = self.editor_form.editing_id;
+        let self_id = self.vaults.cur().editor_form.editing_id;
         conn.jump_chain = self
-            .editor_form
+            .vaults.cur().editor_form
             .jump_chain
             .iter()
             .filter(|id| Some(**id) != self_id)
             .filter(|id| self.vaults.cur().connections.iter().any(|c| c.id == **id))
             .copied()
             .collect();
-        conn.port_forwards = self.editor_form.port_forwards.iter().filter_map(|pf| {
+        conn.port_forwards = self.vaults.cur().editor_form.port_forwards.iter().filter_map(|pf| {
             let local_port = pf.local_port.parse::<u16>().ok()?;
             let remote_port = pf.remote_port.parse::<u16>().ok()?;
             if pf.remote_host.is_empty() { return None; }
@@ -559,7 +559,7 @@ impl Oryxis {
         // Env vars: keep rows with a non-empty key (value may be
         // empty); trim the key so accidental whitespace doesn't
         // create a bogus variable name.
-        conn.env_vars = self.editor_form.env_vars.iter().filter_map(|e| {
+        conn.env_vars = self.vaults.cur().editor_form.env_vars.iter().filter_map(|e| {
             let key = e.key.trim();
             if key.is_empty() { return None; }
             Some(oryxis_core::models::connection::EnvVar {
@@ -572,64 +572,64 @@ impl Oryxis {
         // clamp here too: a host switched away from SSH must not stay
         // MCP-advertised. `list_mcp_connections` filters by protocol as
         // the source-of-truth guard for synced / imported hosts.
-        conn.mcp_enabled = self.editor_form.protocol
+        conn.mcp_enabled = self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Ssh
-            && self.editor_form.mcp_enabled;
+            && self.vaults.cur().editor_form.mcp_enabled;
         // Same SSH clamp as `mcp_enabled`: monitoring reads /proc over an
         // SSH exec channel, so a host switched to Telnet / serial /
         // remote-desktop can't stay monitored.
-        conn.monitor_enabled = self.editor_form.protocol
+        conn.monitor_enabled = self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Ssh
-            && self.editor_form.monitor_enabled;
+            && self.vaults.cur().editor_form.monitor_enabled;
         // Disk selection (issue #135). Auto is `None`; Custom keeps the
         // rows the user typed, blanks dropped (an unfinished row is not
         // a pattern) but an all-blank list still stored as `Some(vec![])`,
         // because Custom-with-nothing is the deliberate "report no disks
         // here" answer and must not silently mean Auto.
-        conn.monitor_disks = self.editor_form.monitor_disks_custom.then(|| {
-            self.editor_form
+        conn.monitor_disks = self.vaults.cur().editor_form.monitor_disks_custom.then(|| {
+            self.vaults.cur().editor_form
                 .monitor_disks
                 .iter()
                 .map(|m| m.trim().to_string())
                 .filter(|m| !m.is_empty())
                 .collect()
         });
-        conn.agent_forwarding = self.editor_form.agent_forwarding;
+        conn.agent_forwarding = self.vaults.cur().editor_form.agent_forwarding;
         // Same SSH clamp as `mcp_enabled` / `monitor_enabled`: `x11-req`
         // is an SSH channel request, so a host switched to Telnet /
         // serial / remote-desktop can't keep the flag set.
-        conn.x11_forwarding = self.editor_form.protocol
+        conn.x11_forwarding = self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Ssh
-            && self.editor_form.x11_forwarding;
-        conn.session_logging = self.editor_form.session_logging;
-        conn.terminal_theme = self.editor_form.terminal_theme.clone();
+            && self.vaults.cur().editor_form.x11_forwarding;
+        conn.session_logging = self.vaults.cur().editor_form.session_logging;
+        conn.terminal_theme = self.vaults.cur().editor_form.terminal_theme.clone();
         // Stored as `None` when nothing is overridden, so a host whose
         // overrides were cleared goes back to being byte-identical to
         // one that never had any (and stops shipping an empty object
         // over sync).
         conn.terminal_appearance =
-            self.editor_form.terminal_appearance.clone().into_option();
-        conn.highlight_rules = self.editor_form.highlight_rules.clone().into_option();
-        conn.icon_style = self.editor_form.icon_style.clone();
-        conn.encoding = self.editor_form.encoding.clone();
-        conn.ambiguous_width = self.editor_form.ambiguous_width;
-        conn.terminal_type = self.editor_form.terminal_type.clone();
-        conn.ciphers = self.editor_form.ciphers.clone();
-        conn.kex = self.editor_form.kex.clone();
-        conn.macs = self.editor_form.macs.clone();
-        conn.host_key_algorithms = self.editor_form.host_key_algorithms.clone();
+            self.vaults.cur().editor_form.terminal_appearance.clone().into_option();
+        conn.highlight_rules = self.vaults.cur().editor_form.highlight_rules.clone().into_option();
+        conn.icon_style = self.vaults.cur().editor_form.icon_style.clone();
+        conn.encoding = self.vaults.cur().editor_form.encoding.clone();
+        conn.ambiguous_width = self.vaults.cur().editor_form.ambiguous_width;
+        conn.terminal_type = self.vaults.cur().editor_form.terminal_type.clone();
+        conn.ciphers = self.vaults.cur().editor_form.ciphers.clone();
+        conn.kex = self.vaults.cur().editor_form.kex.clone();
+        conn.macs = self.vaults.cur().editor_form.macs.clone();
+        conn.host_key_algorithms = self.vaults.cur().editor_form.host_key_algorithms.clone();
         // Startup command source. Snippet -> store the live id and
         // clear the literal; Custom -> store the trimmed text (empty
         // == None); None -> clear both. `.text()` appends a trailing
         // newline, so trim before checking.
-        match &self.editor_startup_choice {
+        match &self.vaults.cur().editor_startup_choice {
             crate::state::StartupChoice::Snippet(id) => {
                 conn.startup_snippet_id = Some(*id);
                 conn.initial_command = None;
             }
             crate::state::StartupChoice::Custom => {
                 conn.startup_snippet_id = None;
-                let initial_command = self.editor_initial_command.text();
+                let initial_command = self.vaults.cur().editor_initial_command.text();
                 conn.initial_command = if initial_command.trim().is_empty() {
                     None
                 } else {
@@ -645,24 +645,24 @@ impl Oryxis {
         // and the user picked a transport in the editor,
         // persist it onto the existing CloudRef. Don't touch
         // anything else (resource_id, region, profile_id).
-        if let Some(picked) = self.editor_form.cloud_transport
+        if let Some(picked) = self.vaults.cur().editor_form.cloud_transport
             && let Some(cref) = conn.cloud_ref.as_mut()
         {
             cref.transport_pref = picked;
         }
         // Empty string == inherit global; "0" == explicitly disabled
         // on this host; positive integer == per-host override.
-        conn.keepalive_interval = if self.editor_form.keepalive_interval.is_empty() {
+        conn.keepalive_interval = if self.vaults.cur().editor_form.keepalive_interval.is_empty() {
             None
         } else {
-            self.editor_form.keepalive_interval.parse::<u32>().ok()
+            self.vaults.cur().editor_form.keepalive_interval.parse::<u32>().ok()
         };
-        conn.auto_title = self.editor_form.auto_title;
+        conn.auto_title = self.vaults.cur().editor_form.auto_title;
         // Empty == no MAC (hides the card's Wake on LAN action). A
         // malformed value blocks the save with an inline error instead
         // of being silently dropped; a valid one is stored canonical
         // ("AA:BB:CC:DD:EE:FF") whatever notation was typed.
-        let mac_raw = self.editor_form.mac_address.trim();
+        let mac_raw = self.vaults.cur().editor_form.mac_address.trim();
         conn.mac_address = if mac_raw.is_empty() {
             None
         } else {
@@ -678,10 +678,10 @@ impl Oryxis {
         // selected script actually references, so a value left over
         // from a previous script cannot be typed at an unrelated
         // prompt.
-        let is_ssh_now = self.editor_form.protocol
+        let is_ssh_now = self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Ssh;
         conn.login_script_id = is_ssh_now
-            .then_some(self.editor_form.login_script_id)
+            .then_some(self.vaults.cur().editor_form.login_script_id)
             .flatten()
             .filter(|sid| self.vaults.cur().login_scripts.iter().any(|s| s.id == *sid));
         conn.login_script_vars = match conn.login_script_id {
@@ -697,7 +697,7 @@ impl Oryxis {
                             .collect()
                     })
                     .unwrap_or_default();
-                self.editor_form
+                self.vaults.cur().editor_form
                     .login_script_vars
                     .iter()
                     .filter(|(n, _)| names.contains(n))
@@ -709,30 +709,30 @@ impl Oryxis {
             }
             None => Vec::new(),
         };
-        conn.tags = crate::util::parse_tags(&self.editor_form.tags_text);
-        conn.privacy_mode = self.editor_form.privacy_mode;
-        conn.sidebar_auto_open = self.editor_form.sidebar_auto_open;
+        conn.tags = crate::util::parse_tags(&self.vaults.cur().editor_form.tags_text);
+        conn.privacy_mode = self.vaults.cur().editor_form.privacy_mode;
+        conn.sidebar_auto_open = self.vaults.cur().editor_form.sidebar_auto_open;
         // Blank means "land in the login directory", the default; storing
         // an empty string instead of NULL would make the mount canonicalize
         // "" and fall back anyway, so normalize here.
         conn.sftp_initial_path = {
-            let p = self.editor_form.sftp_initial_path.trim();
+            let p = self.vaults.cur().editor_form.sftp_initial_path.trim();
             (!p.is_empty()).then(|| p.to_string())
         };
         // SSH-only, like the other transport behaviour flags: `rz` rides
         // the session's byte stream, which only an SSH shell carries, so
         // a host switched to Telnet / serial / remote-desktop can't keep
         // the flag set.
-        conn.zmodem_drops = self.editor_form.protocol
+        conn.zmodem_drops = self.vaults.cur().editor_form.protocol
             == oryxis_core::models::connection::ConnectionProtocol::Ssh
-            && self.editor_form.zmodem_drops;
+            && self.vaults.cur().editor_form.zmodem_drops;
         // C5: store quirks only when they differ from the xterm default,
         // so an untouched host keeps `quirks = None` (old-payload parity).
-        conn.quirks = (self.editor_form.quirks
+        conn.quirks = (self.vaults.cur().editor_form.quirks
             != oryxis_core::models::terminal_quirks::TerminalQuirks::default())
-        .then_some(self.editor_form.quirks);
+        .then_some(self.vaults.cur().editor_form.quirks);
         conn.rekey_limit_mb = self
-            .editor_form
+            .vaults.cur().editor_form
             .rekey_limit_mb
             .trim()
             .parse::<u32>()
@@ -742,7 +742,7 @@ impl Oryxis {
         // or a `proxy_identity_id` reference. Validates host /
         // port / command up-front so the user gets an error
         // instead of a silently-broken proxy entry.
-        let proxy_resolution = build_proxy_resolution(&self.editor_form)?;
+        let proxy_resolution = build_proxy_resolution(&self.vaults.cur().editor_form)?;
         // Authored here, so approved here: a line the user just typed
         // must not meet a "did you mean it?" modal on the next dial.
         //
@@ -803,8 +803,8 @@ impl Oryxis {
         // silently fail at connect time. Cleared/untouched skip, and a
         // disabled "Use TOTP" hides the field, so leftover text in the
         // buffer must not block the save (it gets cleared instead).
-        if self.editor_form.use_totp
-            && let Some(secret) = self.editor_form.totp_secret.resolve()
+        if self.vaults.cur().editor_form.use_totp
+            && let Some(secret) = self.vaults.cur().editor_form.totp_secret.resolve()
             && !secret.trim().is_empty()
             && let Err(e) = oryxis_core::totp::Totp::parse(secret)
         {

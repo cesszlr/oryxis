@@ -3,13 +3,13 @@
 //! mostly the message dispatch + view plumbing.
 
 use iced::keyboard;
-use iced::widget::{svg, text_editor};
+use iced::widget::svg;
 use iced::{Point, Task};
 
 use oryxis_vault::VaultStore;
 
 use crate::app::{TabsMessage, SshMessage, UpdateMessage, Message, Oryxis, AUTO_CONNECT, AUTO_PASSWORD};
-use crate::state::{ConnectionForm, SettingsSection, VaultState, View};
+use crate::state::{SettingsSection, VaultState, View};
 
 mod load;
 mod migrate;
@@ -403,12 +403,9 @@ impl Oryxis {
                 new_tab_picker_group: None,
                 tab_jump_search: String::new(),
                 palette: crate::state::PaletteState::default(),
-                icon_picker: crate::state::IconPickerState::default(),
                 icon_color_popover: None,
                 onboarding_slide: 0,
                 onboarding_import_pending: false,
-                chain_editor_adding: false,
-                chain_editor_search: String::new(),
                 connecting: None,
                 connect_anim_tick: 0,
                 busy_anim_tick: 0,
@@ -423,16 +420,9 @@ impl Oryxis {
                 pending_kbi_prompt: None,
                 pending_kbi_quick: None,
                 pending_auth_switch: None,
-                pending_edit_cancel: false,
                 kbi_inputs: Vec::new(),
                 kbi_response_tx: None,
-                editor_form: ConnectionForm::default(),
-                editor_initial_command: text_editor::Content::new(),
-                host_panel_error: None,
                 host_editor_open_sections: std::collections::HashSet::new(),
-                editor_session_group: crate::state::SessionGroupForm::default(),
-                session_group_script_editor: text_editor::Content::new(),
-                session_group_panel_error: None,
                 pane_script_overrides: std::collections::HashMap::new(),
                 keynav: crate::keynav::KeyNavState::default(),
                 sftp_open_at_path: None,
@@ -446,9 +436,7 @@ impl Oryxis {
                 card_context_menu: None,
                 card_drag: None,
                 card_press: crate::widgets::new_press_hit_cell(),
-                move_hosts_pending: Vec::new(),
                 overlay: None,
-                folder_rename: None,
                 tab_rename: None,
                 pending_paste: None,
                 pending_paste_install: None,
@@ -457,8 +445,6 @@ impl Oryxis {
                 drag_out_echo: Vec::new(),
                 pending_terminal_drops: Vec::new(),
                 os_drop_hover: false,
-                group_edit: crate::state::GroupEditForm::default(),
-                folder_delete: None,
                 pending_auto_connect,
                 pending_deep_link,
                 pending_connect_target,
@@ -526,24 +512,11 @@ impl Oryxis {
                 alt_sides: crate::key_encode::OptionSides::default(),
                 #[cfg(target_os = "windows")]
                 last_printscreen: None,
-                cert_viewer: None,
                 history_search_content: false,
                 history_content: crate::state::HistoryContentSearch::default(),
-                identity_form: crate::state::IdentityForm::default(),
-                identity_context_menu: None,
-                proxy_identity_form: crate::state::ProxyIdentityForm::default(),
                 login_script_generation: 0,
-                login_script_form: crate::state::LoginScriptForm::default(),
-                highlight_rule_form: crate::state::HighlightRuleForm::default(),
                 trigger_confirm: None,
-                cloud_form: crate::state::CloudForm::default(),
                 host_editor_parent_combo_bounds: crate::widgets::new_bounds_cell(),
-                editor_startup_combo: iced::widget::combo_box::State::new(Vec::new()),
-                editor_login_script_combo: iced::widget::combo_box::State::new(Vec::new()),
-                editor_script_template_combo: iced::widget::combo_box::State::new(Vec::new()),
-                editor_key_combo: iced::widget::combo_box::State::new(Vec::new()),
-                group_picker_search: String::new(),
-                editor_startup_choice: crate::state::StartupChoice::None,
                 dynamic_form_parent_combo_bounds: crate::widgets::new_bounds_cell(),
                 session_group_folder_combo_bounds: crate::widgets::new_bounds_cell(),
                 group_edit_parent_combo_bounds: crate::widgets::new_bounds_cell(),
@@ -554,9 +527,7 @@ impl Oryxis {
                 toolbar_split_btn_bounds: crate::widgets::new_bounds_cell(),
                 toolbar_sort_btn_bounds: crate::widgets::new_bounds_cell(),
                 toolbar_overflow_btn_bounds: crate::widgets::new_bounds_cell(),
-                cloud_import_confirm_visible: false,
                 cloud_dynamic_group_state: std::collections::HashMap::new(),
-                cloud_dynamic_form: crate::state::CloudDynamicForm::default(),
                 // Provider registry seeded once at boot. AWS runs as a
                 // plugin subprocess via `PluginProvider`; K8s lands in
                 // a follow-up PR. The Arc lets us hand the registry to
@@ -569,7 +540,6 @@ impl Oryxis {
                 plugins_auto_update_global: true,
                 plugins: Vec::new(),
                 plugin_install_modal: None,
-                theme_ui: crate::state::ThemeEditorUi::default(),
                 monitor: Default::default(),
                 tmux: Default::default(),
                 ssh_transport_pool: Default::default(),
@@ -579,10 +549,6 @@ impl Oryxis {
                 monitor_error: None,
                 monitor_ports_open: false,
                 monitor_disks_open: true,
-                panels: crate::state::PanelsOpen::default(),
-                cloud_discover: crate::state::CloudDiscoverUi::default(),
-                snippet_form: crate::state::SnippetForm::default(),
-                keys_ui: crate::state::KeysUi::default(),
                 sftp_chrome: crate::state::SftpChrome::default(),
                 device_prefs: crate::state::DevicePrefs {
                     // Read before any vault is unlocked: the boot update
@@ -593,10 +559,6 @@ impl Oryxis {
                     ..Default::default()
                 },
                 sftp_edit_upload_all: false,
-                ui_theme_import_content: text_editor::Content::new(),
-                ui_theme_import_name: String::new(),
-                ui_theme_import_error: None,
-                ui_theme_editor: None,
                 ui_color_popover: None,
                 clear_history_confirm: false,
                 viewing_session_log: None,
@@ -617,8 +579,6 @@ impl Oryxis {
                 port_forward_starting: std::collections::HashSet::new(),
                 port_forward_retry: std::collections::HashMap::new(),
                 port_forward_agent_watch: None,
-                port_forward_form: crate::state::PortForwardRuleForm::default(),
-                port_forward_context_menu: None,
                 local_terminal_theme: None,
                 terminal_font_zoom: 0.0,
                 settings_section: SettingsSection::Interface,
@@ -646,14 +606,12 @@ impl Oryxis {
                 tab_drag: None,
                 pane_drag_from: None,
                 panel_resize_drag: None,
-                editor_saved_snapshot: None,
                 // Workspace is the v0.7 default. Existing users who
                 // never persisted `layout_mode` also fall through to
                 // this default on next launch (no migration row
                 // Vault nav orientation: horizontal pill strip by default.
                 // Mirror `Connection::new` / `ConnectionForm::default`, which
                 // expose new hosts via MCP by default.
-                revealed_secrets: std::collections::HashSet::new(),
                 last_user_activity: std::time::Instant::now(),
                 last_session_log_capacity_check: std::time::Instant::now(),
                 session_spool: None,
@@ -697,22 +655,6 @@ impl Oryxis {
                 sidebar_search_open: false,
                 hosts_tree_expanded: std::collections::HashSet::new(),
                 hosts_tree_search: String::new(),
-                export_password: String::new(),
-                export_include_keys: true,
-                export_selection: oryxis_vault::ExportSelection::all(),
-                export_status: None,
-                vault_import: crate::state::VaultImportState::default(),
-                sftp_backup: crate::state::SftpBackupForm::default(),
-                ssh_config_import_status: None,
-                share: crate::state::ShareForm::default(),
-                ssh_import_hosts: Vec::new(),
-                ssh_import_direct: None,
-                import_hub_error: None,
-                import_target_group: None,
-                import_hub_pending: None,
-                import_hub_password: String::new(),
-                ssh_import_selected: Vec::new(),
-                ssh_import_existing: Vec::new(),
             },
             Task::none(),
         );

@@ -8,19 +8,19 @@ impl Oryxis {
     pub(super) fn handle_tabs_menus(&mut self, message: TabsMessage) -> Task<Message> {
         match message {
             TabsMessage::ToggleBurgerMenu => {
-                self.panels.burger_menu = !self.panels.burger_menu;
+                self.vaults.cur_mut().panels.burger_menu = !self.vaults.cur_mut().panels.burger_menu;
             }
             TabsMessage::ToggleSubnavOverflow => {
-                self.panels.subnav_overflow = !self.panels.subnav_overflow;
+                self.vaults.cur_mut().panels.subnav_overflow = !self.vaults.cur_mut().panels.subnav_overflow;
             }
             TabsMessage::HideOverlayMenu => {
                 self.overlay = None;
                 self.card_context_menu = None;
                 self.snippet_context_menu = None;
-                self.keys_ui.context_menu = None;
-                self.identity_context_menu = None;
-                self.port_forward_context_menu = None;
-                self.panels.keychain_add_menu = false;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
+                self.vaults.cur_mut().identity_context_menu = None;
+                self.vaults.cur_mut().port_forward_context_menu = None;
+                self.vaults.cur_mut().panels.keychain_add_menu = false;
             }
             TabsMessage::ShowCardMenu(idx) => {
                 // The index is resolved to the host ID HERE, against

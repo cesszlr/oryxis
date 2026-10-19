@@ -20,83 +20,84 @@ impl Oryxis {
         match message {
             // ── Identities ──
             KeysMessage::ShowIdentityPanel => {
-                self.panels.identity_panel = true;
-                self.identity_form.label.clear();
-                self.identity_form.username.clear();
+                self.vaults.cur_mut().panels.identity_panel = true;
+                self.vaults.cur_mut().identity_form.label.clear();
+                self.vaults.cur_mut().identity_form.username.clear();
                 // SecretInput::clear also drops the touched flag.
-                self.identity_form.password.clear();
-                self.identity_form.key = None;
-                self.identity_form.password_visible = false;
-                self.identity_form.has_existing_password = false;
-                self.identity_form.editing_id = None;
-                self.panels.keychain_add_menu = false;
-                self.identity_context_menu = None;
+                self.vaults.cur_mut().identity_form.password.clear();
+                self.vaults.cur_mut().identity_form.key = None;
+                self.vaults.cur_mut().identity_form.password_visible = false;
+                self.vaults.cur_mut().identity_form.has_existing_password = false;
+                self.vaults.cur_mut().identity_form.editing_id = None;
+                self.vaults.cur_mut().panels.keychain_add_menu = false;
+                self.vaults.cur_mut().identity_context_menu = None;
                 self.overlay = None;
             }
             KeysMessage::HideIdentityPanel => {
-                self.panels.identity_panel = false;
+                self.vaults.cur_mut().panels.identity_panel = false;
             }
             KeysMessage::IdentityLabelChanged(v) => {
-                self.identity_form.label = v;
+                self.vaults.cur_mut().identity_form.label = v;
             }
             KeysMessage::IdentityUsernameChanged(v) => {
-                self.identity_form.username = v;
+                self.vaults.cur_mut().identity_form.username = v;
             }
             KeysMessage::IdentityPasswordChanged(v) => {
-                self.identity_form.password.set(v.into_inner());
+                self.vaults.cur_mut().identity_form.password.set(v.into_inner());
             }
             KeysMessage::IdentityTogglePasswordVisibility => {
-                self.identity_form.password_visible = !self.identity_form.password_visible;
+                self.vaults.cur_mut().identity_form.password_visible = !self.vaults.cur_mut().identity_form.password_visible;
             }
             KeysMessage::IdentityKeyChanged(v) => {
-                self.identity_form.key = if v == "(none)" { None } else { Some(v) };
+                self.vaults.cur_mut().identity_form.key = if v == "(none)" { None } else { Some(v) };
             }
             KeysMessage::SaveIdentity => {
-                if self.identity_form.label.trim().is_empty() {
+                if self.vaults.cur().identity_form.label.trim().is_empty() {
                     return Ok(Task::none());
                 }
-                let mut identity = if let Some(id) = self.identity_form.editing_id {
+                let mut identity = if let Some(id) = self.vaults.cur().identity_form.editing_id {
                     self.vaults.cur().identities.iter().find(|i| i.id == id).cloned()
                         .unwrap_or_else(|| Identity::new(""))
                 } else {
                     Identity::new("")
                 };
-                identity.label = self.identity_form.label.clone();
-                identity.username = if self.identity_form.username.is_empty() {
+                identity.label = self.vaults.cur().identity_form.label.clone();
+                identity.username = if self.vaults.cur().identity_form.username.is_empty() {
                     None
                 } else {
-                    Some(self.identity_form.username.clone())
+                    Some(self.vaults.cur().identity_form.username.clone())
                 };
-                identity.key_id = self.identity_form.key.as_ref().and_then(|label| {
+                identity.key_id = self.vaults.cur().identity_form.key.as_ref().and_then(|label| {
                     self.vaults.cur().keys.iter().find(|k| k.label == *label).map(|k| k.id)
                 });
                 identity.updated_at = chrono::Utc::now();
 
                 // Tri-state: untouched preserves the stored password,
                 // cleared removes it, typed stores (SecretInput::resolve).
-                let password = self.identity_form.password.resolve();
+                let password = self.vaults.cur().identity_form.password.resolve();
 
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.save_identity(&identity, password);
                     self.load_data_from_vault();
                 }
-                self.panels.identity_panel = false;
+                self.vaults.cur_mut().panels.identity_panel = false;
             }
             KeysMessage::EditIdentity(idx) => {
-                if let Some(identity) = self.vaults.cur().identities.get(idx) {
-                    self.identity_form.editing_id = Some(identity.id);
-                    self.identity_form.label = identity.label.clone();
-                    self.identity_form.username = identity.username.clone().unwrap_or_default();
-                    self.identity_form.password.clear();
-                    self.identity_form.password_visible = false;
-                    self.identity_form.has_existing_password = self.vaults.cur().store.as_ref()
+                let ov = self.vaults.cur_mut();
+                if let Some(identity) = ov.identities.get(idx) {
+                    ov.identity_form.editing_id = Some(identity.id);
+                    ov.identity_form.label = identity.label.clone();
+                    ov.identity_form.username = identity.username.clone().unwrap_or_default();
+                    ov.identity_form.password.clear();
+                    ov.identity_form.password_visible = false;
+                    ov.identity_form.has_existing_password = ov.store.as_ref()
                         .and_then(|v| v.get_identity_password(&identity.id).ok().flatten())
                         .is_some();
-                    self.identity_form.key = identity.key_id.and_then(|kid| {
-                        self.vaults.cur().keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
+                    ov.identity_form.key = identity.key_id.and_then(|kid| {
+                        ov.keys.iter().find(|k| k.id == kid).map(|k| k.label.clone())
                     });
-                    self.panels.identity_panel = true;
-                    self.identity_context_menu = None;
+                    ov.panels.identity_panel = true;
+                    ov.identity_context_menu = None;
                     self.overlay = None;
                 }
             }
@@ -114,15 +115,15 @@ impl Oryxis {
                         self.load_data_from_vault();
                     }
                 }
-                self.identity_context_menu = None;
+                self.vaults.cur_mut().identity_context_menu = None;
                 self.overlay = None;
             }
             KeysMessage::ShowIdentityMenu(idx) => {
-                if self.identity_context_menu == Some(idx) {
-                    self.identity_context_menu = None;
+                if self.vaults.cur().identity_context_menu == Some(idx) {
+                    self.vaults.cur_mut().identity_context_menu = None;
                     self.overlay = None;
                 } else {
-                    self.identity_context_menu = Some(idx);
+                    self.vaults.cur_mut().identity_context_menu = Some(idx);
                     let anchor = self.keynav_take_menu_anchor();
                     self.overlay = Some(OverlayState {
                         content: OverlayContent::IdentityActions(idx),
@@ -132,23 +133,23 @@ impl Oryxis {
                 }
             }
             KeysMessage::ToggleKeychainAddMenu => {
-                if self.panels.keychain_add_menu {
-                    self.panels.keychain_add_menu = false;
+                if self.vaults.cur().panels.keychain_add_menu {
+                    self.vaults.cur_mut().panels.keychain_add_menu = false;
                     self.overlay = None;
                 } else {
-                    self.panels.keychain_add_menu = true;
+                    self.vaults.cur_mut().panels.keychain_add_menu = true;
                     // Opening the ADD menu closes any open editor panel
                     // (import / generate / identity). The menu's entries
                     // just reopen one of those, so a stale panel behind the
                     // menu is never wanted, and leaving it open mis-anchored
                     // the menu on top of the panel (the generate panel was
                     // not even counted in panel_width below).
-                    let panel_was_open = self.panels.key_panel
-                        || self.panels.key_generate_panel
-                        || self.panels.identity_panel;
-                    self.panels.key_panel = false;
-                    self.panels.key_generate_panel = false;
-                    self.panels.identity_panel = false;
+                    let panel_was_open = self.vaults.cur().panels.key_panel
+                        || self.vaults.cur().panels.key_generate_panel
+                        || self.vaults.cur().panels.identity_panel;
+                    self.vaults.cur_mut().panels.key_panel = false;
+                    self.vaults.cur_mut().panels.key_generate_panel = false;
+                    self.vaults.cur_mut().panels.identity_panel = false;
                     // The trigger-bounds cell was drawn with that panel
                     // open, and closing it shifts the whole toolbar by the
                     // panel width before the next draw, so the stale rect

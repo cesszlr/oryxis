@@ -9,7 +9,7 @@ use crate::state::{StepForm, StepKind};
 
 impl Oryxis {
     pub(crate) fn handle_snippet_step_edit(&mut self, message: SnippetMessage) {
-        let steps = &mut self.snippet_form.steps;
+        let steps = &mut self.vaults.cur_mut().snippet_form.steps;
         match message {
             SnippetMessage::SnippetStepAdd => steps.push(StepForm::new(StepKind::Command)),
             SnippetMessage::SnippetStepRemove(i) => {
@@ -42,7 +42,7 @@ impl Oryxis {
                 ) {
                     self.keynav.pick_open = false;
                 }
-                let steps = &mut self.snippet_form.steps;
+                let steps = &mut self.vaults.cur_mut().snippet_form.steps;
                 let Some(row) = row_of(&other).and_then(|i| steps.get_mut(i)) else {
                     return;
                 };
@@ -75,7 +75,7 @@ impl Oryxis {
     /// stops the save (the row's number included).
     pub(crate) fn snippet_form_steps(&self) -> Result<Vec<SnippetStep>, String> {
         let t = crate::i18n::t;
-        let form = &self.snippet_form;
+        let form = &self.vaults.cur().snippet_form;
         if form.label.trim().is_empty() {
             return Err(t("snippet_name_required").to_string());
         }

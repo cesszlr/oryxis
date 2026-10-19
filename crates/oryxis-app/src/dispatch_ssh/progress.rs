@@ -102,7 +102,7 @@ impl Oryxis {
                         // that cannot be aborted (Telnet / Serial carry no
                         // handle) still owes the cancel-provoked error.
                         if !self.abort_progress_dial() {
-                            self.pending_edit_cancel = true;
+                            self.vaults.cur_mut().pending_edit_cancel = true;
                         }
                     }
                     self.connecting = None;

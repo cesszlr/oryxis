@@ -239,7 +239,7 @@ impl Oryxis {
                 // does. Wrapping the whole terminal container from outside
                 // (view_content) instead left the canvas eating clicks meant
                 // for the panel, so keep it inside.
-                if sidebar_left || sidebar_right || self.panels.session_group_panel {
+                if sidebar_left || sidebar_right || self.vaults.cur().panels.session_group_panel {
                     // Region sides are explicit physical edges (issues
                     // #85 / #102), like the #87 tab-bar dock, so a plain
                     // Row (not dir_row) places them, RTL must not flip a
@@ -254,7 +254,7 @@ impl Oryxis {
                     if sidebar_right {
                         children.push(self.view_terminal_sidebar(tab, SidebarSide::Right));
                     }
-                    if self.panels.session_group_panel {
+                    if self.vaults.cur().panels.session_group_panel {
                         children.push(self.view_session_group_panel());
                     }
                     iced::widget::Row::with_children(children)

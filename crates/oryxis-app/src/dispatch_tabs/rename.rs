@@ -97,15 +97,15 @@ impl Oryxis {
                     .find(|g| g.id == gid)
                     .map(|g| g.label.clone())
                     .unwrap_or_default();
-                self.folder_rename = Some((gid, current));
+                self.vaults.cur_mut().folder_rename = Some((gid, current));
             }
             TabsMessage::FolderRenameInput(val) => {
-                if let Some((_, ref mut buf)) = self.folder_rename {
+                if let Some((_, ref mut buf)) = self.vaults.cur_mut().folder_rename {
                     *buf = val;
                 }
             }
             TabsMessage::ConfirmRenameFolder => {
-                if let Some((gid, new_label)) = self.folder_rename.take() {
+                if let Some((gid, new_label)) = self.vaults.cur_mut().folder_rename.take() {
                     let trimmed = new_label.trim();
                     let ov = self.vaults.cur_mut();
                     if !trimmed.is_empty()
@@ -120,7 +120,7 @@ impl Oryxis {
                 }
             }
             TabsMessage::CancelFolderModal => {
-                self.folder_rename = None;
+                self.vaults.cur_mut().folder_rename = None;
                 self.close_modal(crate::state::Modal::FolderDelete);
             }
             // Routed here by the parent; anything else is a

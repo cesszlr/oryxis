@@ -99,7 +99,7 @@ impl Oryxis {
             View::Cloud => 95.0,            // "+ Account"
             View::PortForwarding => 92.0,   // "+ Port Forward"
             View::Proxies => {
-                if self.proxy_identity_form.visible {
+                if self.vaults.cur().proxy_identity_form.visible {
                     0.0
                 } else {
                     113.0 // "+ Add" split
@@ -244,7 +244,7 @@ impl Oryxis {
                 ),
                 View::Keys => (
                     "search_keys_identities",
-                    self.keys_ui.search.as_str(),
+                    self.vaults.cur().keys_ui.search.as_str(),
                     |v| Message::Keys(KeysMessage::KeySearchChanged(v)),
                 ),
                 View::Snippets => (
@@ -590,7 +590,7 @@ impl Oryxis {
         let overflow_btn: Element<'_, Message> = if overflow_defs.is_empty() {
             Space::new().boxed()
         } else {
-            let open = self.panels.subnav_overflow;
+            let open = self.vaults.cur().panels.subnav_overflow;
             button(
                 container(
                     text("\u{22EF}")

@@ -72,19 +72,19 @@ impl Oryxis {
     pub(crate) fn side_panel_wanted_on(&self, view: View) -> bool {
         match view {
             View::Dashboard => {
-                self.cloud_discover.visible
-                    || self.cloud_dynamic_form.visible
-                    || self.group_edit.visible
-                    || self.panels.host_panel
-                    || self.panels.session_group_panel
+                self.vaults.cur().cloud_discover.visible
+                    || self.vaults.cur().cloud_dynamic_form.visible
+                    || self.vaults.cur().group_edit.visible
+                    || self.vaults.cur().panels.host_panel
+                    || self.vaults.cur().panels.session_group_panel
             }
             View::Keys => {
-                self.panels.key_panel || self.panels.identity_panel || self.panels.key_generate_panel
+                self.vaults.cur().panels.key_panel || self.vaults.cur().panels.identity_panel || self.vaults.cur().panels.key_generate_panel
             }
-            View::Snippets => self.panels.snippet_panel,
-            View::PortForwarding => self.panels.port_forward_panel,
-            View::Proxies => self.proxy_identity_form.visible,
-            View::Cloud => self.cloud_form.visible,
+            View::Snippets => self.vaults.cur().panels.snippet_panel,
+            View::PortForwarding => self.vaults.cur().panels.port_forward_panel,
+            View::Proxies => self.vaults.cur().proxy_identity_form.visible,
+            View::Cloud => self.vaults.cur().cloud_form.visible,
             _ => false,
         }
     }
@@ -208,41 +208,41 @@ impl Oryxis {
         }
         match self.cur_view() {
             View::Dashboard => {
-                if self.cloud_discover.visible {
+                if self.vaults.cur().cloud_discover.visible {
                     Some(self.view_cloud_discover_panel())
-                } else if self.cloud_dynamic_form.visible {
+                } else if self.vaults.cur().cloud_dynamic_form.visible {
                     Some(self.view_dynamic_group_form_panel())
-                } else if self.group_edit.visible {
+                } else if self.vaults.cur().group_edit.visible {
                     Some(self.view_group_edit_panel())
-                } else if self.panels.host_panel {
+                } else if self.vaults.cur().panels.host_panel {
                     Some(self.view_host_panel())
-                } else if self.panels.session_group_panel {
+                } else if self.vaults.cur().panels.session_group_panel {
                     Some(self.view_session_group_panel())
                 } else {
                     None
                 }
             }
             View::Keys => {
-                if self.panels.key_panel {
+                if self.vaults.cur().panels.key_panel {
                     Some(self.view_key_import_panel())
-                } else if self.panels.identity_panel {
+                } else if self.vaults.cur().panels.identity_panel {
                     Some(self.view_identity_panel())
-                } else if self.panels.key_generate_panel {
+                } else if self.vaults.cur().panels.key_generate_panel {
                     Some(self.view_key_generate_panel())
                 } else {
                     None
                 }
             }
             View::Snippets => self
-                .panels.snippet_panel
+                .vaults.cur().panels.snippet_panel
                 .then(|| self.view_snippet_panel()),
             View::PortForwarding => self
-                .panels.port_forward_panel
+                .vaults.cur().panels.port_forward_panel
                 .then(|| self.view_port_forward_panel()),
             View::Proxies => self
-                .proxy_identity_form.visible
+                .vaults.cur().proxy_identity_form.visible
                 .then(|| self.view_proxy_identity_form()),
-            View::Cloud => self.cloud_form.visible.then(|| self.view_cloud_form_panel()),
+            View::Cloud => self.vaults.cur().cloud_form.visible.then(|| self.view_cloud_form_panel()),
             _ => None,
         }
     }
@@ -396,19 +396,19 @@ impl Oryxis {
         }
         match self.cur_view() {
             View::Dashboard => {
-                self.cloud_discover.visible
-                    || self.cloud_dynamic_form.visible
-                    || self.group_edit.visible
-                    || self.panels.host_panel
-                    || self.panels.session_group_panel
+                self.vaults.cur().cloud_discover.visible
+                    || self.vaults.cur().cloud_dynamic_form.visible
+                    || self.vaults.cur().group_edit.visible
+                    || self.vaults.cur().panels.host_panel
+                    || self.vaults.cur().panels.session_group_panel
             }
             View::Keys => {
-                self.panels.key_panel || self.panels.identity_panel || self.panels.key_generate_panel
+                self.vaults.cur().panels.key_panel || self.vaults.cur().panels.identity_panel || self.vaults.cur().panels.key_generate_panel
             }
-            View::Snippets => self.panels.snippet_panel,
-            View::PortForwarding => self.panels.port_forward_panel,
-            View::Proxies => self.proxy_identity_form.visible,
-            View::Cloud => self.cloud_form.visible,
+            View::Snippets => self.vaults.cur().panels.snippet_panel,
+            View::PortForwarding => self.vaults.cur().panels.port_forward_panel,
+            View::Proxies => self.vaults.cur().proxy_identity_form.visible,
+            View::Cloud => self.vaults.cur().cloud_form.visible,
             _ => false,
         }
     }

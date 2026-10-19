@@ -753,7 +753,7 @@ impl Oryxis {
         // "Import into" input). Picking a row fills the
         // input and closes the menu.
         let picker_needle = self
-            .cloud_discover.default_group_picker_search
+            .vaults.cur().cloud_discover.default_group_picker_search
             .trim()
             .to_lowercase();
         // Rows are full breadcrumb paths so a subgroup is a pickable
@@ -785,7 +785,7 @@ impl Oryxis {
         // form inputs underneath.
         let search_input = iced::widget::text_input(
             crate::i18n::t("search_groups"),
-            &self.cloud_discover.default_group_picker_search,
+            &self.vaults.cur().cloud_discover.default_group_picker_search,
         )
         .on_input(
             |v| Message::Cloud(CloudMessage::CloudDiscoverDefaultGroupPickerSearchChanged(v)),
@@ -902,7 +902,7 @@ impl Oryxis {
         // does.
         let menu_outer_width = self.overlay_menu_width(overlay);
         let menu_content_width = (menu_outer_width - 8.0).max(80.0);
-        let needle = self.group_picker_search.trim().to_lowercase();
+        let needle = self.vaults.cur().group_picker_search.trim().to_lowercase();
         // Re-parenting a manual group must not offer the group itself
         // or anything below it: nesting a folder inside its own
         // subtree would mint a parent cycle and orphan the whole
@@ -910,7 +910,7 @@ impl Oryxis {
         // just keeps the invalid rows out of sight.
         let excluded: std::collections::HashSet<uuid::Uuid> = match target {
             crate::state::GroupPickerTarget::GroupEditParent => self
-                .group_edit
+                .vaults.cur().group_edit
                 .id
                 .map(|gid| oryxis_core::models::Group::subtree_ids(&self.vaults.cur().groups, gid))
                 .unwrap_or_default(),
@@ -950,7 +950,7 @@ impl Oryxis {
         }
         let search_input = iced::widget::text_input(
             crate::i18n::t("search_groups"),
-            &self.group_picker_search,
+            &self.vaults.cur().group_picker_search,
         )
         .on_input(|v| Message::Navigation(NavigationMessage::GroupPickerSearchChanged(v)))
         .padding(8)

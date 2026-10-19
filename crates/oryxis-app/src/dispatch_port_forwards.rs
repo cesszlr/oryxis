@@ -139,61 +139,62 @@ impl Oryxis {
             // -- Editor panel --
             PortForwardMessage::ShowPortForwardPanel => {
                 self.overlay = None;
-                self.panels.port_forward_panel = true;
-                self.port_forward_form.editing_id = None;
-                self.port_forward_form.label.clear();
-                self.port_forward_form.kind = oryxis_core::models::port_forward_rule::ForwardKind::Local;
+                self.vaults.cur_mut().panels.port_forward_panel = true;
+                self.vaults.cur_mut().port_forward_form.editing_id = None;
+                self.vaults.cur_mut().port_forward_form.label.clear();
+                self.vaults.cur_mut().port_forward_form.kind = oryxis_core::models::port_forward_rule::ForwardKind::Local;
                 // Default the host to the first connection so the picker
                 // isn't empty on a fresh rule.
-                self.port_forward_form.host_id = self.vaults.cur().connections.first().map(|c| c.id);
-                self.port_forward_form.listen_host = "127.0.0.1".into();
-                self.port_forward_form.listen_port.clear();
-                self.port_forward_form.target_host.clear();
-                self.port_forward_form.target_port.clear();
-                self.port_forward_form.auto_start = false;
-                self.port_forward_form.error = None;
+                self.vaults.cur_mut().port_forward_form.host_id = self.vaults.cur_mut().connections.first().map(|c| c.id);
+                self.vaults.cur_mut().port_forward_form.listen_host = "127.0.0.1".into();
+                self.vaults.cur_mut().port_forward_form.listen_port.clear();
+                self.vaults.cur_mut().port_forward_form.target_host.clear();
+                self.vaults.cur_mut().port_forward_form.target_port.clear();
+                self.vaults.cur_mut().port_forward_form.auto_start = false;
+                self.vaults.cur_mut().port_forward_form.error = None;
             }
             PortForwardMessage::HidePortForwardPanel => {
-                self.panels.port_forward_panel = false;
+                self.vaults.cur_mut().panels.port_forward_panel = false;
             }
-            PortForwardMessage::PfLabelChanged(v) => self.port_forward_form.label = v,
-            PortForwardMessage::PfKindChanged(k) => self.port_forward_form.kind = k,
-            PortForwardMessage::PfHostChanged(id) => self.port_forward_form.host_id = Some(id),
-            PortForwardMessage::PfListenHostChanged(v) => self.port_forward_form.listen_host = v,
+            PortForwardMessage::PfLabelChanged(v) => self.vaults.cur_mut().port_forward_form.label = v,
+            PortForwardMessage::PfKindChanged(k) => self.vaults.cur_mut().port_forward_form.kind = k,
+            PortForwardMessage::PfHostChanged(id) => self.vaults.cur_mut().port_forward_form.host_id = Some(id),
+            PortForwardMessage::PfListenHostChanged(v) => self.vaults.cur_mut().port_forward_form.listen_host = v,
             PortForwardMessage::PfListenPortChanged(v) => {
-                self.port_forward_form.listen_port = v.chars().filter(|c| c.is_ascii_digit()).collect();
+                self.vaults.cur_mut().port_forward_form.listen_port = v.chars().filter(|c| c.is_ascii_digit()).collect();
             }
-            PortForwardMessage::PfTargetHostChanged(v) => self.port_forward_form.target_host = v,
+            PortForwardMessage::PfTargetHostChanged(v) => self.vaults.cur_mut().port_forward_form.target_host = v,
             PortForwardMessage::PfTargetPortChanged(v) => {
-                self.port_forward_form.target_port = v.chars().filter(|c| c.is_ascii_digit()).collect();
+                self.vaults.cur_mut().port_forward_form.target_port = v.chars().filter(|c| c.is_ascii_digit()).collect();
             }
-            PortForwardMessage::PfAutoStartToggled(v) => self.port_forward_form.auto_start = v,
+            PortForwardMessage::PfAutoStartToggled(v) => self.vaults.cur_mut().port_forward_form.auto_start = v,
             PortForwardMessage::EditPortForwardRule(idx) => {
-                if let Some(rule) = self.vaults.cur().port_forward_rules.get(idx) {
-                    self.panels.port_forward_panel = true;
-                    self.port_forward_form.editing_id = Some(rule.id);
-                    self.port_forward_form.label = rule.label.clone();
-                    self.port_forward_form.kind = rule.kind;
-                    self.port_forward_form.host_id = Some(rule.host_id);
-                    self.port_forward_form.listen_host = rule.listen_host.clone();
-                    self.port_forward_form.listen_port = rule.listen_port.to_string();
-                    self.port_forward_form.target_host = rule.target_host.clone();
-                    self.port_forward_form.target_port = rule.target_port.to_string();
-                    self.port_forward_form.auto_start = rule.auto_start;
-                    self.port_forward_form.error = None;
+                let ov = self.vaults.cur_mut();
+                if let Some(rule) = ov.port_forward_rules.get(idx) {
+                    ov.panels.port_forward_panel = true;
+                    ov.port_forward_form.editing_id = Some(rule.id);
+                    ov.port_forward_form.label = rule.label.clone();
+                    ov.port_forward_form.kind = rule.kind;
+                    ov.port_forward_form.host_id = Some(rule.host_id);
+                    ov.port_forward_form.listen_host = rule.listen_host.clone();
+                    ov.port_forward_form.listen_port = rule.listen_port.to_string();
+                    ov.port_forward_form.target_host = rule.target_host.clone();
+                    ov.port_forward_form.target_port = rule.target_port.to_string();
+                    ov.port_forward_form.auto_start = rule.auto_start;
+                    ov.port_forward_form.error = None;
                 }
             }
             PortForwardMessage::SavePortForwardRule => {
                 if let Some(err) = self.save_port_forward_rule() {
-                    self.port_forward_form.error = Some(err);
+                    self.vaults.cur_mut().port_forward_form.error = Some(err);
                 } else {
-                    self.panels.port_forward_panel = false;
-                    self.port_forward_form.error = None;
+                    self.vaults.cur_mut().panels.port_forward_panel = false;
+                    self.vaults.cur_mut().port_forward_form.error = None;
                     self.load_data_from_vault();
                 }
             }
             PortForwardMessage::ShowPortForwardMenu(idx) => {
-                self.port_forward_context_menu = Some(idx);
+                self.vaults.cur_mut().port_forward_context_menu = Some(idx);
                 self.overlay = Some(crate::state::OverlayState {
                     content: crate::state::OverlayContent::PortForwardActions(idx),
                     x: self.cur_mouse().x,
@@ -232,7 +233,7 @@ impl Oryxis {
                     self.port_forward_retry.remove(&id);
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_port_forward_rule(&id);
-                        self.panels.port_forward_panel = false;
+                        self.vaults.cur_mut().panels.port_forward_panel = false;
                         self.load_data_from_vault();
                     }
                     // Last forward of its host gone: close the shared
@@ -301,7 +302,7 @@ impl Oryxis {
                             // Came up: clear any retry so a later drop starts
                             // the backoff fresh from the shortest interval.
                             self.port_forward_retry.remove(&id);
-                            self.port_forward_form.error = None;
+                            self.vaults.cur_mut().port_forward_form.error = None;
                         } else {
                             // Honor the stop/delete that raced the attach:
                             // release the rule's listener (and, for `-R`,
@@ -336,7 +337,7 @@ impl Oryxis {
                             // single shared error field would otherwise clobber
                             // across rows on every tick.
                             if !already_retrying {
-                                self.port_forward_form.error = Some(e);
+                                self.vaults.cur_mut().port_forward_form.error = Some(e);
                             }
                         }
                         // A failed attach may leave the shared connection
@@ -433,25 +434,25 @@ impl Oryxis {
     /// Validate the editor draft and persist it. Returns `Some(error)` on
     /// a validation failure (left in the panel), `None` on success.
     fn save_port_forward_rule(&mut self) -> Option<String> {
-        let label = self.port_forward_form.label.trim();
+        let label = self.vaults.cur().port_forward_form.label.trim();
         if label.is_empty() {
             return Some(crate::i18n::t("pf_err_required").to_string());
         }
-        let Some(host_id) = self.port_forward_form.host_id else {
+        let Some(host_id) = self.vaults.cur().port_forward_form.host_id else {
             return Some(crate::i18n::t("pf_err_host").to_string());
         };
         if !self.vaults.cur().connections.iter().any(|c| c.id == host_id) {
             return Some(crate::i18n::t("pf_err_host").to_string());
         }
-        let Some(listen_port) = parse_port(&self.port_forward_form.listen_port) else {
+        let Some(listen_port) = parse_port(&self.vaults.cur().port_forward_form.listen_port) else {
             return Some(crate::i18n::t("pf_err_port").to_string());
         };
-        let (target_host, target_port) = if self.port_forward_form.kind.has_target() {
-            let th = self.port_forward_form.target_host.trim();
+        let (target_host, target_port) = if self.vaults.cur().port_forward_form.kind.has_target() {
+            let th = self.vaults.cur().port_forward_form.target_host.trim();
             if th.is_empty() {
                 return Some(crate::i18n::t("pf_err_required").to_string());
             }
-            let Some(tp) = parse_port(&self.port_forward_form.target_port) else {
+            let Some(tp) = parse_port(&self.vaults.cur().port_forward_form.target_port) else {
                 return Some(crate::i18n::t("pf_err_port").to_string());
             };
             (th.to_string(), tp)
@@ -459,23 +460,23 @@ impl Oryxis {
             (String::new(), 0)
         };
 
-        let mut rule = if let Some(id) = self.port_forward_form.editing_id {
+        let mut rule = if let Some(id) = self.vaults.cur().port_forward_form.editing_id {
             self.vaults.cur().port_forward_rules
                 .iter()
                 .find(|r| r.id == id)
                 .cloned()
-                .unwrap_or_else(|| PortForwardRule::new("", self.port_forward_form.kind, host_id))
+                .unwrap_or_else(|| PortForwardRule::new("", self.vaults.cur().port_forward_form.kind, host_id))
         } else {
-            PortForwardRule::new("", self.port_forward_form.kind, host_id)
+            PortForwardRule::new("", self.vaults.cur().port_forward_form.kind, host_id)
         };
         rule.label = label.to_string();
-        rule.kind = self.port_forward_form.kind;
+        rule.kind = self.vaults.cur().port_forward_form.kind;
         rule.host_id = host_id;
-        rule.listen_host = self.port_forward_form.listen_host.trim().to_string();
+        rule.listen_host = self.vaults.cur().port_forward_form.listen_host.trim().to_string();
         rule.listen_port = listen_port;
         rule.target_host = target_host;
         rule.target_port = target_port;
-        rule.auto_start = self.port_forward_form.auto_start;
+        rule.auto_start = self.vaults.cur().port_forward_form.auto_start;
         rule.updated_at = chrono::Utc::now();
 
         let vault = self.vaults.cur().store.as_ref()?;
@@ -538,7 +539,7 @@ impl Oryxis {
             .find(|c| c.id == host_id)
             .cloned()
         else {
-            self.port_forward_form.error = Some(crate::i18n::t("pf_err_host").to_string());
+            self.vaults.cur_mut().port_forward_form.error = Some(crate::i18n::t("pf_err_host").to_string());
             return Task::none();
         };
 

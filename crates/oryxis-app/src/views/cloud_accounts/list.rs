@@ -348,7 +348,7 @@ impl Oryxis {
             }
 
             let nav_width = self.vault_rail_width();
-            let panel_width = if self.cloud_form.visible { self.vaults.cur().panel_width } else { 0.0 };
+            let panel_width = if self.vaults.cur().cloud_form.visible { self.vaults.cur().panel_width } else { 0.0 };
             let available =
                 (self.cur_window_size().width
                 - nav_width

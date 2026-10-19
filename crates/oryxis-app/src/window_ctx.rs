@@ -408,7 +408,7 @@ impl Oryxis {
 
     /// Whether the burger menu is open in the current window.
     pub(crate) fn cur_burger_open(&self) -> bool {
-        self.panels.burger_menu && self.floats_here()
+        self.vaults.cur().panels.burger_menu && self.floats_here()
     }
 
     /// A carried tab hovering the current window's strip: the tab, the
@@ -602,7 +602,7 @@ impl Oryxis {
     pub(crate) fn float_signature(&self) -> [bool; 3] {
         [
             self.overlay.is_some()
-                || self.panels.burger_menu
+                || self.vaults.cur().panels.burger_menu
                 || self.card_context_menu.is_some()
                 || self.sftp.row_menu.is_some(),
             self.error_dialog.is_some()

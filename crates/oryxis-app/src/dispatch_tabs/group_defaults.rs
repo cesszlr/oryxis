@@ -25,21 +25,21 @@ impl Oryxis {
             .and_then(|g| g.defaults.clone())
             .unwrap_or_default();
 
-        self.group_edit.username = defaults.username.clone().unwrap_or_default();
-        self.group_edit.port = defaults.port.map(|p| p.to_string()).unwrap_or_default();
-        self.group_edit.identity_label = defaults.identity_id.and_then(|id| {
+        self.vaults.cur_mut().group_edit.username = defaults.username.clone().unwrap_or_default();
+        self.vaults.cur_mut().group_edit.port = defaults.port.map(|p| p.to_string()).unwrap_or_default();
+        self.vaults.cur_mut().group_edit.identity_label = defaults.identity_id.and_then(|id| {
             self.vaults.cur().identities
                 .iter()
                 .find(|i| i.id == id)
                 .map(|i| i.label.clone())
         });
-        self.group_edit.proxy_identity_label = defaults.proxy_identity_id.and_then(|id| {
+        self.vaults.cur_mut().group_edit.proxy_identity_label = defaults.proxy_identity_id.and_then(|id| {
             self.vaults.cur().proxy_identities
                 .iter()
                 .find(|p| p.id == id)
                 .map(|p| p.label.clone())
         });
-        self.group_edit.startup_snippet_label = defaults.startup_snippet_id.and_then(|id| {
+        self.vaults.cur_mut().group_edit.startup_snippet_label = defaults.startup_snippet_id.and_then(|id| {
             self.vaults.cur().snippets
                 .iter()
                 .find(|s| s.id == id)
@@ -49,11 +49,11 @@ impl Oryxis {
         // lookup; an unknown name (a custom theme deleted since) still
         // shows, because the name is the value and the user may want to
         // keep it.
-        self.group_edit.terminal_theme = defaults.terminal_theme.clone();
-        self.group_edit.env_vars = defaults.env_vars.clone();
+        self.vaults.cur_mut().group_edit.terminal_theme = defaults.terminal_theme.clone();
+        self.vaults.cur_mut().group_edit.env_vars = defaults.env_vars.clone();
         // Open the section when the group already sets something, so
         // existing defaults are never hidden behind a collapsed header.
-        self.group_edit.defaults_open = !defaults.is_empty();
+        self.vaults.cur_mut().group_edit.defaults_open = !defaults.is_empty();
     }
 
     /// Build the `GroupDefaults` to store, or `None` when the form sets
@@ -63,7 +63,7 @@ impl Oryxis {
     /// they are now: a picker still naming something the user deleted
     /// meanwhile stores nothing instead of a dangling id.
     pub(crate) fn group_edit_defaults(&self) -> Option<GroupDefaults> {
-        let form = &self.group_edit;
+        let form = &self.vaults.cur().group_edit;
         let defaults = GroupDefaults {
             username: Some(form.username.trim().to_string()).filter(|u| !u.is_empty()),
             identity_id: form.identity_label.as_ref().and_then(|label| {

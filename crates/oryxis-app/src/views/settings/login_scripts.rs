@@ -42,8 +42,8 @@ impl Oryxis {
 
         for script in &self.vaults.cur().login_scripts {
             let count = usage.get(&script.id).copied().unwrap_or(0);
-            let editing = self.login_script_form.editing_id == Some(script.id);
-            let confirming = self.login_script_form.confirm_delete == Some(script.id);
+            let editing = self.vaults.cur().login_script_form.editing_id == Some(script.id);
+            let confirming = self.vaults.cur().login_script_form.confirm_delete == Some(script.id);
 
             let header = dir_row(vec![
                 column![
@@ -138,7 +138,7 @@ impl Oryxis {
     /// The step editor for the expanded script: the escape hatch for a
     /// bastion whose dialogue the three-field preset cannot express.
     fn login_script_editor(&self) -> Element<'_, Message> {
-        let form = &self.login_script_form;
+        let form = &self.vaults.cur().login_script_form;
         let mut col = column![
             self.settings_nav_slot_labeled(
                 t("name"),

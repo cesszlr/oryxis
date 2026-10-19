@@ -44,7 +44,7 @@ impl Oryxis {
     /// as keyboard rows (the vault panel does; the sidebar editor records
     /// none, like the rest of its form).
     pub(crate) fn snippet_steps_editor(&self, nav: bool) -> Element<'_, Message> {
-        let rows = &self.snippet_form.steps;
+        let rows = &self.vaults.cur().snippet_form.steps;
         let mut col = column![].width(Length::Fill);
         for (i, row) in rows.iter().enumerate() {
             col = col.push(self.snippet_step_card(i, row, rows.len(), nav));
@@ -254,7 +254,7 @@ impl Oryxis {
                 let others: Vec<Uuid> = self
                     .vaults.cur().snippets
                     .iter()
-                    .filter(|s| Some(s.id) != self.snippet_form.editing_id && !s.install)
+                    .filter(|s| Some(s.id) != self.vaults.cur().snippet_form.editing_id && !s.install)
                     .map(|s| s.id)
                     .collect();
                 if others.is_empty() {

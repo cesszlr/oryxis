@@ -53,7 +53,7 @@ impl Oryxis {
                     Some(Message::Settings(SettingsMessage::HideLocalShellPicker)),
                     40.0,
                 ))
-            } else if self.local_terminal_add_open && !self.panels.icon_picker {
+            } else if self.local_terminal_add_open && !self.vaults.cur().panels.icon_picker {
                 // The add / edit modal yields while the shared icon picker is
                 // up (the picker layers inside `view_main`, below this overlay);
                 // it reappears with the chosen icon / color on picker save.
@@ -103,7 +103,7 @@ impl Oryxis {
                     Some(Message::ErrorDialogDismiss),
                     40.0,
                 ))
-            } else if self.cert_viewer.is_some()
+            } else if self.vaults.cur().cert_viewer.is_some()
                 && matches!(self.vaults.cur().vault_ui.state, VaultState::Unlocked)
             {
                 // Read-only certificate viewer (B2). Vault-area modal: gated on

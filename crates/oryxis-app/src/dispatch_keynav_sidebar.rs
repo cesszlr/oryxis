@@ -281,7 +281,7 @@ impl Oryxis {
         event: &keyboard::Event,
     ) -> Option<Task<Message>> {
         let (_side, tab) = self.engaged_sidebar_context()?;
-        if self.any_modal_blocks_input() || self.panels.host_panel {
+        if self.any_modal_blocks_input() || self.vaults.cur().panels.host_panel {
             return None;
         }
         let keyboard::Event::KeyPressed { key, modifiers, .. } = event else {

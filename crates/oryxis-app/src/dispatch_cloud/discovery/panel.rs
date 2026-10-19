@@ -19,24 +19,24 @@ impl Oryxis {
                 self.overlay = None;
                 // Close any other right-panel (mutually exclusive slot).
                 self.editor_flush_pending();
-                self.panels.host_panel = false;
+                self.vaults.cur_mut().panels.host_panel = false;
                 // Drop what the host editor's eyes revealed.
-                self.editor_form.sweep_secrets();
-                self.cloud_form.visible = false;
-                self.cloud_dynamic_form.visible = false;
-                self.group_edit.visible = false;
-                self.cloud_discover.visible = true;
-                self.cloud_discover.profile_id = Some(profile_id);
-                self.cloud_discover.selected_ec2.clear();
-                self.cloud_discover.selected_ecs.clear();
-                self.cloud_discover.selected_k8s.clear();
-                self.cloud_discover.filter.clear();
-                self.cloud_discover.state = CloudDiscoverState::Idle;
+                self.vaults.cur_mut().editor_form.sweep_secrets();
+                self.vaults.cur_mut().cloud_form.visible = false;
+                self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                self.vaults.cur_mut().group_edit.visible = false;
+                self.vaults.cur_mut().cloud_discover.visible = true;
+                self.vaults.cur_mut().cloud_discover.profile_id = Some(profile_id);
+                self.vaults.cur_mut().cloud_discover.selected_ec2.clear();
+                self.vaults.cur_mut().cloud_discover.selected_ecs.clear();
+                self.vaults.cur_mut().cloud_discover.selected_k8s.clear();
+                self.vaults.cur_mut().cloud_discover.filter.clear();
+                self.vaults.cur_mut().cloud_discover.state = CloudDiscoverState::Idle;
                 // Default the input to the profile's own label so the
                 // most common case (one folder per profile) requires
                 // zero typing. The user can clear or change before
                 // hitting Import.
-                self.cloud_discover.default_group_name = self
+                self.vaults.cur_mut().cloud_discover.default_group_name = self
                     .vaults.cur().cloud_profiles
                     .iter()
                     .find(|p| p.id == profile_id)
@@ -45,21 +45,21 @@ impl Oryxis {
                 return Ok(self.spawn_discover(profile_id));
             }
             CloudMessage::HideCloudDiscover => {
-                self.cloud_discover.visible = false;
-                self.cloud_discover.profile_id = None;
-                self.cloud_discover.state = CloudDiscoverState::Idle;
-                self.cloud_discover.selected_ec2.clear();
-                self.cloud_discover.selected_ecs.clear();
-                self.cloud_discover.selected_k8s.clear();
-                self.cloud_discover.filter.clear();
+                self.vaults.cur_mut().cloud_discover.visible = false;
+                self.vaults.cur_mut().cloud_discover.profile_id = None;
+                self.vaults.cur_mut().cloud_discover.state = CloudDiscoverState::Idle;
+                self.vaults.cur_mut().cloud_discover.selected_ec2.clear();
+                self.vaults.cur_mut().cloud_discover.selected_ecs.clear();
+                self.vaults.cur_mut().cloud_discover.selected_k8s.clear();
+                self.vaults.cur_mut().cloud_discover.filter.clear();
             }
             CloudMessage::CloudDiscoverRefresh => {
-                if let Some(id) = self.cloud_discover.profile_id {
+                if let Some(id) = self.vaults.cur().cloud_discover.profile_id {
                     return Ok(self.spawn_discover(id));
                 }
             }
             CloudMessage::CloudDiscoverResult(result) => {
-                self.cloud_discover.state = match result {
+                self.vaults.cur_mut().cloud_discover.state = match result {
                     Ok(boxed) => CloudDiscoverState::Loaded(*boxed),
                     Err(msg) => CloudDiscoverState::Failed(msg),
                 };
@@ -67,13 +67,13 @@ impl Oryxis {
                 // have changed (instance terminated, new ones spun up),
                 // and silently keeping a checked id that no longer
                 // exists in the new list would be misleading.
-                self.cloud_discover.selected_ec2.clear();
-                self.cloud_discover.selected_ecs.clear();
-                self.cloud_discover.selected_k8s.clear();
+                self.vaults.cur_mut().cloud_discover.selected_ec2.clear();
+                self.vaults.cur_mut().cloud_discover.selected_ecs.clear();
+                self.vaults.cur_mut().cloud_discover.selected_k8s.clear();
                 // Stamp the profile's last_discovered when we got real
                 // results, so the cards list shows fresh metadata.
-                if matches!(self.cloud_discover.state, CloudDiscoverState::Loaded(_))
-                    && let Some(id) = self.cloud_discover.profile_id
+                if matches!(self.vaults.cur().cloud_discover.state, CloudDiscoverState::Loaded(_))
+                    && let Some(id) = self.vaults.cur().cloud_discover.profile_id
                     && let Some(vault) = &self.vaults.cur().store
                     && let Some(mut cp) = self
                         .vaults.cur().cloud_profiles

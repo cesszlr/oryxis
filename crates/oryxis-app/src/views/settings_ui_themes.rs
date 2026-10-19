@@ -21,7 +21,7 @@ fn col(hex: &str, fallback: Color) -> Color {
 impl Oryxis {
     /// The custom UI theme editor modal.
     pub(crate) fn view_ui_theme_editor_modal(&self) -> Element<'_, Message> {
-        let Some(form) = self.ui_theme_editor.as_ref() else {
+        let Some(form) = self.vaults.cur().ui_theme_editor.as_ref() else {
             return Space::new().boxed();
         };
         let title = if form.editing_id.is_some() {
@@ -527,14 +527,14 @@ impl Oryxis {
     /// theme JSON; on import the parsed colors open in the editor for
     /// review. Mirrors `view_theme_import_modal`.
     pub(crate) fn view_ui_theme_import_modal(&self) -> Element<'_, Message> {
-        let name_input = text_input(t("theme_name"), &self.ui_theme_import_name)
+        let name_input = text_input(t("theme_name"), &self.vaults.cur().ui_theme_import_name)
             .on_input(|v| Message::Settings(SettingsMessage::UiThemeImportNameChanged(v)))
             .padding(10)
             .size(13)
             .style(crate::widgets::rounded_input_style);
 
         let paste = container(
-            iced::widget::text_editor(&self.ui_theme_import_content)
+            iced::widget::text_editor(&self.vaults.cur().ui_theme_import_content)
                 .on_action(|v| Message::Settings(SettingsMessage::UiThemeImportContentAction(v)))
                 .padding(10)
                 .height(Length::Fixed(220.0))
@@ -555,7 +555,7 @@ impl Oryxis {
         ]
         .spacing(0);
         col = col.push(Space::new().height(8).boxed());
-        col = col.push(crate::widgets::form_error(self.ui_theme_import_error.as_deref()));
+        col = col.push(crate::widgets::form_error(self.vaults.cur().ui_theme_import_error.as_deref()));
         col = col.push(Space::new().height(8).boxed());
         col = col.push(
             dir_row(vec![

@@ -25,12 +25,12 @@ impl Oryxis {
                 self.overlay = None;
                 if self.vaults.cur().connections.iter().any(|c| c.id == id) {
                     // Mutually exclusive right-panel slot.
-                    self.cloud_form.visible = false;
-                    self.cloud_dynamic_form.visible = false;
-                    self.cloud_discover.visible = false;
-                    self.panels.session_group_panel = false;
-                    self.group_edit.visible = false;
-                    self.panels.host_panel = true;
+                    self.vaults.cur_mut().cloud_form.visible = false;
+                    self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                    self.vaults.cur_mut().cloud_discover.visible = false;
+                    self.vaults.cur_mut().panels.session_group_panel = false;
+                    self.vaults.cur_mut().group_edit.visible = false;
+                    self.vaults.cur_mut().panels.host_panel = true;
                     // When invoked from a focused terminal tab (the
                     // OpenPortForwards / edit-host hotkey), leave the
                     // terminal surface so the right-panel editor actually
@@ -60,14 +60,14 @@ impl Oryxis {
                 };
                 // Mutually exclusive right-panel slot, and the panel lives
                 // on the dashboard (the menu was clicked from a terminal).
-                self.cloud_form.visible = false;
-                self.cloud_dynamic_form.visible = false;
-                self.cloud_discover.visible = false;
-                self.panels.session_group_panel = false;
-                self.group_edit.visible = false;
-                self.panels.host_panel = true;
+                self.vaults.cur_mut().cloud_form.visible = false;
+                self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                self.vaults.cur_mut().cloud_discover.visible = false;
+                self.vaults.cur_mut().panels.session_group_panel = false;
+                self.vaults.cur_mut().group_edit.visible = false;
+                self.vaults.cur_mut().panels.host_panel = true;
                 self.panel_nav_clear();
-                self.host_panel_error = None;
+                self.vaults.cur_mut().host_panel_error = None;
                 self.active_view = crate::state::View::Dashboard;
                 let mut form = self.form_from_connection(&entry.conn, false, false, false, false);
                 // Prefill as a NEW host: saving must insert a fresh row,
@@ -86,11 +86,11 @@ impl Oryxis {
                 if let Some(pw) = entry.proxy_password.clone() {
                     form.proxy_password.set(pw);
                 }
-                self.editor_form = form;
+                self.vaults.cur_mut().editor_form = form;
                 let cmd = entry.conn.initial_command.as_deref().unwrap_or_default();
-                self.editor_initial_command =
+                self.vaults.cur_mut().editor_initial_command =
                     iced::widget::text_editor::Content::with_text(cmd);
-                self.editor_startup_choice = match entry.conn.startup_snippet_id {
+                self.vaults.cur_mut().editor_startup_choice = match entry.conn.startup_snippet_id {
                     Some(sid) if self.vaults.cur().snippets.iter().any(|s| s.id == sid) => {
                         crate::state::StartupChoice::Snippet(sid)
                     }
@@ -108,8 +108,8 @@ impl Oryxis {
                 // the flow reads as "edit the temporary host and dial",
                 // never an implicit vault write.
                 let task = self.update(Message::Editor(EditorMessage::SaveQuickHost(id)));
-                if self.panels.host_panel {
-                    self.editor_form.quick_flow = true;
+                if self.vaults.cur().panels.host_panel {
+                    self.vaults.cur_mut().editor_form.quick_flow = true;
                 }
                 return task;
             }
@@ -140,23 +140,23 @@ impl Oryxis {
                 // repeat": every legitimate sender (footer button,
                 // focused on_submit, ringed footer row) only exists
                 // while the panel is up.
-                if !self.panels.host_panel {
+                if !self.vaults.cur().panels.host_panel {
                     return Task::none();
                 }
                 match self.persist_editor_form(super::GroupWrite::Create) {
                     Ok(_) => {
-                        self.panels.host_panel = false;
+                        self.vaults.cur_mut().panels.host_panel = false;
                         self.panel_nav_clear();
-                        self.host_panel_error = None;
+                        self.vaults.cur_mut().host_panel_error = None;
                         // The save consumed the secrets; drop any
                         // plaintext the eye may have revealed.
-                        self.editor_form.sweep_secrets();
-                        self.editor_saved_snapshot = None;
+                        self.vaults.cur_mut().editor_form.sweep_secrets();
+                        self.vaults.cur_mut().editor_saved_snapshot = None;
                     }
                     // Explicit Save surfaces both kinds inline: the
                     // panel stays up either way.
                     Err(e) => {
-                        self.host_panel_error = Some(e.into_message());
+                        self.vaults.cur_mut().host_panel_error = Some(e.into_message());
                     }
                 }
             }
@@ -172,23 +172,23 @@ impl Oryxis {
                 // Local is the one protocol with nothing to dial: its
                 // label is what identifies the session, so that is what
                 // this path requires instead of an address.
-                if self.editor_form.protocol
+                if self.vaults.cur().editor_form.protocol
                     == oryxis_core::models::connection::ConnectionProtocol::Local
                 {
-                    if self.editor_form.label.trim().is_empty() {
-                        self.host_panel_error =
+                    if self.vaults.cur().editor_form.label.trim().is_empty() {
+                        self.vaults.cur_mut().host_panel_error =
                             Some(crate::i18n::t("editor_label_required").into());
                         return Task::none();
                     }
-                } else if self.editor_form.hostname.trim().is_empty() {
-                    self.host_panel_error =
+                } else if self.vaults.cur().editor_form.hostname.trim().is_empty() {
+                    self.vaults.cur_mut().host_panel_error =
                         Some(crate::i18n::t("quick_connect_hostname_required").into());
                     return Task::none();
                 }
                 let mut conn = match self.connection_from_editor_form(super::GroupWrite::Skip) {
                     Ok(conn) => conn,
                     Err(msg) => {
-                        self.host_panel_error = Some(msg);
+                        self.vaults.cur_mut().host_panel_error = Some(msg);
                         return Task::none();
                     }
                 };
@@ -206,7 +206,7 @@ impl Oryxis {
                 // Typed credentials ride the ephemeral entry (there is no
                 // vault row to hydrate from at connect time). Untouched or
                 // cleared fields stay None.
-                let form = &self.editor_form;
+                let form = &self.vaults.cur().editor_form;
                 let password = form
                     .password
                     .resolve()
@@ -233,12 +233,12 @@ impl Oryxis {
                     totp_secret,
                     proxy_password,
                 };
-                self.panels.host_panel = false;
+                self.vaults.cur_mut().panels.host_panel = false;
                 self.panel_nav_clear();
-                self.host_panel_error = None;
+                self.vaults.cur_mut().host_panel_error = None;
                 // The typed secrets rode into the quick-connect entry;
                 // drop any revealed plaintext from the form buffers.
-                self.editor_form.sweep_secrets();
+                self.vaults.cur_mut().editor_form.sweep_secrets();
                 return self.update(Message::Ssh(SshMessage::QuickConnect(Box::new(entry))));
             }
             EditorMessage::EditorCancel => {
@@ -247,11 +247,11 @@ impl Oryxis {
                 // the debounce still holds. A new host keeps the old
                 // meaning (nothing was written, nothing survives).
                 self.editor_flush_pending();
-                self.panels.host_panel = false;
+                self.vaults.cur_mut().panels.host_panel = false;
                 self.panel_nav_clear();
-                self.host_panel_error = None;
-                self.editor_form.sweep_secrets();
-                self.editor_saved_snapshot = None;
+                self.vaults.cur_mut().host_panel_error = None;
+                self.vaults.cur_mut().editor_form.sweep_secrets();
+                self.vaults.cur_mut().editor_saved_snapshot = None;
             }
             EditorMessage::RequestDeleteConnection(idx) => {
                 if let Some(conn) = self.vaults.cur().connections.get(idx) {
@@ -344,13 +344,13 @@ impl Oryxis {
                     P::BasicSsh => {
                         // Also the "back to plain" verb: protocol and
                         // port reset, the section state folds shut.
-                        self.editor_form.protocol =
+                        self.vaults.cur_mut().editor_form.protocol =
                             oryxis_core::models::connection::ConnectionProtocol::Ssh;
-                        self.editor_form.port = "22".to_string();
+                        self.vaults.cur_mut().editor_form.port = "22".to_string();
                         self.host_editor_open_sections.clear();
                     }
                     P::ViaBastion => {
-                        self.editor_form.protocol =
+                        self.vaults.cur_mut().editor_form.protocol =
                             oryxis_core::models::connection::ConnectionProtocol::Ssh;
                         self.host_editor_open_sections.insert(S::Network);
                         // Jump straight into picking the bastion when
@@ -358,18 +358,18 @@ impl Oryxis {
                         // the opened section explains itself and an
                         // empty picker would only confuse.
                         if !self.vaults.cur().connections.is_empty() {
-                            self.panels.chain_editor = true;
-                            self.chain_editor_adding = true;
-                            self.chain_editor_search.clear();
+                            self.vaults.cur_mut().panels.chain_editor = true;
+                            self.vaults.cur_mut().chain_editor_adding = true;
+                            self.vaults.cur_mut().chain_editor_search.clear();
                         }
                     }
                     P::Cloud => {
                         // The cloud import lives in its own view; the
                         // pristine create form has nothing to keep.
-                        self.panels.host_panel = false;
+                        self.vaults.cur_mut().panels.host_panel = false;
                         self.panel_nav_clear();
-                        self.host_panel_error = None;
-                        self.editor_form.sweep_secrets();
+                        self.vaults.cur_mut().host_panel_error = None;
+                        self.vaults.cur_mut().editor_form.sweep_secrets();
                         return self.update(Message::Navigation(
                             crate::app::NavigationMessage::ChangeView(
                                 crate::state::View::Cloud,
@@ -422,23 +422,23 @@ impl Oryxis {
         // "The form already has a password" is both halves of the
         // tri-state that mean one: a secret typed this session and one
         // already in the vault column.
-        let has_password = !self.editor_form.password.as_str().is_empty()
-            || self.editor_form.has_existing_password;
+        let has_password = !self.vaults.cur().editor_form.password.as_str().is_empty()
+            || self.vaults.cur().editor_form.has_existing_password;
         let Some(split) = host_field_split(
-            &self.editor_form.hostname,
-            &self.editor_form.username,
-            &self.editor_form.port,
-            self.editor_form.protocol,
+            &self.vaults.cur().editor_form.hostname,
+            &self.vaults.cur().editor_form.username,
+            &self.vaults.cur().editor_form.port,
+            self.vaults.cur().editor_form.protocol,
             has_password,
         ) else {
             return;
         };
-        self.editor_form.hostname = split.hostname;
+        self.vaults.cur_mut().editor_form.hostname = split.hostname;
         if let Some(user) = split.username {
-            self.editor_form.username = user;
+            self.vaults.cur_mut().editor_form.username = user;
         }
         if let Some(port) = split.port {
-            self.editor_form.port = port;
+            self.vaults.cur_mut().editor_form.port = port;
         }
         let moved_password = split.password.is_some();
         if let Some(pw) = split.password {
@@ -446,7 +446,7 @@ impl Oryxis {
             // persist write it to the ENCRYPTED column. It is also the
             // only place the value is allowed to land: it came out of a
             // plaintext field and must not go back into one.
-            self.editor_form.password.set(pw);
+            self.vaults.cur_mut().editor_form.password.set(pw);
         }
         if split.dropped_user.is_some() || split.dropped_password || moved_password {
             // A TOAST, not the inline panel error: the flush that
@@ -477,7 +477,7 @@ impl Oryxis {
         let mask = |value: &str| -> String {
             // The host being edited may carry its own override, so the
             // gate is the per-host one, not the global default.
-            if self.privacy_active_for_override(self.editor_form.privacy_mode) {
+            if self.privacy_active_for_override(self.vaults.cur().editor_form.privacy_mode) {
                 crate::widgets::mask_blocks(value)
             } else {
                 value.to_string()
@@ -492,7 +492,7 @@ impl Oryxis {
             lines.push(
                 crate::i18n::t("editor_host_user_dropped")
                     .replace("{dropped}", &mask(dropped))
-                    .replace("{kept}", &mask(&self.editor_form.username)),
+                    .replace("{kept}", &mask(&self.vaults.cur().editor_form.username)),
             );
         }
         if moved_password {
@@ -521,10 +521,10 @@ impl Oryxis {
         self.editor_split_host_field();
         // A local host names no endpoint, so its label IS the target and
         // is the only thing required; every other protocol needs both.
-        let takes_address = self.editor_form.protocol
+        let takes_address = self.vaults.cur().editor_form.protocol
             != oryxis_core::models::connection::ConnectionProtocol::Local;
-        if self.editor_form.label.is_empty()
-            || (takes_address && self.editor_form.hostname.trim().is_empty())
+        if self.vaults.cur().editor_form.label.is_empty()
+            || (takes_address && self.vaults.cur().editor_form.hostname.trim().is_empty())
         {
             return Err(PersistError::Invalid(
                 crate::i18n::t(match takes_address {
@@ -561,8 +561,8 @@ impl Oryxis {
         }
         // Disjoint borrows: the derived-clear rescues below write into
         // the form while the vault handle is held.
-        let Self { vaults, editor_form: form, .. } = self;
-        let Some(vault) = vaults.cur().store.as_ref() else {
+        let crate::vault_slots::OpenVault { store, editor_form: form, .. } = self.vaults.cur_mut();
+        let Some(vault) = store.as_ref() else {
             // Unreachable in practice: the editor only renders over an
             // unlocked vault. A hard error beats a silent drop.
             return Err(PersistError::Vault(crate::i18n::t("error").to_string()));
@@ -787,7 +787,7 @@ impl Oryxis {
             return;
         }
         let editing_removed = self
-            .editor_form
+            .vaults.cur().editor_form
             .editing_id
             .is_some_and(|id| ids.contains(&id));
         if !editing_removed {
@@ -806,9 +806,9 @@ impl Oryxis {
             }
         }
         if editing_removed {
-            self.panels.host_panel = false;
+            self.vaults.cur_mut().panels.host_panel = false;
             self.panel_nav_clear();
-            self.editor_form.sweep_secrets();
+            self.vaults.cur_mut().editor_form.sweep_secrets();
         }
         self.load_data_from_vault();
     }

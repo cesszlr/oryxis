@@ -164,7 +164,7 @@ impl Oryxis {
                         self.vaults.cur().sync.passphrase_input.as_str(),
                         |v| Message::Sync(SyncMessage::PassphraseChanged(v.into())),
                         None,
-                        self.revealed_secrets
+                        self.vaults.cur().revealed_secrets
                             .contains(&crate::state::SecretField::SyncPassphrase),
                         Message::Settings(SettingsMessage::ToggleSecretVisibility(
                             crate::state::SecretField::SyncPassphrase,
@@ -1642,7 +1642,7 @@ impl Oryxis {
                     &self.vaults.cur().sync.signaling_token,
                     |v| Message::Sync(SyncMessage::SignalingTokenChanged(v.into())),
                     None,
-                    self.revealed_secrets
+                    self.vaults.cur().revealed_secrets
                         .contains(&crate::state::SecretField::SyncSignalingToken),
                     Message::Settings(SettingsMessage::ToggleSecretVisibility(
                         crate::state::SecretField::SyncSignalingToken,

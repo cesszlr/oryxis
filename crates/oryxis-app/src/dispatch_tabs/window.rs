@@ -860,7 +860,7 @@ impl Oryxis {
                 // overlay AND the burger panel itself so the menu
                 // doesn't linger beside the freshly-opened window.
                 self.overlay = None;
-                self.panels.burger_menu = false;
+                self.vaults.cur_mut().panels.burger_menu = false;
                 return self.spawn_new_window();
             }
             TabsMessage::ConnectHostsInNewWindow(ids) => {

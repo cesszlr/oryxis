@@ -28,22 +28,22 @@ impl Oryxis {
                 // (e.g. when they click "+ Key" from the host editor).
                 self.active_view = View::Keys;
                 self.active_tab = None;
-                self.panels.key_panel = true;
-                self.keys_ui.import_form.label.clear();
-                self.keys_ui.import_content = text_editor::Content::new();
-                self.keys_ui.import_form.pem.clear();
-                self.keys_ui.import_form.passphrase.clear();
-                self.keys_ui.import_form.passphrase_required = false;
-                self.keys_ui.import_form.passphrase_visible = false;
-                self.keys_ui.import_form.public_key.clear();
-                self.keys_ui.import_form.certificate.clear();
-                self.keys_ui.import_public_content = text_editor::Content::new();
-                self.keys_ui.import_cert_content = text_editor::Content::new();
-                self.keys_ui.import_form.cert_detected = false;
-                self.keys_ui.error = None;
-                self.keys_ui.success = None;
-                self.keys_ui.import_form.editing_id = None;
-                self.keys_ui.context_menu = None;
+                self.vaults.cur_mut().panels.key_panel = true;
+                self.vaults.cur_mut().keys_ui.import_form.label.clear();
+                self.vaults.cur_mut().keys_ui.import_content = text_editor::Content::new();
+                self.vaults.cur_mut().keys_ui.import_form.pem.clear();
+                self.vaults.cur_mut().keys_ui.import_form.passphrase.clear();
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_required = false;
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_visible = false;
+                self.vaults.cur_mut().keys_ui.import_form.public_key.clear();
+                self.vaults.cur_mut().keys_ui.import_form.certificate.clear();
+                self.vaults.cur_mut().keys_ui.import_public_content = text_editor::Content::new();
+                self.vaults.cur_mut().keys_ui.import_cert_content = text_editor::Content::new();
+                self.vaults.cur_mut().keys_ui.import_form.cert_detected = false;
+                self.vaults.cur_mut().keys_ui.error = None;
+                self.vaults.cur_mut().keys_ui.success = None;
+                self.vaults.cur_mut().keys_ui.import_form.editing_id = None;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
                 self.overlay = None;
             }
             KeysMessage::ShowKeyPanelPublicFocus => {
@@ -73,47 +73,47 @@ impl Oryxis {
                 ]));
             }
             KeysMessage::HideKeyPanel => {
-                self.panels.key_panel = false;
-                self.keys_ui.import_form.editing_id = None;
-                self.keys_ui.import_form.passphrase.clear();
-                self.keys_ui.import_form.passphrase_required = false;
-                self.keys_ui.import_form.passphrase_visible = false;
-                self.keys_ui.import_form.public_key.clear();
-                self.keys_ui.import_form.certificate.clear();
-                self.keys_ui.import_public_content = text_editor::Content::new();
-                self.keys_ui.import_cert_content = text_editor::Content::new();
-                self.keys_ui.import_form.cert_detected = false;
+                self.vaults.cur_mut().panels.key_panel = false;
+                self.vaults.cur_mut().keys_ui.import_form.editing_id = None;
+                self.vaults.cur_mut().keys_ui.import_form.passphrase.clear();
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_required = false;
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_visible = false;
+                self.vaults.cur_mut().keys_ui.import_form.public_key.clear();
+                self.vaults.cur_mut().keys_ui.import_form.certificate.clear();
+                self.vaults.cur_mut().keys_ui.import_public_content = text_editor::Content::new();
+                self.vaults.cur_mut().keys_ui.import_cert_content = text_editor::Content::new();
+                self.vaults.cur_mut().keys_ui.import_form.cert_detected = false;
                 // Errors raised inside the sidebar are scoped to it.
                 // Closing the panel discards that context so the main
                 // keychain area doesn't inherit a stale message.
-                self.keys_ui.error = None;
-                self.keys_ui.success = None;
+                self.vaults.cur_mut().keys_ui.error = None;
+                self.vaults.cur_mut().keys_ui.success = None;
             }
-            KeysMessage::KeyImportLabelChanged(v) => self.keys_ui.import_form.label = v,
+            KeysMessage::KeyImportLabelChanged(v) => self.vaults.cur_mut().keys_ui.import_form.label = v,
             KeysMessage::KeyContentAction(action) => {
-                self.keys_ui.import_content.perform(action);
-                let new_text = self.keys_ui.import_content.text();
+                self.vaults.cur_mut().keys_ui.import_content.perform(action);
+                let new_text = self.vaults.cur().keys_ui.import_content.text();
                 // Re-detect on every edit. If the user pastes an encrypted
                 // PEM, the passphrase row should appear; if they swap to an
                 // unencrypted one, it should hide. Clearing the cached
                 // passphrase prevents leftover input from being applied
                 // against a different key.
-                if new_text != self.keys_ui.import_form.pem {
+                if new_text != self.vaults.cur().keys_ui.import_form.pem {
                     let encrypted = oryxis_vault::is_key_encrypted(&new_text);
-                    if encrypted != self.keys_ui.import_form.passphrase_required {
-                        self.keys_ui.import_form.passphrase.clear();
+                    if encrypted != self.vaults.cur().keys_ui.import_form.passphrase_required {
+                        self.vaults.cur_mut().keys_ui.import_form.passphrase.clear();
                     }
-                    self.keys_ui.import_form.passphrase_required = encrypted;
+                    self.vaults.cur_mut().keys_ui.import_form.passphrase_required = encrypted;
                 }
-                self.keys_ui.import_form.pem = new_text;
+                self.vaults.cur_mut().keys_ui.import_form.pem = new_text;
             }
             KeysMessage::KeyImportPassphraseChanged(v) => {
-                self.keys_ui.import_form.passphrase = v.into_inner();
+                self.vaults.cur_mut().keys_ui.import_form.passphrase = v.into_inner();
                 // Clear stale "wrong passphrase" feedback as the user types.
-                self.keys_ui.error = None;
+                self.vaults.cur_mut().keys_ui.error = None;
             }
             KeysMessage::KeyImportPassphraseToggleVisibility => {
-                self.keys_ui.import_form.passphrase_visible = !self.keys_ui.import_form.passphrase_visible;
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_visible = !self.vaults.cur_mut().keys_ui.import_form.passphrase_visible;
             }
             KeysMessage::BrowseKeyFile => {
                 return Ok(Task::perform(
@@ -167,49 +167,49 @@ impl Oryxis {
                 ));
             }
             KeysMessage::KeyFileLoaded(filename, content, public, cert) => {
-                if self.keys_ui.import_form.label.is_empty() {
-                    self.keys_ui.import_form.label = filename;
+                if self.vaults.cur().keys_ui.import_form.label.is_empty() {
+                    self.vaults.cur_mut().keys_ui.import_form.label = filename;
                 }
-                self.keys_ui.import_content = text_editor::Content::with_text(&content);
-                self.keys_ui.import_form.passphrase.clear();
+                self.vaults.cur_mut().keys_ui.import_content = text_editor::Content::with_text(&content);
+                self.vaults.cur_mut().keys_ui.import_form.passphrase.clear();
                 // Detect encryption now so the passphrase row appears as soon
                 // as the file lands, not only after the user clicks Save.
-                self.keys_ui.import_form.passphrase_required =
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_required =
                     oryxis_vault::is_key_encrypted(&content);
-                self.keys_ui.import_form.pem = content;
+                self.vaults.cur_mut().keys_ui.import_form.pem = content;
                 // A sibling `<key>.pub` was found and parses: prefill the
                 // editable public line (it carries the user's comment,
                 // which deriving from the private key would lose).
                 if let Some(public) = public {
-                    self.keys_ui.import_form.public_key = public.trim().to_string();
-                    self.keys_ui.import_public_content =
+                    self.vaults.cur_mut().keys_ui.import_form.public_key = public.trim().to_string();
+                    self.vaults.cur_mut().keys_ui.import_public_content =
                         text_editor::Content::with_text(public.trim());
                 }
                 // A sibling `<key>-cert.pub` was found and parses: prefill
                 // and flag the "certificate detected" hint.
                 if let Some(cert) = cert {
-                    self.keys_ui.import_form.certificate = cert.trim().to_string();
-                    self.keys_ui.import_cert_content =
+                    self.vaults.cur_mut().keys_ui.import_form.certificate = cert.trim().to_string();
+                    self.vaults.cur_mut().keys_ui.import_cert_content =
                         text_editor::Content::with_text(cert.trim());
-                    self.keys_ui.import_form.cert_detected = true;
+                    self.vaults.cur_mut().keys_ui.import_form.cert_detected = true;
                 }
-                self.panels.key_panel = true;
-                self.keys_ui.error = None;
+                self.vaults.cur_mut().panels.key_panel = true;
+                self.vaults.cur_mut().keys_ui.error = None;
                 // The sidebar already shows "Loaded (X bytes)"; surfacing
                 // a second toast in the main keychain area is just noise.
-                self.keys_ui.success = None;
+                self.vaults.cur_mut().keys_ui.success = None;
             }
             KeysMessage::KeyImportPublicAction(action) => {
                 let edited = action.is_edit();
-                self.keys_ui.import_public_content.perform(action);
+                self.vaults.cur_mut().keys_ui.import_public_content.perform(action);
                 if edited {
-                    self.keys_ui.import_form.public_key = self.keys_ui.import_public_content.text();
-                    self.keys_ui.error = None;
+                    self.vaults.cur_mut().keys_ui.import_form.public_key = self.vaults.cur_mut().keys_ui.import_public_content.text();
+                    self.vaults.cur_mut().keys_ui.error = None;
                 }
             }
             KeysMessage::KeyFileBrowseError(err) => {
                 if !err.contains("cancelled") {
-                    self.keys_ui.error = Some(err);
+                    self.vaults.cur_mut().keys_ui.error = Some(err);
                 }
             }
             KeysMessage::ImportKey => return Ok(self.import_key_from_form()),
@@ -225,18 +225,18 @@ impl Oryxis {
                     if let Some(vault) = &self.vaults.cur().store {
                         let _ = vault.delete_key(&id);
                         self.load_data_from_vault();
-                        self.keys_ui.success = Some("Key deleted".into());
+                        self.vaults.cur_mut().keys_ui.success = Some("Key deleted".into());
                     }
                 }
-                self.keys_ui.context_menu = None;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
                 self.overlay = None;
             }
             KeysMessage::ShowKeyMenu(idx) => {
-                if self.keys_ui.context_menu == Some(idx) {
-                    self.keys_ui.context_menu = None;
+                if self.vaults.cur().keys_ui.context_menu == Some(idx) {
+                    self.vaults.cur_mut().keys_ui.context_menu = None;
                     self.overlay = None;
                 } else {
-                    self.keys_ui.context_menu = Some(idx);
+                    self.vaults.cur_mut().keys_ui.context_menu = Some(idx);
                     let anchor = self.keynav_take_menu_anchor();
                     self.overlay = Some(OverlayState {
                         content: OverlayContent::KeyActions(idx),
@@ -246,43 +246,44 @@ impl Oryxis {
                 }
             }
             KeysMessage::HideKeyMenu => {
-                self.keys_ui.context_menu = None;
-                self.identity_context_menu = None;
-                self.panels.keychain_add_menu = false;
+                self.vaults.cur_mut().keys_ui.context_menu = None;
+                self.vaults.cur_mut().identity_context_menu = None;
+                self.vaults.cur_mut().panels.keychain_add_menu = false;
                 self.overlay = None;
             }
             KeysMessage::EditKey(idx) => {
-                if let Some(key) = self.vaults.cur().keys.get(idx) {
-                    self.keys_ui.import_form.editing_id = Some(key.id);
-                    self.keys_ui.import_form.label = key.label.clone();
+                let ov = self.vaults.cur_mut();
+                if let Some(key) = ov.keys.get(idx) {
+                    ov.keys_ui.import_form.editing_id = Some(key.id);
+                    ov.keys_ui.import_form.label = key.label.clone();
                     // Load existing private key PEM from vault
-                    let pem = self.vaults.cur().store.as_ref()
+                    let pem = ov.store.as_ref()
                         .and_then(|v| v.get_key_private(&key.id).ok().flatten())
                         .unwrap_or_default();
-                    self.keys_ui.import_content = text_editor::Content::with_text(&pem);
-                    self.keys_ui.import_form.pem = pem;
+                    ov.keys_ui.import_content = text_editor::Content::with_text(&pem);
+                    ov.keys_ui.import_form.pem = pem;
                     // Stored PEM is always unencrypted; no passphrase prompt.
-                    self.keys_ui.import_form.passphrase.clear();
-                    self.keys_ui.import_form.passphrase_required = false;
-                    self.keys_ui.import_form.passphrase_visible = false;
-                    self.keys_ui.import_form.public_key = key.public_key.clone();
-                    self.keys_ui.import_public_content =
+                    ov.keys_ui.import_form.passphrase.clear();
+                    ov.keys_ui.import_form.passphrase_required = false;
+                    ov.keys_ui.import_form.passphrase_visible = false;
+                    ov.keys_ui.import_form.public_key = key.public_key.clone();
+                    ov.keys_ui.import_public_content =
                         text_editor::Content::with_text(&key.public_key);
-                    self.keys_ui.import_form.certificate =
+                    ov.keys_ui.import_form.certificate =
                         key.certificate.clone().unwrap_or_default();
-                    self.keys_ui.import_cert_content = text_editor::Content::with_text(
-                        self.keys_ui.import_form.certificate.as_str(),
+                    ov.keys_ui.import_cert_content = text_editor::Content::with_text(
+                        ov.keys_ui.import_form.certificate.as_str(),
                     );
-                    self.keys_ui.import_form.cert_detected = false;
-                    self.panels.key_panel = true;
-                    self.keys_ui.error = None;
-                    self.keys_ui.success = None;
-                    self.keys_ui.context_menu = None;
+                    ov.keys_ui.import_form.cert_detected = false;
+                    ov.panels.key_panel = true;
+                    ov.keys_ui.error = None;
+                    ov.keys_ui.success = None;
+                    ov.keys_ui.context_menu = None;
                     self.overlay = None;
                 }
             }
             KeysMessage::KeySearchChanged(v) => {
-                self.keys_ui.search = v;
+                self.vaults.cur_mut().keys_ui.search = v;
             }
             KeysMessage::SnippetSearchChanged(v) => {
                 self.nav.snippet_search = v;
@@ -305,9 +306,9 @@ impl Oryxis {
     /// (public-only or private, with passphrase handling) and persist
     /// it. Extracted verbatim from the former inline match arm.
     fn import_key_from_form(&mut self) -> Task<Message> {
-        let pem_empty = self.keys_ui.import_form.pem.trim().is_empty();
-        if pem_empty && self.keys_ui.import_form.public_key.trim().is_empty() {
-            self.keys_ui.error =
+        let pem_empty = self.vaults.cur().keys_ui.import_form.pem.trim().is_empty();
+        if pem_empty && self.vaults.cur().keys_ui.import_form.public_key.trim().is_empty() {
+            self.vaults.cur_mut().keys_ui.error =
                 Some(crate::i18n::t("key_select_file_first").into());
             return Task::none();
         }
@@ -318,28 +319,28 @@ impl Oryxis {
         // the editor buffer can never silently drop a stored
         // private key.
         if pem_empty {
-            let label = if self.keys_ui.import_form.label.is_empty() {
+            let label = if self.vaults.cur().keys_ui.import_form.label.is_empty() {
                 "imported-key".to_string()
             } else {
-                self.keys_ui.import_form.label.clone()
+                self.vaults.cur().keys_ui.import_form.label.clone()
             };
-            let input = self.keys_ui.import_form.public_key.trim().to_string();
+            let input = self.vaults.cur().keys_ui.import_form.public_key.trim().to_string();
             if input.contains("-----BEGIN") {
-                self.keys_ui.error =
+                self.vaults.cur_mut().keys_ui.error =
                     Some(crate::i18n::t("public_key_only_error").to_string());
                 return Task::none();
             }
             let mut key = match oryxis_vault::import_public_key(&label, &input) {
                 Ok(key) => key,
                 Err(_) => {
-                    self.keys_ui.error = Some(
+                    self.vaults.cur_mut().keys_ui.error = Some(
                         crate::i18n::t("public_key_invalid_error").to_string(),
                     );
                     return Task::none();
                 }
             };
-            let editing = self.keys_ui.import_form.editing_id.is_some();
-            if let Some(existing_id) = self.keys_ui.import_form.editing_id {
+            let editing = self.vaults.cur().keys_ui.import_form.editing_id.is_some();
+            if let Some(existing_id) = self.vaults.cur().keys_ui.import_form.editing_id {
                 key.id = existing_id;
                 if let Some(existing) =
                     self.vaults.cur().keys.iter().find(|k| k.id == existing_id)
@@ -370,7 +371,7 @@ impl Oryxis {
                             match validate_public_key(&input, &generated.key.public_key) {
                                 Ok(_) => {}
                                 Err(err_key) => {
-                                    self.keys_ui.error =
+                                    self.vaults.cur_mut().keys_ui.error =
                                         Some(crate::i18n::t(err_key).to_string());
                                     return Task::none();
                                 }
@@ -385,7 +386,7 @@ impl Oryxis {
                         // fail closed rather than save a possibly
                         // mismatched pair.
                         Err(_) => {
-                            self.keys_ui.error = Some(
+                            self.vaults.cur_mut().keys_ui.error = Some(
                                 crate::i18n::t("public_key_mismatch_error")
                                     .to_string(),
                             );
@@ -398,13 +399,13 @@ impl Oryxis {
             // the public line (same validation as the private
             // path); empty keeps whatever the line carried.
             match validate_certificate(
-                &self.keys_ui.import_form.certificate,
+                &self.vaults.cur().keys_ui.import_form.certificate,
                 &key.public_key,
             ) {
                 Ok(Some(cert)) => key.certificate = Some(cert),
                 Ok(None) => {}
                 Err(err_key) => {
-                    self.keys_ui.error =
+                    self.vaults.cur_mut().keys_ui.error =
                         Some(crate::i18n::t(err_key).to_string());
                     return Task::none();
                 }
@@ -414,19 +415,19 @@ impl Oryxis {
                 match vault.save_key(&key, private) {
                     Ok(()) => {
                         let verb = if editing { "updated" } else { "imported" };
-                        self.keys_ui.error = None;
-                        self.keys_ui.success =
+                        self.vaults.cur_mut().keys_ui.error = None;
+                        self.vaults.cur_mut().keys_ui.success =
                             Some(format!("Key '{}' {}", label, verb));
-                        self.keys_ui.import_form = crate::state::KeyImportForm::default();
-                        self.keys_ui.import_content = text_editor::Content::new();
-                        self.keys_ui.import_public_content =
+                        self.vaults.cur_mut().keys_ui.import_form = crate::state::KeyImportForm::default();
+                        self.vaults.cur_mut().keys_ui.import_content = text_editor::Content::new();
+                        self.vaults.cur_mut().keys_ui.import_public_content =
                             text_editor::Content::new();
-                        self.keys_ui.import_cert_content =
+                        self.vaults.cur_mut().keys_ui.import_cert_content =
                             text_editor::Content::new();
-                        self.panels.key_panel = false;
+                        self.vaults.cur_mut().panels.key_panel = false;
                         self.load_data_from_vault();
                     }
-                    Err(e) => self.keys_ui.error = Some(e.to_string()),
+                    Err(e) => self.vaults.cur_mut().keys_ui.error = Some(e.to_string()),
                 }
             }
             return Task::none();
@@ -434,22 +435,22 @@ impl Oryxis {
         // If we already know the key is encrypted but the user
         // clicked Save with an empty passphrase, give explicit
         // feedback instead of silently leaving the row visible.
-        if self.keys_ui.import_form.passphrase_required && self.keys_ui.import_form.passphrase.is_empty() {
-            self.keys_ui.error =
+        if self.vaults.cur().keys_ui.import_form.passphrase_required && self.vaults.cur().keys_ui.import_form.passphrase.is_empty() {
+            self.vaults.cur_mut().keys_ui.error =
                 Some(crate::i18n::t("key_passphrase_required_msg").to_string());
             return Task::none();
         }
-        let label = if self.keys_ui.import_form.label.is_empty() {
+        let label = if self.vaults.cur().keys_ui.import_form.label.is_empty() {
             "imported-key".to_string()
         } else {
-            self.keys_ui.import_form.label.clone()
+            self.vaults.cur().keys_ui.import_form.label.clone()
         };
-        let pass_opt = if self.keys_ui.import_form.passphrase.is_empty() {
+        let pass_opt = if self.vaults.cur().keys_ui.import_form.passphrase.is_empty() {
             None
         } else {
-            Some(self.keys_ui.import_form.passphrase.as_str())
+            Some(self.vaults.cur().keys_ui.import_form.passphrase.as_str())
         };
-        match oryxis_vault::import_key(&label, &self.keys_ui.import_form.pem, pass_opt) {
+        match oryxis_vault::import_key(&label, &self.vaults.cur().keys_ui.import_form.pem, pass_opt) {
             Ok(mut generated) => {
                 // If editing an existing key, preserve the fields
                 // that live outside the import form. `import_key`
@@ -458,7 +459,7 @@ impl Oryxis {
                 // silently re-arm a key the user had removed from the
                 // ssh-agent and reset its creation date (breaking the
                 // by-date sort). Carry the id and both fields over.
-                if let Some(existing_id) = self.keys_ui.import_form.editing_id {
+                if let Some(existing_id) = self.vaults.cur().keys_ui.import_form.editing_id {
                     generated.key.id = existing_id;
                     if let Some(existing) =
                         self.vaults.cur().keys.iter().find(|k| k.id == existing_id)
@@ -478,13 +479,13 @@ impl Oryxis {
                 // private key's key data (a different comment is
                 // fine, that is the point of the field).
                 match validate_public_key(
-                    &self.keys_ui.import_form.public_key,
+                    &self.vaults.cur().keys_ui.import_form.public_key,
                     &generated.key.public_key,
                 ) {
                     Ok(Some(public)) => generated.key.public_key = public,
                     Ok(None) => {}
                     Err(key) => {
-                        self.keys_ui.error = Some(crate::i18n::t(key).to_string());
+                        self.vaults.cur_mut().keys_ui.error = Some(crate::i18n::t(key).to_string());
                         return Task::none();
                     }
                 }
@@ -493,56 +494,56 @@ impl Oryxis {
                 // (the engine's `check_certificate` is the belt to
                 // this brace, but the editor stops it here first).
                 match validate_certificate(
-                    &self.keys_ui.import_form.certificate,
+                    &self.vaults.cur().keys_ui.import_form.certificate,
                     &generated.key.public_key,
                 ) {
                     Ok(cert) => generated.key.certificate = cert,
                     Err(key) => {
-                        self.keys_ui.error = Some(crate::i18n::t(key).to_string());
+                        self.vaults.cur_mut().keys_ui.error = Some(crate::i18n::t(key).to_string());
                         return Task::none();
                     }
                 }
                 if let Some(vault) = &self.vaults.cur().store {
                     match vault.save_key(&generated.key, Some(&generated.private_pem)) {
                         Ok(()) => {
-                            let verb = if self.keys_ui.import_form.editing_id.is_some() { "updated" } else { "imported" };
-                            self.keys_ui.error = None;
-                            self.keys_ui.success = Some(format!("Key '{}' {}", label, verb));
-                            self.keys_ui.import_form.label.clear();
-                            self.keys_ui.import_content = text_editor::Content::new();
-                            self.keys_ui.import_form.pem.clear();
-                            self.keys_ui.import_form.passphrase.clear();
-                            self.keys_ui.import_form.passphrase_required = false;
-                            self.keys_ui.import_form.passphrase_visible = false;
-                            self.keys_ui.import_form.public_key.clear();
-                            self.keys_ui.import_form.certificate.clear();
-                            self.keys_ui.import_public_content =
+                            let verb = if self.vaults.cur().keys_ui.import_form.editing_id.is_some() { "updated" } else { "imported" };
+                            self.vaults.cur_mut().keys_ui.error = None;
+                            self.vaults.cur_mut().keys_ui.success = Some(format!("Key '{}' {}", label, verb));
+                            self.vaults.cur_mut().keys_ui.import_form.label.clear();
+                            self.vaults.cur_mut().keys_ui.import_content = text_editor::Content::new();
+                            self.vaults.cur_mut().keys_ui.import_form.pem.clear();
+                            self.vaults.cur_mut().keys_ui.import_form.passphrase.clear();
+                            self.vaults.cur_mut().keys_ui.import_form.passphrase_required = false;
+                            self.vaults.cur_mut().keys_ui.import_form.passphrase_visible = false;
+                            self.vaults.cur_mut().keys_ui.import_form.public_key.clear();
+                            self.vaults.cur_mut().keys_ui.import_form.certificate.clear();
+                            self.vaults.cur_mut().keys_ui.import_public_content =
                                 text_editor::Content::new();
-                            self.keys_ui.import_cert_content =
+                            self.vaults.cur_mut().keys_ui.import_cert_content =
                                 text_editor::Content::new();
-                            self.keys_ui.import_form.cert_detected = false;
-                            self.panels.key_panel = false;
-                            self.keys_ui.import_form.editing_id = None;
+                            self.vaults.cur_mut().keys_ui.import_form.cert_detected = false;
+                            self.vaults.cur_mut().panels.key_panel = false;
+                            self.vaults.cur_mut().keys_ui.import_form.editing_id = None;
                             self.load_data_from_vault();
                         }
-                        Err(e) => self.keys_ui.error = Some(e.to_string()),
+                        Err(e) => self.vaults.cur_mut().keys_ui.error = Some(e.to_string()),
                     }
                 }
             }
             Err(VaultError::KeyNeedsPassphrase) => {
-                self.keys_ui.import_form.passphrase_required = true;
-                self.keys_ui.error = None;
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_required = true;
+                self.vaults.cur_mut().keys_ui.error = None;
             }
             Err(VaultError::WrongKeyPassphrase) => {
-                self.keys_ui.import_form.passphrase_required = true;
-                self.keys_ui.error = Some(crate::i18n::t("key_passphrase_wrong").to_string());
+                self.vaults.cur_mut().keys_ui.import_form.passphrase_required = true;
+                self.vaults.cur_mut().keys_ui.error = Some(crate::i18n::t("key_passphrase_wrong").to_string());
             }
             Err(VaultError::UnsupportedKeyKind(kind)) => {
-                self.keys_ui.error = Some(
+                self.vaults.cur_mut().keys_ui.error = Some(
                     crate::i18n::t("key_unsupported_kind").replace("{kind}", &kind),
                 );
             }
-            Err(e) => self.keys_ui.error = Some(format!("Import failed: {}", e)),
+            Err(e) => self.vaults.cur_mut().keys_ui.error = Some(format!("Import failed: {}", e)),
         }
         Task::none()
     }

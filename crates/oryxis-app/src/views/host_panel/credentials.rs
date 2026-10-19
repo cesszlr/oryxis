@@ -20,7 +20,7 @@ impl Oryxis {
         // what connects.
         let inherited = self.editor_inherited();
         let username_hint = self
-            .editor_form
+            .vaults.cur().editor_form
             .username
             .trim()
             .is_empty()
@@ -35,7 +35,7 @@ impl Oryxis {
                     self.panel_nav_slot(
                         crate::keynav::RowAction::input(iced::widget::Id::new("editor-username")),
                         10.0,
-                        text_input(t("username"), &self.editor_form.username)
+                        text_input(t("username"), &self.vaults.cur().editor_form.username)
                             .id(iced::widget::Id::new("editor-username"))
                             .on_input(|v| Message::Editor(EditorMessage::EditorUsernameChanged(v)))
                             .on_submit_maybe(self.hp_submit())
@@ -58,8 +58,8 @@ impl Oryxis {
         // `cred_items` moved every row below it, so the password input
         // lost its state, focus included, on that keystroke.
         let mut suggestions = iced::widget::Column::<iced::Element<'_, _>>::new();
-        if is_ssh && self.editor_form.username_focused && self.editor_form.selected_identity.is_none() && !self.vaults.cur().identities.is_empty() {
-            let search = self.editor_form.username.to_lowercase();
+        if is_ssh && self.vaults.cur().editor_form.username_focused && self.vaults.cur().editor_form.selected_identity.is_none() && !self.vaults.cur().identities.is_empty() {
+            let search = self.vaults.cur().editor_form.username.to_lowercase();
             let matching: Vec<&Identity> = if search.is_empty() {
                 self.vaults.cur().identities.iter().collect()
             } else {
@@ -131,7 +131,7 @@ impl Oryxis {
         // We compute the banner / key / password as separate optionals so
         // each lands in its own section below.
         let ssh_identity_banner: Option<Element<'_, Message>> = self
-            .editor_form
+            .vaults.cur().editor_form
             .selected_identity
             .as_ref()
             .filter(|_| is_ssh)
@@ -166,7 +166,7 @@ impl Oryxis {
         // because this is what WILL be used, not what the user chose,
         // and the two must not read the same.
         let inherited_identity_note: Option<Element<'_, Message>> = self
-            .editor_form
+            .vaults.cur().editor_form
             .selected_identity
             .is_none()
             .then_some(inherited.identity.clone())
@@ -206,7 +206,7 @@ impl Oryxis {
                 8.0,
                 banner,
             ));
-        } else if is_ssh && self.editor_form.auth_method == AuthMethod::PasswordPrompt {
+        } else if is_ssh && self.vaults.cur().editor_form.auth_method == AuthMethod::PasswordPrompt {
             // "Ask every time": no password is stored, so there is no field
             // to fill. A one-line note explains the prompt-on-connect flow.
             // SSH-only (the auth-method picker that sets it is hidden on
@@ -222,8 +222,8 @@ impl Oryxis {
                 ]).align_y(iced::Alignment::Center).boxed()
             );
         } else {
-            let pw_placeholder: &'static str = if self.editor_form.has_existing_password
-                && !self.editor_form.password.touched()
+            let pw_placeholder: &'static str = if self.vaults.cur().editor_form.has_existing_password
+                && !self.vaults.cur().editor_form.password.touched()
             {
                 "••••••••"
             } else {
@@ -241,10 +241,10 @@ impl Oryxis {
                     Space::new().width(10).boxed(),
                     crate::widgets::password_input_with_eye_nav(
                         pw_placeholder,
-                        self.editor_form.password.as_str(),
+                        self.vaults.cur().editor_form.password.as_str(),
                         |v| Message::Editor(EditorMessage::EditorPasswordChanged(v.into())),
                         self.hp_submit(),
-                        self.editor_form.password_visible,
+                        self.vaults.cur().editor_form.password_visible,
                         Message::Editor(EditorMessage::EditorTogglePasswordVisibility),
                         10.0,
                         Some(iced::widget::Id::new("editor-password")),
@@ -288,7 +288,7 @@ impl Oryxis {
                         text(t("use_totp")).size(13).color(OryxisColors::t().text_secondary).boxed(),
                         Space::new().width(Length::Fill).boxed(),
                         {
-                            let on = self.editor_form.use_totp;
+                            let on = self.vaults.cur().editor_form.use_totp;
                             let bg = if on { OryxisColors::t().success } else { OryxisColors::t().bg_hover };
                             let fg = crate::theme::contrast_text_for(bg);
                             button(text(if on { crate::i18n::t("toggle_on") } else { crate::i18n::t("toggle_off") }).size(12).color(fg))
@@ -305,9 +305,9 @@ impl Oryxis {
                 )
                 .padding(Padding { top: 8.0, right: 0.0, bottom: 8.0, left: 0.0 }).boxed(),
             ));
-        if self.editor_form.use_totp {
-            let totp_placeholder: &'static str = if self.editor_form.has_existing_totp
-                && !self.editor_form.totp_secret.touched()
+        if self.vaults.cur().editor_form.use_totp {
+            let totp_placeholder: &'static str = if self.vaults.cur().editor_form.has_existing_totp
+                && !self.vaults.cur().editor_form.totp_secret.touched()
             {
                 "••••••••"
             } else {
@@ -323,10 +323,10 @@ impl Oryxis {
                     Space::new().width(23).boxed(),
                     crate::widgets::password_input_with_eye_nav(
                         totp_placeholder,
-                        self.editor_form.totp_secret.as_str(),
+                        self.vaults.cur().editor_form.totp_secret.as_str(),
                         |v| Message::Editor(EditorMessage::EditorTotpChanged(v.into())),
                         self.hp_submit(),
-                        self.editor_form.totp_visible,
+                        self.vaults.cur().editor_form.totp_visible,
                         Message::Editor(EditorMessage::EditorToggleTotpVisibility),
                         10.0,
                         Some(iced::widget::Id::new("editor-totp")),
@@ -355,7 +355,7 @@ impl Oryxis {
                 SerialFlowControl, SerialLineEnding, SerialParity, SerialStopBits,
                 COMMON_BAUD_RATES,
             };
-            let p = self.editor_form.serial.unwrap_or_default();
+            let p = self.vaults.cur().editor_form.serial.unwrap_or_default();
             let radius = crate::widgets::INPUT_RADIUS;
             // Baud: common rates (the model still accepts any u32).
             let baud_row = panel_option_row(

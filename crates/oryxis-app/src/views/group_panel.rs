@@ -29,9 +29,9 @@ impl Oryxis {
         // group", the toolbar/empty-state entry), a filled one a child
         // ("New subgroup", the folder kebab entry). Self-correcting if
         // the user edits the parent field either way.
-        let header_key = if self.group_edit.id.is_some() {
+        let header_key = if self.vaults.cur().group_edit.id.is_some() {
             "edit_group"
-        } else if self.group_edit.parent_label.trim().is_empty() {
+        } else if self.vaults.cur().group_edit.parent_label.trim().is_empty() {
             "new_group"
         } else {
             "new_subgroup"
@@ -59,12 +59,12 @@ impl Oryxis {
 
         // Icon + color badge. Clicking opens the shared icon/color picker,
         // seeded from the in-memory form (deferred save).
-        let badge_bg = crate::os_icon::parse_hex_color(&self.group_edit.color)
+        let badge_bg = crate::os_icon::parse_hex_color(&self.vaults.cur().group_edit.color)
             .unwrap_or_else(|| OryxisColors::t().accent);
-        let badge_glyph = if self.group_edit.icon.is_empty() {
+        let badge_glyph = if self.vaults.cur().group_edit.icon.is_empty() {
             BrandIcon::Glyph(iced_fonts::lucide::boxes())
         } else {
-            crate::os_icon::custom_icon_glyph(&self.group_edit.icon)
+            crate::os_icon::custom_icon_glyph(&self.vaults.cur().group_edit.icon)
         };
         let icon_badge = button(
             container(badge_glyph.view(18.0, Color::WHITE))
@@ -88,7 +88,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("group-edit-name")),
                 10.0,
-                text_input(crate::i18n::t("group_placeholder"), &self.group_edit.label)
+                text_input(crate::i18n::t("group_placeholder"), &self.vaults.cur().group_edit.label)
                     .id(iced::widget::Id::new("group-edit-name"))
                     .on_input(|v| Message::Tabs(TabsMessage::GroupEditLabelChanged(v)))
                     .on_submit(Message::Tabs(TabsMessage::SaveGroupEdit))
@@ -109,7 +109,7 @@ impl Oryxis {
             10.0,
             text_input(
                 crate::i18n::t("group_placeholder"),
-                &self.group_edit.parent_label,
+                &self.vaults.cur().group_edit.parent_label,
             )
             .id(iced::widget::Id::new("group-edit-parent"))
             .on_input(|v| Message::Tabs(TabsMessage::GroupEditParentChanged(v)))
@@ -195,7 +195,7 @@ impl Oryxis {
         // key and identity, so a second inheritance path over the same
         // fields would be two answers to one question.
         let is_dynamic = self
-            .group_edit
+            .vaults.cur().group_edit
             .id
             .and_then(|gid| self.vaults.cur().groups.iter().find(|g| g.id == gid))
             .is_some_and(|g| g.cloud_query.is_some());

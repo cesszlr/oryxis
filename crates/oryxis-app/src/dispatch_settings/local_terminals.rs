@@ -108,7 +108,7 @@ impl Oryxis {
                 // Burger menu is the most common entry point for
                 // this action; dismiss it so the spawned shell
                 // doesn't appear behind the still-open dropdown.
-                self.panels.burger_menu = false;
+                self.vaults.cur_mut().panels.burger_menu = false;
                 // First open ever: run the one-time scan, then act on the
                 // result. Every later open reads the persisted list (the
                 // scan never repeats unless the user asks for a re-scan).
@@ -239,21 +239,21 @@ impl Oryxis {
                 // it back at the form (deferred save on IconPickerSave).
                 // Fall back to the label's OS hint (then a terminal glyph)
                 // so the preview matches the card when there's no override.
-                self.icon_picker.icon = self.local_terminal_form.icon.clone().or_else(|| {
+                self.vaults.cur_mut().icon_picker.icon = self.local_terminal_form.icon.clone().or_else(|| {
                     crate::os_icon::local_shell_os_hint(&self.local_terminal_form.label)
                         .or_else(|| Some("terminal".to_string()))
                 });
-                self.icon_picker.color = self.local_terminal_form.color.clone();
-                self.icon_picker.hex_input =
+                self.vaults.cur_mut().icon_picker.color = self.local_terminal_form.color.clone();
+                self.vaults.cur_mut().icon_picker.hex_input =
                     self.local_terminal_form.color.clone().unwrap_or_default();
-                self.icon_picker.icon_search = String::new();
+                self.vaults.cur_mut().icon_picker.icon_search = String::new();
                 self.icon_color_popover = None;
-                self.icon_picker.for_id = None;
-                self.icon_picker.for_group_form = false;
-                self.icon_picker.for_session_group = false;
-                self.icon_picker.for_group_edit = false;
-                self.icon_picker.for_local_terminal = true;
-                self.panels.icon_picker = true;
+                self.vaults.cur_mut().icon_picker.for_id = None;
+                self.vaults.cur_mut().icon_picker.for_group_form = false;
+                self.vaults.cur_mut().icon_picker.for_session_group = false;
+                self.vaults.cur_mut().icon_picker.for_group_edit = false;
+                self.vaults.cur_mut().icon_picker.for_local_terminal = true;
+                self.vaults.cur_mut().panels.icon_picker = true;
             }
             SettingsMessage::LocalTerminalCardHovered(idx) => {
                 self.nav.hover.local_terminal_card = Some(idx);

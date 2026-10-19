@@ -60,7 +60,7 @@ impl Oryxis {
         // its id and changes what the field shows and what the flush
         // compares against.
         let stored_group = |app: &Self| {
-            app.editor_form
+            app.vaults.cur().editor_form
                 .editing_id
                 .and_then(|id| app.vaults.cur().connections.iter().find(|c| c.id == id))
                 .map(|c| {
@@ -71,7 +71,7 @@ impl Oryxis {
         };
         let group_before = stored_group(self);
         let group_id_of = |app: &Self| {
-            app.editor_form
+            app.vaults.cur().editor_form
                 .editing_id
                 .and_then(|id| app.vaults.cur().connections.iter().find(|c| c.id == id))
                 .map(|c| c.group_id)

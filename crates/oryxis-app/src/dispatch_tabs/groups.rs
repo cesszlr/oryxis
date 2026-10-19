@@ -12,32 +12,35 @@ impl Oryxis {
         match message {
             TabsMessage::EditGroup(gid) => {
                 self.overlay = None;
-                if let Some(group) = self.vaults.cur().groups.iter().find(|g| g.id == gid) {
-                    self.group_edit.id = Some(gid);
-                    self.group_edit.label = group.label.clone();
-                    self.group_edit.icon = group.icon.clone().unwrap_or_default();
-                    self.group_edit.color = group.color.clone().unwrap_or_default();
+                let ov = self.vaults.cur_mut();
+                if let Some(group) = ov.groups.iter().find(|g| g.id == gid) {
+                    ov.group_edit.id = Some(gid);
+                    ov.group_edit.label = group.label.clone();
+                    ov.group_edit.icon = group.icon.clone().unwrap_or_default();
+                    ov.group_edit.color = group.color.clone().unwrap_or_default();
                     // Resolve the stored parent id back to its full
                     // breadcrumb path for the combo (what the picker
                     // displays); a dangling id (deleted parent) shows
                     // as root, matching how the grid renders it.
-                    self.group_edit.parent_label = group
+                    ov.group_edit.parent_label = group
                         .parent_id
-                        .filter(|pid| self.vaults.cur().groups.iter().any(|g| g.id == *pid))
-                        .map(|pid| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, pid))
+                        .filter(|pid| ov.groups.iter().any(|g| g.id == *pid))
+                        .map(|pid| oryxis_core::models::Group::path_of(&ov.groups, pid))
                         .unwrap_or_default();
                     self.hydrate_group_defaults_form(gid);
-                    self.group_edit.visible = true;
+                    self.vaults.cur_mut().group_edit.visible = true;
                     // Mutually exclusive with the other right-hand panels.
                     self.editor_flush_pending();
-                    self.panels.host_panel = false;
+                    let ov = self.vaults.cur_mut();
+                    ov.panels.host_panel = false;
                     // Drop what the host editor's eyes revealed.
-                    self.editor_form.sweep_secrets();
+                    ov.editor_form.sweep_secrets();
                     self.panel_nav_clear();
-                    self.panels.session_group_panel = false;
-                    self.cloud_form.visible = false;
-                    self.cloud_dynamic_form.visible = false;
-                    self.cloud_discover.visible = false;
+                    let ov = self.vaults.cur_mut();
+                    ov.panels.session_group_panel = false;
+                    ov.cloud_form.visible = false;
+                    ov.cloud_dynamic_form.visible = false;
+                    ov.cloud_discover.visible = false;
                 }
             }
             TabsMessage::NewSubgroup(gid) => {
@@ -50,7 +53,7 @@ impl Oryxis {
                     .any(|g| g.id == gid && g.cloud_query.is_none())
                     .then(|| oryxis_core::models::Group::path_of(&self.vaults.cur().groups, gid));
                 if let Some(parent_label) = parent_label {
-                    self.group_edit = crate::state::GroupEditForm {
+                    self.vaults.cur_mut().group_edit = crate::state::GroupEditForm {
                         visible: true,
                         id: None,
                         label: String::new(),
@@ -61,14 +64,14 @@ impl Oryxis {
                     };
                     // Mutually exclusive with the other right-hand panels.
                     self.editor_flush_pending();
-                    self.panels.host_panel = false;
+                    self.vaults.cur_mut().panels.host_panel = false;
                     // Drop what the host editor's eyes revealed.
-                    self.editor_form.sweep_secrets();
+                    self.vaults.cur_mut().editor_form.sweep_secrets();
                     self.panel_nav_clear();
-                    self.panels.session_group_panel = false;
-                    self.cloud_form.visible = false;
-                    self.cloud_dynamic_form.visible = false;
-                    self.cloud_discover.visible = false;
+                    self.vaults.cur_mut().panels.session_group_panel = false;
+                    self.vaults.cur_mut().cloud_form.visible = false;
+                    self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                    self.vaults.cur_mut().cloud_discover.visible = false;
                 }
             }
             TabsMessage::NewGroup => {
@@ -77,7 +80,7 @@ impl Oryxis {
                 // Symmetric counterpart to "New subgroup", so an empty
                 // group can be born from the add menu instead of only by
                 // typing a new name in the host editor's group combo.
-                self.group_edit = crate::state::GroupEditForm {
+                self.vaults.cur_mut().group_edit = crate::state::GroupEditForm {
                     visible: true,
                     id: None,
                     label: String::new(),
@@ -88,46 +91,46 @@ impl Oryxis {
                 };
                 // Mutually exclusive with the other right-hand panels.
                 self.editor_flush_pending();
-                self.panels.host_panel = false;
+                self.vaults.cur_mut().panels.host_panel = false;
                 // Drop what the host editor's eyes revealed.
-                self.editor_form.sweep_secrets();
+                self.vaults.cur_mut().editor_form.sweep_secrets();
                 self.panel_nav_clear();
-                self.panels.session_group_panel = false;
-                self.cloud_form.visible = false;
-                self.cloud_dynamic_form.visible = false;
-                self.cloud_discover.visible = false;
+                self.vaults.cur_mut().panels.session_group_panel = false;
+                self.vaults.cur_mut().cloud_form.visible = false;
+                self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                self.vaults.cur_mut().cloud_discover.visible = false;
             }
             TabsMessage::GroupEditLabelChanged(v) => {
-                self.group_edit.label = v;
+                self.vaults.cur_mut().group_edit.label = v;
             }
             TabsMessage::GroupEditParentChanged(v) => {
-                self.group_edit.parent_label = v;
+                self.vaults.cur_mut().group_edit.parent_label = v;
             }
             TabsMessage::GroupEditToggleDefaults => {
-                self.group_edit.defaults_open = !self.group_edit.defaults_open;
+                self.vaults.cur_mut().group_edit.defaults_open = !self.vaults.cur_mut().group_edit.defaults_open;
             }
             TabsMessage::GroupEditDefaultUsername(v) => {
-                self.group_edit.username = v;
+                self.vaults.cur_mut().group_edit.username = v;
             }
             TabsMessage::GroupEditDefaultPort(v) => {
                 // Digits only, same guard the host editor's port field
                 // uses: a typo must not be storable.
-                self.group_edit.port = v.chars().filter(|c| c.is_ascii_digit()).collect();
+                self.vaults.cur_mut().group_edit.port = v.chars().filter(|c| c.is_ascii_digit()).collect();
             }
             TabsMessage::GroupEditDefaultIdentity(v) => {
-                self.group_edit.identity_label = v;
+                self.vaults.cur_mut().group_edit.identity_label = v;
             }
             TabsMessage::GroupEditDefaultProxyIdentity(v) => {
-                self.group_edit.proxy_identity_label = v;
+                self.vaults.cur_mut().group_edit.proxy_identity_label = v;
             }
             TabsMessage::GroupEditDefaultTheme(v) => {
-                self.group_edit.terminal_theme = v;
+                self.vaults.cur_mut().group_edit.terminal_theme = v;
             }
             TabsMessage::GroupEditDefaultSnippet(v) => {
-                self.group_edit.startup_snippet_label = v;
+                self.vaults.cur_mut().group_edit.startup_snippet_label = v;
             }
             TabsMessage::GroupEditEnvAdd => {
-                self.group_edit.env_vars.push(
+                self.vaults.cur_mut().group_edit.env_vars.push(
                     oryxis_core::models::connection::EnvVar {
                         key: String::new(),
                         value: String::new(),
@@ -135,41 +138,41 @@ impl Oryxis {
                 );
             }
             TabsMessage::GroupEditEnvRemove(idx) => {
-                if idx < self.group_edit.env_vars.len() {
-                    self.group_edit.env_vars.remove(idx);
+                if idx < self.vaults.cur().group_edit.env_vars.len() {
+                    self.vaults.cur_mut().group_edit.env_vars.remove(idx);
                 }
             }
             TabsMessage::GroupEditEnvKey(idx, v) => {
-                if let Some(var) = self.group_edit.env_vars.get_mut(idx) {
+                if let Some(var) = self.vaults.cur_mut().group_edit.env_vars.get_mut(idx) {
                     var.key = v;
                 }
             }
             TabsMessage::GroupEditEnvValue(idx, v) => {
-                if let Some(var) = self.group_edit.env_vars.get_mut(idx) {
+                if let Some(var) = self.vaults.cur_mut().group_edit.env_vars.get_mut(idx) {
                     var.value = v;
                 }
             }
             TabsMessage::ShowGroupEditIconPicker => {
-                self.icon_picker.icon = if self.group_edit.icon.is_empty() {
+                self.vaults.cur_mut().icon_picker.icon = if self.vaults.cur_mut().group_edit.icon.is_empty() {
                     None
                 } else {
-                    Some(self.group_edit.icon.clone())
+                    Some(self.vaults.cur().group_edit.icon.clone())
                 };
-                self.icon_picker.color = if self.group_edit.color.is_empty() {
+                self.vaults.cur_mut().icon_picker.color = if self.vaults.cur_mut().group_edit.color.is_empty() {
                     None
                 } else {
-                    Some(self.group_edit.color.clone())
+                    Some(self.vaults.cur().group_edit.color.clone())
                 };
-                self.icon_picker.hex_input = self.group_edit.color.clone();
-                self.icon_picker.for_id = None;
-                self.icon_picker.for_group_form = false;
-                self.icon_picker.for_session_group = false;
-                self.icon_picker.for_group_edit = true;
-                self.icon_picker.for_local_terminal = false;
-                self.panels.icon_picker = true;
+                self.vaults.cur_mut().icon_picker.hex_input = self.vaults.cur_mut().group_edit.color.clone();
+                self.vaults.cur_mut().icon_picker.for_id = None;
+                self.vaults.cur_mut().icon_picker.for_group_form = false;
+                self.vaults.cur_mut().icon_picker.for_session_group = false;
+                self.vaults.cur_mut().icon_picker.for_group_edit = true;
+                self.vaults.cur_mut().icon_picker.for_local_terminal = false;
+                self.vaults.cur_mut().panels.icon_picker = true;
             }
             TabsMessage::SaveGroupEdit => {
-                let trimmed = self.group_edit.label.trim().to_string();
+                let trimmed = self.vaults.cur().group_edit.label.trim().to_string();
                 if !trimmed.is_empty() {
                     // Resolve the parent combo by label, mirroring the
                     // dynamic-group editor: empty / unmatched = root and
@@ -178,7 +181,7 @@ impl Oryxis {
                     // can never mint a parent cycle (nesting a folder
                     // under its own descendant would orphan the subtree).
                     let excluded = self
-                        .group_edit
+                        .vaults.cur().group_edit
                         .id
                         .map(|gid| oryxis_core::models::Group::subtree_ids(&self.vaults.cur().groups, gid))
                         .unwrap_or_default();
@@ -186,25 +189,25 @@ impl Oryxis {
                     // bare label as the typed-by-hand fallback.
                     let parent_id = oryxis_core::models::Group::resolve_path_or_label(
                         &self.vaults.cur().groups,
-                        &self.group_edit.parent_label,
+                        &self.vaults.cur().group_edit.parent_label,
                         &excluded,
                     );
-                    let icon = if self.group_edit.icon.is_empty() {
+                    let icon = if self.vaults.cur().group_edit.icon.is_empty() {
                         None
                     } else {
-                        Some(self.group_edit.icon.clone())
+                        Some(self.vaults.cur().group_edit.icon.clone())
                     };
-                    let color = if self.group_edit.color.is_empty() {
+                    let color = if self.vaults.cur().group_edit.color.is_empty() {
                         None
                     } else {
-                        Some(self.group_edit.color.clone())
+                        Some(self.vaults.cur().group_edit.color.clone())
                     };
                     // Labels resolve to ids HERE, against the lists as
                     // they are at save time, so a picker left pointing
                     // at something the user deleted meanwhile stores
                     // nothing rather than a dangling id.
                     let defaults = self.group_edit_defaults();
-                    if let Some(gid) = self.group_edit.id {
+                    if let Some(gid) = self.vaults.cur().group_edit.id {
                         let ov = self.vaults.cur_mut();
                         if let Some(group) = ov.groups.iter_mut().find(|g| g.id == gid) {
                             group.label = trimmed;
@@ -267,19 +270,19 @@ impl Oryxis {
                         }
                     }
                 }
-                self.group_edit.visible = false;
-                self.group_edit.id = None;
+                self.vaults.cur_mut().group_edit.visible = false;
+                self.vaults.cur_mut().group_edit.id = None;
             }
             TabsMessage::CancelGroupEdit => {
-                self.group_edit.visible = false;
-                self.group_edit.id = None;
+                self.vaults.cur_mut().group_edit.visible = false;
+                self.vaults.cur_mut().group_edit.id = None;
             }
             TabsMessage::StartDeleteFolder(gid) => {
                 self.overlay = None;
-                self.folder_delete = Some(gid);
+                self.vaults.cur_mut().folder_delete = Some(gid);
             }
             TabsMessage::DeleteFolderKeepHosts => {
-                if let Some(gid) = self.folder_delete {
+                if let Some(gid) = self.vaults.cur().folder_delete {
                     // Deleting a folder promotes its contents one level
                     // up (to the deleted folder's own parent; root for a
                     // top-level folder, which preserves the pre-subgroup
@@ -359,16 +362,16 @@ impl Oryxis {
                             self.nav.active_group = new_parent;
                         }
                         // Don't leave the editor panel open on a deleted row.
-                        if self.group_edit.id == Some(gid) {
-                            self.group_edit.visible = false;
-                            self.group_edit.id = None;
+                        if self.vaults.cur().group_edit.id == Some(gid) {
+                            self.vaults.cur_mut().group_edit.visible = false;
+                            self.vaults.cur_mut().group_edit.id = None;
                         }
                     }
                     self.close_modal(crate::state::Modal::FolderDelete);
                 }
             }
             TabsMessage::DeleteFolderWithHosts => {
-                if let Some(gid) = self.folder_delete {
+                if let Some(gid) = self.vaults.cur().folder_delete {
                     // Drop every host inside the folder, then the folder.
                     let to_drop: Vec<_> = self
                         .vaults.cur().connections
@@ -456,9 +459,9 @@ impl Oryxis {
                             self.nav.active_group = new_parent;
                         }
                         // Don't leave the editor panel open on a deleted row.
-                        if self.group_edit.id == Some(gid) {
-                            self.group_edit.visible = false;
-                            self.group_edit.id = None;
+                        if self.vaults.cur().group_edit.id == Some(gid) {
+                            self.vaults.cur_mut().group_edit.visible = false;
+                            self.vaults.cur_mut().group_edit.id = None;
                         }
                     }
                     self.close_modal(crate::state::Modal::FolderDelete);

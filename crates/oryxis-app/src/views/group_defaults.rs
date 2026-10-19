@@ -24,7 +24,7 @@ impl Oryxis {
     /// panel contract, so the walk matches what is on screen.
     pub(crate) fn group_defaults_section(&self) -> Element<'_, Message> {
         let mut col = column![self.group_defaults_header()].spacing(10);
-        if !self.group_edit.defaults_open {
+        if !self.vaults.cur().group_edit.defaults_open {
             return col.boxed();
         }
 
@@ -44,7 +44,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("group-default-username")),
                 crate::widgets::INPUT_RADIUS,
-                text_input(t("group_default_inherit"), &self.group_edit.username)
+                text_input(t("group_default_inherit"), &self.vaults.cur().group_edit.username)
                     .id(iced::widget::Id::new("group-default-username"))
                     .on_input(|v| Message::Tabs(TabsMessage::GroupEditDefaultUsername(v)))
                     .padding(10)
@@ -58,14 +58,14 @@ impl Oryxis {
             t("identity"),
             "group-default-identity",
             self.vaults.cur().identities.iter().map(|i| i.label.clone()).collect(),
-            self.group_edit.identity_label.clone(),
+            self.vaults.cur().group_edit.identity_label.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultIdentity(v)),
         ));
         col = col.push(self.group_default_picker(
             t("group_default_proxy"),
             "group-default-proxy",
             self.vaults.cur().proxy_identities.iter().map(|p| p.label.clone()).collect(),
-            self.group_edit.proxy_identity_label.clone(),
+            self.vaults.cur().group_edit.proxy_identity_label.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultProxyIdentity(v)),
         ));
 
@@ -80,7 +80,7 @@ impl Oryxis {
             t("terminal_theme"),
             "group-default-theme",
             themes,
-            self.group_edit.terminal_theme.clone(),
+            self.vaults.cur().group_edit.terminal_theme.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultTheme(v)),
         ));
 
@@ -88,7 +88,7 @@ impl Oryxis {
             t("group_default_snippet"),
             "group-default-snippet",
             self.vaults.cur().snippets.iter().map(|s| s.label.clone()).collect(),
-            self.group_edit.startup_snippet_label.clone(),
+            self.vaults.cur().group_edit.startup_snippet_label.clone(),
             |v| Message::Tabs(TabsMessage::GroupEditDefaultSnippet(v)),
         ));
 
@@ -101,7 +101,7 @@ impl Oryxis {
             self.panel_nav_slot(
                 crate::keynav::RowAction::input(iced::widget::Id::new("group-default-port")),
                 crate::widgets::INPUT_RADIUS,
-                text_input(t("group_default_inherit"), &self.group_edit.port)
+                text_input(t("group_default_inherit"), &self.vaults.cur().group_edit.port)
                     .id(iced::widget::Id::new("group-default-port"))
                     .on_input(|v| Message::Tabs(TabsMessage::GroupEditDefaultPort(v)))
                     .padding(10)
@@ -127,7 +127,7 @@ impl Oryxis {
     /// but the group does set something, so a closed section can never
     /// hide the fact that inheritance is in play.
     fn group_defaults_header(&self) -> Element<'_, Message> {
-        let open = self.group_edit.defaults_open;
+        let open = self.vaults.cur().group_edit.defaults_open;
         let chevron = if open {
             iced_fonts::lucide::chevron_down::<iced::Theme>()
         } else if crate::i18n::is_rtl_layout() {
@@ -233,7 +233,7 @@ impl Oryxis {
         ]
         .spacing(6);
 
-        for (idx, var) in self.group_edit.env_vars.iter().enumerate() {
+        for (idx, var) in self.vaults.cur().group_edit.env_vars.iter().enumerate() {
             col = col.push(
                 dir_row(vec![
                     // Same static-id limitation the host editor's env

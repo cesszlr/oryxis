@@ -63,23 +63,24 @@ impl Oryxis {
                 self.overlay = None;
                 // Close any other right-panel (mutually exclusive slot).
                 self.editor_flush_pending();
-                self.panels.host_panel = false;
+                self.vaults.cur_mut().panels.host_panel = false;
                 // Drop what the host editor's eyes revealed.
-                self.editor_form.sweep_secrets();
-                self.cloud_dynamic_form.visible = false;
-                self.cloud_discover.visible = false;
-                self.group_edit.visible = false;
-                self.cloud_form.visible = true;
-                self.cloud_form.error = None;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().editor_form.sweep_secrets();
+                self.vaults.cur_mut().cloud_dynamic_form.visible = false;
+                self.vaults.cur_mut().cloud_discover.visible = false;
+                self.vaults.cur_mut().group_edit.visible = false;
+                self.vaults.cur_mut().cloud_form.visible = true;
+                self.vaults.cur_mut().cloud_form.error = None;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
 
+                let ov = self.vaults.cur_mut();
                 if let Some(id) = maybe_id
-                    && let Some(cp) = self.vaults.cur().cloud_profiles.iter().find(|p| p.id == id)
+                    && let Some(cp) = ov.cloud_profiles.iter().find(|p| p.id == id)
                 {
-                    self.cloud_form.editing_id = Some(id);
-                    self.cloud_form.label = cp.label.clone();
-                    self.cloud_form.provider = CloudProviderChoice::from_id(&cp.provider);
-                    self.cloud_form.auth_kind = CloudAuthChoice::from_id(&cp.auth_kind);
+                    ov.cloud_form.editing_id = Some(id);
+                    ov.cloud_form.label = cp.label.clone();
+                    ov.cloud_form.provider = CloudProviderChoice::from_id(&cp.provider);
+                    ov.cloud_form.auth_kind = CloudAuthChoice::from_id(&cp.auth_kind);
                     let cfg: serde_json::Value =
                         serde_json::from_str(&cp.config).unwrap_or(serde_json::Value::Null);
                     let str_field = |key: &str| {
@@ -88,7 +89,7 @@ impl Oryxis {
                             .unwrap_or("")
                             .to_string()
                     };
-                    self.cloud_form.aws_profile_name = str_field("profile_name");
+                    ov.cloud_form.aws_profile_name = str_field("profile_name");
                     // Multi-region: prefer the `regions` array; fall
                     // back to the single `region` for profiles written
                     // by older builds so they round-trip without losing
@@ -103,85 +104,85 @@ impl Oryxis {
                         })
                         .unwrap_or_default();
                     let single = str_field("region");
-                    self.cloud_form.aws_regions = if !regions_array.is_empty() {
+                    ov.cloud_form.aws_regions = if !regions_array.is_empty() {
                         regions_array
                     } else if !single.is_empty() {
                         vec![single]
                     } else {
                         Vec::new()
                     };
-                    self.cloud_form.aws_region_draft = String::new();
-                    self.cloud_form.aws_access_key_id = str_field("access_key_id");
-                    self.cloud_form.aws_access_key_session_token =
+                    ov.cloud_form.aws_region_draft = String::new();
+                    ov.cloud_form.aws_access_key_id = str_field("access_key_id");
+                    ov.cloud_form.aws_access_key_session_token =
                         str_field("access_key_session_token");
-                    self.cloud_form.aws_sso_start_url = str_field("sso_start_url");
-                    self.cloud_form.aws_sso_region = str_field("sso_region");
-                    self.cloud_form.aws_sso_account_id = str_field("sso_account_id");
-                    self.cloud_form.aws_sso_role_name = str_field("sso_role_name");
-                    self.cloud_form.kubeconfig_path = str_field("kubeconfig");
-                    self.cloud_form.context = str_field("context");
-                    self.cloud_form.gcp_project = str_field("project");
-                    self.cloud_form.azure_subscription = str_field("subscription");
-                    self.cloud_form.cli_profile = str_field("profile");
-                    self.cloud_form.cli_region = str_field("region");
+                    ov.cloud_form.aws_sso_start_url = str_field("sso_start_url");
+                    ov.cloud_form.aws_sso_region = str_field("sso_region");
+                    ov.cloud_form.aws_sso_account_id = str_field("sso_account_id");
+                    ov.cloud_form.aws_sso_role_name = str_field("sso_role_name");
+                    ov.cloud_form.kubeconfig_path = str_field("kubeconfig");
+                    ov.cloud_form.context = str_field("context");
+                    ov.cloud_form.gcp_project = str_field("project");
+                    ov.cloud_form.azure_subscription = str_field("subscription");
+                    ov.cloud_form.cli_profile = str_field("profile");
+                    ov.cloud_form.cli_region = str_field("region");
                     // Never pre-fill the secret. Same convention as
                     // identity / proxy passwords, we just flag that
                     // one exists so the user knows leaving the field
                     // blank preserves it.
-                    self.cloud_form.aws_access_key_secret = String::new();
-                    self.cloud_form.aws_access_key_secret_touched = false;
-                    self.cloud_form.aws_has_existing_secret = self
-                        .vaults.cur().store
+                    ov.cloud_form.aws_access_key_secret = String::new();
+                    ov.cloud_form.aws_access_key_secret_touched = false;
+                    ov.cloud_form.aws_has_existing_secret = ov
+                        .store
                         .as_ref()
                         .and_then(|v| v.get_cloud_profile_secret(&id).ok().flatten())
                         .is_some();
                 } else {
-                    self.cloud_form.editing_id = None;
-                    self.cloud_form.label = String::new();
-                    self.cloud_form.provider = CloudProviderChoice::Aws;
-                    self.cloud_form.auth_kind = CloudAuthChoice::Profile;
-                    self.cloud_form.aws_profile_name = String::new();
+                    ov.cloud_form.editing_id = None;
+                    ov.cloud_form.label = String::new();
+                    ov.cloud_form.provider = CloudProviderChoice::Aws;
+                    ov.cloud_form.auth_kind = CloudAuthChoice::Profile;
+                    ov.cloud_form.aws_profile_name = String::new();
                     // Prefill regions from the user's existing AWS
                     // config so the wizard isn't blank for the
                     // common case (single-region developer with a
                     // [default] profile in ~/.aws/config or an
                     // AWS_REGION env var). User can still add/edit.
-                    self.cloud_form.aws_regions = detect_default_aws_region()
+                    ov.cloud_form.aws_regions = detect_default_aws_region()
                         .into_iter()
                         .collect();
-                    self.cloud_form.aws_region_draft = String::new();
-                    self.cloud_form.aws_access_key_id = String::new();
-                    self.cloud_form.aws_access_key_secret = String::new();
-                    self.cloud_form.aws_access_key_secret_touched = false;
-                    self.cloud_form.aws_access_key_session_token = String::new();
-                    self.cloud_form.aws_has_existing_secret = false;
-                    self.cloud_form.aws_sso_start_url = String::new();
-                    self.cloud_form.aws_sso_region = String::new();
-                    self.cloud_form.aws_sso_account_id = String::new();
-                    self.cloud_form.aws_sso_role_name = String::new();
-                    self.cloud_form.kubeconfig_path = String::new();
-                    self.cloud_form.context = String::new();
-                    self.cloud_form.gcp_project = String::new();
-                    self.cloud_form.azure_subscription = String::new();
-                    self.cloud_form.cli_profile = String::new();
-                    self.cloud_form.cli_region = String::new();
+                    ov.cloud_form.aws_region_draft = String::new();
+                    ov.cloud_form.aws_access_key_id = String::new();
+                    ov.cloud_form.aws_access_key_secret = String::new();
+                    ov.cloud_form.aws_access_key_secret_touched = false;
+                    ov.cloud_form.aws_access_key_session_token = String::new();
+                    ov.cloud_form.aws_has_existing_secret = false;
+                    ov.cloud_form.aws_sso_start_url = String::new();
+                    ov.cloud_form.aws_sso_region = String::new();
+                    ov.cloud_form.aws_sso_account_id = String::new();
+                    ov.cloud_form.aws_sso_role_name = String::new();
+                    ov.cloud_form.kubeconfig_path = String::new();
+                    ov.cloud_form.context = String::new();
+                    ov.cloud_form.gcp_project = String::new();
+                    ov.cloud_form.azure_subscription = String::new();
+                    ov.cloud_form.cli_profile = String::new();
+                    ov.cloud_form.cli_region = String::new();
                 }
-                self.cloud_form.aws_access_key_secret_visible = false;
+                self.vaults.cur_mut().cloud_form.aws_access_key_secret_visible = false;
             }
             CloudMessage::HideCloudForm => {
-                self.cloud_form.visible = false;
-                self.cloud_form.error = None;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.visible = false;
+                self.vaults.cur_mut().cloud_form.error = None;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormLabelChanged(v) => {
-                self.cloud_form.label = v;
+                self.vaults.cur_mut().cloud_form.label = v;
             }
             CloudMessage::CloudFormProviderChanged(p) => {
-                self.cloud_form.provider = p;
+                self.vaults.cur_mut().cloud_form.provider = p;
                 // Reset auth choice when provider switches, Profile is
                 // AWS-only, Kubeconfig is K8s-only. Keep them coherent
                 // so the user doesn't see a stale auth kind on switch.
-                self.cloud_form.auth_kind = match p {
+                self.vaults.cur_mut().cloud_form.auth_kind = match p {
                     CloudProviderChoice::Aws => CloudAuthChoice::Profile,
                     CloudProviderChoice::K8s => CloudAuthChoice::Kubeconfig,
                     CloudProviderChoice::Gcp => CloudAuthChoice::GcloudCli,
@@ -189,116 +190,116 @@ impl Oryxis {
                     CloudProviderChoice::Aliyun => CloudAuthChoice::AliyunCli,
                     CloudProviderChoice::Tencent => CloudAuthChoice::TccliCli,
                 };
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAuthKindChanged(a) => {
-                self.cloud_form.auth_kind = a;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.auth_kind = a;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormKubeconfigPathChanged(v) => {
-                self.cloud_form.kubeconfig_path = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.kubeconfig_path = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormGcpProjectChanged(v) => {
-                self.cloud_form.gcp_project = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.gcp_project = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAzureSubscriptionChanged(v) => {
-                self.cloud_form.azure_subscription = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.azure_subscription = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormCliProfileChanged(v) => {
-                self.cloud_form.cli_profile = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.cli_profile = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormCliRegionChanged(v) => {
-                self.cloud_form.cli_region = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.cli_region = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormContextChanged(v) => {
-                self.cloud_form.context = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.context = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsProfileNameChanged(v) => {
-                self.cloud_form.aws_profile_name = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_profile_name = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsRegionDraftChanged(v) => {
-                self.cloud_form.aws_region_draft = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_region_draft = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsRegionAdd => {
                 // Split on comma or whitespace so pasting
                 // "us-east-1, us-west-2" lands as two chips.
                 let parts: Vec<String> = self
-                    .cloud_form.aws_region_draft
+                    .vaults.cur().cloud_form.aws_region_draft
                     .split(|c: char| c == ',' || c.is_whitespace())
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect();
                 for p in parts {
-                    if !self.cloud_form.aws_regions.contains(&p) {
-                        self.cloud_form.aws_regions.push(p);
+                    if !self.vaults.cur().cloud_form.aws_regions.contains(&p) {
+                        self.vaults.cur_mut().cloud_form.aws_regions.push(p);
                     }
                 }
-                self.cloud_form.aws_region_draft.clear();
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_region_draft.clear();
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsRegionRemove(idx) => {
-                if idx < self.cloud_form.aws_regions.len() {
-                    self.cloud_form.aws_regions.remove(idx);
+                if idx < self.vaults.cur().cloud_form.aws_regions.len() {
+                    self.vaults.cur_mut().cloud_form.aws_regions.remove(idx);
                 }
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsAccessKeyIdChanged(v) => {
-                self.cloud_form.aws_access_key_id = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_access_key_id = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsAccessKeySecretChanged(v) => {
-                self.cloud_form.aws_access_key_secret = v.into_inner();
-                self.cloud_form.aws_access_key_secret_touched = true;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_access_key_secret = v.into_inner();
+                self.vaults.cur_mut().cloud_form.aws_access_key_secret_touched = true;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsAccessKeySessionTokenChanged(v) => {
-                self.cloud_form.aws_access_key_session_token = v.into_inner();
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_access_key_session_token = v.into_inner();
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsAccessKeySecretToggleVisibility => {
-                self.cloud_form.aws_access_key_secret_visible =
-                    !self.cloud_form.aws_access_key_secret_visible;
+                self.vaults.cur_mut().cloud_form.aws_access_key_secret_visible =
+                    !self.vaults.cur().cloud_form.aws_access_key_secret_visible;
             }
             CloudMessage::CloudFormAwsSsoStartUrlChanged(v) => {
-                self.cloud_form.aws_sso_start_url = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_sso_start_url = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsSsoRegionChanged(v) => {
-                self.cloud_form.aws_sso_region = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_sso_region = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsSsoAccountIdChanged(v) => {
-                self.cloud_form.aws_sso_account_id = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_sso_account_id = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormAwsSsoRoleNameChanged(v) => {
-                self.cloud_form.aws_sso_role_name = v;
-                self.cloud_form.test_state = CloudTestState::Idle;
+                self.vaults.cur_mut().cloud_form.aws_sso_role_name = v;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Idle;
             }
             CloudMessage::CloudFormTestCredentials => {
-                let provider_id = self.cloud_form.provider.id();
+                let provider_id = self.vaults.cur().cloud_form.provider.id();
                 let registry: Arc<CloudProviderRegistry> =
                     self.cloud_provider_registry.clone();
                 let Some(provider) = registry.get(provider_id) else {
-                    self.cloud_form.test_state = CloudTestState::Failed(
+                    self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Failed(
                         format!("provider \"{provider_id}\" not registered"),
                     );
                     return Ok(Task::none());
                 };
                 let Some(profile) = self.build_cloud_profile_for_test() else {
-                    self.cloud_form.test_state =
+                    self.vaults.cur_mut().cloud_form.test_state =
                         CloudTestState::Failed(crate::i18n::t("cloud_err_label_required").into());
                     return Ok(Task::none());
                 };
-                self.cloud_form.test_state = CloudTestState::Running;
+                self.vaults.cur_mut().cloud_form.test_state = CloudTestState::Running;
                 return Ok(Task::perform(
                     async move { provider.test_credentials(&profile).await },
                     |result| {
@@ -307,15 +308,15 @@ impl Oryxis {
                 ));
             }
             CloudMessage::CloudFormTestResult(result) => {
-                self.cloud_form.test_state = match result {
+                self.vaults.cur_mut().cloud_form.test_state = match result {
                     Ok(()) => CloudTestState::Ok,
                     Err(msg) => CloudTestState::Failed(msg),
                 };
             }
             CloudMessage::SaveCloudProfile => {
-                let label = self.cloud_form.label.trim().to_string();
+                let label = self.vaults.cur().cloud_form.label.trim().to_string();
                 if label.is_empty() {
-                    self.cloud_form.error =
+                    self.vaults.cur_mut().cloud_form.error =
                         Some(crate::i18n::t("cloud_err_label_required").into());
                     return Ok(Task::none());
                 }
@@ -325,26 +326,26 @@ impl Oryxis {
                 // profile so we can rename the matching provider folder
                 // (linked by label until v0.7 adds a stable cloud
                 // profile id column to groups).
-                let old_label = self.cloud_form.editing_id.and_then(|id| {
+                let old_label = self.vaults.cur().cloud_form.editing_id.and_then(|id| {
                     self.vaults.cur().cloud_profiles
                         .iter()
                         .find(|p| p.id == id)
                         .map(|p| p.label.clone())
                 });
-                let mut profile = if let Some(id) = self.cloud_form.editing_id {
+                let mut profile = if let Some(id) = self.vaults.cur().cloud_form.editing_id {
                     self.vaults.cur().cloud_profiles
                         .iter()
                         .find(|p| p.id == id)
                         .cloned()
                         .unwrap_or_else(|| {
-                            CloudProfile::new(label.clone(), self.cloud_form.provider.id())
+                            CloudProfile::new(label.clone(), self.vaults.cur().cloud_form.provider.id())
                         })
                 } else {
-                    CloudProfile::new(label.clone(), self.cloud_form.provider.id())
+                    CloudProfile::new(label.clone(), self.vaults.cur().cloud_form.provider.id())
                 };
                 profile.label = label.clone();
-                profile.provider = self.cloud_form.provider.id().to_string();
-                profile.auth_kind = self.cloud_form.auth_kind.id().to_string();
+                profile.provider = self.vaults.cur().cloud_form.provider.id().to_string();
+                profile.auth_kind = self.vaults.cur().cloud_form.auth_kind.id().to_string();
                 profile.config = self.serialize_cloud_form_config();
                 profile.updated_at = now;
 
@@ -354,12 +355,12 @@ impl Oryxis {
                     // field. Empty + touched = explicit clear.
                     // Touched + value = set. Untouched = preserve.
                     let secret_arg: Option<&str> = if self
-                        .cloud_form.aws_access_key_secret_touched
+                        .vaults.cur().cloud_form.aws_access_key_secret_touched
                     {
-                        if self.cloud_form.aws_access_key_secret.is_empty() {
+                        if self.vaults.cur().cloud_form.aws_access_key_secret.is_empty() {
                             Some("")
                         } else {
-                            Some(self.cloud_form.aws_access_key_secret.as_str())
+                            Some(self.vaults.cur().cloud_form.aws_access_key_secret.as_str())
                         }
                     } else {
                         None
@@ -391,12 +392,12 @@ impl Oryxis {
                                     }
                                 }
                             }
-                            self.cloud_form.visible = false;
-                            self.cloud_form.error = None;
+                            self.vaults.cur_mut().cloud_form.visible = false;
+                            self.vaults.cur_mut().cloud_form.error = None;
                             self.load_data_from_vault();
                         }
                         Err(e) => {
-                            self.cloud_form.error = Some(e.to_string());
+                            self.vaults.cur_mut().cloud_form.error = Some(e.to_string());
                         }
                     }
                 }
@@ -445,7 +446,7 @@ impl Oryxis {
                 // rail layout and its 150 width disagreed with the
                 // render clamp's 210, pushing the menu past the button).
                 // The panel width only feeds the pre-first-draw fallback.
-                let panel_width = if self.cloud_discover.visible || self.panels.host_panel {
+                let panel_width = if self.vaults.cur().cloud_discover.visible || self.vaults.cur().panels.host_panel {
                     self.vaults.cur().panel_width
                 } else {
                     0.0

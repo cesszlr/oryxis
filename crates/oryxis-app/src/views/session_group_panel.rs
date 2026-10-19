@@ -32,7 +32,7 @@ impl Oryxis {
     pub(crate) fn view_session_group_panel(&self) -> Element<'_, Message> {
         // Keyboard rows are recorded in visual order (row mode: Up/Down from any input).
         self.panel_nav_reset();
-        let form = &self.editor_session_group;
+        let form = &self.vaults.cur().editor_session_group;
         let is_editing = form.editing_id.is_some();
         let title = if is_editing {
             t("session_group_edit_title")
@@ -252,7 +252,7 @@ impl Oryxis {
                 )),
                 10.0,
                 container(
-                    iced::widget::text_editor(&self.session_group_script_editor)
+                    iced::widget::text_editor(&self.vaults.cur().session_group_script_editor)
                         .id(iced::widget::Id::new("panel-session-group-script"))
                         .placeholder(t("session_group_pane_script_placeholder"))
                         .on_action(|v| Message::SessionGroup(SessionGroupMessage::SessionGroupScriptAction(v)))
@@ -284,7 +284,7 @@ impl Oryxis {
         };
 
         // ── Error ──
-        let panel_error: Element<'_, Message> = if let Some(err) = &self.session_group_panel_error {
+        let panel_error: Element<'_, Message> = if let Some(err) = &self.vaults.cur().session_group_panel_error {
             container(text(err.clone()).size(11).color(OryxisColors::t().error))
             .padding(Padding { top: 4.0, right: 16.0, bottom: 4.0, left: 16.0 })
             .boxed()

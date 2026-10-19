@@ -166,8 +166,8 @@ impl Oryxis {
                     None => self.keynav_take_menu_anchor(),
                 };
                 self.card_context_menu = None;
-                self.group_picker_search.clear();
-                self.move_hosts_pending = ids;
+                self.vaults.cur_mut().group_picker_search.clear();
+                self.vaults.cur_mut().move_hosts_pending = ids;
                 self.overlay = Some(OverlayState {
                     content: OverlayContent::GroupPicker(
                         crate::state::GroupPickerTarget::MoveHosts,
@@ -383,7 +383,7 @@ impl Oryxis {
         // pending, so the form can follow the move afterwards without
         // either reverting it or dropping the user's other edits.
         let editing_moved = self
-            .editor_form
+            .vaults.cur().editor_form
             .editing_id
             .is_some_and(|e| ids.contains(&e));
         let editor_was_dirty = if editing_moved {

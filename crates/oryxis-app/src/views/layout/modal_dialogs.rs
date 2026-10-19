@@ -11,7 +11,7 @@ impl Oryxis {
     /// Content for the share / group-export dialog (password, optional
     /// per-folder checklist, include-keys toggle, Share + Cancel).
     pub(crate) fn build_share_dialog(&self) -> Element<'_, Message> {
-        let share_include_keys = self.share.include_keys;
+        let share_include_keys = self.vaults.cur().share.include_keys;
         // Keyboard rows in visual order: the password field (Enter
         // focuses it), its reveal eye, the per-folder checkboxes, the
         // keys toggle, then Share as the default (Enter shares) and
@@ -27,10 +27,10 @@ impl Oryxis {
             false,
             container(crate::widgets::password_input_with_eye_nav(
                 crate::i18n::t("export_password"),
-                &self.share.password,
+                &self.vaults.cur().share.password,
                 |v| Message::Share(ShareMessage::SharePasswordChanged(v.into())),
                 None,
-                self.revealed_secrets
+                self.vaults.cur().revealed_secrets
                     .contains(&crate::state::SecretField::SharePassword),
                 Message::Settings(SettingsMessage::ToggleSecretVisibility(
                     crate::state::SecretField::SharePassword,
@@ -54,7 +54,7 @@ impl Oryxis {
         // Group-mode export: a per-folder include/exclude checklist
         // sits between the password and the keys toggle. A single-host
         // share skips it (no folder choice to make).
-        let group_picker: Element<'_, Message> = if self.share.group_mode {
+        let group_picker: Element<'_, Message> = if self.vaults.cur().share.group_mode {
             let mut list = column![text(crate::i18n::t("export_groups"))
                 .size(12)
                 .color(OryxisColors::t().text_muted)]
@@ -65,7 +65,7 @@ impl Oryxis {
                     crate::keynav::RowAction::activate(Message::Share(ShareMessage::ShareToggleGroup(id))),
                     4.0,
                     false,
-                    iced::widget::checkbox(self.share.groups.contains(&id))
+                    iced::widget::checkbox(self.vaults.cur().share.groups.contains(&id))
                         .label(g.label.as_str())
                         .on_toggle(move |_| Message::Share(ShareMessage::ShareToggleGroup(id)))
                         .size(16)
@@ -77,7 +77,7 @@ impl Oryxis {
                 crate::keynav::RowAction::activate(Message::Share(ShareMessage::ShareToggleUngrouped)),
                 4.0,
                 false,
-                iced::widget::checkbox(self.share.include_ungrouped)
+                iced::widget::checkbox(self.vaults.cur().share.include_ungrouped)
                     .label(crate::i18n::t("export_ungrouped"))
                     .on_toggle(|_| Message::Share(ShareMessage::ShareToggleUngrouped))
                     .size(16)
@@ -95,7 +95,7 @@ impl Oryxis {
         } else {
             Space::new().boxed()
         };
-        let dialog_title = if self.share.group_mode {
+        let dialog_title = if self.vaults.cur().share.group_mode {
             crate::i18n::t("export_hosts")
         } else {
             crate::i18n::t("share")
@@ -142,7 +142,7 @@ impl Oryxis {
                         styled_button(crate::i18n::t("cancel"), Message::Share(ShareMessage::ShareDismiss), OryxisColors::t().text_muted),
                     ),
                 ],
-                if let Some(status) = &self.share.status {
+                if let Some(status) = &self.vaults.cur().share.status {
                     let (msg, color) = match status {
                         Ok(m) => (m.as_str(), OryxisColors::t().success),
                         Err(m) => (m.as_str(), OryxisColors::t().error),
@@ -618,7 +618,7 @@ impl Oryxis {
                 .align_y(iced::Alignment::Center).boxed(),
             );
         }
-        let error_line: Element<'_, Message> = match &self.import_hub_error {
+        let error_line: Element<'_, Message> = match &self.vaults.cur().import_hub_error {
             Some(e) => column![
                 Space::new().height(10),
                 text(e.clone()).size(12).color(OryxisColors::t().error),
@@ -627,10 +627,10 @@ impl Oryxis {
         };
         // A protected mRemoteNG file is parked here while its password
         // is asked for; Enter in the field retries directly.
-        let password_row: Element<'_, Message> = if self.import_hub_pending.is_some() {
+        let password_row: Element<'_, Message> = if self.vaults.cur().import_hub_pending.is_some() {
             let field = iced::widget::text_input(
                 crate::i18n::t("password"),
-                &self.import_hub_password,
+                &self.vaults.cur().import_hub_password,
             )
             .id(iced::widget::Id::new("import-hub-password"))
             .secure(true)
@@ -751,7 +751,7 @@ impl Oryxis {
         // (label, detail) per row, source-agnostic. Direct batches
         // are already Connections; ssh_config rows derive from the
         // parsed block.
-        let direct = self.ssh_import_direct.as_ref();
+        let direct = self.vaults.cur().ssh_import_direct.as_ref();
         let rows: Vec<(String, String)> = match direct {
             Some(direct) => direct
                 .hosts
@@ -781,7 +781,7 @@ impl Oryxis {
                 })
                 .collect(),
             None => self
-                .ssh_import_hosts
+                .vaults.cur().ssh_import_hosts
                 .iter()
                 .map(|host| {
                     // "user@hostname:port", falling back to the alias
@@ -804,7 +804,7 @@ impl Oryxis {
         let title_key = direct.map_or("import_ssh_config_btn", |d| d.source_key);
         let ssh_total = rows.len();
         let ssh_selected =
-            self.ssh_import_selected.iter().filter(|s| **s).count();
+            self.vaults.cur().ssh_import_selected.iter().filter(|s| **s).count();
         // Keyboard rows in visual order: select/deselect all, the
         // per-host checkboxes, then Import (default) + Cancel.
         // Pre-build the top buttons so the recording order matches
@@ -833,9 +833,9 @@ impl Oryxis {
         let mut list = iced::widget::Column::<iced::Element<'_, _>>::new().spacing(4);
         for (i, (name, detail)) in rows.iter().enumerate() {
             let checked =
-                self.ssh_import_selected.get(i).copied().unwrap_or(false);
+                self.vaults.cur().ssh_import_selected.get(i).copied().unwrap_or(false);
             let exists =
-                self.ssh_import_existing.get(i).copied().unwrap_or(false);
+                self.vaults.cur().ssh_import_existing.get(i).copied().unwrap_or(false);
             let mut label = format!("{name}  ({detail})");
             if exists {
                 label.push_str("  · ");

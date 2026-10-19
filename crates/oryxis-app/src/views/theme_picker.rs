@@ -41,8 +41,8 @@ impl Oryxis {
         // Filter, matched against every card's visible label (the
         // inherit sentinel participates too): one rule, no special
         // cases, same contract as the Settings gallery.
-        let picker_filter = self.theme_ui.picker_filter.trim().to_lowercase();
-        let picker_tone = self.theme_ui.picker_tone;
+        let picker_filter = self.vaults.cur().theme_ui.picker_filter.trim().to_lowercase();
+        let picker_tone = self.vaults.cur().theme_ui.picker_tone;
         let shows = |label: &str, traits: Option<&[oryxis_terminal::ThemeTrait]>| {
             crate::theme_tags::theme_matches(&picker_filter, picker_tone, label, traits)
         };
@@ -55,7 +55,7 @@ impl Oryxis {
             filter_idx,
             8.0,
             false,
-            iced::widget::text_input(t("filter_placeholder"), &self.theme_ui.picker_filter)
+            iced::widget::text_input(t("filter_placeholder"), &self.vaults.cur().theme_ui.picker_filter)
                 .id(filter_id)
                 .on_input(|v| Message::Editor(EditorMessage::EditorThemePickerFilterChanged(v)))
                 .padding(10)
@@ -104,7 +104,7 @@ impl Oryxis {
                 crate::widgets::terminal_theme_card(
                     global_palette,
                     &inherit_label,
-                    self.editor_form.terminal_theme.is_none(),
+                    self.vaults.cur().editor_form.terminal_theme.is_none(),
                     pick.clone(),
                 ),
                 pick,
@@ -116,7 +116,7 @@ impl Oryxis {
                 continue;
             }
             let is_selected =
-                self.editor_form.terminal_theme.as_deref() == Some(theme.name());
+                self.vaults.cur().editor_form.terminal_theme.as_deref() == Some(theme.name());
             let pick =
                 Message::Editor(EditorMessage::EditorTerminalThemeChanged(theme.name().to_string()));
             cards.push(card(
@@ -137,7 +137,7 @@ impl Oryxis {
                 continue;
             }
             let is_selected =
-                self.editor_form.terminal_theme.as_deref() == Some(ct.name.as_str());
+                self.vaults.cur().editor_form.terminal_theme.as_deref() == Some(ct.name.as_str());
             let pick = Message::Editor(EditorMessage::EditorTerminalThemeChanged(ct.name.clone()));
             cards.push(card(
                 crate::widgets::terminal_theme_card(palette, &ct.name, is_selected, pick.clone()),

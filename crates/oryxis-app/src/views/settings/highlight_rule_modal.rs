@@ -30,7 +30,7 @@ impl Oryxis {
     /// soft auto-lock, a cloud import finishing) can never leave a modal
     /// floating over a screen that has nothing to do with it.
     pub(crate) fn highlight_rule_editor_open(&self) -> bool {
-        if self.highlight_rule_form.editing.is_none() {
+        if self.vaults.cur().highlight_rule_form.editing.is_none() {
             return false;
         }
         // Both arms mirror the predicate the LAYOUT uses, not just the
@@ -38,8 +38,8 @@ impl Oryxis {
         // tab and the other Dashboard panels win over
         // (`active_side_panel`), and `active_view == Settings` says
         // nothing while a terminal tab is on screen.
-        match self.highlight_rule_form.scope {
-            crate::state::RuleScope::Host => self.side_panel_open() && self.panels.host_panel,
+        match self.vaults.cur().highlight_rule_form.scope {
+            crate::state::RuleScope::Host => self.side_panel_open() && self.vaults.cur().panels.host_panel,
             crate::state::RuleScope::Global => {
                 self.cur_active_tab().is_none() && self.cur_view() == crate::state::View::Settings
             }
@@ -51,7 +51,7 @@ impl Oryxis {
     pub(crate) fn view_highlight_rule_modal(&self) -> Element<'_, Message> {
         self.modal_nav_reset();
         let c = OryxisColors::t();
-        let form = &self.highlight_rule_form;
+        let form = &self.vaults.cur().highlight_rule_form;
         let rule = &form.rule;
 
         let title = if form.creating {

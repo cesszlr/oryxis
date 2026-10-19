@@ -40,7 +40,7 @@ impl Oryxis {
             }
             SettingsMessage::LoginScriptEdit(id) => {
                 if let Some(script) = self.vaults.cur().login_scripts.iter().find(|s| s.id == id) {
-                    self.login_script_form = crate::state::LoginScriptForm {
+                    self.vaults.cur_mut().login_script_form = crate::state::LoginScriptForm {
                         editing_id: Some(id),
                         name: script.name.clone(),
                         steps: script.steps.clone(),
@@ -50,13 +50,13 @@ impl Oryxis {
                 }
             }
             SettingsMessage::LoginScriptCancelEdit => {
-                self.login_script_form = crate::state::LoginScriptForm::default();
+                self.vaults.cur_mut().login_script_form = crate::state::LoginScriptForm::default();
             }
             SettingsMessage::LoginScriptNameChanged(v) => {
-                self.login_script_form.name = v;
+                self.vaults.cur_mut().login_script_form.name = v;
             }
             SettingsMessage::LoginScriptAddStep => {
-                self.login_script_form.steps.push(LoginStep {
+                self.vaults.cur_mut().login_script_form.steps.push(LoginStep {
                     expect: Some(ExpectPattern::Suffix(String::new())),
                     send: SendPayload::Text(String::new()),
                     timeout_ms: 0,
@@ -64,12 +64,12 @@ impl Oryxis {
                 });
             }
             SettingsMessage::LoginScriptRemoveStep(i) => {
-                if i < self.login_script_form.steps.len() {
-                    self.login_script_form.steps.remove(i);
+                if i < self.vaults.cur().login_script_form.steps.len() {
+                    self.vaults.cur_mut().login_script_form.steps.remove(i);
                 }
             }
             SettingsMessage::LoginScriptStepExpect(i, v) => {
-                if let Some(step) = self.login_script_form.steps.get_mut(i) {
+                if let Some(step) = self.vaults.cur_mut().login_script_form.steps.get_mut(i) {
                     step.expect = if v.trim().is_empty() {
                         // Blank means "send without waiting", which the
                         // engine models as no pattern at all.
@@ -82,7 +82,7 @@ impl Oryxis {
                 }
             }
             SettingsMessage::LoginScriptStepSendKind(i, label) => {
-                if let Some(step) = self.login_script_form.steps.get_mut(i) {
+                if let Some(step) = self.vaults.cur_mut().login_script_form.steps.get_mut(i) {
                     // Compare against the localized labels the picker
                     // rendered, in the same order the view declares.
                     let kinds = crate::views::settings::login_scripts::SEND_KINDS;
@@ -99,38 +99,38 @@ impl Oryxis {
                 }
             }
             SettingsMessage::LoginScriptStepText(i, v) => {
-                if let Some(step) = self.login_script_form.steps.get_mut(i)
+                if let Some(step) = self.vaults.cur_mut().login_script_form.steps.get_mut(i)
                     && matches!(step.send, SendPayload::Text(_))
                 {
                     step.send = SendPayload::Text(v);
                 }
             }
             SettingsMessage::LoginScriptStepOptional(i) => {
-                if let Some(step) = self.login_script_form.steps.get_mut(i) {
+                if let Some(step) = self.vaults.cur_mut().login_script_form.steps.get_mut(i) {
                     step.optional = !step.optional;
                 }
             }
             SettingsMessage::LoginScriptSave => {
-                let Some(id) = self.login_script_form.editing_id else {
+                let Some(id) = self.vaults.cur().login_script_form.editing_id else {
                     return Task::none();
                 };
-                let name = self.login_script_form.name.trim().to_string();
+                let name = self.vaults.cur().login_script_form.name.trim().to_string();
                 if name.is_empty() {
-                    self.login_script_form.error =
+                    self.vaults.cur_mut().login_script_form.error =
                         Some(crate::i18n::t("login_script_name_required").to_string());
                     return Task::none();
                 }
-                let steps = self.login_script_form.steps.clone();
+                let steps = self.vaults.cur().login_script_form.steps.clone();
                 // Validated here rather than at connect: a bad regex
                 // should be a form error the user can see and fix, not a
                 // silent no-op sixty seconds into a failed login.
                 if let Err(e) = ScriptRunner::validate(&steps) {
-                    self.login_script_form.error =
+                    self.vaults.cur_mut().login_script_form.error =
                         Some(format!("{}: {e}", crate::i18n::t("login_script_invalid")));
                     return Task::none();
                 }
                 let Some(script) = self.vaults.cur_mut().login_scripts.iter_mut().find(|s| s.id == id) else {
-                    self.login_script_form = crate::state::LoginScriptForm::default();
+                    self.vaults.cur_mut().login_script_form = crate::state::LoginScriptForm::default();
                     return Task::none();
                 };
                 script.name = name;
@@ -140,17 +140,17 @@ impl Oryxis {
                 if let Some(vault) = &self.vaults.cur().store
                     && let Err(e) = vault.save_login_script(&saved)
                 {
-                    self.login_script_form.error = Some(e.to_string());
+                    self.vaults.cur_mut().login_script_form.error = Some(e.to_string());
                     return Task::none();
                 }
                 self.vaults.cur_mut().login_scripts.sort_by(|a, b| a.name.cmp(&b.name));
-                self.login_script_form = crate::state::LoginScriptForm::default();
+                self.vaults.cur_mut().login_script_form = crate::state::LoginScriptForm::default();
             }
             SettingsMessage::LoginScriptRequestDelete(id) => {
-                self.login_script_form.confirm_delete = Some(id);
+                self.vaults.cur_mut().login_script_form.confirm_delete = Some(id);
             }
             SettingsMessage::LoginScriptCancelDelete => {
-                self.login_script_form.confirm_delete = None;
+                self.vaults.cur_mut().login_script_form.confirm_delete = None;
             }
             SettingsMessage::LoginScriptDelete(id) => {
                 if let Some(vault) = &self.vaults.cur().store {
@@ -166,11 +166,11 @@ impl Oryxis {
                         conn.login_script_vars.clear();
                     }
                 }
-                if self.editor_form.login_script_id == Some(id) {
-                    self.editor_form.login_script_id = None;
-                    self.editor_form.login_script_vars.clear();
+                if self.vaults.cur().editor_form.login_script_id == Some(id) {
+                    self.vaults.cur_mut().editor_form.login_script_id = None;
+                    self.vaults.cur_mut().editor_form.login_script_vars.clear();
                 }
-                self.login_script_form = crate::state::LoginScriptForm::default();
+                self.vaults.cur_mut().login_script_form = crate::state::LoginScriptForm::default();
             }
             // Routed here by the parent; anything else is a grouping
             // mistake, not a runtime case.

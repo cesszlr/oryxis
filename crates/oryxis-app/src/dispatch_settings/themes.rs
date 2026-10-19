@@ -37,11 +37,11 @@ impl Oryxis {
         let (section, toast) = match to {
             ThemeKind::Terminal => {
                 self.close_modal(crate::state::Modal::UiThemeImport);
-                self.ui_theme_import_error = None;
-                self.panels.theme_import = true;
-                self.theme_ui.import_content = editor;
-                self.theme_ui.import_name = name;
-                self.theme_ui.import_error = None;
+                self.vaults.cur_mut().ui_theme_import_error = None;
+                self.vaults.cur_mut().panels.theme_import = true;
+                self.vaults.cur_mut().theme_ui.import_content = editor;
+                self.vaults.cur_mut().theme_ui.import_name = name;
+                self.vaults.cur_mut().theme_ui.import_error = None;
                 (
                     crate::state::SettingsSection::Terminal,
                     crate::i18n::t("theme_import_moved_terminal"),
@@ -49,11 +49,11 @@ impl Oryxis {
             }
             ThemeKind::Ui => {
                 self.close_modal(crate::state::Modal::ThemeImport);
-                self.theme_ui.import_error = None;
-                self.panels.ui_theme_import = true;
-                self.ui_theme_import_content = editor;
-                self.ui_theme_import_name = name;
-                self.ui_theme_import_error = None;
+                self.vaults.cur_mut().theme_ui.import_error = None;
+                self.vaults.cur_mut().panels.ui_theme_import = true;
+                self.vaults.cur_mut().ui_theme_import_content = editor;
+                self.vaults.cur_mut().ui_theme_import_name = name;
+                self.vaults.cur_mut().ui_theme_import_error = None;
                 (
                     crate::state::SettingsSection::Interface,
                     crate::i18n::t("theme_import_moved_ui"),
@@ -81,7 +81,7 @@ impl Oryxis {
     /// success (after reloading the list + repainting).
     pub(crate) fn save_theme_editor(&mut self) -> Option<String> {
         use oryxis_core::models::custom_terminal_theme::CustomTerminalTheme;
-        let form = self.theme_ui.editor.clone()?;
+        let form = self.vaults.cur().theme_ui.editor.clone()?;
         let name = form.name.trim().to_string();
         if name.is_empty() {
             return Some(crate::i18n::t("theme_error_name_required").to_string());
@@ -228,7 +228,7 @@ impl Oryxis {
     /// active one, re-applies it live.
     pub(crate) fn save_ui_theme_editor(&mut self) -> Option<String> {
         use oryxis_core::models::custom_ui_theme::CustomUiTheme;
-        let form = self.ui_theme_editor.clone()?;
+        let form = self.vaults.cur().ui_theme_editor.clone()?;
         let name = form.name.trim().to_string();
         if name.is_empty() {
             return Some(crate::i18n::t("theme_error_name_required").to_string());
@@ -522,10 +522,10 @@ impl Oryxis {
                 }
             }
             SettingsMessage::ThemeEditorOpenPicker(slot) => {
-                self.theme_ui.color_popover = Some((slot, self.cur_mouse()));
+                self.vaults.cur_mut().theme_ui.color_popover = Some((slot, self.cur_mouse()));
             }
             SettingsMessage::ThemeEditorClosePicker => {
-                self.theme_ui.color_popover = None;
+                self.vaults.cur_mut().theme_ui.color_popover = None;
             }
             SettingsMessage::ThemeCardHovered(idx) => {
                 self.nav.hover.theme_card = Some(idx);
@@ -541,7 +541,7 @@ impl Oryxis {
                     let q = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
                     format!("#{:02x}{:02x}{:02x}", q(c.r), q(c.g), q(c.b))
                 };
-                self.theme_ui.editor = Some(crate::state::ThemeEditorForm {
+                self.vaults.cur_mut().theme_ui.editor = Some(crate::state::ThemeEditorForm {
                     editing_id: None,
                     name: String::new(),
                     foreground: hex(p.foreground),
@@ -552,27 +552,27 @@ impl Oryxis {
                 });
             }
             SettingsMessage::ThemeImportOpen => {
-                self.panels.theme_import = true;
-                self.theme_ui.import_content = iced::widget::text_editor::Content::new();
-                self.theme_ui.import_name.clear();
-                self.theme_ui.import_error = None;
+                self.vaults.cur_mut().panels.theme_import = true;
+                self.vaults.cur_mut().theme_ui.import_content = iced::widget::text_editor::Content::new();
+                self.vaults.cur_mut().theme_ui.import_name.clear();
+                self.vaults.cur_mut().theme_ui.import_error = None;
             }
             SettingsMessage::ThemeImportClose => {
-                self.panels.theme_import = false;
+                self.vaults.cur_mut().panels.theme_import = false;
             }
             SettingsMessage::ThemeImportContentAction(action) => {
-                self.theme_ui.import_content.perform(action);
-                self.theme_ui.import_error = None;
+                self.vaults.cur_mut().theme_ui.import_content.perform(action);
+                self.vaults.cur_mut().theme_ui.import_error = None;
             }
             SettingsMessage::ThemeImportNameChanged(v) => {
-                self.theme_ui.import_name = v;
+                self.vaults.cur_mut().theme_ui.import_name = v;
             }
             SettingsMessage::ThemeImportApply => {
-                let content = self.theme_ui.import_content.text();
-                let name = if self.theme_ui.import_name.trim().is_empty() {
+                let content = self.vaults.cur().theme_ui.import_content.text();
+                let name = if self.vaults.cur().theme_ui.import_name.trim().is_empty() {
                     crate::i18n::t("theme_imported_default").to_string()
                 } else {
-                    self.theme_ui.import_name.trim().to_string()
+                    self.vaults.cur().theme_ui.import_name.trim().to_string()
                 };
                 match crate::theme_import::parse_theme(&content, &name) {
                     Ok(theme) => {
@@ -580,16 +580,16 @@ impl Oryxis {
                         // theme) so the user can review / rename before save.
                         let mut form = crate::state::ThemeEditorForm::from_theme(&theme);
                         form.editing_id = None;
-                        self.theme_ui.editor = Some(form);
-                        self.panels.theme_import = false;
+                        self.vaults.cur_mut().theme_ui.editor = Some(form);
+                        self.vaults.cur_mut().panels.theme_import = false;
                     }
                     // A UI theme pasted here is not a mistake to report,
                     // it is a paste in the wrong panel: carry it over.
                     Err(crate::theme_import::ImportError::WrongImporter(kind)) => {
-                        let typed = self.theme_ui.import_name.clone();
+                        let typed = self.vaults.cur().theme_ui.import_name.clone();
                         return Ok(self.hand_off_theme_import(kind, content, &typed));
                     }
-                    Err(e) => self.theme_ui.import_error = Some(e.localized()),
+                    Err(e) => self.vaults.cur_mut().theme_ui.import_error = Some(e.localized()),
                 }
             }
             // -- Custom UI (chrome) themes --
@@ -597,27 +597,27 @@ impl Oryxis {
                 // Seed from the currently active chrome colors so the user
                 // starts from a working theme.
                 let seed = crate::theme::theme_colors_to_hex(crate::theme::OryxisColors::t());
-                self.ui_theme_editor =
+                self.vaults.cur_mut().ui_theme_editor =
                     Some(crate::state::UiThemeEditorForm::new_from_colors(seed));
             }
             SettingsMessage::UiThemeEditorEdit(idx) => {
                 if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx) {
-                    self.ui_theme_editor =
+                    self.vaults.cur_mut().ui_theme_editor =
                         Some(crate::state::UiThemeEditorForm::from_theme(theme));
                 }
             }
             SettingsMessage::UiThemeEditorClose => {
-                self.ui_theme_editor = None;
+                self.vaults.cur_mut().ui_theme_editor = None;
                 self.ui_color_popover = None;
             }
             SettingsMessage::UiThemeEditorNameChanged(name) => {
-                if let Some(form) = &mut self.ui_theme_editor {
+                if let Some(form) = &mut self.vaults.cur_mut().ui_theme_editor {
                     form.name = name;
                     form.error = None;
                 }
             }
             SettingsMessage::UiThemeColorChanged(idx, value) => {
-                if let Some(form) = &mut self.ui_theme_editor
+                if let Some(form) = &mut self.vaults.cur_mut().ui_theme_editor
                     && idx < 21
                 {
                     let cleaned: String = value
@@ -636,11 +636,11 @@ impl Oryxis {
             }
             SettingsMessage::UiThemeEditorSave => {
                 if let Some(err) = self.save_ui_theme_editor() {
-                    if let Some(form) = &mut self.ui_theme_editor {
+                    if let Some(form) = &mut self.vaults.cur_mut().ui_theme_editor {
                         form.error = Some(err);
                     }
                 } else {
-                    self.ui_theme_editor = None;
+                    self.vaults.cur_mut().ui_theme_editor = None;
                     self.ui_color_popover = None;
                 }
             }
@@ -672,7 +672,7 @@ impl Oryxis {
             }
             SettingsMessage::ThemeEditorEdit(idx) => {
                 if let Some(theme) = self.vaults.cur().custom_terminal_themes.get(idx) {
-                    self.theme_ui.editor =
+                    self.vaults.cur_mut().theme_ui.editor =
                         Some(crate::state::ThemeEditorForm::from_theme(theme));
                 }
             }
@@ -680,13 +680,13 @@ impl Oryxis {
                 self.close_modal(crate::state::Modal::ThemeEditor);
             }
             SettingsMessage::ThemeEditorNameChanged(name) => {
-                if let Some(form) = &mut self.theme_ui.editor {
+                if let Some(form) = &mut self.vaults.cur_mut().theme_ui.editor {
                     form.name = name;
                     form.error = None;
                 }
             }
             SettingsMessage::ThemeEditorColorChanged(slot, value) => {
-                if let Some(form) = &mut self.theme_ui.editor {
+                if let Some(form) = &mut self.vaults.cur_mut().theme_ui.editor {
                     // Keep only hex-ish characters so the live preview stays
                     // sane while typing; full validation happens on save.
                     let cleaned: String = value
@@ -699,7 +699,7 @@ impl Oryxis {
             }
             SettingsMessage::ThemeEditorSave => {
                 if let Some(err) = self.save_theme_editor() {
-                    if let Some(form) = &mut self.theme_ui.editor {
+                    if let Some(form) = &mut self.vaults.cur_mut().theme_ui.editor {
                         form.error = Some(err);
                     }
                 } else {
@@ -761,7 +761,7 @@ impl Oryxis {
                     let mut form = crate::state::ThemeEditorForm::from_theme(theme);
                     form.editing_id = None;
                     form.name = self.unique_terminal_theme_name(&theme.name);
-                    self.theme_ui.editor = Some(form);
+                    self.vaults.cur_mut().theme_ui.editor = Some(form);
                 }
             }
             SettingsMessage::ThemeCloneBuiltin(idx) => {
@@ -770,7 +770,7 @@ impl Oryxis {
                 if let Some(theme) = oryxis_terminal::TerminalTheme::ALL.get(idx) {
                     let p = theme.palette();
                     let hex = crate::theme::color_to_hex;
-                    self.theme_ui.editor = Some(crate::state::ThemeEditorForm {
+                    self.vaults.cur_mut().theme_ui.editor = Some(crate::state::ThemeEditorForm {
                         editing_id: None,
                         name: self.unique_terminal_theme_name(theme.name()),
                         foreground: hex(p.foreground),
@@ -828,16 +828,16 @@ impl Oryxis {
                 }
             },
             SettingsMessage::ThemeGalleryFilterChanged(v) => {
-                self.theme_ui.gallery_filter = v;
+                self.vaults.cur_mut().theme_ui.gallery_filter = v;
             }
             SettingsMessage::ThemeGalleryToneChanged(tone) => {
-                self.theme_ui.gallery_tone = tone;
+                self.vaults.cur_mut().theme_ui.gallery_tone = tone;
             }
             SettingsMessage::UiThemeGalleryFilterChanged(v) => {
-                self.theme_ui.ui_gallery_filter = v;
+                self.vaults.cur_mut().theme_ui.ui_gallery_filter = v;
             }
             SettingsMessage::UiThemeGalleryToneChanged(tone) => {
-                self.theme_ui.ui_gallery_tone = tone;
+                self.vaults.cur_mut().theme_ui.ui_gallery_tone = tone;
             }
             SettingsMessage::ThemeImportBrowse => {
                 // Feed a scheme file into the paste modal; the existing
@@ -871,17 +871,17 @@ impl Oryxis {
             }
             SettingsMessage::ThemeImportFileLoaded(result) => match result {
                 Ok(content) => {
-                    if self.theme_ui.import_name.trim().is_empty()
+                    if self.vaults.cur().theme_ui.import_name.trim().is_empty()
                         && let Some(name) = crate::theme_import::suggest_name(&content)
                     {
-                        self.theme_ui.import_name = name;
+                        self.vaults.cur_mut().theme_ui.import_name = name;
                     }
-                    self.theme_ui.import_content =
+                    self.vaults.cur_mut().theme_ui.import_content =
                         iced::widget::text_editor::Content::with_text(&content);
-                    self.theme_ui.import_error = None;
+                    self.vaults.cur_mut().theme_ui.import_error = None;
                 }
                 Err(e) if e == "cancelled" => {}
-                Err(e) => self.theme_ui.import_error = Some(e),
+                Err(e) => self.vaults.cur_mut().theme_ui.import_error = Some(e),
             },
             SettingsMessage::UiThemeBuiltinCardHovered(idx) => {
                 self.nav.hover.builtin_ui_theme_card = Some(idx);
@@ -891,7 +891,7 @@ impl Oryxis {
             }
             SettingsMessage::UiThemeClone(idx) => {
                 if let Some(theme) = self.vaults.cur().custom_ui_themes.get(idx) {
-                    self.ui_theme_editor = Some(crate::state::UiThemeEditorForm {
+                    self.vaults.cur_mut().ui_theme_editor = Some(crate::state::UiThemeEditorForm {
                         editing_id: None,
                         name: self.unique_ui_theme_name(&theme.name),
                         colors: theme.colors.clone(),
@@ -901,7 +901,7 @@ impl Oryxis {
             }
             SettingsMessage::UiThemeCloneBuiltin(idx) => {
                 if let Some(theme) = AppTheme::ALL.get(idx) {
-                    self.ui_theme_editor = Some(crate::state::UiThemeEditorForm {
+                    self.vaults.cur_mut().ui_theme_editor = Some(crate::state::UiThemeEditorForm {
                         editing_id: None,
                         name: self.unique_ui_theme_name(theme.name()),
                         colors: crate::theme::theme_colors_to_hex(theme.colors_ref()),
@@ -934,24 +934,24 @@ impl Oryxis {
                 }
             }
             SettingsMessage::UiThemeImportOpen => {
-                self.panels.ui_theme_import = true;
-                self.ui_theme_import_content =
+                self.vaults.cur_mut().panels.ui_theme_import = true;
+                self.vaults.cur_mut().ui_theme_import_content =
                     iced::widget::text_editor::Content::new();
-                self.ui_theme_import_name.clear();
-                self.ui_theme_import_error = None;
+                self.vaults.cur_mut().ui_theme_import_name.clear();
+                self.vaults.cur_mut().ui_theme_import_error = None;
             }
             SettingsMessage::UiThemeImportClose => {
                 self.close_modal(crate::state::Modal::UiThemeImport);
             }
             SettingsMessage::UiThemeImportContentAction(action) => {
-                self.ui_theme_import_content.perform(action);
-                self.ui_theme_import_error = None;
+                self.vaults.cur_mut().ui_theme_import_content.perform(action);
+                self.vaults.cur_mut().ui_theme_import_error = None;
             }
             SettingsMessage::UiThemeImportNameChanged(v) => {
-                self.ui_theme_import_name = v;
+                self.vaults.cur_mut().ui_theme_import_name = v;
             }
             SettingsMessage::UiThemeImportApply => {
-                let content = self.ui_theme_import_content.text();
+                let content = self.vaults.cur().ui_theme_import_content.text();
                 match crate::theme_import::parse_ui_theme(
                     &content,
                     crate::i18n::t("theme_imported_default"),
@@ -959,29 +959,29 @@ impl Oryxis {
                     Ok(theme) => {
                         // A typed name overrides the file's own; dedupe up
                         // front so Save doesn't trip on a collision.
-                        let typed = self.ui_theme_import_name.trim();
+                        let typed = self.vaults.cur().ui_theme_import_name.trim();
                         let base = if typed.is_empty() { theme.name.as_str() } else { typed };
                         let name = if self.ui_theme_name_taken(base) {
                             self.unique_ui_theme_name(base)
                         } else {
                             base.to_string()
                         };
-                        self.ui_theme_editor = Some(crate::state::UiThemeEditorForm {
+                        self.vaults.cur_mut().ui_theme_editor = Some(crate::state::UiThemeEditorForm {
                             editing_id: None,
                             name,
                             colors: theme.colors,
                             error: None,
                         });
-                        self.panels.ui_theme_import = false;
+                        self.vaults.cur_mut().panels.ui_theme_import = false;
                     }
                     // Same courtesy in the other direction: a terminal
                     // scheme travels to Settings > Terminal instead of
                     // being turned away here.
                     Err(crate::theme_import::ImportError::WrongImporter(kind)) => {
-                        let typed = self.ui_theme_import_name.clone();
+                        let typed = self.vaults.cur().ui_theme_import_name.clone();
                         return Ok(self.hand_off_theme_import(kind, content, &typed));
                     }
-                    Err(e) => self.ui_theme_import_error = Some(e.localized()),
+                    Err(e) => self.vaults.cur_mut().ui_theme_import_error = Some(e.localized()),
                 }
             }
             SettingsMessage::UiThemeImportBrowse => {
@@ -1013,17 +1013,17 @@ impl Oryxis {
                 Ok(content) => {
                     // Fill the paste modal; Apply parses it like any pasted
                     // content (mirrors the terminal import flow).
-                    if self.ui_theme_import_name.trim().is_empty()
+                    if self.vaults.cur().ui_theme_import_name.trim().is_empty()
                         && let Some(name) = crate::theme_import::suggest_name(&content)
                     {
-                        self.ui_theme_import_name = name;
+                        self.vaults.cur_mut().ui_theme_import_name = name;
                     }
-                    self.ui_theme_import_content =
+                    self.vaults.cur_mut().ui_theme_import_content =
                         iced::widget::text_editor::Content::with_text(&content);
-                    self.ui_theme_import_error = None;
+                    self.vaults.cur_mut().ui_theme_import_error = None;
                 }
                 Err(e) if e == "cancelled" => {}
-                Err(e) => self.ui_theme_import_error = Some(e),
+                Err(e) => self.vaults.cur_mut().ui_theme_import_error = Some(e),
             },
             m => return Err(m),
         }
