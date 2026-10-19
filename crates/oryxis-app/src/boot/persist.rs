@@ -458,6 +458,20 @@ impl Oryxis {
         out
     }
 
+    /// Run `f` with vault `vault` as the one `update` works on and keep
+    /// the work it starts on that vault: the update's own tagging would
+    /// give its follow-ups the vault acting when the update ENDS.
+    pub(crate) fn task_on_vault(
+        &mut self,
+        vault: uuid::Uuid,
+        f: impl FnOnce(&mut Self) -> Task<Message>,
+    ) -> Task<Message> {
+        let previous = self.vaults.act_on(vault);
+        let task = f(self).map(move |m| m.on_vault(vault));
+        self.vaults.act_back(previous);
+        task
+    }
+
     /// Recreate last session's non-pinned tabs as dormant placeholders,
     /// once per process (issue #206), and decide what the launch owes
     /// them beyond that (issue #229).

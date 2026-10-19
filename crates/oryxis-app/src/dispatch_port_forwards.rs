@@ -886,10 +886,13 @@ impl Oryxis {
     /// (`or_insert` so a repeated failure never resets a backoff that's
     /// already climbing).
     fn pf_mark_retry_pending(&mut self, id: Uuid, cause: PfRetryCause) {
-        let is_auto = self
-            .vaults.cur().port_forward_rules
-            .iter()
-            .any(|r| r.id == id && r.auto_start);
+        // The rule's own vault decides, whichever vault this runs on (the
+        // liveness sweep is app-wide).
+        let Some(owner) = self.vault_of_forward_rule(id) else {
+            return;
+        };
+        let is_auto = owner.port_forward_rules.iter().any(|r| r.id == id && r.auto_start);
+        let auto_reconnect = owner.prefs.auto_reconnect;
         let allowed = match cause {
             // A forward that was UP and fell over is the same event as a
             // host disconnecting, so it answers to the same setting the
@@ -899,7 +902,7 @@ impl Oryxis {
             // different question from "keep it up", and it left a manually
             // started forward silently dead after a network blip while
             // every terminal tab climbed back on its own.
-            PfRetryCause::Dropped => self.vaults.cur().prefs.auto_reconnect || is_auto,
+            PfRetryCause::Dropped => auto_reconnect || is_auto,
             // A start the user just watched fail shows its error instead
             // of looping behind their back. Only an auto_start rule, whose
             // attempt nobody is watching, retries from here.
@@ -1001,28 +1004,50 @@ impl Oryxis {
         self.pf_reissue_pending_now()
     }
 
-    /// Issue a connect for every pending rule whose backoff has elapsed.
-    /// Prunes entries that are no longer eligible (rule deleted, no longer
-    /// wanted per `pf_retry_still_wanted`, or already up) so the
-    /// subscription unmounts once nothing is pending. Shared by the
-    /// heartbeat and the census kick.
+    /// The open vault holding forward rule `id`.
+    pub(crate) fn vault_of_forward_rule(&self, id: Uuid) -> Option<&crate::vault_slots::OpenVault> {
+        self.vaults.all().find(|v| v.port_forward_rules.iter().any(|r| r.id == id))
+    }
+
+    /// Whether a pending retry could run now: its rule's vault is open
+    /// and unlocked (a retry needs that vault's credentials, and would
+    /// burn attempts against a sealed one; a soft lock keeps the live
+    /// forwards but pauses its healer until the unlock).
+    pub(crate) fn pf_retry_runnable(&self, id: Uuid) -> bool {
+        self.vault_of_forward_rule(id)
+            .is_some_and(|v| v.vault_ui.state == crate::state::VaultState::Unlocked)
+    }
+
+    /// Issue a connect for every pending rule whose backoff has elapsed,
+    /// each on its rule's own vault. Prunes entries that are no longer
+    /// eligible (rule deleted, its vault closed, no longer wanted per
+    /// `pf_retry_still_wanted`, or already up) so the subscription
+    /// unmounts once nothing is pending; a locked vault's stay as they
+    /// are. Shared by the heartbeat and the census kick.
     fn pf_issue_due_retries(&mut self, now: Instant) -> Task<Message> {
         let ids: Vec<Uuid> = self.port_forward_retry.keys().copied().collect();
-        let auto_reconnect = self.vaults.cur().prefs.auto_reconnect;
-        let mut due = Vec::new();
+        let mut due: Vec<(Uuid, Uuid)> = Vec::new();
         for id in ids {
-            let still_wanted = self
-                .vaults.cur().port_forward_rules
-                .iter()
-                .any(|r| r.id == id && pf_retry_still_wanted(r.auto_start, auto_reconnect));
-            if !still_wanted || self.active_forwards.contains_key(&id) {
+            let owner = self.vault_of_forward_rule(id).map(|v| {
+                let wanted = v
+                    .port_forward_rules
+                    .iter()
+                    .any(|r| r.id == id && pf_retry_still_wanted(r.auto_start, v.prefs.auto_reconnect));
+                (v.id, wanted, v.vault_ui.state == crate::state::VaultState::Unlocked)
+            });
+            let Some((vault, true, unlocked)) = owner else {
+                self.port_forward_retry.remove(&id);
+                continue;
+            };
+            if self.active_forwards.contains_key(&id) {
                 self.port_forward_retry.remove(&id);
                 continue;
             }
             // An attempt is already in flight (or the connect just landed);
             // don't stack a second one. `start_port_forward` also guards
-            // this, but skipping here keeps the backoff honest.
-            if self.port_forward_starting.contains(&id) {
+            // this, but skipping here keeps the backoff honest. A locked
+            // vault's rule waits for its unlock.
+            if !unlocked || self.port_forward_starting.contains(&id) {
                 continue;
             }
             if self
@@ -1030,12 +1055,12 @@ impl Oryxis {
                 .get(&id)
                 .is_some_and(|r| r.next_at <= now)
             {
-                due.push(id);
+                due.push((id, vault));
             }
         }
 
         let mut tasks = Vec::new();
-        for id in due {
+        for (id, vault) in due {
             // Advance the backoff BEFORE issuing: a failure that lands after
             // this tick keeps climbing, and a success clears the entry.
             if let Some(retry) = self.port_forward_retry.get_mut(&id) {
@@ -1043,7 +1068,7 @@ impl Oryxis {
                 retry.next_at = now + pf_retry_backoff(retry.attempts);
             }
             tracing::info!("retrying auto-start port forward {id}");
-            tasks.push(self.start_port_forward(id, true));
+            tasks.push(self.task_on_vault(vault, |app| app.start_port_forward(id, true)));
         }
         Task::batch(tasks)
     }

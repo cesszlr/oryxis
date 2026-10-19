@@ -574,15 +574,14 @@ impl Oryxis {
         // auto_start rule is down and pending a re-attempt, and only while
         // unlocked (a retry needs vault credentials, and would burn attempts
         // against a sealed vault; a soft auto-lock keeps live forwards but
-        // pauses the healer until unlock). The 15 s heartbeat just wakes the
+        // pauses the healer until unlock), per rule by its own vault. The
+        // 15 s heartbeat just wakes the
         // handler; the per-rule exponential backoff (15 s → 120 s ceiling)
         // decides which rules are actually due. 15 s matches the shortest
         // backoff, so a permanently-down forward keeps this at a gentle
         // 4 wakes/min rather than churning the view faster than any rule
         // could possibly be due.
-        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
-            && !self.port_forward_retry.is_empty()
-        {
+        if self.port_forward_retry.keys().any(|id| self.pf_retry_runnable(*id)) {
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(15))
                     .map(|_| Message::PortForward(PortForwardMessage::PortForwardRetryTick)),
@@ -607,21 +606,31 @@ impl Oryxis {
             );
         }
 
-        // Cloud auto-refresh ticker. Only mounts the subscription when
-        // the user enabled the toggle in Settings; otherwise zero
-        // background API calls. Interval reads the persisted setting
+        // Cloud auto-refresh ticker, one per open vault that enabled the
+        // toggle in its Settings (each its own interval, each tick
+        // `ForVault` to that vault); otherwise zero background API calls.
+        // Unlocked only: a refresh reads the profile's secret and writes
+        // the merge into the vault. Interval reads the persisted setting
         // and falls back to 30 min on any parse failure so a malformed
         // value doesn't pin the ticker at 1 ms.
-        if self.vaults.cur().prefs.cloud_auto_refresh_enabled && !self.vaults.cur().cloud_profiles.is_empty() {
-            let minutes = self
-                .vaults.cur().prefs.cloud_auto_refresh_interval_minutes
+        for vault in self.vaults.all().filter(|v| {
+            v.vault_ui.state == crate::state::VaultState::Unlocked
+                && v.prefs.cloud_auto_refresh_enabled
+                && !v.cloud_profiles.is_empty()
+        }) {
+            let minutes = vault
+                .prefs
+                .cloud_auto_refresh_interval_minutes
                 .parse::<u64>()
                 .ok()
                 .filter(|m| *m > 0)
                 .unwrap_or(30);
             subs.push(
                 iced::time::every(std::time::Duration::from_secs(minutes * 60))
-                    .map(|_| Message::Cloud(CloudMessage::CloudAutoRefreshTick)),
+                    .with(vault.id)
+                    .map(|(vault, _)| {
+                        Message::ForVault(vault, Box::new(Message::Cloud(CloudMessage::CloudAutoRefreshTick)))
+                    }),
             );
         }
         // Cloud SSM/ECS idle keepalive. The SSM websocket drops the
