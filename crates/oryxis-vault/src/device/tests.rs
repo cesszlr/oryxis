@@ -452,3 +452,18 @@ fn another_vaults_sync_target_reads_while_locked_and_never_a_sealed_row() {
     assert!(read_plain_settings(&dir.path().join("missing.db"), &["sync_folder_path"]).is_empty());
     assert!(!dir.path().join("missing.db").exists());
 }
+
+#[test]
+fn the_first_vault_keeps_the_plain_mcp_variables_and_the_others_carry_their_slug() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(dir.path());
+    let first = store.entry(FIRST_VAULT_ID).unwrap();
+    assert_eq!(
+        mcp_env_names(&first),
+        McpEnvNames { token: "ORYXIS_MCP_TOKEN".into(), password: "ORYXIS_VAULT_PASSWORD".into() }
+    );
+    let work = store.create_entry("Área de Trabalho").unwrap();
+    assert_eq!(mcp_env_names(&work).password, "ORYXIS_VAULT_PASSWORD_AREA_DE_TRABALHO");
+    assert_eq!(mcp_env_names(&work).token, "ORYXIS_MCP_TOKEN_AREA_DE_TRABALHO");
+}
+

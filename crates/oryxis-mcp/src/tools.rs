@@ -1,10 +1,45 @@
 use serde_json::{json, Value};
 
+/// Every tool, each taking the optional `vault` parameter, after
+/// `list_vaults`.
 pub fn tool_definitions() -> Vec<Value> {
+    let mut tools = vec![list_vaults()];
+    tools.extend(base_tools().into_iter().map(with_vault_param));
+    tools
+}
+
+/// `list_vaults`: the vaults this server serves.
+fn list_vaults() -> Value {
+    json!({
+        "name": "list_vaults",
+        "description": "List the Oryxis vaults this server serves: `vault` (the slug every other answer carries and the `vault` parameter takes), `label`, and whether MCP and host writes are on in each.",
+        "inputSchema": { "type": "object", "properties": {} }
+    })
+}
+
+/// `tool` with the optional `vault` parameter.
+fn with_vault_param(mut tool: Value) -> Value {
+    if let Some(props) = tool
+        .get_mut("inputSchema")
+        .and_then(|s| s.get_mut("properties"))
+        .and_then(|p| p.as_object_mut())
+    {
+        props.insert(
+            "vault".into(),
+            json!({
+                "type": "string",
+                "description": "Vault slug (the `vault` field answers carry; list_vaults lists them). Narrows the call to that vault; needed only when several vaults are served and the call would be ambiguous: create_host, or a host or refused key two vaults share."
+            }),
+        );
+    }
+    tool
+}
+
+fn base_tools() -> Vec<Value> {
     vec![
         json!({
             "name": "list_hosts",
-            "description": "List all MCP-enabled SSH hosts in the vault. `username` is the host's own field (null when it leaves the user to its group or identity); `effective_username` is the login ssh_execute will use.",
+            "description": "List all MCP-enabled SSH hosts in every vault served (each with its `vault`). `username` is the host's own field (null when it leaves the user to its group or identity); `effective_username` is the login ssh_execute will use.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

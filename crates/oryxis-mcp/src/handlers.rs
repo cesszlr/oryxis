@@ -675,12 +675,22 @@ pub async fn handle_ssh_execute(
     let id = Uuid::parse_str(id_str).map_err(|_| "Invalid UUID".to_string())?;
 
     let started = Instant::now();
-    let plan = match resolve_dial_plan(&server.vault(), id, std::sync::Arc::clone(&server.refusals)) {
-        Ok(plan) => plan,
-        Err(PlanError::NotFound) => {
+    // The vault holding the host: its pool, its refusals, its pins.
+    let served = match server.holding_host(params, id) {
+        Ok(served) => served,
+        Err(e) => {
             // A host withdrawn from MCP (or deleted) takes its pooled
             // connection with it now, not at idle eviction.
-            server.pool.forget(id);
+            for v in server.served() {
+                v.pool.forget(id);
+            }
+            return Err(e);
+        }
+    };
+    let plan = match resolve_dial_plan(&served.vault(), id, std::sync::Arc::clone(&served.refusals)) {
+        Ok(plan) => plan,
+        Err(PlanError::NotFound) => {
+            served.pool.forget(id);
             return Err(PlanError::NotFound.into());
         }
         Err(e) => return Err(e.into()),
@@ -691,8 +701,8 @@ pub async fn handle_ssh_execute(
     let timeout = std::time::Duration::from_secs(timeout_secs);
     let endpoints = plan.endpoints.clone();
     // Only what THIS dial refuses may describe its failure.
-    server.refusals.clear_endpoints(&endpoints);
-    let outcome = server.pool.exec(plan, command, timeout, cancel).await;
+    served.refusals.clear_endpoints(&endpoints);
+    let outcome = served.pool.exec(plan, command, timeout, cancel).await;
     match outcome {
         Ok(run) => {
             tracing::info!(
@@ -709,6 +719,7 @@ pub async fn handle_ssh_execute(
                 "exit_code": run.result.exit_code,
                 "stdout": run.result.stdout,
                 "stderr": run.result.stderr,
+                "vault": served.slug,
             }))
         }
         Err(e) => {
@@ -726,7 +737,7 @@ pub async fn handle_ssh_execute(
             // this very dial ran.
             if e.stage == "connect" {
                 if let Some(text) =
-                    crate::hostkey::describe_refusals(&server.refusals, &endpoints)
+                    crate::hostkey::describe_refusals(&served.refusals, &endpoints)
                 {
                     return Err(format!("{}: {text}", e.stage_title()));
                 }

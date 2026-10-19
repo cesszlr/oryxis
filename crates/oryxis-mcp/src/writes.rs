@@ -552,7 +552,9 @@ fn finish(vault: &VaultStore, conn: &Connection, password: Option<&str>) -> Resu
 /// `create_host`: a new SSH host from `label` + `hostname` and whatever
 /// else the call carries.
 pub fn handle_create_host(server: &Server, params: Option<&Value>) -> Result<Value, String> {
-    let vault = server.vault();
+    // Into the one vault in scope; with several, the call's `vault`.
+    let served = server.one_in_scope(params)?;
+    let vault = served.vault();
     gate(&vault)?;
     let Field::Set(label) = str_field(params, "label")? else {
         return Err("Missing required parameter: label".to_string());
@@ -567,20 +569,22 @@ pub fn handle_create_host(server: &Server, params: Option<&Value>) -> Result<Val
     let password = apply_fields(&vault, &mut conn, params)?;
     credential_guard(&vault, None, &conn, password.as_deref())?;
     conn.updated_at = chrono::Utc::now();
-    tracing::info!(host = %conn.label, id = %conn.id, "create_host");
-    finish(&vault, &conn, password.as_deref())
+    tracing::info!(host = %conn.label, id = %conn.id, vault = %served.slug, "create_host");
+    finish(&vault, &conn, password.as_deref()).map(|r| crate::server::tagged(r, &served.slug))
 }
 
 /// `update_host`: change the given fields of an MCP-visible SSH host;
 /// every field not named keeps its value.
 pub fn handle_update_host(server: &Server, params: Option<&Value>) -> Result<Value, String> {
-    let vault = server.vault();
-    gate(&vault)?;
     let id_str = params
         .and_then(|p| p.get("id"))
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing required parameter: id".to_string())?;
     let id = Uuid::parse_str(id_str).map_err(|_| "Invalid UUID".to_string())?;
+    // The vault holding the host is the one written.
+    let served = server.holding_host(params, id)?;
+    let vault = served.vault();
+    gate(&vault)?;
     let conns = vault.list_mcp_connections().map_err(|e| e.to_string())?;
     let mut conn = conns
         .into_iter()
@@ -593,6 +597,6 @@ pub fn handle_update_host(server: &Server, params: Option<&Value>) -> Result<Val
     let password = apply_fields(&vault, &mut conn, params)?;
     credential_guard(&vault, Some(&original), &conn, password.as_deref())?;
     conn.updated_at = chrono::Utc::now();
-    tracing::info!(host = %conn.label, id = %conn.id, "update_host");
-    finish(&vault, &conn, password.as_deref())
+    tracing::info!(host = %conn.label, id = %conn.id, vault = %served.slug, "update_host");
+    finish(&vault, &conn, password.as_deref()).map(|r| crate::server::tagged(r, &served.slug))
 }

@@ -845,6 +845,33 @@ pub fn for_app_dir() -> Option<DeviceStore> {
     oryxis_core::paths::oryxis_dir().map(DeviceStore::at)
 }
 
+/// The environment variables a vault's MCP secrets ride in, for the
+/// app writing a client config and `oryxis-mcp` reading it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpEnvNames {
+    /// The MCP token (`mcp_server_token`).
+    pub token: String,
+    /// The master password, when the user embeds it.
+    pub password: String,
+}
+
+/// [`McpEnvNames`] of `entry`: `ORYXIS_MCP_TOKEN_<SLUG>` and
+/// `ORYXIS_VAULT_PASSWORD_<SLUG>`, the slug upper-cased with `-` as `_`.
+/// The FIRST vault keeps the plain `ORYXIS_MCP_TOKEN` /
+/// `ORYXIS_VAULT_PASSWORD`, so a config written before there were
+/// several vaults (and an `oryxis-mcp` that knows only those) keeps
+/// serving it.
+pub fn mcp_env_names(entry: &VaultEntry) -> McpEnvNames {
+    if entry.id == FIRST_VAULT_ID {
+        return McpEnvNames { token: "ORYXIS_MCP_TOKEN".into(), password: "ORYXIS_VAULT_PASSWORD".into() };
+    }
+    let suffix = entry.slug.to_ascii_uppercase().replace('-', "_");
+    McpEnvNames {
+        token: format!("ORYXIS_MCP_TOKEN_{suffix}"),
+        password: format!("ORYXIS_VAULT_PASSWORD_{suffix}"),
+    }
+}
+
 /// The file the app opens at start: the installed store's boot vault,
 /// else (no store installed: the MCP server) the install's `vault.db`.
 pub fn boot_vault_path() -> Option<PathBuf> {

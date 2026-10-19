@@ -192,8 +192,31 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
         .map(|p| p as u16)
         .ok_or_else(|| "Missing or invalid parameter: port (1-65535)".to_string())?;
 
-    // Guard one: only a key a dial of THIS process reported, verbatim.
-    let Some(refusal) = server.refusals.get(&host, port, &key_type) else {
+    // Guard one: only a key a dial of THIS process reported, verbatim,
+    // and pinned into the vault whose dial it was.
+    let refused_in: Vec<&crate::server::Served> = server
+        .in_scope(params)?
+        .into_iter()
+        .filter(|v| v.refusals.get(&host, port, &key_type).is_some())
+        .collect();
+    let served = match refused_in.as_slice() {
+        [one] => *one,
+        [] => {
+            return Err(format!(
+                "No refused dial reported a {key_type} key for {}; run ssh_execute against the host \
+                 first and use the values its answer carries.",
+                oryxis_core::net::host_port(&host, port)
+            ));
+        }
+        several => {
+            return Err(format!(
+                "Dials of more than one vault refused this key ({}); pass `vault` to say which \
+                 vault pins it.",
+                several.iter().map(|v| v.slug.as_str()).collect::<Vec<_>>().join(", ")
+            ));
+        }
+    };
+    let Some(refusal) = served.refusals.get(&host, port, &key_type) else {
         return Err(format!(
             "No refused dial reported a {key_type} key for {}; run ssh_execute against the host \
              first and use the values its answer carries.",
@@ -218,7 +241,7 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
     // Guard two: re-read the vault at the moment of writing. The app may
     // have pinned (or re-pinned) the host meanwhile, and `save_known_host`
     // replaces a different fingerprint without complaint.
-    let vault = server.vault();
+    let vault = served.vault();
     let pins: Vec<_> = vault
         .list_known_hosts()
         .map_err(|e| e.to_string())?
@@ -238,11 +261,12 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
     }
     match existing {
         Some(k) if k.fingerprint == fingerprint => {
-            server.refusals.remove(&host, port, &key_type);
+            served.refusals.remove(&host, port, &key_type);
             return Ok(json!({
                 "pinned": true,
                 "already_pinned": true,
                 "host": host, "port": port, "key_type": key_type, "fingerprint": fingerprint,
+                "vault": served.slug,
             }));
         }
         Some(k) => {
@@ -257,7 +281,7 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
     let kh = oryxis_core::models::KnownHost::new(&host, port, &key_type, &fingerprint);
     vault.save_known_host(&kh).map_err(|e| e.to_string())?;
     drop(vault);
-    server.refusals.remove(&host, port, &key_type);
+    served.refusals.remove(&host, port, &key_type);
     tracing::info!(host = %host, port, key_type = %key_type, fingerprint = %fingerprint, "host key pinned");
     // The running app keeps its Known Hosts in memory: tell it.
     if let Err(e) = oryxis_vault::change_notice::announce("oryxis-mcp") {
@@ -267,5 +291,6 @@ pub fn handle_accept_host_key(server: &Server, params: Option<&Value>) -> Result
         "pinned": true,
         "already_pinned": false,
         "host": host, "port": port, "key_type": key_type, "fingerprint": fingerprint,
+        "vault": served.slug,
     }))
 }

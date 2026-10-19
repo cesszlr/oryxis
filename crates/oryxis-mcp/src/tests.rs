@@ -82,8 +82,16 @@ mod tests {
     #[test]
     fn tool_definitions_lists_every_tool() {
         let tools = tool_definitions();
-        assert_eq!(tools.len(), 8);
+        assert_eq!(tools.len(), 9);
         let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+        assert!(names.contains(&"list_vaults"));
+        for tool in tools.iter().filter(|t| t["name"] != "list_vaults") {
+            assert!(
+                tool["inputSchema"]["properties"]["vault"].is_object(),
+                "{} takes no vault",
+                tool["name"]
+            );
+        }
         assert!(names.contains(&"accept_host_key"));
         assert!(names.contains(&"create_host"));
         assert!(names.contains(&"update_host"));
@@ -694,7 +702,7 @@ mod tests {
     async fn an_unknown_key_the_dial_refused_can_be_pinned_once() {
         let server = Server::new(test_vault());
         server
-            .refusals
+            .refusals()
             .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:abc", None);
         let args = json!({"host": "10.0.0.5", "port": 22, "key_type": "ssh-ed25519", "fingerprint": "SHA256:abc"});
         let (err, text) = call(&server, "accept_host_key", args.clone()).await;
@@ -709,7 +717,7 @@ mod tests {
 
         // The refusal is consumed, but the vault row makes a repeat a yes.
         server
-            .refusals
+            .refusals()
             .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:abc", None);
         let (err, text) = call(&server, "accept_host_key", args).await;
         assert!(!err, "{text}");
@@ -733,7 +741,7 @@ mod tests {
         assert!(text.contains("No refused dial"), "{text}");
 
         server
-            .refusals
+            .refusals()
             .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:real", None);
         let (err, text) = call(
             &server,
@@ -756,7 +764,7 @@ mod tests {
             .save_known_host(&pin("10.0.0.5", 22, "ssh-ed25519", "SHA256:old"))
             .unwrap();
         server
-            .refusals
+            .refusals()
             .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:new", Some(("ssh-ed25519", "SHA256:old")));
         let (err, text) = call(
             &server,
@@ -782,18 +790,18 @@ mod tests {
             .vault()
             .save_known_host(&pin("10.0.0.5", 22, "ssh-ed25519", "SHA256:real"))
             .unwrap();
-        let check = crate::handlers::make_host_key_check(&server.vault(), server.refusals.clone());
+        let check = crate::handlers::make_host_key_check(&server.vault(), server.refusals());
         assert!(matches!(
             check("10.0.0.5", 22, "ssh-rsa", "SHA256:mitm"),
             oryxis_ssh::HostKeyStatus::Changed { .. }
         ));
-        let r = server.refusals.get("10.0.0.5", 22, "ssh-rsa").unwrap();
+        let r = server.refusals().get("10.0.0.5", 22, "ssh-rsa").unwrap();
         assert_eq!(r.old_key_type.as_deref(), Some("ssh-ed25519"));
         assert_eq!(r.old_fingerprint.as_deref(), Some("SHA256:real"));
-        let text = crate::hostkey::describe_refusals(&server.refusals, &[("10.0.0.5".into(), 22)]).unwrap();
+        let text = crate::hostkey::describe_refusals(&server.refusals(), &[("10.0.0.5".into(), 22)]).unwrap();
         assert!(text.contains("pins ssh-ed25519 SHA256:real"), "{text}");
 
-        server.refusals.record("10.0.0.5", 22, "ssh-rsa", "SHA256:mitm", None);
+        server.refusals().record("10.0.0.5", 22, "ssh-rsa", "SHA256:mitm", None);
         let (err, text) = call(
             &server,
             "accept_host_key",
@@ -811,7 +819,7 @@ mod tests {
     async fn a_pin_made_meanwhile_is_not_replaced() {
         let server = Server::new(test_vault());
         server
-            .refusals
+            .refusals()
             .record("10.0.0.5", 22, "ssh-ed25519", "SHA256:abc", None);
         server
             .vault()
@@ -1253,4 +1261,167 @@ mod tests {
         let (err, text) = call(&server, "create_host", json!({"label": "x", "hostname": "10.0.0.1", "group": "Prod / Web"})).await;
         assert!(!err, "{text}");
     }
+
+    // ── Several vaults ──
+
+    /// A server for two vaults, Work and Home, each with MCP on.
+    fn two_vaults() -> std::sync::Arc<Server> {
+        use crate::server::Served;
+        Server::with_vaults(vec![
+            Served::new(uuid::Uuid::new_v4(), "work".into(), "Work".into(), test_vault()),
+            Served::new(uuid::Uuid::new_v4(), "home".into(), "Home".into(), test_vault()),
+        ])
+    }
+
+    fn mcp_host(label: &str) -> Connection {
+        let mut c = Connection::new(label, "10.1.1.1");
+        c.mcp_enabled = true;
+        c
+    }
+
+    #[tokio::test]
+    async fn every_answer_names_its_vault_and_a_host_is_found_in_its_own() {
+        let server = two_vaults();
+        let (work, home) = (&server.served()[0], &server.served()[1]);
+        let db = mcp_host("db");
+        work.vault().save_connection(&db, None).unwrap();
+        home.vault().save_connection(&mcp_host("nas"), None).unwrap();
+
+        let (err, text) = call(&server, "list_hosts", json!({})).await;
+        assert!(!err, "{text}");
+        let hosts: Value = serde_json::from_str(&text).unwrap();
+        let pairs: Vec<(String, String)> = hosts
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|h| (h["label"].as_str().unwrap().into(), h["vault"].as_str().unwrap().into()))
+            .collect();
+        assert_eq!(pairs, vec![("db".into(), "work".into()), ("nas".into(), "home".into())]);
+
+        let (_, text) = call(&server, "list_hosts", json!({"vault": "home"})).await;
+        assert!(!text.contains("\"db\""), "the vault parameter narrows: {text}");
+
+        let (err, text) = call(&server, "get_host", json!({"id": db.id.to_string()})).await;
+        assert!(!err, "{text}");
+        assert!(text.contains("\"vault\": \"work\""), "{text}");
+        let (err, _) = call(&server, "get_host", json!({"id": db.id.to_string(), "vault": "home"})).await;
+        assert!(err, "a host is not found in a vault that does not hold it");
+
+        let (err, text) = call(&server, "list_vaults", json!({})).await;
+        assert!(!err && text.contains("\"work\"") && text.contains("\"home\""), "{text}");
+    }
+
+    #[tokio::test]
+    async fn a_host_two_vaults_hold_needs_the_vault_named() {
+        let server = two_vaults();
+        let shared = mcp_host("shared");
+        for v in server.served() {
+            v.vault().save_connection(&shared, None).unwrap();
+        }
+        let id = shared.id.to_string();
+        let (err, text) = call(&server, "get_host", json!({"id": id})).await;
+        assert!(err && text.contains("pass `vault`"), "{text}");
+        let (err, text) = call(&server, "get_host", json!({"id": id, "vault": "home"})).await;
+        assert!(!err && text.contains("\"vault\": \"home\""), "{text}");
+    }
+
+    #[tokio::test]
+    async fn a_vault_with_mcp_off_is_not_reached() {
+        let server = two_vaults();
+        let (work, home) = (&server.served()[0], &server.served()[1]);
+        home.vault().set_setting("mcp_server_enabled", "false").unwrap();
+        let nas = mcp_host("nas");
+        home.vault().save_connection(&nas, None).unwrap();
+        work.vault().save_connection(&mcp_host("db"), None).unwrap();
+        let (_, text) = call(&server, "list_hosts", json!({})).await;
+        assert!(text.contains("db") && !text.contains("nas"), "{text}");
+        let (err, _) = call(&server, "get_host", json!({"id": nas.id.to_string()})).await;
+        assert!(err);
+        let (err, text) = call(&server, "list_hosts", json!({"vault": "home"})).await;
+        assert!(err && text.contains("served: work"), "{text}");
+        // Both off: the server answers as a disabled one always did.
+        work.vault().set_setting("mcp_server_enabled", "false").unwrap();
+        let (err, text) = call(&server, "list_hosts", json!({})).await;
+        assert!(err && text.contains("MCP server is disabled"), "{text}");
+    }
+
+    #[tokio::test]
+    async fn a_write_with_several_vaults_says_which_vault() {
+        let server = two_vaults();
+        for v in server.served() {
+            v.vault().set_setting(crate::writes::ALLOW_WRITES_SETTING, "true").unwrap();
+        }
+        let args = json!({"label": "new", "hostname": "10.2.2.2", "mcp_enabled": true});
+        let (err, text) = call(&server, "create_host", args.clone()).await;
+        assert!(err && text.contains("pass `vault`"), "{text}");
+        let mut named = args;
+        named["vault"] = json!("home");
+        let (err, text) = call(&server, "create_host", named).await;
+        assert!(!err && text.contains("\"vault\": \"home\""), "{text}");
+        let labels = |i: usize| -> Vec<String> {
+            server.served()[i].vault().list_connections().unwrap().into_iter().map(|c| c.label).collect()
+        };
+        assert_eq!(labels(1), vec!["new".to_string()]);
+        assert!(labels(0).is_empty(), "nothing was written into the other vault");
+    }
+
+    #[tokio::test]
+    async fn a_refused_key_is_pinned_in_the_vault_whose_dial_refused_it() {
+        let server = two_vaults();
+        let home = &server.served()[1];
+        let check = crate::handlers::make_host_key_check(&home.vault(), std::sync::Arc::clone(&home.refusals));
+        let _ = check("10.3.3.3", 22, "ssh-ed25519", "SHA256:home");
+        let (err, text) = call(
+            &server,
+            "accept_host_key",
+            json!({"host": "10.3.3.3", "port": 22, "key_type": "ssh-ed25519", "fingerprint": "SHA256:home"}),
+        )
+        .await;
+        assert!(!err && text.contains("\"vault\": \"home\""), "{text}");
+        let pinned = |i: usize| server.served()[i].vault().list_known_hosts().unwrap().len();
+        assert_eq!((pinned(0), pinned(1)), (0, 1));
+    }
+
+    #[test]
+    fn the_vaults_served_follow_the_passwords_and_tokens_given() {
+        use oryxis_vault::device::{mcp_env_names, DeviceStore, FIRST_VAULT_ID};
+        let dir = tempfile::tempdir().unwrap();
+        let device = DeviceStore::at(dir.path());
+        // The first vault: no password, a token. Work: a password.
+        let mut first = VaultStore::open(dir.path().join("vault.db")).unwrap();
+        first.open_without_password().unwrap();
+        first.set_setting("mcp_server_token", "tok-1").unwrap();
+        drop(first);
+        let work = device.create_entry("Work").unwrap();
+        std::fs::create_dir_all(device.resolve(&work).parent().unwrap()).unwrap();
+        let mut w = VaultStore::open(device.resolve(&work)).unwrap();
+        w.set_master_password("pw-work").unwrap();
+        drop(w);
+        let work_names = mcp_env_names(&work);
+        let slugs = |served: Vec<crate::server::Served>| served.into_iter().map(|s| s.slug).collect::<Vec<_>>();
+        let first_slug = device.entry(FIRST_VAULT_ID).unwrap().slug;
+
+        // An old client config (plain variables only): the first vault.
+        let old = |n: &str| (n == "ORYXIS_MCP_TOKEN").then(|| "tok-1".to_string());
+        assert_eq!(slugs(crate::open_vaults(&device, vec![], old).unwrap()), vec![first_slug.clone()]);
+
+        // Work's password too: both.
+        let both = |n: &str| match n {
+            "ORYXIS_MCP_TOKEN" => Some("tok-1".to_string()),
+            n if n == work_names.password => Some("pw-work".to_string()),
+            _ => None,
+        };
+        assert_eq!(slugs(crate::open_vaults(&device, vec![], both).unwrap()), vec![first_slug.clone(), "work".into()]);
+
+        // --vault picks one.
+        let args = vec!["--vault".to_string(), "work".to_string()];
+        assert_eq!(slugs(crate::open_vaults(&device, args, both).unwrap()), vec!["work".to_string()]);
+
+        // A wrong token leaves its vault out; nothing served is the error.
+        let wrong = |n: &str| (n == "ORYXIS_MCP_TOKEN").then(|| "nope".to_string());
+        let err = crate::open_vaults(&device, vec![], wrong).err().unwrap();
+        assert!(err.contains("token mismatch") && err.contains(&work_names.password), "{err}");
+        assert!(crate::open_vaults(&device, vec!["--vault".into(), "ghost".into()], both).is_err());
+    }
+
 }
