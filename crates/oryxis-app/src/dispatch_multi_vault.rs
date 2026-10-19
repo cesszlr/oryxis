@@ -740,6 +740,7 @@ impl Oryxis {
             }
             let previous = self.vaults.act_on(id);
             self.sever_vault_sessions();
+            tasks.push(self.stop_vault_forwards());
             self.vaults.act_back(previous);
             // Whatever parked view still names it holds tabs that just
             // ended.

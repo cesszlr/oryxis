@@ -338,6 +338,10 @@ impl Oryxis {
                         // its SFTP tabs. Another open vault's sessions go on
                         // (each vault locks on its own).
                         let in_view = self.sever_vault_sessions();
+                        // Its port forwards too: they are live sessions,
+                        // and the auto-start ones come back with the
+                        // unlock (the soft lock keeps them).
+                        let forwards = self.stop_vault_forwards();
                         // The reopen stack goes with them (issue #186).
                         // A manual lock is an explicit "I'm done" that
                         // severs every session; leaving a chord that
@@ -472,10 +476,14 @@ impl Oryxis {
                         // Same auto-focus as the soft lock: the unlock
                         // field is the only thing to interact with.
                         if in_view {
-                            return crate::widgets::focus_input(iced::widget::Id::new(
-                                "vault-unlock-password",
-                            ));
+                            return Task::batch([
+                                forwards,
+                                crate::widgets::focus_input(iced::widget::Id::new(
+                                    "vault-unlock-password",
+                                )),
+                            ]);
                         }
+                        return forwards;
                     } else {
                         // No user password: re-open immediately
                         if let Some(vault) = self.vaults.cur_mut().store.as_mut() {

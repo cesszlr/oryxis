@@ -851,14 +851,20 @@ impl Oryxis {
     /// connection, not leave it idling. `Connecting` entries are exempt,
     /// their `PortForwardConnReady` is still in flight and settles them.
     fn pf_gc_host_conns(&mut self) {
-        let rules = &self.vaults.cur().port_forward_rules;
+        // Every open vault's rules: a host's shared connection may carry
+        // another vault's forwards than the one this runs on.
+        let rules: Vec<(Uuid, Uuid)> = self
+            .vaults
+            .all()
+            .flat_map(|v| v.port_forward_rules.iter().map(|r| (r.id, r.host_id)))
+            .collect();
         let active = &self.active_forwards;
         let starting = &self.port_forward_starting;
         self.forward_conns.retain(|host_id, state| match state {
             PfHostConn::Connecting { .. } => true,
             PfHostConn::Up(_) => {
                 let on_this_host = |rid: &Uuid| {
-                    rules.iter().any(|r| r.id == *rid && r.host_id == *host_id)
+                    rules.iter().any(|(id, host)| id == rid && host == host_id)
                 };
                 active.keys().any(&on_this_host) || starting.iter().any(on_this_host)
             }
@@ -878,6 +884,34 @@ impl Oryxis {
         ids.into_iter()
             .map(|id| self.start_port_forward(id, true))
             .collect()
+    }
+
+    /// Stop every port forward of the acting vault: its manual lock (an
+    /// explicit "I'm done" that severs its sessions, a forward is one)
+    /// and its removal. Live forwards are cancelled (a `-R` releases its
+    /// server-side listener), a connect in flight is refused when it
+    /// lands (`PortForwardStarted` finds it no longer starting), pending
+    /// retries are dropped, and a shared connection left with no forward
+    /// closes. The soft lock keeps them, like it keeps the terminals.
+    /// Auto-start rules come back with the vault's next unlock.
+    pub(crate) fn stop_vault_forwards(&mut self) -> Task<Message> {
+        let ids: Vec<Uuid> = self.vaults.cur().port_forward_rules.iter().map(|r| r.id).collect();
+        let hosts: Vec<Uuid> = self.vaults.cur().port_forward_rules.iter().map(|r| r.host_id).collect();
+        let mut sessions = Vec::new();
+        for id in &ids {
+            self.port_forward_starting.remove(id);
+            self.port_forward_retry.remove(id);
+            if let Some(session) = self.active_forwards.remove(id) {
+                sessions.push(session);
+            }
+        }
+        self.pf_aborted_pending.retain(|host, _| !hosts.contains(host));
+        self.pf_gc_host_conns();
+        Task::batch(sessions.into_iter().map(|session| {
+            Task::perform(async move { session.cancel().await }, |_| {
+                Message::PortForward(PortForwardMessage::PortForwardLivenessTick)
+            })
+        }))
     }
 
     /// Mark a failed/dropped rule as pending and schedule its first
