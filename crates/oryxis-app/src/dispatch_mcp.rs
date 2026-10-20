@@ -131,16 +131,7 @@ impl Oryxis {
                 self.vaults.cur_mut().mcp.install_status = Some(result);
             }
             McpMessage::RegenerateMcpToken => {
-                let mut bytes = [0u8; 32];
-                getrandom::fill(&mut bytes)
-                    .expect("OS RNG unavailable");
-                let mut token = String::with_capacity(64);
-                for b in bytes {
-                    use std::fmt::Write as _;
-                    let _ = write!(token, "{b:02x}");
-                }
-                self.persist_setting("mcp_server_token", &token);
-                self.vaults.cur_mut().mcp.server_token = token;
+                self.mint_mcp_token();
                 // Reveal once after regenerating so the user can copy
                 // it without an extra click; flip it back to masked
                 // explicitly via `ToggleMcpTokenVisibility`. Not when
@@ -240,8 +231,23 @@ impl Oryxis {
     /// named by `--vault`.
     fn mcp_ensure_token_with_several_vaults(&mut self) {
         if self.vault_count() > 1 && self.vaults.cur().mcp.server_token.is_empty() {
-            let _ = self.handle_mcp(McpMessage::RegenerateMcpToken);
+            // Minted, not "regenerated": that arm reveals the token on
+            // screen, which a Copy or Install did not ask for.
+            self.mint_mcp_token();
         }
+    }
+
+    /// A fresh MCP token for the acting vault, stored and in state.
+    fn mint_mcp_token(&mut self) {
+        let mut bytes = [0u8; 32];
+        getrandom::fill(&mut bytes).expect("OS RNG unavailable");
+        let mut token = String::with_capacity(64);
+        for b in bytes {
+            use std::fmt::Write as _;
+            let _ = write!(token, "{b:02x}");
+        }
+        self.persist_setting("mcp_server_token", &token);
+        self.vaults.cur_mut().mcp.server_token = token;
     }
 
     /// Ask which AI clients are installed for the current target, off

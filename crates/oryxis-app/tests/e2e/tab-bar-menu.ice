@@ -19,7 +19,7 @@ click "Continue without password"
 settle 250
 # Empty strip, right of the `+`. Coordinates because empty space has no
 # text to aim a selector at, which is the whole point of the surface.
-click right (400.00, 18.00)
+click right (470.00, 18.00)
 settle 250
 expect "New Tab"
 absent "Reopen Closed Tab"
@@ -42,7 +42,7 @@ settle 250
 absent "bash (default)"
 # Now the strip has something to offer back, and it is the mouse path
 # the issue asked for.
-click right (400.00, 18.00)
+click right (470.00, 18.00)
 settle 250
 expect "Reopen Closed Tab"
 click "Reopen Closed Tab"

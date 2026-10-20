@@ -1427,6 +1427,30 @@ mod tests {
         assert!(err.contains("token mismatch") && err.contains(&work_names.password), "{err}");
         assert!(crate::open_vaults(&device, vec!["--vault".into(), "ghost".into()], both).is_err());
 
+        // A tokenless FIRST vault is served by a legacy config alone: an
+        // environment naming another vault by its slug is a config
+        // written for that vault, and must not be handed the first.
+        let mut first = VaultStore::open(dir.path().join("vault.db")).unwrap();
+        first.open_without_password().unwrap();
+        first.set_setting("mcp_server_token", "").unwrap();
+        drop(first);
+        let work_only = |n: &str| match n {
+            n if n == work_names.password => Some("pw-work".to_string()),
+            n if n == work_names.token => Some("tok-w".to_string()),
+            _ => None,
+        };
+        assert_eq!(slugs(crate::open_vaults(&device, vec![], work_only).unwrap()), vec!["work".to_string()]);
+        let nothing = |_: &str| None::<String>;
+        assert_eq!(
+            slugs(crate::open_vaults(&device, vec![], nothing).unwrap()),
+            vec![first_slug.clone()],
+            "a legacy config (no slug variable) still reaches the tokenless first vault"
+        );
+        let mut first = VaultStore::open(dir.path().join("vault.db")).unwrap();
+        first.open_without_password().unwrap();
+        first.set_setting("mcp_server_token", "tok-1").unwrap();
+        drop(first);
+
         // A vault other than the first with no token is never served: a
         // client set up for the first vault would reach it.
         let mut w = VaultStore::open(device.resolve(&work)).unwrap();
