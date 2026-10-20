@@ -78,6 +78,9 @@ use iced_test::futures::futures::channel::mpsc::{self, TryRecvError};
 /// control over anyway. Generous because a cold tokio +
 /// headless-renderer start under a software rasterizer can be slow.
 const BOOT_TIMEOUT: Duration = Duration::from_secs(120);
+/// The least a boot waits after its last event before it is taken as
+/// up with a session still streaming (`Session::pump_boot`).
+const BOOT_QUIET_FLOOR: Duration = Duration::from_secs(2);
 
 /// Which harness front-end was requested on the CLI.
 enum Frontend {
@@ -485,7 +488,8 @@ where
     P: Program + 'static,
 {
     /// Boots the emulated application and pumps until the boot task
-    /// settles (or [`BOOT_TIMEOUT`] passes).
+    /// settles ([`Session::pump_boot`]: `Ready`, a quiet channel, or
+    /// [`BOOT_TIMEOUT`]).
     fn new(program: &P, options: &Options) -> (Self, Pump) {
         let (sender, receiver) = mpsc::channel(256);
         let mut session = Self {
@@ -500,7 +504,7 @@ where
             shot_counter: 0,
             history: Vec::new(),
         };
-        let boot = session.pump_until_ready(program, BOOT_TIMEOUT);
+        let boot = session.pump_boot(program);
         (session, boot)
     }
 
@@ -525,7 +529,51 @@ where
         self.receiver = receiver;
         self.emulator = Emulator::new(sender, program, self.mode, self.viewport);
         self.history.clear();
-        Ok(self.pump_until_ready(program, BOOT_TIMEOUT))
+        Ok(self.pump_boot(program))
+    }
+
+    /// Pumps a boot (first start or `reset`) until the app is ready,
+    /// or until the channel has been QUIET for the per-instruction
+    /// timeout, or until [`BOOT_TIMEOUT`] passes.
+    ///
+    /// The quiet exit is for a boot that opens a session: a restored
+    /// tab dialled at launch (`restore_tabs_connect`), the landing on a
+    /// live tab, a connect-at-launch host. Its stream lives as long as
+    /// the session, so in Zen mode the emulator never counts its tasks
+    /// down to zero and `Ready` never comes; before this, such a
+    /// `reset` sat out the whole boot budget (120 s, twice in
+    /// `restore-tabs-connect.ice`). Quiet, not elapsed: a boot that is
+    /// still producing events (data load, the shell's first prompt) is
+    /// never cut short, and a test that lowered `timeout` for its live
+    /// session gets a reset that waits that long after the last event,
+    /// the same deal every instruction after the open already has,
+    /// under a floor: a boot has silent stretches an instruction does
+    /// not (the vault open, the data load, the strip restored before
+    /// the dial spawns), and a test's 500 ms would end it early on a
+    /// loaded runner, with the next `expect` racing the boot. A plain
+    /// boot still returns on `Ready`, in well under a second.
+    fn pump_boot(&mut self, program: &P) -> Pump {
+        let quiet = self.timeout.max(BOOT_QUIET_FLOOR);
+        let deadline = Instant::now() + BOOT_TIMEOUT;
+        let mut last_event = Instant::now();
+        loop {
+            match self.receiver.try_recv() {
+                Ok(Event::Action(action)) => {
+                    self.emulator.perform(program, action);
+                    last_event = Instant::now();
+                }
+                Ok(Event::Ready) => return Pump::Ready,
+                Ok(Event::Failed(instruction)) => return Pump::Failed(instruction),
+                Err(TryRecvError::Closed) => return Pump::Closed,
+                Err(TryRecvError::Empty) => {
+                    let now = Instant::now();
+                    if now >= deadline || now.duration_since(last_event) >= quiet {
+                        return Pump::Timeout;
+                    }
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            }
+        }
     }
 
     /// Parses and executes one `.ice` instruction line, recording it

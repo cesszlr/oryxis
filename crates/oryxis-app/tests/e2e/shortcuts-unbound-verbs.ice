@@ -55,6 +55,10 @@ expect "Reset"
 click "Reset"
 settle 250
 # Unbound again: on a shell tab the chord moves nothing.
+# A PTY lives from here on, so no instruction settles on its own:
+# cap the per-instruction wait (20 s by default) like the other
+# shell tests do.
+timeout 800
 type ctrl+shift+l
 settle 900
 expect "bash (default)"

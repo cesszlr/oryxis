@@ -11,6 +11,10 @@ expect "Welcome to Oryxis"
 click "Skip"
 click "Continue without password"
 expect "Create host"
+# A PTY lives from here on, so no instruction settles on its own:
+# cap the per-instruction wait (20 s by default) like the other
+# shell tests do.
+timeout 800
 type ctrl+shift+l
 settle 1500
 absent "Create host"

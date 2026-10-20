@@ -42,6 +42,10 @@ click "Save"
 settle 250
 expect "work-db"
 # A tab of Work: a local shell.
+# A PTY lives from here on, so no instruction settles on its own:
+# cap the per-instruction wait (20 s by default) like the other
+# shell tests do.
+timeout 800
 type ctrl+shift+l
 settle 250
 wait 1000

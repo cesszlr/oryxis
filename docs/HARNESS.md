@@ -238,6 +238,12 @@ Two things to know:
   instruction burns the full instruction timeout before handing
   control back. Everything still executes; it is only wasted
   wall-clock. `settle` remains the right way to let output arrive.
+  A boot (the first start, a `reset`) that opens a session on its own
+  (a tab restored and dialled at launch, the landing on a live tab)
+  has the same never-ending task from its first frame, so it ends on
+  `Ready` OR once the event stream has stayed quiet for that same
+  per-instruction timeout (2 s at the least), never on the full boot
+  budget.
 - **Assert terminal output visually.** The grid is a canvas, so
   `expect` cannot match text inside it; take a `screenshot` instead.
   The status bar is a regular text widget, so

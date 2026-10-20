@@ -64,6 +64,10 @@ expect "dc-marker.txt"
 # button sits after the SFTP chip; a coordinate, as it carries no text.
 click (402, 20)
 settle
+# A PTY lives from here on, so no instruction settles on its own:
+# cap the per-instruction wait (20 s by default) like the other
+# shell tests do.
+timeout 800
 click "Local Shell"
 settle 800
 click (1036, 20)
