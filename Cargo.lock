@@ -2321,7 +2321,7 @@ checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 [[package]]
 name = "dpi"
 version = "0.1.2"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 
 [[package]]
 name = "dtor"
@@ -9878,7 +9878,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "cfg_aliases 0.2.2",
@@ -9904,7 +9904,7 @@ dependencies = [
 [[package]]
 name = "winit-android"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "android-activity",
  "bitflags 2.13.2",
@@ -9919,7 +9919,7 @@ dependencies = [
 [[package]]
 name = "winit-appkit"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "block2",
@@ -9941,7 +9941,7 @@ dependencies = [
 [[package]]
 name = "winit-common"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "block2",
  "dpi 0.1.2 (git+https://github.com/wilsonglasser/winit)",
@@ -9959,7 +9959,7 @@ dependencies = [
 [[package]]
 name = "winit-core"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "cursor-icon",
@@ -9973,7 +9973,7 @@ dependencies = [
 [[package]]
 name = "winit-orbital"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "dpi 0.1.2 (git+https://github.com/wilsonglasser/winit)",
@@ -9989,7 +9989,7 @@ dependencies = [
 [[package]]
 name = "winit-uikit"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "block2",
@@ -10009,7 +10009,7 @@ dependencies = [
 [[package]]
 name = "winit-wayland"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "calloop",
@@ -10036,7 +10036,7 @@ dependencies = [
 [[package]]
 name = "winit-web"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "atomic-waker",
  "bitflags 2.13.2",
@@ -10058,7 +10058,7 @@ dependencies = [
 [[package]]
 name = "winit-win32"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "cursor-icon",
@@ -10076,7 +10076,7 @@ dependencies = [
 [[package]]
 name = "winit-x11"
 version = "0.31.0-beta.3"
-source = "git+https://github.com/wilsonglasser/winit#9410f9e5748be9bdf0829acac5c4117c6c720dc4"
+source = "git+https://github.com/wilsonglasser/winit#792a8471a26fbb0477a59246b698cd5e40c933c5"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
