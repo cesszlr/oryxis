@@ -1042,7 +1042,7 @@ impl Oryxis {
                         // Applied inside the lock: the marks' grid positions
                         // refer to rows this very batch drew.
                         let new_marks = state.take_shell_marks();
-                        run_marks = new_marks
+                        let batch_marks: Vec<crate::snippet_run::RunMark> = new_marks
                             .iter()
                             .filter_map(|m| match m.mark {
                                 oryxis_terminal::ShellMark::PromptEnd
@@ -1055,6 +1055,14 @@ impl Oryxis {
                                 _ => None,
                             })
                             .collect();
+                        // Held while a synchronized update keeps this
+                        // batch's text off the grid; the flush feeds them
+                        // too (`TerminalSyncFlush`).
+                        run_marks = crate::snippet_run::marks_to_feed(
+                            &mut pane.held_run_marks,
+                            batch_marks,
+                            state.sync_timeout().is_some(),
+                        );
                         if !new_marks.is_empty() {
                             // Drained in the same breath as the marks: a
                             // `CommandLine` mark resolves its text by id

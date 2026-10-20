@@ -672,6 +672,7 @@ impl Oryxis {
                 {
                     pane.sync_flush_scheduled = false;
                     let mut reschedule: Option<std::time::Duration> = None;
+                    let mut flushed = false;
                     if let Ok(mut state) = pane.terminal.lock() {
                         match state.sync_timeout() {
                             // The app extended the update past our deadline
@@ -685,7 +686,10 @@ impl Oryxis {
                             }
                             // Deadline reached, update still open: force the
                             // buffered frame onto the grid.
-                            Some(_) => state.flush_sync(),
+                            Some(_) => {
+                                state.flush_sync();
+                                flushed = true;
+                            }
                             // Closed normally in the meantime; nothing to do.
                             None => {}
                         }
@@ -698,6 +702,12 @@ impl Oryxis {
                             },
                             move |_| Message::Terminal(TerminalMessage::TerminalSyncFlush(pane_id)),
                         );
+                    }
+                    // The text the held marks waited for is on the grid
+                    // now: a run's command-end wait may go on.
+                    if flushed && !pane.held_run_marks.is_empty() {
+                        let held = std::mem::take(&mut pane.held_run_marks);
+                        return self.snippet_run_marks(pane_id, &held);
                     }
                 }
             }

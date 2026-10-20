@@ -259,6 +259,24 @@ pub(crate) enum RunMark {
     End(Option<i32>),
 }
 
+/// The marks a run is fed after one batch. A shell mark is sniffed from
+/// the byte stream ahead of the emulator, and a DEC `?2026` synchronized
+/// update still open at the end of the batch (a prompt framework draws
+/// the prompt, where the D mark is emitted, inside one) HOLDS the text
+/// back from the grid: fed now, a command-end mark would resume the run
+/// and its Copy Screen / Save Output would read the screen from before
+/// the command's output (reported on PR #260). So the batch's marks wait
+/// on the pane (`held`) while an update is open, and go in, in order,
+/// with the first batch that closes it or at the stalled-update flush.
+pub(crate) fn marks_to_feed(held: &mut Vec<RunMark>, batch: Vec<RunMark>, update_open: bool) -> Vec<RunMark> {
+    held.extend(batch);
+    if update_open {
+        Vec::new()
+    } else {
+        std::mem::take(held)
+    }
+}
+
 /// What a command-end wait makes of one batch's marks: the exit of the
 /// command it waits for, if this batch ended it. `ready` is updated as the
 /// marks go by.
@@ -284,6 +302,22 @@ mod tests {
         let outer = snip("outer", vec![SnippetStep::RunSnippet { id: install.id }]);
         let all = vec![install.clone(), outer.clone()];
         assert_eq!(flatten(&all, &outer), Err(PlanError::Install("setup".into())));
+    }
+
+    #[test]
+    fn marks_wait_for_an_open_synchronized_update_to_close() {
+        let mut held = Vec::new();
+        // The D arrives with the update still open: nothing is fed.
+        assert!(marks_to_feed(&mut held, vec![RunMark::End(Some(0))], true).is_empty());
+        // The next batch closes it (or the flush ran): the held D leads,
+        // this batch's marks follow, in order.
+        assert_eq!(
+            marks_to_feed(&mut held, vec![RunMark::Ready], false),
+            vec![RunMark::End(Some(0)), RunMark::Ready]
+        );
+        assert!(held.is_empty());
+        // No update open: the batch goes straight through.
+        assert_eq!(marks_to_feed(&mut held, vec![RunMark::Ready], false), vec![RunMark::Ready]);
     }
 
     #[test]

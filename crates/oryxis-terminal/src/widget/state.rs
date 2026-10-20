@@ -1339,6 +1339,28 @@ mod tests {
         assert_eq!(state.visible_text(), "three\nfour\nfive");
     }
 
+    /// A shell mark is sniffed from the byte stream ahead of the
+    /// emulator, while an open DEC `?2026` synchronized update holds the
+    /// text back: a command-end mark inside such a block reaches its
+    /// reader before the output it follows is on the grid. What reads
+    /// the grid on that mark (a snippet's Copy Screen) sees the screen
+    /// from before the update; the text lands at the closing `?2026l`
+    /// or the stalled-update flush.
+    #[test]
+    fn a_mark_inside_an_open_synchronized_update_precedes_its_text() {
+        let mut state = TerminalState::new_no_pty_with_scrollback(24, 3, 100).expect("headless state");
+        state.process(b"$ ls\r\n\x1b[?2026hfile-a\r\n\x1b]133;D;0\x07");
+        let marks = state.take_shell_marks();
+        assert!(
+            marks.iter().any(|m| matches!(m.mark, crate::osc::ShellMark::CommandEnd(Some(0)))),
+            "the D mark is delivered at once: {marks:?}"
+        );
+        assert_eq!(state.visible_text(), "$ ls", "the output is still held by the open update");
+        assert!(state.sync_timeout().is_some(), "an update is open");
+        state.flush_sync();
+        assert_eq!(state.visible_text(), "$ ls\nfile-a", "the flush lands it");
+    }
+
     // ── Anchored region reads (AI tool capture) ──
 
     /// The whole point of the anchor: what was already on screen when the

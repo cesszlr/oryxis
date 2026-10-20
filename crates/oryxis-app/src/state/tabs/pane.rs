@@ -725,6 +725,10 @@ pub(crate) struct Pane {
     /// The flag is the rising-edge guard so a long sync burst (one
     /// `PtyOutput` per coalesced batch) arms a single timer, not one each.
     pub sync_flush_scheduled: bool,
+    /// Snippet-run marks of batches that ended with a DEC `?2026`
+    /// synchronized update still open, fed once the text they follow is
+    /// on the grid (`snippet_run::marks_to_feed`).
+    pub held_run_marks: Vec<crate::snippet_run::RunMark>,
     /// Latest window title the shell set via OSC 0/2 (`None` once an OSC
     /// ResetTitle, or never set). When auto-title is on, the tab strip shows
     /// this instead of the connection label so a tab reads as the running
@@ -966,6 +970,7 @@ impl Pane {
             relaunch: None,
             local_generation: 0,
             sync_flush_scheduled: false,
+            held_run_marks: Vec::new(),
             osc_title: None,
             bell_flash: false,
             cwd: None,
