@@ -103,6 +103,11 @@ matching installer. Windows binaries are Authenticode-signed (see
   optional master password, biometric unlock (Windows Hello / Touch ID /
   Linux keyring), idle auto-lock, TOTP autofill for 2FA hosts, and
   stored passwords offered at `sudo` prompts (never sent on their own).
+- **Several vaults.** Keep Work and Personal in separate encrypted
+  files, each with its own master password, settings, sync and MCP
+  exposure, open at once: every window works on one vault and switches
+  in place from the Home tab, a per-vault shortcut or the palette, while
+  the other vault's tabs keep running. Two vaults never share a key.
 - **The full SSH pipeline.** Auto-auth, multi-hop jump chains, SOCKS /
   HTTP / command proxies, agent forwarding, standalone `-L`/`-R`/`-D` port
   forwarding, expect-style login scripts for menu-driven bastions
@@ -275,11 +280,6 @@ tracks it interactively.
 
 **Planned**
 
-- **Multiple vaults:** keep separate encrypted vaults (Personal, Work)
-  instead of one. Each has its own lock password, so isolation is real:
-  two vaults never share a key. A unified unlock is offered for people
-  who want the split for organization rather than secrecy, opening the
-  linked ones together; that is a per-vault choice, not the default.
 - **AI ops toolkit:** the assistant graduates from generating shell
   strings to typed, structured operations synthesized for the host's
   actual OS, with dry-run previews on every state change, an audit

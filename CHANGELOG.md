@@ -4,6 +4,28 @@ All notable changes to Oryxis are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Several encrypted vaults can be open at once, each with its own master password, settings, sync and MCP exposure; every window works on one of them.
+
+### Added
+- Several vaults: Settings > Vaults creates, renames, locks, removes and deletes vaults, and opens a vault file from anywhere (a USB key); the file of a vault that is not there is reported, never replaced.
+- The Home tab carries the vault the window works on and its switcher; Settings > Vaults moves the switcher to the toolbar or hides it with a single vault.
+- A shortcut per vault, plus "Next vault", "Previous vault" and "Open vault switcher" (unbound), and "Vault: <name>", "New vault…" and "Lock all vaults" in the command palette.
+- The app opens the last vault used; Settings > Vaults can ask which vault to open at start instead.
+- Each vault keeps its own idle auto-lock, recordings, auto-reconnect, port forwards and cloud refresh; a vault's manual lock stops its port forwards.
+- A deep link, a JumpList entry or `--connect` opens the vault that holds the host; the tray's recent hosts list every open vault's.
+- Settings rows that apply to the whole device (language, renderer, folders, the SSH agent, updates, shortcuts) carry a badge; the rest belong to the vault.
+- The SSH agent serves the keys of every unlocked vault; with several, a key's comment names its vault.
+- Every vault syncs on its own (folder, Git, WebDAV, SFTP, relay); two vaults pointed at one target are refused; P2P sync listens on one port for every vault, a remote device pairs with one vault per computer, and peers on older builds keep working.
+- An `.oryxis` export can be imported as a new vault.
+- The window title names the vault when there are several.
+- MCP plugin 0.1.13 serves every vault it can open: `ORYXIS_VAULT_PASSWORD_<SLUG>` and `ORYXIS_MCP_TOKEN_<SLUG>` per vault (the first keeps the plain names), `--vault <slug>` for one, a `vault` field in every answer, a `vault` parameter on every tool, and `list_vaults`; Settings > MCP Server writes each vault's variables into the same client entry.
+
+### Changed
+- Device-level settings (language, window geometry, tray, renderer, updates, offline mode, local programs and folders, the SSH agent, the sync listen port and device name, shortcuts) now live in `~/.oryxis/device.json`, copied once from the vault on first start.
+- A second Oryxis process no longer removes the first one's spooled recordings at start.
+
 ## [0.21.0] - 2026-10-16
 
 A snippet can now hold several actions, run in order on one terminal, and Settings > Shortcuts can start from another terminal's keys. A vault file damaged on disk says why it does not open and can be rebuilt, and the MCP plugin can add and edit hosts.
