@@ -11,7 +11,7 @@ click "Continue without password"
 settle 250
 # New-tab button and the host picker's close: neither carries text, so
 # both are coordinates. Retake them if the tab strip's metrics change.
-click (92.00, 20.00)
+click (161.00, 20.00)
 settle 250
 click "SFTP"
 settle 250

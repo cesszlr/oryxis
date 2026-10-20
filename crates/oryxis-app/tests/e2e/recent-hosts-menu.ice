@@ -30,7 +30,7 @@ expect "Create host"
 # Nothing has been connected yet, so the menu has nothing recent to
 # offer: a row that is always there and usually does nothing reads as
 # broken the first time it is tried, the same rule the reopen follows.
-click right (400.00, 18.00)
+click right (470.00, 18.00)
 settle 250
 expect "New Tab"
 absent "prod-database"
@@ -55,7 +55,7 @@ click "prod-database-primary-eu-west-1"
 settle 1500
 expect "Connection failed with connection log:"
 # The strip's own menu now carries it, under the hairline.
-click right (400.00, 18.00)
+click right (470.00, 18.00)
 settle 400
 expect "prod-database-primary-e…"
 screenshot recent-strip-menu
