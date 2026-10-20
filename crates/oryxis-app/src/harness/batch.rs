@@ -4,7 +4,10 @@
 //! in file-name order, each one against a freshly wiped sandbox (the
 //! `.oryxis` directory is removed before every test), so tests are
 //! independent, deterministic and always start from the first-run
-//! (onboarding) state regardless of what ran before them.
+//! (onboarding) state regardless of what ran before them. That
+//! independence is also what lets `--harness-shard <i>/<n>` run one
+//! slice of the list ([`super::Shard`]: round-robin over the sorted
+//! names), so CI spreads the directory over several runners.
 //!
 //! Unlike `iced_test::run`, which waits indefinitely for the emulator
 //! to quiesce after each instruction (a live PTY keeps a never-ending
@@ -47,7 +50,7 @@ use std::time::Duration;
 use iced::{Program, Size};
 use iced_test::emulator;
 
-use super::{Frontend, Options, Pump, RunOutcome, Session};
+use super::{Frontend, Options, Pump, RunOutcome, Session, Shard};
 
 /// One parsed `.ice` file: the header metadata plus the raw body
 /// lines (comments and blanks already dropped).
@@ -62,12 +65,21 @@ pub(super) fn serve<P>(program: P, options: Options, dir: &Path) -> iced::Result
 where
     P: Program + 'static,
 {
-    let tests = match collect(dir) {
+    let tests = match collect(dir, options.shard) {
         Ok(tests) => tests,
         Err(reason) => fail(&reason),
     };
     if tests.is_empty() {
         fail(&format!("no .ice tests found in {}", dir.display()));
+    }
+    if let Some(shard) = options.shard {
+        println!(
+            "== shard {}/{}: {} of the .ice tests in {}",
+            shard.index,
+            shard.count,
+            tests.len(),
+            dir.display()
+        );
     }
 
     let errors_dir = dir.join("errors");
@@ -91,7 +103,15 @@ where
         );
     }
 
-    println!("== ok all ice tests passed in {}", dir.display());
+    match options.shard {
+        Some(shard) => println!(
+            "== ok all ice tests of shard {}/{} passed in {}",
+            shard.index,
+            shard.count,
+            dir.display()
+        ),
+        None => println!("== ok all ice tests passed in {}", dir.display()),
+    }
     Ok(())
 }
 
@@ -103,18 +123,11 @@ fn fail(reason: &str) -> ! {
 }
 
 /// Reads and parses every `.ice` file in `dir`, sorted by file name
-/// so the run order is deterministic (`fs::read_dir` order is not).
-fn collect(dir: &Path) -> Result<Vec<IceFile>, String> {
-    let entries = std::fs::read_dir(dir).map_err(|e| format!("reading {}: {e}", dir.display()))?;
-    let mut paths: Vec<PathBuf> = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("ice"))
-        .collect();
-    paths.sort();
-
-    let mut tests = Vec::with_capacity(paths.len());
-    for path in paths {
+/// so the run order is deterministic (`fs::read_dir` order is not),
+/// or the `shard`'s slice of that list.
+fn collect(dir: &Path, shard: Option<Shard>) -> Result<Vec<IceFile>, String> {
+    let mut tests = Vec::new();
+    for path in shard_paths(dir, shard)? {
         let content = std::fs::read_to_string(&path)
             .map_err(|e| format!("reading {}: {e}", path.display()))?;
         let (viewport, mode, lines) =
@@ -127,6 +140,27 @@ fn collect(dir: &Path) -> Result<Vec<IceFile>, String> {
         });
     }
     Ok(tests)
+}
+
+/// The `.ice` paths of `dir` in name order, or the `shard`'s slice of
+/// them (by position in that order).
+fn shard_paths(dir: &Path, shard: Option<Shard>) -> Result<Vec<PathBuf>, String> {
+    let entries = std::fs::read_dir(dir).map_err(|e| format!("reading {}: {e}", dir.display()))?;
+    let mut paths: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("ice"))
+        .collect();
+    paths.sort();
+    if let Some(shard) = shard {
+        paths = paths
+            .into_iter()
+            .enumerate()
+            .filter(|(position, _)| shard.holds(*position))
+            .map(|(_, path)| path)
+            .collect();
+    }
+    Ok(paths)
 }
 
 /// Parses an `.ice` file: `key: value` metadata lines up to the
@@ -230,6 +264,7 @@ where
         scale: options.scale,
         mode: test.mode,
         timeout: options.timeout,
+        shard: options.shard,
     };
     let (mut session, boot) = Session::new(program, &per_test);
     match boot {
@@ -440,5 +475,38 @@ mod tests {
         assert!(parse_ice("viewport: 800x600\nmode: dance\n-----\n").is_err());
         assert!(parse_ice("viewport: 800\nmode: zen\n-----\n").is_err());
         assert!(parse_ice("viewport: 800x600\nspeed: fast\n-----\n").is_err());
+    }
+
+    #[test]
+    fn three_shards_partition_a_directory_exactly() {
+        let dir = tempfile::tempdir().unwrap();
+        let names = ["b.ice", "a.ice", "d.ice", "c.ice", "notes.txt", "e.ice", "g.ice", "f.ice"];
+        for name in names {
+            std::fs::write(dir.path().join(name), "").unwrap();
+        }
+        let whole = shard_paths(dir.path(), None).unwrap();
+        let stems = |paths: &[PathBuf]| -> Vec<String> {
+            paths
+                .iter()
+                .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(stems(&whole), ["a.ice", "b.ice", "c.ice", "d.ice", "e.ice", "f.ice", "g.ice"]);
+
+        let mut seen = Vec::new();
+        for index in 1..=3 {
+            let shard = Shard::parse(&format!("{index}/3")).unwrap();
+            let slice = shard_paths(dir.path(), Some(shard)).unwrap();
+            // Round-robin: shard 1 holds a, d, g; 2 holds b, e; 3 holds c, f.
+            let expected: Vec<&str> = match index {
+                1 => vec!["a.ice", "d.ice", "g.ice"],
+                2 => vec!["b.ice", "e.ice"],
+                _ => vec!["c.ice", "f.ice"],
+            };
+            assert_eq!(stems(&slice), expected, "shard {index}");
+            seen.extend(slice);
+        }
+        seen.sort();
+        assert_eq!(seen, whole, "the shards together are the whole list, once each");
     }
 }

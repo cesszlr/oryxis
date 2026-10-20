@@ -6,7 +6,8 @@
 //! `--harness-ctl` client) parsed from the CLI before anything else
 //! in `main()`:
 //!
-//! - `oryxis --harness-run <dir>`: batch-runs every `.ice` test file
+//! - `oryxis --harness-run <dir>` (`--harness-shard <i>/<n>` for one
+//!   slice of it): batch-runs every `.ice` test file
 //!   in `<dir>`, in file-name order, each on a freshly wiped sandbox
 //!   (first-run state), with the harness line grammar (instructions
 //!   plus `settle` / `wait` / `timeout` / `screenshot` / `#`
@@ -122,6 +123,50 @@ pub struct Options {
     mode: emulator::Mode,
     /// Per-instruction completion timeout in the interactive modes.
     timeout: Duration,
+    /// `--harness-shard <i>/<n>`: the slice of the batch this process
+    /// runs, so CI can spread one directory over several runners.
+    shard: Option<Shard>,
+}
+
+/// One slice of a batch run: the files at positions `index - 1`,
+/// `index - 1 + count`, ... of the directory's name-sorted list.
+///
+/// Round-robin over the sorted names, so every slice is decided by
+/// the directory's content alone and a file added or removed moves
+/// the others by at most one slot. Every file runs on a freshly wiped
+/// sandbox, which is what makes the slices independent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Shard {
+    /// 1-based.
+    index: usize,
+    count: usize,
+}
+
+impl Shard {
+    /// Parses `<i>/<n>` with `1 <= i <= n`.
+    fn parse(raw: &str) -> Result<Self, String> {
+        let (index, count) = raw
+            .split_once('/')
+            .ok_or_else(|| format!("--harness-shard wants <i>/<n>, got {raw:?}"))?;
+        let index = index
+            .trim()
+            .parse::<usize>()
+            .map_err(|e| format!("--harness-shard index: {e}"))?;
+        let count = count
+            .trim()
+            .parse::<usize>()
+            .map_err(|e| format!("--harness-shard count: {e}"))?;
+        if count == 0 || index == 0 || index > count {
+            return Err(format!("--harness-shard {raw:?}: want 1 <= i <= n"));
+        }
+        Ok(Self { index, count })
+    }
+
+    /// Whether the file at `position` of the sorted list is this
+    /// slice's.
+    pub fn holds(self, position: usize) -> bool {
+        position % self.count == self.index - 1
+    }
 }
 
 /// Parses harness flags out of the process arguments. Returns `None`
@@ -242,6 +287,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
     let mut scale = 1.0f32;
     let mut mode = emulator::Mode::Zen;
     let mut timeout = Duration::from_millis(20_000);
+    let mut shard: Option<Shard> = None;
     // Harness-only flags seen without a harness mode are an error,
     // not a silent no-op: `--home` on a normal launch means the user
     // thought they were sandboxed when they weren't.
@@ -265,6 +311,10 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             }
             "--harness-run" => {
                 batch = Some(PathBuf::from(value("--harness-run")?));
+            }
+            "--harness-shard" => {
+                harness_flags.push("--harness-shard");
+                shard = Some(Shard::parse(value("--harness-shard")?)?);
             }
             "--home" => {
                 harness_flags.push("--home");
@@ -346,6 +396,9 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
     if port_given && !serve_daemon {
         return Err("--port only makes sense with --harness-serve or --harness-ctl".into());
     }
+    if shard.is_some() && batch.is_none() {
+        return Err("--harness-shard only makes sense with --harness-run".into());
+    }
 
     let frontend = if let Some(dir) = batch {
         Frontend::Batch(dir)
@@ -368,6 +421,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
         scale,
         mode,
         timeout,
+        shard,
     })))
 }
 
@@ -1192,6 +1246,38 @@ mod tests {
     #[test]
     fn harness_flags_without_a_mode_are_an_error() {
         assert!(parse(&args(&["--home", "/tmp/x"])).is_err());
+        assert!(parse(&args(&["--harness-shard", "1/2"])).is_err());
+    }
+
+    #[test]
+    fn a_shard_is_one_slice_of_a_batch_run() {
+        let options =
+            mode_options(parse(&args(&["--harness-run", "d", "--harness-shard", "2/3"])).unwrap());
+        assert_eq!(options.shard, Some(Shard { index: 2, count: 3 }));
+        // Only the batch runner has a list to slice.
+        assert!(parse(&args(&["--harness-repl", "--harness-shard", "1/2"])).is_err());
+        assert!(parse(&args(&["--harness-serve", "--harness-shard", "1/2"])).is_err());
+        for bad in ["0/3", "4/3", "1/0", "2", "a/b", "1/"] {
+            assert!(
+                parse(&args(&["--harness-run", "d", "--harness-shard", bad])).is_err(),
+                "{bad:?} parsed"
+            );
+        }
+    }
+
+    #[test]
+    fn shards_partition_the_sorted_list_round_robin() {
+        let shards: Vec<Shard> = (1..=3).map(|i| Shard::parse(&format!("{i}/3")).unwrap()).collect();
+        for position in 0..10 {
+            let holders: Vec<usize> = shards
+                .iter()
+                .filter(|s| s.holds(position))
+                .map(|s| s.index)
+                .collect();
+            assert_eq!(holders, vec![position % 3 + 1], "position {position}");
+        }
+        let whole = Shard::parse("1/1").unwrap();
+        assert!((0..10).all(|p| whole.holds(p)));
     }
 
     #[test]

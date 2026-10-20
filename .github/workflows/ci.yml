@@ -65,8 +65,18 @@ jobs:
 
   # The headless E2E suite (docs/HARNESS.md): the real app, real vault,
   # real subscriptions, no window. Its own job because it is long
-  # (~45 s per file) and because a red UI test must be readable as
-  # "the UI moved", not mixed into the compile gate.
+  # (~10 s per file on this runner, a few minutes for the files that
+  # drive a live shell through several resets) and because a red UI
+  # test must be readable as "the UI moved", not mixed into the
+  # compile gate.
+  #
+  # Three shards: every file runs on a freshly wiped sandbox, so the
+  # list splits cleanly, and `--harness-shard i/3` takes every third
+  # file of the name-sorted list (round-robin, so a file added or
+  # removed moves the others by one slot at most). Nothing else is
+  # shared between the shards; each builds the same binary from the
+  # same cache. `fail-fast` is off so one red shard still lets the
+  # others finish and report.
   #
   # It exists as a job at all because four committed `.ice` files had
   # silently rotted: the runner aborts on the FIRST failure, so each
@@ -78,8 +88,12 @@ jobs:
   # No network by design (see the note in font-pack.ice), and every test
   # runs on a freshly wiped sandbox HOME, never the runner's own.
   e2e:
-    name: Headless E2E
+    name: Headless E2E (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v5
 
@@ -118,14 +132,16 @@ jobs:
       # loaded runner either can miss its assert by a hair; the runner
       # aborts on the FIRST failure, so one flake takes the whole suite
       # with it. A genuine break fails both attempts, so this costs a
-      # rerun on a flake and hides nothing. `vault-lock-confirm` and
-      # `sftp-slow-click-rename` are the two that have actually flaked.
+      # rerun on a flake (of this shard only) and hides nothing.
+      # `vault-lock-confirm` and `sftp-slow-click-rename` are the two
+      # that have actually flaked.
       - name: Run the .ice suite
         run: |
           run_suite() {
             rm -rf "$RUNNER_TEMP/e2e-home"
             mkdir -p "$RUNNER_TEMP/e2e-home"
             target/debug/oryxis --harness-run crates/oryxis-app/tests/e2e \
+              --harness-shard "${{ matrix.shard }}/3" \
               --home "$RUNNER_TEMP/e2e-home"
           }
           run_suite || {
@@ -136,11 +152,13 @@ jobs:
       # Canvas assertions are screenshot-based (text selectors cannot see
       # inside the terminal), so the shots are the only evidence of what
       # a failing run actually drew.
+      # One artifact per shard: v4 artifacts are immutable, a second
+      # upload under one name fails the job that gets there second.
       - name: Collect screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-screenshots
+          name: e2e-screenshots-${{ matrix.shard }}
           # `--home X` puts the shots in `X/shots`; the glob stays broad
           # so a run that relocates them still uploads something.
           path: ${{ runner.temp }}/e2e-home/**/*.png

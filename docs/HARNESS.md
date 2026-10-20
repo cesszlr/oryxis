@@ -37,7 +37,12 @@ Runs every `.ice` file in `<dir>` in file-name order (`fs::read_dir`
 order is not deterministic, so the runner sorts), each one on a
 freshly wiped sandbox: the `.oryxis` directory is removed before
 every test, so every test starts from the first-run (onboarding)
-state and never depends on what ran before it. A failing instruction
+state and never depends on what ran before it. That independence is
+what `--harness-shard <i>/<n>` builds on: the process runs only the
+files at positions `i-1`, `i-1+n`, ... of the sorted list (round-robin,
+so a file added or removed moves the others by one slot at most), and
+CI spreads the directory over three runners that way, each on its own
+wiped sandbox. A failing instruction
 dumps a PNG screenshot plus a truncated reproduction `.ice` into
 `<dir>/errors/` and exits non-zero.
 
@@ -144,6 +149,7 @@ ignored, so a command file can be annotated.
 | `--scale <f>` | `1` | screenshot scale factor (0.25..=4) |
 | `--mode zen\|patient\|immediate` | `zen` | task-waiting strategy |
 | `--timeout-ms <ms>` | `20000` | REPL per-instruction timeout |
+| `--harness-shard <i>/<n>` | the whole list | batch mode only: run the i-th of n round-robin slices of the sorted `.ice` list |
 
 ## Daemon + CLI client (AI agents): `--harness-serve` / `--harness-ctl`
 
