@@ -2726,6 +2726,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Nhập thành kho mới",
         "import_new_vault_name" => "Tên kho mới",
         "import_into_new_vault_failed" => "Kho mới đã được tạo, nhưng nhập thất bại: {error}",
+        "vault_mcp_config_not_cleaned" => "Kho đã bị xóa, nhưng không thể gỡ các biến MCP của nó khỏi mọi cấu hình máy khách: {error}",
+        "vault_delete_file_left" => "Kho đã rời khỏi danh sách, nhưng không thể xóa tệp của nó (chương trình khác đang giữ?): {path}",
         "vault_status_missing" => "Không tìm thấy tệp. Kho sẽ trở lại khi tệp trở lại (ví dụ một USB).",
         "vault_status_unlocked" => "Đã mở khóa",
         "vault_status_locked" => "Đã khóa",

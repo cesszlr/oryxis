@@ -2692,6 +2692,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Importer comme nouveau coffre",
         "import_new_vault_name" => "Nom du nouveau coffre",
         "import_into_new_vault_failed" => "Le nouveau coffre a été créé, mais l’import a échoué : {error}",
+        "vault_mcp_config_not_cleaned" => "Le coffre est supprimé, mais ses variables MCP n’ont pas pu être retirées de toutes les configurations client : {error}",
+        "vault_delete_file_left" => "Le coffre a quitté la liste, mais son fichier n’a pas pu être supprimé (un autre programme l’utilise ?) : {path}",
         "vault_status_missing" => "Fichier introuvable. Le coffre revient quand son fichier revient (une clé USB, par exemple).",
         "vault_status_unlocked" => "Déverrouillé",
         "vault_status_locked" => "Verrouillé",

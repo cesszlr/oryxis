@@ -2731,6 +2731,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "ייבוא ככספת חדשה",
         "import_new_vault_name" => "שם הכספת החדשה",
         "import_into_new_vault_failed" => "הכספת החדשה נוצרה, אבל הייבוא נכשל: {error}",
+        "vault_mcp_config_not_cleaned" => "הכספת הוסרה, אבל לא ניתן היה להסיר את משתני ה-MCP שלה מכל תצורות הלקוחות: {error}",
+        "vault_delete_file_left" => "הכספת הוסרה מהרשימה, אבל לא ניתן היה למחוק את הקובץ שלה (תוכנית אחרת מחזיקה בו?): {path}",
         "vault_status_missing" => "הקובץ לא נמצא. הכספת תחזור כשהקובץ שלה יחזור (למשל דיסק און קי).",
         "vault_status_unlocked" => "לא נעולה",
         "vault_status_locked" => "נעולה",

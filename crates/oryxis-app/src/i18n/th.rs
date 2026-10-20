@@ -2732,6 +2732,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "นำเข้าเป็น Vault ใหม่",
         "import_new_vault_name" => "ชื่อ Vault ใหม่",
         "import_into_new_vault_failed" => "สร้าง Vault ใหม่แล้ว แต่การนำเข้าล้มเหลว: {error}",
+        "vault_mcp_config_not_cleaned" => "ลบ Vault แล้ว แต่ไม่สามารถลบตัวแปร MCP ของมันออกจากการตั้งค่าไคลเอนต์ทั้งหมด: {error}",
+        "vault_delete_file_left" => "นำ Vault ออกจากรายการแล้ว แต่ลบไฟล์ไม่ได้ (มีโปรแกรมอื่นใช้อยู่หรือไม่): {path}",
         "vault_status_missing" => "ไม่พบไฟล์ Vault จะกลับมาเมื่อไฟล์กลับมา (เช่น แฟลชไดรฟ์)",
         "vault_status_unlocked" => "ปลดล็อกแล้ว",
         "vault_status_locked" => "ล็อกอยู่",

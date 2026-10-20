@@ -2694,6 +2694,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Importar como um cofre novo",
         "import_new_vault_name" => "Nome do cofre novo",
         "import_into_new_vault_failed" => "O cofre novo foi criado, mas a importação falhou: {error}",
+        "vault_mcp_config_not_cleaned" => "O cofre foi removido, mas as variáveis de MCP dele não puderam ser tiradas de todas as configurações de cliente: {error}",
+        "vault_delete_file_left" => "O cofre saiu da lista, mas o arquivo não pôde ser apagado (outro programa está usando?): {path}",
         "vault_status_missing" => "Arquivo não encontrado. O cofre volta quando o arquivo voltar (um pendrive, por exemplo).",
         "vault_status_unlocked" => "Desbloqueado",
         "vault_status_locked" => "Bloqueado",

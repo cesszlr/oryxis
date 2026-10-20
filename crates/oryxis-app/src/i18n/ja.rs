@@ -2694,6 +2694,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "新しいボールトとしてインポート",
         "import_new_vault_name" => "新しいボールトの名前",
         "import_into_new_vault_failed" => "新しいボールトは作成されましたが、インポートに失敗しました：{error}",
+        "vault_mcp_config_not_cleaned" => "ボールトは削除されましたが、MCP 変数をすべてのクライアント設定から取り除けませんでした：{error}",
+        "vault_delete_file_left" => "ボールトは一覧から外れましたが、ファイルを削除できませんでした（他のプログラムが使用中ですか？）：{path}",
         "vault_status_missing" => "ファイルが見つかりません。ファイルが戻れば (USB メモリなど) ボールトも戻ります。",
         "vault_status_unlocked" => "ロック解除済み",
         "vault_status_locked" => "ロック中",

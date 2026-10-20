@@ -2693,6 +2693,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Импортировать как новое хранилище",
         "import_new_vault_name" => "Имя нового хранилища",
         "import_into_new_vault_failed" => "Новое хранилище создано, но импорт не удался: {error}",
+        "vault_mcp_config_not_cleaned" => "Хранилище удалено, но его переменные MCP не удалось убрать из всех конфигураций клиентов: {error}",
+        "vault_delete_file_left" => "Хранилище убрано из списка, но его файл не удалось удалить (его держит другая программа?): {path}",
         "vault_status_missing" => "Файл не найден. Хранилище вернётся, когда вернётся его файл (например, флешка).",
         "vault_status_unlocked" => "Разблокировано",
         "vault_status_locked" => "Заблокировано",

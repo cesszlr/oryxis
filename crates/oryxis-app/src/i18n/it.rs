@@ -2693,6 +2693,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Importa come nuovo vault",
         "import_new_vault_name" => "Nome del nuovo vault",
         "import_into_new_vault_failed" => "Il nuovo vault è stato creato, ma l’importazione non è riuscita: {error}",
+        "vault_mcp_config_not_cleaned" => "Il vault è stato rimosso, ma le sue variabili MCP non sono state tolte da tutte le configurazioni dei client: {error}",
+        "vault_delete_file_left" => "Il vault è uscito dall’elenco, ma il suo file non è stato eliminato (un altro programma lo tiene aperto?): {path}",
         "vault_status_missing" => "File non trovato. Il vault torna quando torna il suo file (una chiavetta USB, per esempio).",
         "vault_status_unlocked" => "Sbloccato",
         "vault_status_locked" => "Bloccato",

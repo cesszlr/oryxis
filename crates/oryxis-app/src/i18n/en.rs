@@ -2735,6 +2735,8 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "import_as_new_vault" => "Import as a new vault",
         "import_new_vault_name" => "Name of the new vault",
         "import_into_new_vault_failed" => "The new vault was created, but the import failed: {error}",
+        "vault_mcp_config_not_cleaned" => "The vault is gone, but its MCP variables could not be removed from every client config: {error}",
+        "vault_delete_file_left" => "The vault was removed from the list, but its file could not be deleted (is another program holding it?): {path}",
         "vault_status_missing" => "File not found. The vault comes back when its file does (a USB key, for instance).",
         "vault_status_unlocked" => "Unlocked",
         "vault_status_locked" => "Locked",

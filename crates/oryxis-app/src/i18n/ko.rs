@@ -2726,6 +2726,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "새 볼트로 가져오기",
         "import_new_vault_name" => "새 볼트 이름",
         "import_into_new_vault_failed" => "새 볼트는 만들었지만 가져오기에 실패했습니다: {error}",
+        "vault_mcp_config_not_cleaned" => "볼트는 제거되었지만 모든 클라이언트 설정에서 MCP 변수를 지우지 못했습니다: {error}",
+        "vault_delete_file_left" => "볼트는 목록에서 빠졌지만 파일을 삭제하지 못했습니다(다른 프로그램이 사용 중인가요?): {path}",
         "vault_status_missing" => "파일을 찾을 수 없습니다. 파일이 돌아오면(예: USB 메모리) 볼트도 돌아옵니다.",
         "vault_status_unlocked" => "잠금 해제됨",
         "vault_status_locked" => "잠김",

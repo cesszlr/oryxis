@@ -111,7 +111,9 @@ pub(crate) fn entry_env(entry: &serde_json::Value) -> Vec<(String, String)> {
             .collect();
     }
     match entry.get("args").and_then(|a| a.as_array()).map(|a| a.as_slice()) {
-        Some([flag, line]) if flag == "/c" => line.as_str().map(parse_cmd_sets).unwrap_or_default(),
+        Some([flag, line]) if flag.as_str().is_some_and(|f| f.eq_ignore_ascii_case("/c")) => {
+            line.as_str().map(parse_cmd_sets).unwrap_or_default()
+        }
         _ => Vec::new(),
     }
 }

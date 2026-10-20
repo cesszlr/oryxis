@@ -1251,6 +1251,26 @@ mod tests {
         assert_eq!(host_labels(&y), vec!["home-nas".to_string()]);
     }
 
+    /// A vault opened from a copy of another open vault's file carries
+    /// the same identity: the listener serves one of them, never both.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_copied_vault_file_cannot_take_over_the_originals_peers() {
+        let listener = crate::engine::SyncListener::bind(0, None).unwrap();
+        let identity = DeviceIdentity::generate("this-pc");
+        let config = || SyncConfig { enabled: true, mode: SyncMode::Manual, listen_port: 0, ..SyncConfig::default() };
+        let mut original = SyncEngine::new(config(), identity.clone(), Arc::new(Mutex::new(test_vault())))
+            .with_listener(listener.clone());
+        let _ = original.take_events();
+        original.start().unwrap();
+        let mut copy = SyncEngine::new(config(), identity, Arc::new(Mutex::new(test_vault())))
+            .with_listener(listener.clone());
+        let _ = copy.take_events();
+        assert!(copy.start().is_err(), "the copy's engine was attached beside the original's");
+        // The original stopping frees its identity for a restart.
+        original.stop();
+        assert!(copy.start().is_ok());
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn a_remote_identity_pairs_with_one_vault_per_device() {
         let listener = crate::engine::SyncListener::bind(0, None).unwrap();

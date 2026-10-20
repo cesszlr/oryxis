@@ -87,15 +87,18 @@ fn fields_a_newer_build_wrote_survive_a_rewrite() {
 }
 
 #[test]
-fn a_file_that_does_not_parse_reads_as_fresh_and_is_kept_aside() {
+fn a_file_that_does_not_parse_reads_as_fresh_and_is_never_written_over() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join(FILE_NAME);
     std::fs::write(&path, b"{ not json").unwrap();
     let store = store_in(dir.path());
     assert_eq!(store.vaults(), vec![VaultEntry::first()]);
-    store.set("language", "it").unwrap();
+    // A write refuses: the registry a hand edit broke (every other
+    // vault) must not be replaced by a fresh one-vault file.
+    assert!(matches!(store.set("language", "it"), Err(DeviceError::Unparsable { .. })));
+    assert_eq!(std::fs::read(&path).unwrap(), b"{ not json", "the file is kept as it is");
     assert_eq!(std::fs::read(dir.path().join("device.json.broken")).unwrap(), b"{ not json");
-    assert_eq!(store_in(dir.path()).get("language").as_deref(), Some("it"));
+    assert_eq!(store_in(dir.path()).get("language"), None);
 }
 
 #[test]

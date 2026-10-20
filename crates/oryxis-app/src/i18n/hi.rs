@@ -2731,6 +2731,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "नए वॉल्ट के रूप में इंपोर्ट करें",
         "import_new_vault_name" => "नए वॉल्ट का नाम",
         "import_into_new_vault_failed" => "नया वॉल्ट बन गया, पर इंपोर्ट विफल रहा: {error}",
+        "vault_mcp_config_not_cleaned" => "वॉल्ट हट गया, पर उसके MCP वेरिएबल हर क्लाइंट कॉन्फ़िग से नहीं हटाए जा सके: {error}",
+        "vault_delete_file_left" => "वॉल्ट सूची से हट गया, पर उसकी फ़ाइल नहीं हटाई जा सकी (क्या कोई और प्रोग्राम उसे खोले हुए है?): {path}",
         "vault_status_missing" => "फ़ाइल नहीं मिली। फ़ाइल वापस आने पर (जैसे USB ड्राइव) वॉल्ट भी लौट आएगा।",
         "vault_status_unlocked" => "अनलॉक",
         "vault_status_locked" => "लॉक",

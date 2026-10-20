@@ -2730,6 +2730,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Εισαγωγή ως νέο vault",
         "import_new_vault_name" => "Όνομα του νέου vault",
         "import_into_new_vault_failed" => "Το νέο vault δημιουργήθηκε, αλλά η εισαγωγή απέτυχε: {error}",
+        "vault_mcp_config_not_cleaned" => "Το vault αφαιρέθηκε, αλλά οι μεταβλητές MCP του δεν αφαιρέθηκαν από όλες τις ρυθμίσεις πελατών: {error}",
+        "vault_delete_file_left" => "Το vault βγήκε από τη λίστα, αλλά το αρχείο του δεν διαγράφηκε (το κρατά άλλο πρόγραμμα;): {path}",
         "vault_status_missing" => "Το αρχείο δεν βρέθηκε. Το vault επιστρέφει όταν επιστρέψει το αρχείο του (π.χ. ένα USB stick).",
         "vault_status_unlocked" => "Ξεκλείδωτο",
         "vault_status_locked" => "Κλειδωμένο",

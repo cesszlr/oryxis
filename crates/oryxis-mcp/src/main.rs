@@ -105,10 +105,20 @@ pub(crate) fn open_vaults(
             return Err(format!("No vault \"{slug}\" is registered; known: {}.", known.join(", ")));
         }
     }
+    // A config written for several vaults names at least one by its
+    // slug; a legacy one (the first vault only, from before there were
+    // several) names none. Only the latter may reach the first vault
+    // without a token: otherwise a config installed for vault B alone
+    // would also be handed a tokenless first vault.
+    let legacy_config = !entries
+        .iter()
+        .filter(|e| e.id != oryxis_vault::device::FIRST_VAULT_ID)
+        .map(oryxis_vault::device::mcp_env_names)
+        .any(|names| env(&names.token).is_some() || env(&names.password).is_some());
     let mut served = Vec::new();
     let mut skipped = Vec::new();
     for entry in entries.iter().filter(|e| named.as_ref().is_none_or(|n| &e.slug == n)) {
-        match open_one(device, entry, &env) {
+        match open_one(device, entry, &env, legacy_config || named.is_some()) {
             Ok(store) => served.push(Served::new(
                 entry.id,
                 entry.slug.clone(),
@@ -132,6 +142,7 @@ fn open_one(
     device: &oryxis_vault::device::DeviceStore,
     entry: &oryxis_vault::device::VaultEntry,
     env: &impl Fn(&str) -> Option<String>,
+    tokenless_first: bool,
 ) -> Result<VaultStore, String> {
     let path = device.resolve(entry);
     if !path.is_file() {
@@ -154,9 +165,9 @@ fn open_one(
     // open to a client configured for the first one, so it is not served
     // (the app gives it a token when its MCP is turned on).
     let stored = vault.get_setting("mcp_server_token").ok().flatten().unwrap_or_default();
-    if stored.is_empty() && entry.id != oryxis_vault::device::FIRST_VAULT_ID {
-        return Err("it has no MCP token; turn its MCP Server on in Oryxis, which sets one, and install the \
-                    config again."
+    if stored.is_empty() && (entry.id != oryxis_vault::device::FIRST_VAULT_ID || !tokenless_first) {
+        return Err("it has no MCP token; set one in Oryxis Settings > MCP Server (Regenerate) and install \
+                    the config again."
             .to_string());
     }
     if !stored.is_empty() && env(&names.token).unwrap_or_default() != stored {

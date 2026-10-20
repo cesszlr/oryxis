@@ -341,6 +341,7 @@ impl Oryxis {
         // Never shown, nothing of it loaded: closing it drops its key
         // (a vault without a password was unlocked to read its theme).
         if !self.vaults.all().any(|v| v.id == boot && v.loaded) {
+            self.drop_parked_views_of(boot);
             drop(self.vaults.remove(boot));
         }
         task
@@ -765,11 +766,27 @@ impl Oryxis {
                 return Err(crate::i18n::t("vault_no_heir").to_string());
             }
         }
-        if let Some(device) = oryxis_vault::device::installed()
+        let device = oryxis_vault::device::installed();
+        // The variables its MCP secrets ride in every client config go
+        // with it: the password still opens a file that is only left
+        // (or gone), and the slug is free for a later vault, which
+        // would inherit them. Read before the registry forgets the slug.
+        let names = device.as_ref().and_then(|d| d.entry(id)).map(|e| oryxis_vault::device::mcp_env_names(&e));
+        if let Some(device) = &device
             && let Err(e) = device.unregister(id)
         {
             tracing::warn!("could not unregister vault {id}: {e}");
             return Err(e.to_string());
+        }
+        if let Some(names) = names {
+            let secrets = crate::mcp::McpSecrets { names, token: String::new(), vault_pw: None };
+            tasks.push(Task::perform(
+                async move { crate::mcp::strip_vault_password_everywhere(&secrets) },
+                |result| match result {
+                    Ok(()) => Message::NoOp,
+                    Err(e) => Message::ToastShow(crate::i18n::t("vault_mcp_config_not_cleaned").replacen("{error}", &e, 1)),
+                },
+            ));
         }
         // Its spool was sealed under a key that went with it.
         crate::session_spool::SessionSpool::remove_for(id);
@@ -777,7 +794,13 @@ impl Oryxis {
             if self.biometric_available {
                 crate::biometric::forget_account_of(&path);
             }
-            remove_vault_files(&path);
+            // The user was told the vault is deleted: a file that stays
+            // (held open by another process) is said, not logged.
+            if !remove_vault_files(&path) {
+                tasks.push(self.show_toast(
+                    crate::i18n::t("vault_delete_file_left").replacen("{path}", &path.display().to_string(), 1),
+                ));
+            }
         }
         Ok(Task::batch(tasks))
     }
@@ -816,6 +839,7 @@ impl Oryxis {
         if self.window_on_vault(abandoned).is_some() {
             return task;
         }
+        self.drop_parked_views_of(abandoned);
         let path = self.vaults.remove(abandoned).and_then(|v| v.path);
         if let Some(device) = oryxis_vault::device::installed()
             && let Err(e) = device.unregister(abandoned)
@@ -872,16 +896,18 @@ impl Oryxis {
 /// name: `-wal`, `-shm`, `.rebuild-lock`, and every `.damaged-<stamp>`
 /// copy (with their own `-wal` / `-shm`). A file already gone is fine;
 /// one that will not go is logged.
-fn remove_vault_files(path: &std::path::Path) {
+/// Answers whether every file went.
+fn remove_vault_files(path: &std::path::Path) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-        return;
+        return false;
     };
     let Some(dir) = path.parent() else {
-        return;
+        return false;
     };
     let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
+        return false;
     };
+    let mut all = true;
     for entry in entries.flatten() {
         let file = entry.file_name();
         let Some(file) = file.to_str() else {
@@ -896,8 +922,10 @@ fn remove_vault_files(path: &std::path::Path) {
             && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!(path = %entry.path().display(), "could not remove a deleted vault's file: {e}");
+            all = false;
         }
     }
+    all
 }
 
 /// The id of the "New vault" dialog's name field.

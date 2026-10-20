@@ -2726,6 +2726,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Impor sebagai vault baru",
         "import_new_vault_name" => "Nama vault baru",
         "import_into_new_vault_failed" => "Vault baru sudah dibuat, tetapi impor gagal: {error}",
+        "vault_mcp_config_not_cleaned" => "Vault sudah dihapus, tetapi variabel MCP-nya tidak bisa dihapus dari semua konfigurasi klien: {error}",
+        "vault_delete_file_left" => "Vault sudah keluar dari daftar, tetapi berkasnya tidak bisa dihapus (dipakai program lain?): {path}",
         "vault_status_missing" => "Berkas tidak ditemukan. Vault kembali saat berkasnya kembali (misalnya flashdisk).",
         "vault_status_unlocked" => "Tidak terkunci",
         "vault_status_locked" => "Terkunci",

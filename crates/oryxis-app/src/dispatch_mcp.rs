@@ -23,14 +23,12 @@ impl Oryxis {
                 if let Some(vault) = &self.vaults.cur().store {
                     let _ = vault.set_setting("mcp_server_enabled", if self.vaults.cur().mcp.server_enabled { "true" } else { "false" });
                 }
-                // A vault other than the first gets a token when its MCP
-                // goes on: `oryxis-mcp` serves no such vault without one
-                // (a client configured for the first vault would reach it).
-                if self.vaults.cur().mcp.server_enabled
-                    && self.vaults.cur().mcp.server_token.is_empty()
-                    && self.vaults.cur().id != oryxis_vault::device::FIRST_VAULT_ID
-                {
-                    let _ = self.handle_mcp(McpMessage::RegenerateMcpToken);
+                // With several vaults every vault gets a token when its
+                // MCP goes on: `oryxis-mcp` serves a tokenless vault only
+                // to a config from before there were several (a client
+                // configured for one vault must not reach another).
+                if self.vaults.cur().mcp.server_enabled {
+                    self.mcp_ensure_token_with_several_vaults();
                 }
                 // MCP ships as a plugin (~5 MB binary external clients
                 // like Claude Desktop spawn). First-time enable triggers
@@ -62,6 +60,7 @@ impl Oryxis {
                 self.vaults.cur_mut().mcp.config_copied = false;
             }
             McpMessage::CopyMcpConfig => {
+                self.mcp_ensure_token_with_several_vaults();
                 self.vaults.cur_mut().mcp.config_copied = true;
                 let secrets = self.mcp_secrets();
                 let client = self.vaults.cur().mcp.client;
@@ -81,6 +80,7 @@ impl Oryxis {
                 if !self.vaults.cur().mcp.detected.contains(&self.vaults.cur().mcp.client) {
                     return Task::none();
                 }
+                self.mcp_ensure_token_with_several_vaults();
                 self.vaults.cur_mut().mcp.install_status = None;
                 let secrets = self.mcp_secrets();
                 let wsl = self.vaults.cur().mcp.target_wsl;
@@ -234,6 +234,16 @@ impl Oryxis {
 }
 
 impl Oryxis {
+    /// With several vaults registered, give the acting vault a token
+    /// when it has none: a config written now names vaults by slug, and
+    /// `oryxis-mcp` serves a tokenless vault to such a config only when
+    /// named by `--vault`.
+    fn mcp_ensure_token_with_several_vaults(&mut self) {
+        if self.vault_count() > 1 && self.vaults.cur().mcp.server_token.is_empty() {
+            let _ = self.handle_mcp(McpMessage::RegenerateMcpToken);
+        }
+    }
+
     /// Ask which AI clients are installed for the current target, off
     /// the UI thread: the native check is a few `stat`s, the WSL one a
     /// `wsl.exe` spawn. The answer carries the target it was asked

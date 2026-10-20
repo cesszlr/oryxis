@@ -98,13 +98,23 @@ impl SyncListener {
         self.port
     }
 
-    /// Serve `route`'s vault (replacing an earlier route of the same
-    /// identity).
-    pub(super) fn attach(&self, route: Route) {
-        if let Ok(mut routes) = self.routes.lock() {
-            routes.retain(|r| r.identity.device_id != route.identity.device_id);
-            routes.push(route);
+    /// Serve `route`'s vault. Refused when a route of the same identity
+    /// is already served: a vault opened from a COPY of another open
+    /// vault's file carries that vault's identity (it lives in the file),
+    /// and the copy's engine would take over every peer the original
+    /// paired, served with the copy's records. An engine restarting
+    /// detaches first (`SyncEngine::stop`), so its own identity is free.
+    pub(super) fn attach(&self, route: Route) -> Result<(), SyncError> {
+        let mut routes = self.routes.lock().map_err(|_| SyncError::Transport("sync listener lock".into()))?;
+        if routes.iter().any(|r| r.identity.device_id == route.identity.device_id) {
+            return Err(SyncError::Transport(
+                "another open vault already syncs with this vault's identity (a copy of its file?); \
+                 only one of them can sync"
+                    .into(),
+            ));
         }
+        routes.push(route);
+        Ok(())
     }
 
     /// Stop serving the vault with identity `device_id`.

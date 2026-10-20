@@ -2693,6 +2693,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Als neuen Tresor importieren",
         "import_new_vault_name" => "Name des neuen Tresors",
         "import_into_new_vault_failed" => "Der neue Tresor wurde erstellt, aber der Import ist fehlgeschlagen: {error}",
+        "vault_mcp_config_not_cleaned" => "Der Tresor ist weg, aber seine MCP-Variablen konnten nicht aus jeder Client-Konfiguration entfernt werden: {error}",
+        "vault_delete_file_left" => "Der Tresor wurde aus der Liste entfernt, aber seine Datei konnte nicht gelöscht werden (hält ein anderes Programm sie offen?): {path}",
         "vault_status_missing" => "Datei nicht gefunden. Der Tresor kommt zurück, wenn seine Datei zurückkommt (etwa ein USB-Stick).",
         "vault_status_unlocked" => "Entsperrt",
         "vault_status_locked" => "Gesperrt",

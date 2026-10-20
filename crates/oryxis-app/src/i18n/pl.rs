@@ -2725,6 +2725,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Importuj jako nowy sejf",
         "import_new_vault_name" => "Nazwa nowego sejfu",
         "import_into_new_vault_failed" => "Nowy sejf został utworzony, ale import się nie powiódł: {error}",
+        "vault_mcp_config_not_cleaned" => "Sejf usunięto, ale nie udało się usunąć jego zmiennych MCP z każdej konfiguracji klienta: {error}",
+        "vault_delete_file_left" => "Sejf zniknął z listy, ale nie udało się usunąć jego pliku (czy inny program go używa?): {path}",
         "vault_status_missing" => "Nie znaleziono pliku. Sejf wróci, gdy wróci jego plik (na przykład pendrive).",
         "vault_status_unlocked" => "Odblokowany",
         "vault_status_locked" => "Zablokowany",

@@ -260,6 +260,10 @@ pub enum DeviceError {
     },
     #[error("device store encode: {0}")]
     Encode(#[from] serde_json::Error),
+    /// The file is there and does not parse: nothing is written over it
+    /// (the registry it holds would go with it), reads see a fresh store.
+    #[error("device store {path} does not parse ({reason}); not writing over it")]
+    Unparsable { path: PathBuf, reason: String },
 }
 
 /// `~/.oryxis/device.json`, read through, written under a lock.
@@ -340,7 +344,8 @@ impl DeviceStore {
         }
         let path = self.path();
         let mut cached = self.cache.lock().unwrap_or_else(|p| p.into_inner());
-        let mut file = read_file(&path);
+        // Never over a file that is there and does not parse.
+        let mut file = parse_file(&path)?;
         change(&mut file);
         file.version = file.version.max(FORMAT_VERSION);
         write_file(&path, &file)?;
@@ -636,29 +641,35 @@ fn fold_latin(c: char) -> &'static str {
 }
 
 /// The file's content, a fresh device when absent. A file that does not
-/// parse is reported and read as fresh; the next write replaces it (the
-/// broken copy is kept beside it first, see [`write_file`]).
+/// parse is reported and read as fresh, and a copy of it kept beside
+/// ([`keep_broken_copy`]); a WRITE refuses it ([`parse_file`]): the
+/// registry it holds (every other vault, one on a USB key) would go
+/// with the file.
 fn read_file(path: &Path) -> DeviceFile {
+    parse_file(path).unwrap_or_else(|_| DeviceFile::fresh())
+}
+
+/// [`read_file`] saying why the file could not be read as it is.
+fn parse_file(path: &Path) -> Result<DeviceFile, DeviceError> {
     match std::fs::read(path) {
         Ok(bytes) => match serde_json::from_slice::<DeviceFile>(&bytes) {
-            Ok(file) => file.normalized(),
+            Ok(file) => Ok(file.normalized()),
             Err(e) => {
                 tracing::warn!(error = %e, path = %path.display(), "device store does not parse; reading it as fresh");
                 keep_broken_copy(path);
-                DeviceFile::fresh()
+                Err(DeviceError::Unparsable { path: path.to_path_buf(), reason: e.to_string() })
             }
         },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => DeviceFile::fresh(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(DeviceFile::fresh()),
         Err(e) => {
             tracing::warn!(error = %e, path = %path.display(), "device store unreadable; reading it as fresh");
-            DeviceFile::fresh()
+            Err(DeviceError::Io { path: path.to_path_buf(), source: e })
         }
     }
 }
 
 /// A file that did not parse is copied to `device.json.broken` once, so
-/// the next write (which replaces it) does not destroy what a hand edit
-/// left there.
+/// a hand edit's result is kept whatever happens to the file next.
 fn keep_broken_copy(path: &Path) {
     let broken = path.with_extension("json.broken");
     if !broken.exists() {

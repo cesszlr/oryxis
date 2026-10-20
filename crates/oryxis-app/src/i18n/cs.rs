@@ -2730,6 +2730,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Importovat jako nový trezor",
         "import_new_vault_name" => "Název nového trezoru",
         "import_into_new_vault_failed" => "Nový trezor byl vytvořen, ale import selhal: {error}",
+        "vault_mcp_config_not_cleaned" => "Trezor byl odstraněn, ale jeho proměnné MCP se nepodařilo odebrat ze všech konfigurací klientů: {error}",
+        "vault_delete_file_left" => "Trezor byl odebrán ze seznamu, ale jeho soubor se nepodařilo smazat (drží ho jiný program?): {path}",
         "vault_status_missing" => "Soubor nenalezen. Trezor se vrátí, až se vrátí jeho soubor (třeba USB disk).",
         "vault_status_unlocked" => "Odemčeno",
         "vault_status_locked" => "Zamčeno",

@@ -2712,6 +2712,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "الاستيراد كخزنة جديدة",
         "import_new_vault_name" => "اسم الخزنة الجديدة",
         "import_into_new_vault_failed" => "أُنشئت الخزنة الجديدة، لكن الاستيراد فشل: {error}",
+        "vault_mcp_config_not_cleaned" => "أُزيلت الخزنة، لكن تعذّر حذف متغيرات MCP الخاصة بها من كل إعدادات العملاء: {error}",
+        "vault_delete_file_left" => "أُزيلت الخزنة من القائمة، لكن تعذّر حذف ملفها (هل يستخدمه برنامج آخر؟): {path}",
         "vault_status_missing" => "الملف غير موجود. تعود الخزنة عندما يعود ملفها (ذاكرة USB مثلًا).",
         "vault_status_unlocked" => "غير مقفلة",
         "vault_status_locked" => "مقفلة",

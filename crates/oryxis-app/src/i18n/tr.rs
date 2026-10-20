@@ -2725,6 +2725,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "Yeni bir kasa olarak içe aktar",
         "import_new_vault_name" => "Yeni kasanın adı",
         "import_into_new_vault_failed" => "Yeni kasa oluşturuldu, ancak içe aktarma başarısız oldu: {error}",
+        "vault_mcp_config_not_cleaned" => "Kasa kaldırıldı, ancak MCP değişkenleri her istemci yapılandırmasından silinemedi: {error}",
+        "vault_delete_file_left" => "Kasa listeden çıkarıldı, ancak dosyası silinemedi (başka bir program kullanıyor olabilir mi?): {path}",
         "vault_status_missing" => "Dosya bulunamadı. Dosyası geri geldiğinde (örneğin bir USB bellek) kasa da geri gelir.",
         "vault_status_unlocked" => "Kilidi açık",
         "vault_status_locked" => "Kilitli",

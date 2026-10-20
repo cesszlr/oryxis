@@ -2693,6 +2693,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "作为新保险库导入",
         "import_new_vault_name" => "新保险库的名称",
         "import_into_new_vault_failed" => "新保险库已创建，但导入失败：{error}",
+        "vault_mcp_config_not_cleaned" => "保险库已移除，但无法从所有客户端配置中删除其 MCP 变量：{error}",
+        "vault_delete_file_left" => "保险库已从列表移除，但无法删除其文件（是否有其他程序正在占用？）：{path}",
         "vault_status_missing" => "找不到文件。文件回来后（例如 U 盘），保险库也会回来。",
         "vault_status_unlocked" => "已解锁",
         "vault_status_locked" => "已锁定",

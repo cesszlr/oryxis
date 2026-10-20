@@ -2713,6 +2713,8 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "import_as_new_vault" => "وارد کردن به‌عنوان صندوقچهٔ جدید",
         "import_new_vault_name" => "نام صندوقچهٔ جدید",
         "import_into_new_vault_failed" => "صندوقچهٔ جدید ساخته شد، اما وارد کردن ناموفق بود: {error}",
+        "vault_mcp_config_not_cleaned" => "صندوقچه حذف شد، اما متغیرهای MCP آن از همهٔ پیکربندی‌های کلاینت پاک نشدند: {error}",
+        "vault_delete_file_left" => "صندوقچه از فهرست خارج شد، اما فایل آن حذف نشد (برنامهٔ دیگری آن را باز نگه داشته؟): {path}",
         "vault_status_missing" => "فایل پیدا نشد. وقتی فایل برگردد (مثلاً یک فلش USB)، صندوقچه هم برمی‌گردد.",
         "vault_status_unlocked" => "باز",
         "vault_status_locked" => "قفل",

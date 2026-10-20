@@ -401,7 +401,7 @@ impl SyncEngine {
         // a port of its own with its own accept loop below.
         let own_endpoint = match &self.listener {
             Some(listener) => {
-                listener.attach(self.route());
+                listener.attach(self.route())?;
                 None
             }
             None => Some(self.bind_server_endpoint()?),
