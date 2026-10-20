@@ -20,12 +20,15 @@ click "Skip"
 settle 250
 click "Continue without password"
 settle 250
-# A live PTY never lets the emulator quiesce, so cap the per-instruction
-# wait instead of burning the full timeout on every line.
-timeout 500
+# The shell's spawn is what the first expect waits for: a batch run under
+# load (the previous test's dial still ending) has taken past 500 ms to
+# show the tab, so that one wait keeps the default budget.
 type ctrl+shift+l
 settle 250
 expect "bash (default)"
+# A live PTY never lets the emulator quiesce, so cap the per-instruction
+# wait from here on instead of burning the full timeout on every line.
+timeout 500
 # Through the tab context menu, one of the three close paths that reach
 # `close_tab_now`. Coordinates rather than a text selector: the chip's
 # own label is the string being asserted on.
