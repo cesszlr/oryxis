@@ -53,10 +53,13 @@ impl Oryxis {
         let menu_open = self
             .cur_overlay()
             .is_some_and(|o| matches!(o.content, crate::state::OverlayContent::VaultSwitcher));
+        // On the toolbar's keyboard ring (recorded first: it leads the
+        // row).
+        let chip = self.keynav_toolbar_slot(crate::keynav::ToolbarItem::VaultSwitcher, chip.boxed());
         let chip: Element<'_, Message> = if menu_open {
-            chip.boxed()
+            chip
         } else {
-            crate::views::terminal::icon_tooltip(chip.boxed(), t("vault_switcher_tooltip"))
+            crate::views::terminal::icon_tooltip(chip, t("vault_switcher_tooltip"))
         };
         crate::widgets::bounds_reporter(chip, self.vault_chip_bounds.clone())
     }

@@ -230,7 +230,10 @@ impl Oryxis {
             Space::new().width(10).boxed(),
             text(shown).size(12).font(iced::Font::MONOSPACE).color(c.text_primary).boxed(),
             Space::new().width(12).boxed(),
-            self.settings_nav_slot(
+            // Labeled: the settings index names this row (`vault_hotkey`),
+            // and a reveal highlights the labeled slot.
+            self.settings_nav_slot_labeled(
+                t("vault_hotkey"),
                 crate::keynav::RowAction::activate(record.clone()),
                 6.0,
                 styled_button(record_label, record, record_color),

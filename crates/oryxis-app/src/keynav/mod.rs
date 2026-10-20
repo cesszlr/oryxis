@@ -78,6 +78,8 @@ pub(crate) enum ToolbarItem {
     PagerNext,
     /// Privacy-mode reveal eye (History / Known Hosts).
     PrivacyReveal,
+    /// The vault chip (the switcher menu), when it rides the toolbar.
+    VaultSwitcher,
     /// The "⋯" button when the cluster is folded at narrow widths.
     Overflow,
     /// The search icon when the search field is collapsed.

@@ -1144,10 +1144,13 @@ impl Oryxis {
                 // Where it goes: this vault, or a vault of its own made
                 // for it (named here, set up next).
                 let as_new = self.vaults.cur().vault_import.as_new_vault;
-                let mut destination = column![self.nav_toggle_row(
-                    crate::i18n::t("import_as_new_vault"),
-                    as_new,
-                    Message::Share(ShareMessage::ImportAsNewVaultToggled),
+                // A dialog control, not a setting row: recorded like the
+                // name field under it, outside the settings index.
+                let toggle_msg = Message::Share(ShareMessage::ImportAsNewVaultToggled);
+                let mut destination = column![self.settings_nav_slot(
+                    crate::keynav::RowAction::activate(toggle_msg.clone()),
+                    8.0,
+                    crate::widgets::toggle_row(crate::i18n::t("import_as_new_vault"), as_new, toggle_msg),
                 )];
                 if as_new {
                     let name_idx = self.settings_nav_record(crate::keynav::RowAction::input(

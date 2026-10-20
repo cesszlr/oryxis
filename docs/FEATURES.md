@@ -675,6 +675,16 @@ If your vault has no password, omit the `env` field.
 - **Idle auto-lock.** A timer zeroizes the master key and shows the lock
   screen while live SSH sessions and tabs survive and greet you after
   unlock; secret-bearing UI is swept on lock.
+- **Several vaults.** Keep work and personal hosts in separate encrypted
+  files, each with its own master password, settings, sync and MCP
+  exposure, open at once: every window works on one vault, switched in
+  place from the Home tab (or a toolbar chip), by a shortcut you assign
+  to each vault, or from the command palette; its tabs keep running
+  while you look at another. Settings > Vaults creates, renames, locks,
+  removes and deletes vaults, opens a vault file from anywhere (a USB
+  key), and can ask which vault to open at start; an `.oryxis` export
+  can be imported as a new vault. Settings rows that apply to the whole
+  device carry a badge; the rest are the vault's own.
 - **TOTP 2FA autofill.** Store a per-host TOTP secret (bare base32 or an
   `otpauth://` URI), encrypted like every credential;
   keyboard-interactive verification-code prompts are answered

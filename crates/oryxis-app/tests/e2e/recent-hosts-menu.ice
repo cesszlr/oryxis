@@ -65,7 +65,7 @@ settle 250
 # builder. It opens on HOVER rather than a click, hence the move; the
 # two menus differ only in which row helper they use, because this one
 # is a hover popover the keynav layer deliberately declines.
-move (333.00, 20.00)
+move (402.00, 20.00)
 settle 400
 expect "Split side by side"
 expect "prod-database-primary-e…"

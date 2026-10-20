@@ -912,6 +912,9 @@ impl Oryxis {
     fn toolbar_item_message(&self, item: ToolbarItem) -> Option<Message> {
         use crate::state::SortMenuKind;
         Some(match (self.cur_view(), item) {
+            (_, ToolbarItem::VaultSwitcher) => Message::MultiVault(crate::app::MultiVaultMessage::ShowVaultSwitcher(
+                crate::dispatch_multi_vault::VaultChipPlace::Toolbar,
+            )),
             (View::Dashboard, ToolbarItem::ViewToggle) => Message::Settings(SettingsMessage::CycleHostViewMode),
             // Monitoring toolbar (issue #95): shared tag filter, plus
             // its own grid/list toggle.
