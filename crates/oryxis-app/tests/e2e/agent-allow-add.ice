@@ -28,10 +28,11 @@ expect "SSH Agent"
 click (1141, 440)
 # The agent runtime is a LISTENER, so from here on the boot task never
 # reports done and every instruction waits out the per-instruction
-# timeout instead. Same reason terminal-primary-selection.ice drops it
+# timeout instead. Same reason clipboard-paths.ice drops it
 # once a PTY is live; declared here rather than in the header so the
-# steps above keep the patient default. Measured: 63s -> 18s.
-timeout 5000
+# steps above keep the patient default. Measured: 63s -> 18s at 5 s, 35s -> 29s from 5 s to
+# 1.5 s (two clean local passes, 2026-10-20).
+timeout 1500
 settle 300
 click "SSH Agent"
 expect "Confirm each use"

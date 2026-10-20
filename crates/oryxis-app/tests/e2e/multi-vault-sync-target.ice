@@ -19,8 +19,9 @@ click "Features & Plugins"
 settle
 click (1338, 207)
 # Sync on mounts an engine that keeps running: no instruction reports
-# done from here, so each waits out a short timeout instead.
-timeout 5000
+# done from here, so each waits out a short timeout instead (71s -> 44s
+# from 5 s to 1.5 s, two clean local passes, 2026-10-20).
+timeout 1500
 settle
 click (60, 463)
 settle

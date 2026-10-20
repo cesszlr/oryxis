@@ -40,7 +40,9 @@ click "Features & Plugins"
 settle
 click (1338, 207)
 # The engine keeps running from here on: cap the per-instruction wait.
-timeout 5000
+# 1.5 s is what the probe's refusal and the picker need between two
+# instructions (82s -> 43s from 5 s, two clean local passes, 2026-10-20).
+timeout 1500
 settle
 click (60, 463)
 settle

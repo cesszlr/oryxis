@@ -33,8 +33,9 @@ click (1338, 207)
 # instruction reports done and each one waits out the per-instruction
 # timeout instead. Same rule the agent and PTY tests follow; declared
 # here rather than in the header so the steps above keep the patient
-# default. Measured: 91s -> 30s.
-timeout 5000
+# default. Measured: 91s -> 30s at 5 s, 48s -> 38s from 5 s to 1.5 s (two
+# clean local passes, 2026-10-20).
+timeout 1500
 settle
 # The sidebar gained "Sync" under SFTP (fixed-height rows: y 463).
 click (60, 463)
