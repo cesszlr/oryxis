@@ -347,6 +347,7 @@ impl Oryxis {
                 | SidebarFilesMessage::SidebarFilesToggleFollow
                 | SidebarFilesMessage::SidebarFilesToggleHidden
                 | SidebarFilesMessage::SidebarFilesRefresh
+                | SidebarFilesMessage::SidebarFilesDismissNotice(..)
                 | SidebarFilesMessage::SidebarFilesNavigate(..)
                 | SidebarFilesMessage::SidebarFilesExpand
                 | SidebarFilesMessage::SidebarFilesOpenSftpAt(..)
@@ -478,6 +479,7 @@ impl Oryxis {
             }
             pane.files.mounting = true;
             pane.files.error = None;
+            pane.files.notice = None;
             // The pre-mount hint can only use an absolute cwd (a
             // `~`-relative title fallback has no home to expand against
             // yet; the mount lands on the home anyway and the post-mount

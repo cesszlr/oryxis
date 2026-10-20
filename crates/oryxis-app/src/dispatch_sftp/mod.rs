@@ -90,7 +90,7 @@ impl Oryxis {
         if !self.cur_sftp().pane(rn.side).is_remote {
             let original = std::path::PathBuf::from(&rn.original_path);
             let Some(parent) = original.parent().map(|p| p.to_path_buf()) else {
-                self.sftp.pane_mut(rn.side).error = Some("Cannot rename root".into());
+                self.sftp.pane_mut(rn.side).notice = Some("Cannot rename root".into());
                 return Task::none();
             };
             let dest = parent.join(&new_name);
@@ -99,7 +99,7 @@ impl Oryxis {
                     crate::state::SftpLogLevel::Ok,
                     format!("{} {}", crate::i18n::t("sftp_log_renamed"), new_name),
                 ),
-                Err(e) => self.sftp.pane_mut(rn.side).error = Some(e.to_string()),
+                Err(e) => self.sftp.pane_mut(rn.side).notice = Some(e.to_string()),
             }
             self.refresh_sftp_local(rn.side);
             Task::none()
@@ -238,6 +238,7 @@ impl Oryxis {
             | SftpMessage::OpenSftpConsoleForHost(..)
             | SftpMessage::OpenSftpConsoleForTab(..)
             | SftpMessage::SftpCancelRemoteLoad(..)
+            | SftpMessage::SftpDismissNotice(..)
             | SftpMessage::SftpRetryRemote(..)) => self
                 .handle_sftp_hosts(m)
                 .unwrap_or_else(crate::dispatch::unrouted),

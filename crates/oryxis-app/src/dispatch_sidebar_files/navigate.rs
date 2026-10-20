@@ -214,6 +214,11 @@ impl Oryxis {
                     }
                 }
             }
+            SidebarFilesMessage::SidebarFilesDismissNotice(pane_id) => {
+                if let Some(pane) = self.pane_by_id_any_tab(pane_id) {
+                    pane.files.notice = None;
+                }
+            }
             SidebarFilesMessage::SidebarFilesRefresh => {
                 // Also fired from the background context menu.
                 self.overlay = None;
@@ -283,6 +288,7 @@ impl Oryxis {
                 pane.files.entries.clear();
                 pane.files.loading = true;
                 pane.files.error = None;
+                pane.files.notice = None;
                 pane.files.selected.clear();
                 pane.files.selection_anchor = None;
                 pane.files.click_tracker.reset();

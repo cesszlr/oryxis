@@ -277,6 +277,9 @@ pub enum SftpMessage {
     /// to the login directory.
     SftpClearInitialPath(crate::state::SftpPaneSide),
     SftpCancelRemoteLoad(crate::state::SftpPaneSide),
+    /// The × on the pane's notice banner (an operation that failed over
+    /// a listing that stays): clears `PaneState.notice`.
+    SftpDismissNotice(crate::state::SftpPaneSide),
     /// Retry the last failed remote action, either re-list the
     /// current path (if a session is still mounted) or re-run the
     /// full host-pick flow (if the connect itself failed).

@@ -98,6 +98,7 @@ impl Oryxis {
                 pane.files.entries.clear();
                 pane.files.loading = true;
                 pane.files.error = None;
+                pane.files.notice = None;
                 let seq = pane.files.next_req();
                 return Task::perform(
                     async move {

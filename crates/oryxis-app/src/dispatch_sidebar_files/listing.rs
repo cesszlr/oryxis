@@ -38,6 +38,7 @@ impl Oryxis {
                 pane.files.mounting = false;
                 pane.files.loading = false;
                 pane.files.error = None;
+                pane.files.notice = None;
                 // Adopted-directory history (issue #85): recorded only
                 // here and in Listed, i.e. once a path proved listable.
                 // Unconditional: the optimistic navigate already set

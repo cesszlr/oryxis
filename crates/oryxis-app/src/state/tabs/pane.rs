@@ -354,6 +354,13 @@ pub(crate) struct PaneFiles {
     /// install a client whose channel rode the dead session.
     pub req_seq: u64,
     pub error: Option<String>,
+    /// An operation failed over a listing that is still valid (a
+    /// transfer, a rename, a delete, a new entry): a dismissible banner
+    /// above the rows, which stay. `error` takes the body over instead,
+    /// and is for a listing that could not be produced. Lives until
+    /// dismissed, a navigation elsewhere or a fresh mount; a re-list of
+    /// the same folder keeps it.
+    pub notice: Option<String>,
     /// Whether the browser follows the shell's OSC 7 cwd. `true` for a
     /// fresh pane; the pin toggle flips it.
     pub follow_disabled: bool,

@@ -1587,9 +1587,11 @@ impl Oryxis {
     }
 
     /// Where a failed transfer's message goes, so the user still sees it
-    /// after a toast would have gone. Each surface renders its own error
-    /// line, and writing into the wrong one is a silent drop, which is
-    /// half of what the 3 GB field report actually cost.
+    /// after a toast would have gone. Each surface renders its own notice
+    /// banner over the listing it keeps (the `error` slot would take the
+    /// listing over, with a Retry that re-dials: a failed upload is not a
+    /// lost connection), and writing into the wrong one is a silent drop,
+    /// which is half of what the 3 GB field report actually cost.
     pub(crate) fn transfer_set_error(
         &mut self,
         owner: uuid::Uuid,
@@ -1598,11 +1600,11 @@ impl Oryxis {
     ) {
         if self.is_sidebar_owner(owner) {
             if let Some(pane) = self.pane_by_id_any_tab(owner) {
-                pane.files.error = Some(message);
+                pane.files.notice = Some(message);
             }
             return;
         }
-        self.sftp.pane_mut(side).error = Some(message);
+        self.sftp.pane_mut(side).notice = Some(message);
     }
 
     /// Re-list what a finished transfer changed on the sidebar side.

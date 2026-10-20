@@ -6,6 +6,11 @@ use uuid::Uuid;
 pub enum SidebarFilesMessage {
     SidebarFilesNavigate(String),
     SidebarFilesRefresh,
+    /// The × on the browser's notice banner (an operation that failed
+    /// over a listing that stays): clears `PaneFiles.notice` of the
+    /// pane named, not of "the active pane", which can be another one
+    /// by the time the click lands.
+    SidebarFilesDismissNotice(Uuid),
     SidebarFilesToggleFollow,
     SidebarFilesToggleHidden,
     /// Promote the sidebar browser to a full SFTP tab at its current

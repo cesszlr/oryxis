@@ -112,7 +112,7 @@ impl Oryxis {
                         };
                         match result {
                             Ok(()) => local_deleted += 1,
-                            Err(e) => self.sftp.pane_mut(t.side).error = Some(e.to_string()),
+                            Err(e) => self.sftp.pane_mut(t.side).notice = Some(e.to_string()),
                         }
                         if !local_sides.contains(&t.side) {
                             local_sides.push(t.side);
@@ -248,7 +248,9 @@ impl Oryxis {
                             .map(|_| ()),
                     };
                     if let Err(e) = result {
-                        self.sftp.pane_mut(ne.side).error =
+                        // The refresh below re-lists the same folder, which
+                        // the notice survives; the `error` slot did not.
+                        self.sftp.pane_mut(ne.side).notice =
                             if e.kind() == std::io::ErrorKind::AlreadyExists {
                                 Some(
                                     crate::i18n::t("files_entry_exists")
@@ -313,7 +315,9 @@ impl Oryxis {
                         crate::state::SftpLogLevel::Error,
                         format!("{} {}", crate::i18n::t("sftp_log_error"), msg),
                     );
-                    self.sftp.pane_mut(side).error = Some(msg);
+                    // An operation's failure, not a listing's: the rows
+                    // stay and the message rides the banner above them.
+                    self.sftp.pane_mut(side).notice = Some(msg);
                 } else {
                     self.push_sftp_log(crate::state::SftpLogLevel::Ok, msg.clone());
                     tracing::info!("sftp op: {}", msg);

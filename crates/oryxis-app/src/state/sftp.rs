@@ -43,7 +43,19 @@ pub(crate) struct PaneState {
     /// rendered on Windows hosts.
     pub drives_open: bool,
     // Shared per-pane UI.
+    /// The pane has NO listing to show: the connect, the first list or a
+    /// local navigation failed. The remote view takes the pane over with
+    /// the message plus Retry / Pick another host; the local view keeps
+    /// its `..` row and shows the message where the entries would be.
     pub error: Option<String>,
+    /// An operation failed over a listing that is still valid (a
+    /// transfer, a rename, a delete, a duplicate, a new entry): drawn as
+    /// a dismissible banner ABOVE the listing, which stays. Lives until
+    /// the user dismisses it or the pane navigates to another folder (a
+    /// re-list of the same path keeps it: every failed operation asks
+    /// for one); the SFTP log keeps the record. Never the slot for
+    /// "nothing to show".
+    pub notice: Option<String>,
     pub filter: String,
     /// Sort column + direction for this pane.
     pub sort: SftpSort,

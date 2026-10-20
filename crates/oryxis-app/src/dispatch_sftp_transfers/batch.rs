@@ -160,7 +160,7 @@ impl Oryxis {
                         let parent = match src.parent() {
                             Some(p) => p.to_path_buf(),
                             None => {
-                                self.sftp.pane_mut(side).error = Some("Cannot duplicate root".into());
+                                self.sftp.pane_mut(side).notice = Some("Cannot duplicate root".into());
                                 return Ok(Task::none());
                             }
                         };
@@ -181,7 +181,7 @@ impl Oryxis {
                             size: None,
                         });
                         if let Err(e) = walk_local_for_duplicate(&src, &target_root, &mut queue) {
-                            self.sftp.pane_mut(side).error = Some(e);
+                            self.sftp.pane_mut(side).notice = Some(e);
                             return Ok(Task::none());
                         }
                         // Local duplicate uses sync std::fs::copy in

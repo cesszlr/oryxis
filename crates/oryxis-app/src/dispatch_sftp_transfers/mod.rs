@@ -220,7 +220,7 @@ impl Oryxis {
             self.cur_sftp().pane(from).client.clone(),
             self.cur_sftp().pane(dest_side).client.clone(),
         ) else {
-            self.sftp.pane_mut(from).error = Some(crate::i18n::t("sftp_both_panes_connected").to_string());
+            self.sftp.pane_mut(from).notice = Some(crate::i18n::t("sftp_both_panes_connected").to_string());
             return Task::none();
         };
         // Same machine? Two conservative signals: a shared SSH session is

@@ -1013,8 +1013,23 @@ impl Oryxis {
         // filter, breadcrumb, column headers) and let the centered
         // "Pick a host" empty state own the whole pane.
         let show_header = !(is_remote && pane.host_label.is_none());
+        // The notice slot is ALWAYS pushed (an empty column when there is
+        // none): widget state is matched by index and type (issue #241),
+        // and a banner that only appears when an operation fails would
+        // shift the list's scroll offset and the inline inputs under it
+        // at exactly that moment.
+        let notice_slot: Element<'_, Message> = match &pane.notice {
+            Some(msg) => container(crate::widgets::notice_banner(
+                msg,
+                Message::Sftp(SftpMessage::SftpDismissNotice(side)),
+            ))
+            .padding(iced::Padding { top: 6.0, right: 8.0, bottom: 0.0, left: 8.0 })
+            .width(Length::Fill)
+            .boxed(),
+            None => iced::widget::Column::<Element<'_, Message>>::new().boxed(),
+        };
         let pane_body: Element<'_, Message> = if show_header {
-            column![header_band, body]
+            column![header_band, notice_slot, body]
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .boxed()

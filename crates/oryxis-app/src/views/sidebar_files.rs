@@ -430,7 +430,25 @@ impl Oryxis {
             })],
             None => column![],
         };
-        let mut col = column![header, hint_slot, body].width(Length::Fill).height(Length::Fill);
+        // Always pushed, like `hint_slot`, so the rows keep their widget
+        // state when a notice lands (issue #241). Recorded on the sidebar
+        // ring where it is drawn, above the rows: Enter on it dismisses.
+        let notice_slot: Element<'_, Message> = match &files.notice {
+            Some(msg) => {
+                let dismiss = Message::SidebarFiles(SidebarFilesMessage::SidebarFilesDismissNotice(pane_id));
+                container(self.sidebar_nav_slot(
+                    crate::keynav::SidebarRow::button(dismiss.clone()),
+                    stab,
+                    6.0,
+                    crate::widgets::notice_banner(msg, dismiss),
+                ))
+                .padding(Padding { top: 0.0, right: 12.0, bottom: 8.0, left: 12.0 })
+                .width(Length::Fill)
+                .boxed()
+            }
+            None => iced::widget::Column::<Element<'_, Message>>::new().boxed(),
+        };
+        let mut col = column![header, hint_slot, notice_slot, body].width(Length::Fill).height(Length::Fill);
         if let Some(transfer) = files.transfer.state.as_ref() {
             let cancel = Message::SftpFor(
                 pane_id,

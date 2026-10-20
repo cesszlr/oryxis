@@ -71,6 +71,12 @@ impl Oryxis {
                     pane.remote_loading = true;
                     pane.remote_list_seq = seq;
                     pane.error = None;
+                    // A notice outlives the refresh that follows its own
+                    // operation (every failed op re-lists the same path);
+                    // only a navigation elsewhere, or its ×, clears it.
+                    if pane.remote_path != path {
+                        pane.notice = None;
+                    }
                 }
                 let target = path.clone();
                 return Ok(Task::perform(
@@ -215,6 +221,10 @@ impl Oryxis {
                     pane.actions_open = false;
                     if changed_dir {
                         pane.list_scroll_y = 0.0;
+                        // Same-path re-lists keep the notice (the failed
+                        // operation just asked for one); a new folder
+                        // starts clean.
+                        pane.notice = None;
                     }
                 }
                 self.sftp.left.actions_open = false;
@@ -254,6 +264,7 @@ impl Oryxis {
                             let visited = pane.local_path.display().to_string();
                             push_path_history(pane, visited);
                             pane.push_nav(previous);
+                            pane.notice = None;
                         }
                         pane.local_entries = entries;
                         pane.error = None;

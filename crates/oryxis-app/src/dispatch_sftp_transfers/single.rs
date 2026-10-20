@@ -70,7 +70,7 @@ impl Oryxis {
                         let parent = match src.parent() {
                             Some(p) => p.to_path_buf(),
                             None => {
-                                self.sftp.pane_mut(side).error = Some("Cannot duplicate root".into());
+                                self.sftp.pane_mut(side).notice = Some("Cannot duplicate root".into());
                                 return Ok(Task::none());
                             }
                         };

@@ -132,6 +132,7 @@ impl Oryxis {
                     pane.host_label = Some(conn.label.clone());
                     pane.remote_loading = true;
                     pane.error = None;
+                    pane.notice = None;
                     pane.remote_entries.clear();
                 }
 
@@ -411,6 +412,7 @@ impl Oryxis {
                     pane.host_label = None;
                     pane.remote_entries.clear();
                     pane.error = None;
+                    pane.notice = None;
                     // The remote history belonged to the unmounted host.
                     pane.path_history.clear();
                     pane.path_history_open = false;
@@ -443,6 +445,7 @@ impl Oryxis {
                 pane.remote_entries = entries;
                 pane.remote_loading = false;
                 pane.error = None;
+                pane.notice = None;
                 // Fresh mount: any zip browse belonged to the previous
                 // session, and the new host gets its own tool probe. The
                 // path history is host-scoped too (issue #85): another
@@ -529,6 +532,9 @@ impl Oryxis {
                 let pane = self.sftp.pane_mut(side);
                 pane.remote_loading = false;
                 pane.error = Some("Cancelled by user".into());
+            }
+            SftpMessage::SftpDismissNotice(side) => {
+                self.sftp.pane_mut(side).notice = None;
             }
             SftpMessage::SftpRetryRemote(side) => {
                 // Three cases the retry button has to cover:
