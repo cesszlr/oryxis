@@ -17,6 +17,10 @@ pub enum ShareMessage {
     /// The CSV write finished; `Ok` carries the written path.
     ExportHostsCsvCompleted(Result<String, String>),
     ImportVault,
+    /// The import dialog's "as a new vault" switch.
+    ImportAsNewVaultToggled,
+    /// The name of that new vault.
+    ImportNewVaultNameChanged(String),
     /// Pick `~/.ssh/config` (or any file the user chooses) and read it.
     /// The parsed Host blocks land in a preview modal where the user
     /// ticks which to import.

@@ -211,6 +211,9 @@ impl Oryxis {
                                     // that there IS a vault to import
                                     // into.
                                     self.take_onboarding_import_task(),
+                                    // The export a vault made by "Import as a new vault"
+                                    // waited for: its key exists now.
+                                    self.take_pending_import(),
                                     crate::widgets::focus_input(iced::widget::Id::new(
                                         "search-dashboard",
                                     )),

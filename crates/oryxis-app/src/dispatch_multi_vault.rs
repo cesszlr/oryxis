@@ -578,18 +578,28 @@ impl Oryxis {
             }
             return Task::none();
         }
-        let Some(device) = oryxis_vault::device::installed() else {
-            return Task::none();
-        };
-        let entry = match device.create_entry(&name) {
-            Ok(entry) => entry,
+        match self.make_vault(&name, copy_from) {
+            Ok(id) => {
+                self.vault_dialog = None;
+                self.enter_new_vault(id)
+            }
             Err(e) => {
                 if let Some(form) = self.vault_dialog.as_mut() {
-                    form.error = Some(crate::i18n::t("vault_create_failed").replacen("{error}", &e.to_string(), 1));
+                    form.error = Some(e);
                 }
-                return Task::none();
+                Task::none()
             }
-        };
+        }
+    }
+
+    /// Make a vault called `name`: registered, its file made, and
+    /// `copy_from`'s preferences copied in once. Answers its id, or the
+    /// text of what failed (a vault whose file could not be made leaves
+    /// the registry again).
+    pub(crate) fn make_vault(&self, name: &str, copy_from: Option<Uuid>) -> Result<Uuid, String> {
+        let failed = |e: String| crate::i18n::t("vault_create_failed").replacen("{error}", &e, 1);
+        let device = oryxis_vault::device::installed().ok_or_else(|| failed("no device store".into()))?;
+        let entry = device.create_entry(name).map_err(|e| failed(e.to_string()))?;
         let path = device.resolve(&entry);
         let created = path
             .parent()
@@ -601,19 +611,20 @@ impl Oryxis {
             Err(e) => {
                 // Nothing usable was made: the registry forgets it.
                 let _ = device.unregister(entry.id);
-                if let Some(form) = self.vault_dialog.as_mut() {
-                    form.error = Some(crate::i18n::t("vault_create_failed").replacen("{error}", &e.to_string(), 1));
-                }
-                return Task::none();
+                return Err(failed(e.to_string()));
             }
         };
         if let Some(source) = copy_from {
             self.copy_settings_into(source, &store);
         }
-        drop(store);
-        self.vault_dialog = None;
+        Ok(entry.id)
+    }
+
+    /// Move this window to vault `id` just made, on its setup step alone
+    /// (Cancel there goes back and removes the empty vault).
+    pub(crate) fn enter_new_vault(&mut self, id: Uuid) -> Task<Message> {
         let from = self.vaults.window_id();
-        let task = self.switch_this_window_to_vault(entry.id);
+        let task = self.switch_this_window_to_vault(id);
         self.vaults.cur_mut().created_from = Some(from);
         task
     }

@@ -18,6 +18,19 @@ pub(crate) struct VaultImportState {
     /// every category the file actually contains.
     pub(crate) selection: oryxis_vault::ExportSelection,
     pub(crate) status: Option<Result<String, String>>,
+    /// Bring the file in as a vault of its own instead of into this one.
+    pub(crate) as_new_vault: bool,
+    /// The name of that new vault.
+    pub(crate) new_vault_name: String,
+}
+
+/// An inspected export waiting for the vault made for it to be set up
+/// (`OpenVault::pending_import`): the file, its password, the categories
+/// the user picked.
+pub(crate) struct PendingImport {
+    pub(crate) data: Vec<u8>,
+    pub(crate) password: String,
+    pub(crate) selection: oryxis_vault::ExportSelection,
 }
 
 impl Default for VaultImportState {
@@ -30,6 +43,8 @@ impl Default for VaultImportState {
             // is what the modal shows on open.
             selection: oryxis_vault::ExportSelection::all(),
             status: None,
+            as_new_vault: false,
+            new_vault_name: String::new(),
         }
     }
 }

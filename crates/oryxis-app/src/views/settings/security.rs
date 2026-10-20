@@ -1141,9 +1141,35 @@ impl Oryxis {
                     6.0,
                     styled_button(crate::i18n::t("cancel"), Message::Share(ShareMessage::ExportImportDismiss), OryxisColors::t().text_muted),
                 );
+                // Where it goes: this vault, or a vault of its own made
+                // for it (named here, set up next).
+                let as_new = self.vaults.cur().vault_import.as_new_vault;
+                let mut destination = column![self.nav_toggle_row(
+                    crate::i18n::t("import_as_new_vault"),
+                    as_new,
+                    Message::Share(ShareMessage::ImportAsNewVaultToggled),
+                )];
+                if as_new {
+                    let name_idx = self.settings_nav_record(crate::keynav::RowAction::input(
+                        iced::widget::Id::new("set-import-new-vault-name"),
+                    ));
+                    destination = destination.push(Space::new().height(6).boxed()).push(self.settings_nav_ring_at(
+                        name_idx,
+                        10.0,
+                        text_input(crate::i18n::t("import_new_vault_name"), &self.vaults.cur().vault_import.new_vault_name)
+                            .id(iced::widget::Id::new("set-import-new-vault-name"))
+                            .on_input(|v| Message::Share(ShareMessage::ImportNewVaultNameChanged(v)))
+                            .width(300)
+                            .padding(10)
+                            .style(crate::widgets::rounded_input_style)
+                            .boxed(),
+                    ));
+                }
                 export_import_section = export_import_section
                     .push(Space::new().height(10).boxed())
                     .push(categories.boxed())
+                    .push(Space::new().height(10).boxed())
+                    .push(destination.boxed())
                     .push(Space::new().height(8).boxed())
                     .push(dir_row(vec![confirm_btn, Space::new().width(8).boxed(), cancel_btn]).boxed());
             } else {

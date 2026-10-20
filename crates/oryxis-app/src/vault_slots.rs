@@ -38,6 +38,10 @@ pub(crate) struct OpenVault {
     /// not the first-run carousel, and cancelling that step goes back
     /// there (the empty new vault goes away).
     pub(crate) created_from: Option<Uuid>,
+    /// A `.oryxis` export to bring in once this vault, made for it
+    /// ("Import as a new vault"), is set up: the import needs the vault's
+    /// key, which its setup step makes.
+    pub(crate) pending_import: Option<crate::state::PendingImport>,
     /// `load_data_from_vault` ran for it in this process (a vault opened
     /// unlocked by a window switching to it loads on the switch).
     pub(crate) loaded: bool,
@@ -519,6 +523,7 @@ impl OpenVault {
             store,
             path: None,
             created_from: None,
+            pending_import: None,
             loaded: false,
             last_user_activity: std::time::Instant::now(),
             last_session_log_capacity_check: std::time::Instant::now(),
