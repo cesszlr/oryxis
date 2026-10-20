@@ -1525,14 +1525,19 @@ impl Oryxis {
 
     /// The daemon's per-window forms of `title` / `theme` / `view`. With
     /// several windows the title names what each shows (its tab, or
-    /// Hosts), so the taskbar and Alt+Tab can tell them apart; a single
-    /// window keeps the plain name.
+    /// Hosts), so the taskbar and Alt+Tab can tell them apart; with
+    /// several vaults it names the window's vault too ("Work - Oryxis",
+    /// "db01 · Work - Oryxis"). One window on one vault keeps the plain
+    /// name.
     pub fn title_for(&self, window: iced::window::Id) -> String {
-        if self.extra_windows.is_empty() {
-            return self.title();
-        }
         let target = (Some(window) != resident_window_id()).then_some(window);
-        format!("{} - {}", self.window_label(target), self.title())
+        let vault = (self.vault_count() > 1).then(|| self.vault_name(self.vault_of_window(target)));
+        match (self.extra_windows.is_empty(), vault) {
+            (true, None) => self.title(),
+            (true, Some(vault)) => format!("{vault} - {}", self.title()),
+            (false, None) => format!("{} - {}", self.window_label(target), self.title()),
+            (false, Some(vault)) => format!("{} \u{b7} {vault} - {}", self.window_label(target), self.title()),
+        }
     }
 
     /// The iced theme of one window: built from its vault's chrome
