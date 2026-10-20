@@ -8,6 +8,8 @@ mode: Zen
 # `read -s -p` is the fixture rather than `sudo`: it prints the exact
 # prompt with echo off and blocks, which is the whole shape the
 # detector keys on, without needing a privileged binary on the CI box.
+# The last section takes the same shell into tmux (issue #232), which
+# used to be a file of its own with this same setup in front of it.
 #
 # Setup is coordinate-driven because none of it is text-selectable: a
 # key must exist before the keychain toolbar (and its "+ ADD" split
@@ -52,11 +54,11 @@ screenshot pwsuggest-identity
 # this covers the whole path without a server.
 click (161, 20)
 expect "Local Shell"
+# A live PTY never lets the emulator quiesce, so every instruction from
+# here would otherwise burn the full timeout, the spawning click first.
+timeout 500
 click "Local Shell"
 settle 500
-# A live PTY never lets the emulator quiesce, so every instruction from
-# here would otherwise burn the full timeout.
-timeout 500
 wait 1500
 # The popup anchors at the caret, which needs the pane's DRAWN rect.
 # The emulator only draws on `screenshot`, so this one is load-bearing:
@@ -151,3 +153,61 @@ type enter
 wait 800
 # Must show `[hunter2]`: the click reached the row, not the terminal.
 screenshot pwsuggest-flipped-sent
+
+# 7. Inside tmux (issue #232). The multiplexer lives on the alternate
+# screen, where the prompt shares its row with the pane beside it and
+# the screen may belong to an editor instead, so the detector cuts the
+# row at tmux's divider and only accepts the exact shapes programs
+# print. The tmux socket lives inside the sandbox (TMUX_TMPDIR), which
+# the runner wipes per test, and `-f /dev/null` keeps a runner's own
+# config out of the layout.
+#
+# 7a. Split tmux left / right. The left pane prints words that would
+# both carry and exclude a match if the row were read from column 0.
+type "export TMUX_TMPDIR=$HOME/.oryxis"
+type enter
+type "tmux -L e2e -f /dev/null new-session"
+type enter
+wait 1500
+type "echo old password new; tmux split-window -h"
+type enter
+wait 1500
+screenshot pwsuggest-tmux-split
+
+# 7b. A prompt in the right pane raises the popup at its caret.
+type "read -s -p '[sudo] password for wilson: ' PW"
+type enter
+wait 1500
+expect "Stored passwords"
+expect "ops-admin"
+screenshot pwsuggest-tmux-popup
+
+# 7c. Picking sends that credential into the pane that asked.
+click "ops-admin"
+wait 800
+absent "Stored passwords"
+type "echo [$PW]"
+type enter
+wait 800
+# Must show `[hunter2]` in the RIGHT pane.
+screenshot pwsuggest-tmux-sent
+
+# 7d. What only looks like a prompt stays quiet on the alternate screen:
+# a lower-case key an editor could be sitting after, and a prompt that
+# asks the user to CHOOSE a password.
+type "read -p 'password:' X"
+type enter
+wait 1200
+absent "Stored passwords"
+type enter
+wait 600
+type "read -s -p 'New Password: ' X"
+type enter
+wait 1200
+absent "Stored passwords"
+type enter
+wait 600
+
+type "tmux -L e2e kill-server"
+type enter
+wait 800

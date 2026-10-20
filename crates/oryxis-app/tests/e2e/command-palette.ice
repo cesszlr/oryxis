@@ -33,7 +33,9 @@ settle 400
 expect "Open local shell"
 # Enter activates the top match via the two-step PaletteActivate
 # dispatch: the palette closes and a local shell tab opens.
+# The Enter that spawns the shell already leaves the never-ending PTY
+# task pending, so the cap goes before it.
+timeout 500
 type enter
 settle 500
-timeout 500
 screenshot command-palette-activated
