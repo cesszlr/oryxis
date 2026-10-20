@@ -53,9 +53,10 @@ impl Oryxis {
         let menu_open = self
             .cur_overlay()
             .is_some_and(|o| matches!(o.content, crate::state::OverlayContent::VaultSwitcher));
-        // On the toolbar's keyboard ring (recorded first: it leads the
-        // row).
-        let chip = self.keynav_toolbar_slot(crate::keynav::ToolbarItem::VaultSwitcher, chip.boxed());
+        // The ring half only: the chip is BUILT whether or not the
+        // toolbar places it, so the toolbar records the item where it
+        // puts the chip (recording here rang an invisible control first).
+        let chip = self.keynav_toolbar_ring(crate::keynav::ToolbarItem::VaultSwitcher, chip.boxed());
         let chip: Element<'_, Message> = if menu_open {
             chip
         } else {

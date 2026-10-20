@@ -595,6 +595,8 @@ impl Oryxis {
         // The vault chip, unless a single vault is all there is and the
         // user hid it for that case.
         if self.vault_switcher_in_toolbar() {
+            // First on the toolbar's keyboard ring: it leads the row.
+            self.keynav_toolbar_record(crate::keynav::ToolbarItem::VaultSwitcher);
             row_items.push(vault_chip);
             row_items.push(Space::new().width(8).boxed());
         }
