@@ -360,8 +360,13 @@ impl Oryxis {
                             self.give_ref_to_window(heir, r, false);
                         }
                     } else {
+                        // Remembered (and its quick-connect pruned) on the
+                        // tab's own vault: a tab parked under another vault
+                        // is that vault's to reopen.
+                        let previous = self.vaults.act_on(self.tabs[idx].vault_or(self.vaults.window_id()));
                         self.remember_closed_tab(idx);
                         self.teardown_tab_at(idx);
+                        self.vaults.act_back(previous);
                     }
                 }
                 TabRef::Sftp(id) => {
@@ -375,10 +380,12 @@ impl Oryxis {
                             self.give_ref_to_window(heir, r, false);
                         }
                     } else {
+                        let previous = self.vaults.act_on(self.sftp_tabs[idx].vault.unwrap_or(self.vaults.window_id()));
                         self.remember_closed_sftp_tab(idx);
                         // Its own follow-up only navigates this window,
                         // which is on its way out.
                         let _ = self.close_sftp_tab(idx);
+                        self.vaults.act_back(previous);
                     }
                 }
                 TabRef::Panel(kind) => {

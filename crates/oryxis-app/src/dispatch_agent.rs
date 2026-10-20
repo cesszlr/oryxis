@@ -190,8 +190,13 @@ impl Oryxis {
             runtime.detach(self.vaults.current_id());
         }
         // No prompt (on screen or queued) is answered across a lock:
-        // deny them all and drop the grants.
-        self.agent.deny_all_and_clear_grants();
+        // deny them all and drop the grants. Only when the lock is the
+        // one the user is looking at: a vault locking in the background
+        // leaves another vault's prompts up (a sign for one of ITS keys
+        // fails on its own, the key is detached).
+        if self.vaults.window_id() == self.vaults.current_id() {
+            self.agent.deny_all_and_clear_grants();
+        }
     }
 
     /// The acting vault's keys join the agent after its unlock.

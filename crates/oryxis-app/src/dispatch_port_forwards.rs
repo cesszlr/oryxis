@@ -355,7 +355,9 @@ impl Oryxis {
                 // Unwind the in-flight bookkeeping so the dialog's retry
                 // passes the double-start guard instead of hitting a stuck
                 // "starting" id, and queued siblings stop spinning.
-                match self.forward_conns.remove(&host_id) {
+                // A follow-up of the dial, so this runs on the rule's vault.
+                let key = (self.vaults.current_id(), host_id);
+                match self.forward_conns.remove(&key) {
                     Some(PfHostConn::Connecting { pending }) => {
                         for rid in &pending {
                             self.port_forward_starting.remove(rid);
@@ -365,12 +367,12 @@ impl Oryxis {
                         // retry-ladder entry to bring them back, so without
                         // this they would silently stay off.
                         if !pending.is_empty() {
-                            self.pf_aborted_pending.insert(host_id, pending);
+                            self.pf_aborted_pending.insert(key, pending);
                         }
                     }
                     // A stray abort must not drop a live connection.
                     Some(up) => {
-                        self.forward_conns.insert(host_id, up);
+                        self.forward_conns.insert(key, up);
                     }
                     None => {}
                 }
@@ -382,7 +384,7 @@ impl Oryxis {
                 // guard in `start_port_forward` skips anything already back).
                 let mut ids = self
                     .pf_aborted_pending
-                    .remove(&host_id)
+                    .remove(&(self.vaults.current_id(), host_id))
                     .unwrap_or_default();
                 ids.retain(|rid| *rid != initiator);
                 ids.insert(0, initiator);
@@ -509,8 +511,11 @@ impl Oryxis {
         };
         let host_id = rule.host_id;
         let rule_label = rule.label.clone();
+        // The host's connection is this vault's: the same id in another
+        // vault is another host (an import keeps ids).
+        let key = (self.vaults.current_id(), host_id);
 
-        match self.forward_conns.get_mut(&host_id) {
+        match self.forward_conns.get_mut(&key) {
             // Already connected: attach this rule as one more channel.
             Some(PfHostConn::Up(fconn)) if fconn.is_alive() => {
                 let fconn = fconn.clone();
@@ -519,7 +524,7 @@ impl Oryxis {
             }
             // The connection died since its last forward: dial fresh below.
             Some(PfHostConn::Up(_)) => {
-                self.forward_conns.remove(&host_id);
+                self.forward_conns.remove(&key);
             }
             // A dial for this host is already in flight: queue behind it;
             // `PortForwardConnReady` attaches everything at once.
@@ -562,11 +567,11 @@ impl Oryxis {
         // This rule opens the dial; siblings toggled on meanwhile queue
         // behind it and everything attaches on `PortForwardConnReady`.
         self.forward_conns
-            .insert(host_id, PfHostConn::Connecting { pending: vec![id] });
+            .insert(key, PfHostConn::Connecting { pending: vec![id] });
         // A fresh dial supersedes any queue stranded by an earlier
         // legacy-algorithm abort; drop it so a later dialog retry can't
         // resurrect rules the user has since left off.
-        self.pf_aborted_pending.remove(&host_id);
+        self.pf_aborted_pending.remove(&key);
 
         if boot_auto_start {
             tracing::info!("auto-starting port forward {} ({})", rule_label, id);
@@ -791,12 +796,14 @@ impl Oryxis {
         host_id: Uuid,
         res: Result<ForwardConn, String>,
     ) -> Task<Message> {
-        let pending = match self.forward_conns.remove(&host_id) {
+        // A follow-up of the dial, so this runs on the rule's vault.
+        let key = (self.vaults.current_id(), host_id);
+        let pending = match self.forward_conns.remove(&key) {
             Some(PfHostConn::Connecting { pending }) => pending,
             // One dial per host at a time, so this can only be a stray
             // late completion; keep whatever state superseded it.
             Some(up @ PfHostConn::Up(_)) => {
-                self.forward_conns.insert(host_id, up);
+                self.forward_conns.insert(key, up);
                 Vec::new()
             }
             None => Vec::new(),
@@ -819,7 +826,7 @@ impl Oryxis {
                     .iter()
                     .map(|rid| self.attach_port_forward_task(fconn.clone(), *rid))
                     .collect();
-                self.forward_conns.insert(host_id, PfHostConn::Up(fconn));
+                self.forward_conns.insert(key, PfHostConn::Up(fconn));
                 // This dial proves the route is back: pull every other
                 // pending forward off its backoff too (issue #144). The
                 // rules attaching above are still in
@@ -851,20 +858,20 @@ impl Oryxis {
     /// connection, not leave it idling. `Connecting` entries are exempt,
     /// their `PortForwardConnReady` is still in flight and settles them.
     fn pf_gc_host_conns(&mut self) {
-        // Every open vault's rules: a host's shared connection may carry
-        // another vault's forwards than the one this runs on.
-        let rules: Vec<(Uuid, Uuid)> = self
+        // Every open vault's rules: the sweep is app-wide, and each
+        // connection is judged by the rules of the vault it belongs to.
+        let rules: Vec<(Uuid, Uuid, Uuid)> = self
             .vaults
             .all()
-            .flat_map(|v| v.port_forward_rules.iter().map(|r| (r.id, r.host_id)))
+            .flat_map(|v| v.port_forward_rules.iter().map(move |r| (r.id, r.host_id, v.id)))
             .collect();
         let active = &self.active_forwards;
         let starting = &self.port_forward_starting;
-        self.forward_conns.retain(|host_id, state| match state {
+        self.forward_conns.retain(|(vault, host_id), state| match state {
             PfHostConn::Connecting { .. } => true,
             PfHostConn::Up(_) => {
                 let on_this_host = |rid: &Uuid| {
-                    rules.iter().any(|(id, host)| id == rid && host == host_id)
+                    rules.iter().any(|(id, host, v)| id == rid && host == host_id && v == vault)
                 };
                 active.keys().any(&on_this_host) || starting.iter().any(on_this_host)
             }
@@ -896,7 +903,7 @@ impl Oryxis {
     /// Auto-start rules come back with the vault's next unlock.
     pub(crate) fn stop_vault_forwards(&mut self) -> Task<Message> {
         let ids: Vec<Uuid> = self.vaults.cur().port_forward_rules.iter().map(|r| r.id).collect();
-        let hosts: Vec<Uuid> = self.vaults.cur().port_forward_rules.iter().map(|r| r.host_id).collect();
+        let vault = self.vaults.current_id();
         let mut sessions = Vec::new();
         for id in &ids {
             self.port_forward_starting.remove(id);
@@ -905,7 +912,7 @@ impl Oryxis {
                 sessions.push(session);
             }
         }
-        self.pf_aborted_pending.retain(|host, _| !hosts.contains(host));
+        self.pf_aborted_pending.retain(|(v, _), _| *v != vault);
         self.pf_gc_host_conns();
         Task::batch(sessions.into_iter().map(|session| {
             Task::perform(async move { session.cancel().await }, |_| {

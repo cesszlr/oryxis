@@ -46,18 +46,17 @@ impl Oryxis {
                         Ok(()) => {
                             self.vaults.cur_mut().vault_ui.state = VaultState::Unlocked;
                             self.vaults.cur_mut().vault_ui.error = None;
-                            self.load_data_from_vault();
+                            // Everything a vault owes when it opens
+                            // (data, agent, sync, forwards, plugins, the
+                            // font heal, the perf notice), the one way
+                            // every other door takes.
+                            let opened = self.finish_vault_open();
                             // The app's own fetches, deferred from boot
                             // until the onboarding had its say on
                             // offline mode.
-                            let fetches = Task::batch(
-                                self.boot_fetch_tasks()
-                                    .into_iter()
-                                    .chain(self.unlock_fetch_tasks()),
-                            );
+                            let fetches = Task::batch(self.boot_fetch_tasks());
                             return Task::batch([
-                                self.agent_boot_task(),
-                                self.take_perf_mode_toast_task(),
+                                opened,
                                 // Onboarding's import offer, now that
                                 // there IS a vault to import into.
                                 self.take_onboarding_import_task(),

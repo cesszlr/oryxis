@@ -290,9 +290,24 @@ impl Oryxis {
                 // surface that isn't visible still raises the dialog, which
                 // layers globally. With an autosave grant the upload starts
                 // right here instead of asking.
-                let auto = self.vaults.cur().prefs.sftp_edit_autosave || self.sftp_edit_upload_all;
+                // Each surface by ITS vault: the autosave grant and the
+                // upload name are that vault's settings, and a locked
+                // vault's watches wait for its unlock (the lock sweeps
+                // them; this is the structural gate). The buffer in the
+                // fields is the window's vault's.
+                let upload_all = self.sftp_edit_upload_all;
+                let per_vault: std::collections::HashMap<uuid::Uuid, (bool, bool)> = self
+                    .vaults
+                    .all()
+                    .filter(|v| v.vault_ui.state == crate::state::VaultState::Unlocked)
+                    .map(|v| (v.id, (v.prefs.sftp_edit_autosave || upload_all, v.prefs.sftp_upload_temp_name)))
+                    .collect();
+                let window = self.vaults.window_id();
                 let mut tasks: Vec<Task<Message>> = Vec::new();
-                let mut scan = |st: &mut crate::state::SftpState| {
+                let mut scan = |st: &mut crate::state::SftpState, vault: uuid::Uuid| {
+                    let Some(&(auto, temp_name)) = per_vault.get(&vault) else {
+                        return;
+                    };
                     for w in st.edit_watches.iter_mut() {
                         if w.uploading {
                             continue;
@@ -305,7 +320,7 @@ impl Oryxis {
                                 if auto {
                                     w.uploading = true;
                                     w.dirty = false;
-                                    tasks.push(watch_upload_task(w.clone(), self.vaults.cur().prefs.sftp_upload_temp_name));
+                                    tasks.push(watch_upload_task(w.clone(), temp_name));
                                 } else {
                                     w.dirty = true;
                                 }
@@ -314,12 +329,13 @@ impl Oryxis {
                         }
                     }
                 };
-                scan(&mut self.sftp);
+                scan(&mut self.sftp, window);
                 for tab in self.sftp_tabs.iter_mut() {
-                    scan(&mut tab.state);
+                    scan(&mut tab.state, tab.vault.unwrap_or(window));
                 }
                 for tab in self.tabs.iter_mut() {
-                    scan(&mut tab.files_state);
+                    let vault = tab.vault_or(window);
+                    scan(&mut tab.files_state, vault);
                 }
                 if !tasks.is_empty() {
                     return Ok(Task::batch(tasks));

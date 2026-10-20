@@ -463,7 +463,10 @@ impl Oryxis {
     pub(crate) fn repaint_terminal_palettes_for_label(&self, label: &str) {
         let palette = self.resolve_terminal_palette_for_label(label);
         let base = label.trim_end_matches(" (disconnected)");
-        for tab in &self.tabs {
+        let (vault, window) = (self.vaults.current_id(), self.vaults.window_id());
+        // This vault's tabs: another vault's host of the same name has
+        // its own theme resolution.
+        for tab in self.tabs.iter().filter(|t| t.vault_or(window) == vault) {
             let tab_base = tab.label.trim_end_matches(" (disconnected)");
             if tab_base != base {
                 continue;

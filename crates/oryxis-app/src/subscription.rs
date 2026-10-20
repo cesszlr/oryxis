@@ -462,11 +462,12 @@ impl Oryxis {
             );
         }
 
-        // Unlocked-gated like the monitor above: the soft-lock sweep
-        // clears every watch, but the gate makes the invariant structural
-        // (no save can upload behind the lock screen even if a watch
-        // slipped past a future sweep edit).
-        if self.vaults.cur().vault_ui.state == crate::state::VaultState::Unlocked
+        // Unlocked-gated like the monitor above, per vault: the lock
+        // sweeps its vault's watches, and the handler skips a locked
+        // vault's surfaces, which makes the invariant structural (no
+        // save can upload behind a lock screen even if a watch slipped
+        // past a future sweep edit). Mounts while any vault is open.
+        if self.vaults.all().any(|v| v.vault_ui.state == crate::state::VaultState::Unlocked)
             && (!self.cur_sftp().edit_watches.is_empty()
                 || self
                     .sftp_tabs

@@ -57,13 +57,22 @@ impl Oryxis {
                     .filter(|v| v.auto_lock_due())
                     .map(|v| v.id)
                     .collect();
-                return Ok(Task::batch(idle.into_iter().map(|vault| {
-                    tracing::info!(%vault, "vault auto-lock after its idle threshold");
-                    Task::done(Message::ForVault(
-                        vault,
-                        Box::new(Message::Vault(VaultMessage::SoftLockVault)),
-                    ))
-                })));
+                // Delivered in a window showing the vault when one does,
+                // so the lock's sweep of that window's own surface (its
+                // SFTP buffer, its floats) runs with that window in the
+                // fields; a vault no window shows locks as the resident.
+                let locks: Vec<Message> = idle
+                    .into_iter()
+                    .map(|vault| {
+                        tracing::info!(%vault, "vault auto-lock after its idle threshold");
+                        let lock = Message::ForVault(vault, Box::new(Message::Vault(VaultMessage::SoftLockVault)));
+                        match self.window_on_vault(vault) {
+                            Some(Some(window)) => Message::InWindow(window, Box::new(lock)),
+                            _ => lock,
+                        }
+                    })
+                    .collect();
+                return Ok(Task::batch(locks.into_iter().map(Task::done)));
             }
             SettingsMessage::ConnectAnimTick => {
                 self.connect_anim_tick = self.connect_anim_tick.wrapping_add(1);

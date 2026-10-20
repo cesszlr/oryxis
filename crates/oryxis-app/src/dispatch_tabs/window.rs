@@ -386,7 +386,7 @@ impl Oryxis {
     /// window and the extra ones: a card dragged out of an extra window
     /// and released outside used to stay armed there, and the next move
     /// inside could still tear it off into a new window.
-    pub(super) fn on_window_blur(&mut self) {
+    pub(crate) fn on_window_blur(&mut self) {
         self.tab_drag = None;
         self.card_drag = None;
         self.sftp.drag = None;

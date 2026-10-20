@@ -51,7 +51,8 @@ impl Oryxis {
                 self.vaults.cur_mut().chat_ui.viewer = None;
                 // A tab still appending to a wiped conversation must start a
                 // fresh row instead of resurrecting a deleted one.
-                for tab in &mut self.tabs {
+                let (vault, window) = (self.vaults.current_id(), self.vaults.window_id());
+                for tab in self.tabs.iter_mut().filter(|t| t.vault_or(window) == vault) {
                     tab.chat_saved_id = None;
                     tab.chat_persisted = 0;
                 }

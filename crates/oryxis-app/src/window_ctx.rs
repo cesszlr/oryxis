@@ -629,6 +629,14 @@ impl Oryxis {
             nav: std::mem::take(&mut self.nav),
         };
         self.parked_views.insert(from, left);
+        // A menu, a card context menu or a drag raised over the vault
+        // this window leaves is index-keyed into ITS lists; over the
+        // other vault's they would act on the wrong row.
+        if self.floats_here() {
+            self.overlay = None;
+            self.card_context_menu = None;
+        }
+        self.on_window_blur();
         self.vaults.switch_window_to(target);
         // Brought up by the user: its idle clock starts now, or a vault
         // left in the background for longer than its threshold would
@@ -1144,7 +1152,22 @@ impl Oryxis {
         f: impl FnOnce(&mut Self) -> Task<Message>,
     ) -> Task<Message> {
         let prev = self.window_ctx.as_ref().map(|c| c.id);
-        let task = self.as_window(target, f);
+        // Its follow-ups run on the vault `f` worked on (the target
+        // window's), read before the window leaves the fields: the
+        // outer `update` tags with the vault acting when IT ends, the
+        // originating window's, and a vault's first showing in a new
+        // window (`vault_shown` -> `finish_vault_open`) would have its
+        // engine, forwards and plugin answers land on that one.
+        let mut vault = None;
+        let task = self.as_window(target, |app| {
+            let task = f(app);
+            vault = Some(app.vaults.current_id());
+            task
+        });
+        let task = match vault {
+            Some(vault) => task.map(move |m| m.on_vault(vault)),
+            None => task,
+        };
         if prev == target {
             return task;
         }

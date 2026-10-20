@@ -666,6 +666,14 @@ impl Oryxis {
                 action: None,
             });
         }
+        // What follows is the boot vault's work; its answers must reach
+        // that vault whichever one the window is on when they arrive.
+        // Boot's tasks do not go through `update`, which is what tags
+        // the others, so they are tagged here (`on_vault`), apart from
+        // the app's own (updates, fonts), which a closed boot vault (the
+        // start picker's) must not take down with it.
+        let boot_vault = app.vaults.current_id();
+        let mut vault_tasks: Vec<Task<Message>> = Vec::new();
         // Whether something with a claim on where the app opens fired
         // below: the restored-strip landing (issue #229) yields to all
         // of them, the way it yields at the unlock site.
@@ -676,7 +684,7 @@ impl Oryxis {
             })
         {
             app.pending_auto_connect = None;
-            tasks.push(Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))));
+            vault_tasks.push(Task::done(Message::Ssh(SshMessage::ConnectSsh(idx))));
             landed = true;
         }
         // Route a deep link the launch carried. `handle_deep_link`
@@ -685,14 +693,14 @@ impl Oryxis {
         // lookup needs the loaded connections).
         if let Some(link) = app.pending_deep_link.take() {
             let route = app.handle_deep_link(link);
-            tasks.push(route);
+            vault_tasks.push(route);
             landed = true;
         }
         // Same for a CLI target, which `handle_connect_target` likewise
         // re-stashes while the vault is locked.
         if let Some(target) = app.pending_connect_target.take() {
             let route = app.handle_connect_target(&target);
-            tasks.push(route);
+            vault_tasks.push(route);
             landed = true;
         }
         // The restored strip's own two asks, for a vault that is open
@@ -706,13 +714,13 @@ impl Oryxis {
         // foreground one (the tab keeps its place in the queue).
         if open_now {
             let landing = app.take_launch_landing_task(landed);
-            tasks.extend(landing.dial);
-            tasks.extend(landing.select);
-            tasks.extend(app.launch_dial_kick());
+            vault_tasks.extend(landing.dial);
+            vault_tasks.extend(landing.select);
+            vault_tasks.extend(app.launch_dial_kick());
             // Finished downloads a previous process left in the ZMODEM
             // staging folder are OFFERED once the vault is readable (the
             // download folder is a setting); nothing is moved unasked.
-            tasks.extend(app.zmodem_sweep_task());
+            vault_tasks.extend(app.zmodem_sweep_task());
         }
         // Bring the sync engine up if the vault is already open and the
         // user left sync enabled. When the vault is locked we defer to
@@ -720,29 +728,24 @@ impl Oryxis {
         // Only the P2P transport runs a background engine; every
         // snapshot transport reconciles on the iced cadence
         // subscription instead.
-        // Its follow-ups name the boot vault: boot's tasks do not go
-        // through `update`, which is what tags the others, and the
-        // engine's events must reach this vault whichever one the
-        // window is on when they arrive.
-        let boot_vault = app.vaults.current_id();
         if open_now
             && app.vaults.cur().sync.enabled
             && app.sync_uses_p2p()
         {
-            tasks.push(app.start_sync_engine().map(move |m| m.on_vault(boot_vault)));
+            vault_tasks.push(app.start_sync_engine());
         }
         // The git card's availability probe spawns a subprocess, so it
         // runs as a task rather than inside `view()`. Fire it whenever
         // the git transport can be on screen (also done on `VaultUnlock`
         // and on `TransportChanged`).
         if open_now && app.vaults.cur().sync.transport == "git" {
-            tasks.push(crate::dispatch_git_sync::git_availability_task().map(move |m| m.on_vault(boot_vault)));
+            vault_tasks.push(crate::dispatch_git_sync::git_availability_task());
         }
 
         // Auto-start port forward rules marked `auto_start`. Deferred to
         // `VaultUnlock` when the vault is locked, same as sync / --connect.
         if open_now {
-            tasks.extend(app.auto_start_port_forwards());
+            vault_tasks.extend(app.auto_start_port_forwards());
         }
 
         // Sweep any leftover `.old.exe` from a previous Windows MCP
@@ -763,20 +766,21 @@ impl Oryxis {
         // the user's password opens it (the boot constructor can't
         // re-run). See `spawn_plugin_unlock_tasks`.
         if open_now {
-            tasks.extend(app.spawn_plugin_unlock_tasks());
+            vault_tasks.extend(app.spawn_plugin_unlock_tasks());
         }
         // One-time performance-mode auto-enable notice, for the
         // auto-unlocked (no-password) vault. The password path shows it
         // from the `VaultUnlock` handler instead.
-        tasks.push(app.take_perf_mode_toast_task());
+        vault_tasks.push(app.take_perf_mode_toast_task());
 
         // The terminal font pack rides `unlock_fetch_tasks`: the picked
         // family and weight are vault settings, so for a password vault
         // the heal used to run against the constructor's default font
         // and never against the configured one.
         if open_now {
-            tasks.extend(app.unlock_fetch_tasks());
+            vault_tasks.extend(app.unlock_fetch_tasks());
         }
+        tasks.push(Task::batch(vault_tasks).map(move |m| m.on_vault(boot_vault)));
 
         // A restored position may reference a monitor that is gone
         // (undocked laptop, unplugged display). Verify shortly after the

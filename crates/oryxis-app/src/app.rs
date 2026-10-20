@@ -991,15 +991,17 @@ pub struct Oryxis {
     /// each dialing its own connection. Keyed by the host's connection
     /// id. `Connecting` queues rules toggled on while the dial is in
     /// flight; the entry is dropped when the last forward of that host
-    /// stops (which closes the SSH connection). See
+    /// stops (which closes the SSH connection). Keyed by (vault, host):
+    /// a host id may exist in two vaults (an import keeps ids), each
+    /// with its own address and login. See
     /// `dispatch_port_forwards::PfHostConn`.
     pub(crate) forward_conns:
-        std::collections::HashMap<Uuid, crate::dispatch_port_forwards::PfHostConn>,
+        std::collections::HashMap<(Uuid, Uuid), crate::dispatch_port_forwards::PfHostConn>,
     /// Rules that were queued behind a shared dial the legacy-algorithm
     /// dialog aborted, keyed by host id. Consumed by the dialog's retry
     /// (`PortForwardHostRetry`) so the whole queue restarts together;
     /// discarded when a fresh dial for the host starts any other way.
-    pub(crate) pf_aborted_pending: std::collections::HashMap<Uuid, Vec<Uuid>>,
+    pub(crate) pf_aborted_pending: std::collections::HashMap<(Uuid, Uuid), Vec<Uuid>>,
     /// Callback tunnels opened by Ctrl+clicking a link in a terminal
     /// pane, keyed by `(pane_id, port)`. Each is a `-L` forward riding
     /// that pane's own SSH connection so a CLI login's

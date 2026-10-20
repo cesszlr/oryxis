@@ -1106,22 +1106,26 @@ impl Oryxis {
         // built eagerly (the icon glyph is not `Clone`), then capped
         // below; the pre-cap count also picks between the list and the
         // "nothing open" note.
+        // This vault's sessions only: the lock severs them, another
+        // vault's go on (a tab not claimed yet is the window's, so in a
+        // view pass every tab has its vault).
+        let vault = self.vaults.cur().id;
         let mut rows: Vec<Element<'_, Message>> = Vec::new();
-        for tab in &self.tabs {
+        for tab in self.tabs.iter().filter(|t| t.vault.is_none_or(|v| v == vault)) {
             for pane in tab.pane_grid.panes.values() {
                 if pane.session.as_ref().is_some_and(|s| s.is_alive()) {
                     rows.push(lock_impact_row(iced_fonts::lucide::terminal(), pane.label.clone()));
                 }
             }
         }
-        for (idx, tab) in self.sftp_tabs.iter().enumerate() {
+        for (idx, tab) in self.sftp_tabs.iter().enumerate().filter(|(_, t)| t.vault.is_none_or(|v| v == vault)) {
             // A tab counts only while it has a mounted session: a
             // disconnected SFTP tab has nothing to sever. The ACTIVE
-            // tab's live state rides the swap-on-focus buffer
-            // (`self.sftp`); its parked slot is a taken default, so
-            // resolve each tab against where its state actually lives.
-            let st: &crate::state::SftpState = if self.active_sftp == Some(idx) {
-                &self.sftp
+            // tab's live state rides the swap-on-focus buffer (this
+            // window's, `cur_sftp`); its parked slot is a taken default,
+            // so resolve each tab against where its state actually lives.
+            let st: &crate::state::SftpState = if self.cur_active_sftp() == Some(idx) {
+                self.cur_sftp()
             } else {
                 &tab.state
             };

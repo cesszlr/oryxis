@@ -101,6 +101,11 @@ impl Oryxis {
                     vault.lock();
                     self.vaults.cur_mut().vault_ui.state = VaultState::Locked;
                     self.vaults.cur_mut().master_password = None;
+                    // What of the app's own (one-per-app) state this lock
+                    // may sweep: only what belongs to this vault. The idle
+                    // lock of a vault in the background runs with another
+                    // vault's window in the fields, whose surface stays.
+                    let scope = self.lock_sweep_scope();
                     // The lock screen leads with biometrics when enrolled;
                     // a fallback choice from a previous lock must not stick.
                     self.vaults.cur_mut().vault_ui.password_fallback = false;
@@ -119,7 +124,7 @@ impl Oryxis {
                     // owner walked away. Only a dialog raised over this
                     // vault: an idle lock of a vault in the background
                     // leaves another vault's dialog alone.
-                    if self.vault_of_window(self.float_window) == self.vaults.current_id() {
+                    if scope.floats_mine {
                         self.error_dialog = None;
                     }
                     self.vaults.cur_mut().panels.host_panel = false;
@@ -145,62 +150,18 @@ impl Oryxis {
                     self.vaults.cur_mut().keys_ui.import_public_content = iced::widget::text_editor::Content::new();
                     self.vaults.cur_mut().keys_ui.import_cert_content = iced::widget::text_editor::Content::new();
                     self.vaults.cur_mut().cert_viewer = None;
-                    // The session player / log viewer hold DECRYPTED
-                    // recording bytes (a session that ran `cat
-                    // /etc/shadow` keeps that output in the emulator grid
-                    // / rendered spans). That is secret-bearing UI like a
-                    // revealed secret, so it must not sit in RAM behind
-                    // the lock screen; it can only be rebuilt from the
-                    // vault after unlock anyway.
-                    self.session_player = None;
-                    self.viewing_session_log = None;
                     // The History content-search results hold decrypted
                     // command lines / output excerpts; same rule.
                     self.history_content_reset();
                     // The ssh-agent goes dark (keys ungated) while locked;
                     // the listener stays up so a `git` sees an empty agent.
                     self.agent_on_lock();
-                    self.overlay = None;
-                    self.card_context_menu = None;
-                    // The burger menu and the SFTP row menu are dropdown
-                    // overlays, not Modals, so the modal sweep below never
-                    // reaches them. Left armed, their flag survives the
-                    // lock screen, and the Enter that submits the unlock
-                    // password reaches the modal keynav router in the same
-                    // update batch the vault unlocks in: the router then
-                    // activates the menu's remembered default row against
-                    // its stale pre-lock recording (issue #169, the unlock
-                    // that landed on a fresh SFTP tab with the host picker
-                    // up, because the SFTP row recorded slot 0).
-                    self.vaults.cur_mut().panels.burger_menu = false;
-                    self.sftp.row_menu = None;
-                    // Top-strip pickers (command palette, tab-jump,
-                    // new-tab picker) are NOT rendered over the lock
-                    // screen, but their `show_*` flags still make
-                    // `any_modal_blocks_input()` true, so the modal key
-                    // router would keep processing arrows / Enter for the
-                    // hidden surface behind the lock screen (the command
-                    // palette could even dispatch an action while locked).
-                    // Close them like the SFTP modals below.
-                    self.close_modal(crate::state::Modal::CommandPalette);
-                    self.close_modal(crate::state::Modal::TabJump);
-                    self.close_modal(crate::state::Modal::NewTabPicker);
-                    // A careful-paste / snippet-variables confirm parked
-                    // over a live session is ARMED state: its keynav
-                    // default is the Confirm row, the lock screen never
-                    // re-records the modal ring, and both flags keep
-                    // `any_modal_blocks_input()` true while locked, so a
-                    // stray Enter on the lock screen (an empty or failed
-                    // unlock) would reach the modal key router and
-                    // activate the stale default, injecting the staged
-                    // text into the still-live session, the exact
-                    // auto-run the careful paste exists to stop. Close
-                    // them and drop the stale modal recording with them.
-                    self.close_modal(crate::state::Modal::CarefulPaste);
-                    self.close_modal(crate::state::Modal::SnippetVars);
-                    self.pending_paste_install = None;
-                    self.pending_paste_snippet = None;
-                    self.modal_nav_reset();
+                    // Floats, pickers, the SFTP buffer's dialogs, the
+                    // monitor and the pending dial prompts are the app's
+                    // (one each), swept only when this vault's; see
+                    // `lock_sweep_scope` for what the lock screen still
+                    // needs of them (issue #169, the careful paste).
+                    self.sweep_app_surface_for_lock(scope);
                     // A master-password candidate typed into the change /
                     // set-password form must not survive the soft lock.
                     self.vaults.cur_mut().vault_ui.new_password.clear();
@@ -215,61 +176,6 @@ impl Oryxis {
                     // password too (when the snippet embeds it); a reveal
                     // left on would spell it out the moment the vault opens.
                     self.vaults.cur_mut().mcp.token_visible = false;
-                    // SFTP modals carry remote paths and live action buttons;
-                    // root_view already stops rendering them while locked, but
-                    // sweep the state so none reappears after unlock. A watch
-                    // holding a pending save is dropped with it, matching the
-                    // soft-lock promise (secret-bearing UI is discarded, the
-                    // live session survives).
-                    self.sftp.picker_open = false;
-                    self.sftp.new_entry = None;
-                    self.sftp.delete_confirm.clear();
-                    self.sftp_edit_reopen = None;
-                    self.sftp.edit_watches.clear();
-                    // Watches parked in standalone / hybrid tab states feed
-                    // the same 2s tick; left alive they would keep uploading
-                    // local saves (under an autosave grant) behind the lock
-                    // screen, and dirty ones would re-prompt after unlock.
-                    for tab in self.sftp_tabs.iter_mut() {
-                                                tab.state.edit_watches.clear();
-                    }
-                    for tab in self.tabs.iter_mut() {
-                                                tab.files_state.edit_watches.clear();
-                    }
-                    // Monitor samples are host telemetry gathered while
-                    // unlocked; drop them with the rest of the sweep so a
-                    // locked screen shows nothing about the fleet. The
-                    // stamp bump inside makes a probe still in flight land
-                    // dead instead of repopulating the swept state.
-                    self.monitor_reset_all();
-                    // Same reasoning for the tmux listings: what runs on
-                    // a host is telemetry too, and a locked screen owes
-                    // the fleet nothing.
-                    self.tmux_reset_all();
-                    self.sftp.overwrite_prompt = None;
-                    self.sftp.properties = None;
-                    // A pending keyboard-interactive prompt belongs to an
-                    // in-flight connect; cancel it cleanly (the engine
-                    // treats `None` as auth abort).
-                    if self.pending_kbi_prompt.take().is_some() {
-                        self.kbi_inputs.clear();
-                        if let Some(ref tx) = self.kbi_response_tx {
-                            let _ = tx.try_send(None);
-                        }
-                    }
-                    // A pending host-key prompt is a security dialog for an
-                    // in-flight backgrounded connect; reject it (safe
-                    // default) rather than leaving it rendered over the lock
-                    // screen. Mirrors SshHostKeyReject.
-                    if self.pending_host_key.take().is_some()
-                        && let Some(tx) = self.active_host_key_tx.take()
-                    {
-                        let _ = tx.try_send(false);
-                    }
-                    self.pending_kbi_quick = None;
-                    // A parked identity/key switch must not fire a
-                    // reconnect behind the lock screen.
-                    self.pending_auth_switch = None;
                     // Quick-connect entries hold typed plaintext credentials;
                     // sweep the secrets but keep the connections themselves,
                     // matching the soft-lock promise that live tabs survive.
@@ -282,10 +188,13 @@ impl Oryxis {
                     }
                     self.sweep_sync_passphrase();
                     // Land the keyboard in the unlock field so the user
-                    // returning to the machine just types the password.
-                    return crate::widgets::focus_input(iced::widget::Id::new(
-                        "vault-unlock-password",
-                    ));
+                    // returning to the machine just types the password:
+                    // in the window that shows this vault's lock screen.
+                    if scope.in_view {
+                        return crate::widgets::focus_input(iced::widget::Id::new(
+                            "vault-unlock-password",
+                        ));
+                    }
                 }
             }
             VaultMessage::LockVault => {
@@ -338,6 +247,7 @@ impl Oryxis {
                         // its SFTP tabs. Another open vault's sessions go on
                         // (each vault locks on its own).
                         let in_view = self.sever_vault_sessions();
+                        let scope = self.lock_sweep_scope();
                         // Its port forwards too: they are live sessions,
                         // and the auto-start ones come back with the
                         // unlock (the soft lock keeps them).
@@ -391,34 +301,11 @@ impl Oryxis {
                         // command lines / output excerpts; sweep like the
                         // soft lock does.
                         self.history_content_reset();
-                        self.overlay = None;
-                        self.card_context_menu = None;
-                        // Same dropdown sweep as the soft lock: the confirm
-                        // dialog already closed the burger menu on its way
-                        // in, but the sweep must hold on its own so no
-                        // trigger site can leave the menu armed behind the
-                        // lock screen (issue #169). The SFTP row menu dies
-                        // with the buffer reset above.
-                        self.vaults.cur_mut().panels.burger_menu = false;
-                        // Top-strip pickers: same reason as the soft lock,
-                        // a stray key must not drive the hidden surface (the
-                        // command palette could dispatch an action) behind
-                        // the lock screen.
-                        self.close_modal(crate::state::Modal::CommandPalette);
-                        self.close_modal(crate::state::Modal::TabJump);
-                        self.close_modal(crate::state::Modal::NewTabPicker);
-                        // Same paste-confirm sweep as the soft lock. The
-                        // sessions are gone here, so a stale Confirm could
-                        // not inject anywhere, but the armed flags would
-                        // still hold `any_modal_blocks_input()` true and
-                        // feed the modal router stale rows behind the lock
-                        // screen.
-                        self.close_modal(crate::state::Modal::CarefulPaste);
-                        self.close_modal(crate::state::Modal::SnippetVars);
-                        self.pending_paste_install = None;
-                        self.pending_paste_snippet = None;
-                        self.modal_nav_reset();
-                        self.error_dialog = None;
+                        // The app's own floats, pickers, SFTP dialogs,
+                        // monitor and dial prompts: only this vault's
+                        // ("Lock all" runs this once per vault from one
+                        // window).
+                        self.sweep_app_surface_for_lock(scope);
                         self.vaults.cur_mut().panels.host_panel = false;
                         self.vaults.cur_mut().host_panel_error = None;
                         self.vaults.cur_mut().editor_form = crate::state::ConnectionForm::default();
@@ -430,49 +317,11 @@ impl Oryxis {
                         self.vaults.cur_mut().keys_ui.import_public_content = iced::widget::text_editor::Content::new();
                         self.vaults.cur_mut().keys_ui.import_cert_content = iced::widget::text_editor::Content::new();
                         self.vaults.cur_mut().cert_viewer = None;
-                        // Decrypted session-recording bytes (player grid /
-                        // rendered viewer spans) are secret-bearing and
-                        // have no business surviving an explicit "I'm
-                        // done"; the soft lock sweeps these too.
-                        self.session_player = None;
-                        self.viewing_session_log = None;
                         self.vaults.cur_mut().vault_ui.new_password.clear();
                         self.vaults.cur_mut().vault_ui.confirm_password.clear();
                         // Abort an in-flight KDF calibration (snapshot is
                         // secret material; the apply must not land post-lock).
                         self.vaults.cur_mut().vault_ui.pending_kdf_pw = None;
-                        self.sftp.picker_open = false;
-                        self.sftp.new_entry = None;
-                        self.sftp.delete_confirm.clear();
-                        self.sftp_edit_reopen = None;
-                        self.sftp.edit_watches.clear();
-                        for tab in self.sftp_tabs.iter_mut() {
-                                                        tab.state.edit_watches.clear();
-                        }
-                        for tab in self.tabs.iter_mut() {
-                                                        tab.files_state.edit_watches.clear();
-                        }
-                        self.monitor_reset_all();
-                        self.tmux_reset_all();
-                        self.sftp.overwrite_prompt = None;
-                        self.sftp.properties = None;
-                        // Cancel a pending keyboard-interactive / host-key
-                        // prompt from an in-flight connect (the sessions
-                        // were just torn down; the engine treats `None` /
-                        // `false` as a clean abort).
-                        if self.pending_kbi_prompt.take().is_some() {
-                            self.kbi_inputs.clear();
-                            if let Some(ref tx) = self.kbi_response_tx {
-                                let _ = tx.try_send(None);
-                            }
-                        }
-                        if self.pending_host_key.take().is_some()
-                            && let Some(tx) = self.active_host_key_tx.take()
-                        {
-                            let _ = tx.try_send(false);
-                        }
-                        self.pending_kbi_quick = None;
-                        self.pending_auth_switch = None;
                         // Same auto-focus as the soft lock: the unlock
                         // field is the only thing to interact with.
                         if in_view {
@@ -640,3 +489,141 @@ impl Oryxis {
         in_view
     }
 }
+
+/// Which of the app's one-per-app surfaces a lock of the acting vault
+/// may sweep ([`Oryxis::lock_sweep_scope`]): the idle lock of a vault in
+/// the background, and "Lock all", run with another vault's window in
+/// the fields, whose menus, dialogs, buffer and dials are not this
+/// vault's to close.
+#[derive(Clone, Copy)]
+pub(crate) struct LockSweepScope {
+    /// The window in the fields shows the locking vault.
+    pub(crate) in_view: bool,
+    /// The floating layer (menus, modals) was raised over a window on
+    /// the locking vault.
+    pub(crate) floats_mine: bool,
+    /// The dial in progress (its prompts: host key, 2FA, auth switch)
+    /// is a tab of the locking vault's.
+    pub(crate) dial_mine: bool,
+}
+
+impl Oryxis {
+    pub(crate) fn lock_sweep_scope(&self) -> LockSweepScope {
+        let vault = self.vaults.current_id();
+        let window = self.vaults.window_id();
+        let in_view = window == vault;
+        let floats_mine = self.vault_of_window(self.float_window) == vault;
+        // A dial with a progress card is its tab's vault's; a prompt a
+        // pane's reconnect raised belongs to whatever this window shows.
+        let dial_mine = self
+            .connecting
+            .as_ref()
+            .and_then(|c| self.tabs.get(c.tab_idx))
+            .map(|t| t.vault_or(window) == vault)
+            .unwrap_or(in_view);
+        LockSweepScope { in_view, floats_mine, dial_mine }
+    }
+
+    /// The app-level half of a lock's sweep, soft or hard, each piece
+    /// only when `scope` says it is the locking vault's.
+    pub(crate) fn sweep_app_surface_for_lock(&mut self, scope: LockSweepScope) {
+        let vault = self.vaults.current_id();
+        let window = self.vaults.window_id();
+        // The session player / log viewer hold DECRYPTED recording bytes
+        // (a session that ran `cat /etc/shadow` keeps that output in the
+        // emulator grid / rendered spans). Secret-bearing UI like a
+        // revealed secret, with no vault written on it: swept whichever
+        // vault locks; it can only be rebuilt from its vault anyway.
+        self.session_player = None;
+        self.viewing_session_log = None;
+        // The burger menu is the vault's own (drawn by its windows).
+        self.vaults.cur_mut().panels.burger_menu = false;
+        if scope.floats_mine {
+            self.overlay = None;
+            self.card_context_menu = None;
+            // Top-strip pickers (command palette, tab-jump, new-tab
+            // picker) are NOT rendered over the lock screen, but their
+            // `show_*` flags still make `any_modal_blocks_input()` true,
+            // so the modal key router would keep processing arrows /
+            // Enter for the hidden surface behind the lock screen (the
+            // command palette could even dispatch an action while
+            // locked). A careful-paste / snippet-variables confirm
+            // parked over a live session is ARMED state: its keynav
+            // default is the Confirm row, the lock screen never
+            // re-records the modal ring, and a stray Enter on the lock
+            // screen would inject the staged text into the still-live
+            // session, the exact auto-run the careful paste exists to
+            // stop. Close them and drop the stale modal recording.
+            self.close_modal(crate::state::Modal::CommandPalette);
+            self.close_modal(crate::state::Modal::TabJump);
+            self.close_modal(crate::state::Modal::NewTabPicker);
+            self.close_modal(crate::state::Modal::CarefulPaste);
+            self.close_modal(crate::state::Modal::SnippetVars);
+            self.pending_paste_install = None;
+            self.pending_paste_snippet = None;
+            self.modal_nav_reset();
+        }
+        if scope.in_view {
+            // The SFTP buffer in the fields is this window's: its row
+            // menu (a dropdown, not a Modal, so the modal sweep never
+            // reaches it; left armed, the Enter that submits the unlock
+            // password activated its stale default row, issue #169) and
+            // its dialogs, which carry remote paths and live action
+            // buttons; a watch holding a pending save goes with them.
+            self.sftp.row_menu = None;
+            self.sftp.picker_open = false;
+            self.sftp.new_entry = None;
+            self.sftp.delete_confirm.clear();
+            self.sftp.overwrite_prompt = None;
+            self.sftp.properties = None;
+            self.sftp.edit_watches.clear();
+            self.sftp_edit_reopen = None;
+            // Monitor samples are host telemetry gathered while unlocked;
+            // a locked screen shows nothing about the fleet. The stamp
+            // bump inside makes a probe still in flight land dead.
+            self.monitor_reset_all();
+        }
+        // Watches parked in this vault's standalone / hybrid tab states
+        // feed the same 2 s tick; left alive they would keep uploading
+        // local saves (under an autosave grant) behind the lock screen,
+        // and dirty ones would re-prompt after unlock. Another vault's
+        // tabs keep theirs.
+        for tab in self.sftp_tabs.iter_mut().filter(|t| t.vault.unwrap_or(window) == vault) {
+            tab.state.edit_watches.clear();
+        }
+        let mut panes: Vec<uuid::Uuid> = Vec::new();
+        for tab in self.tabs.iter_mut().filter(|t| t.vault_or(window) == vault) {
+            tab.files_state.edit_watches.clear();
+            panes.extend(tab.pane_grid.panes.values().map(|p| p.id));
+        }
+        // The tmux listings of this vault's panes: what runs on a host
+        // is telemetry too, and a locked screen owes the fleet nothing.
+        for pane in panes {
+            self.tmux_reset_pane(&pane);
+        }
+        if scope.dial_mine {
+            // A pending keyboard-interactive prompt belongs to an
+            // in-flight connect; cancel it cleanly (the engine treats
+            // `None` as auth abort). A pending host-key prompt is a
+            // security dialog for an in-flight backgrounded connect;
+            // reject it (safe default) rather than leaving it rendered
+            // over the lock screen. Mirrors SshHostKeyReject.
+            if self.pending_kbi_prompt.take().is_some() {
+                self.kbi_inputs.clear();
+                if let Some(ref tx) = self.kbi_response_tx {
+                    let _ = tx.try_send(None);
+                }
+            }
+            if self.pending_host_key.take().is_some()
+                && let Some(tx) = self.active_host_key_tx.take()
+            {
+                let _ = tx.try_send(false);
+            }
+            self.pending_kbi_quick = None;
+            // A parked identity/key switch must not fire a reconnect
+            // behind the lock screen.
+            self.pending_auth_switch = None;
+        }
+    }
+}
+
