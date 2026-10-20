@@ -481,7 +481,7 @@ pub fn any_live_instance() -> bool {
 /// an unreadable image as "not ours": the registry lives under this
 /// user's home, so a sibling is always a process this user can query.
 #[cfg(target_os = "windows")]
-fn is_live_oryxis(pid: u32) -> bool {
+pub(crate) fn is_live_oryxis(pid: u32) -> bool {
     use std::os::windows::ffi::OsStringExt as _;
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{
@@ -514,7 +514,7 @@ fn is_live_oryxis(pid: u32) -> bool {
 }
 
 #[cfg(target_os = "linux")]
-fn is_live_oryxis(pid: u32) -> bool {
+pub(crate) fn is_live_oryxis(pid: u32) -> bool {
     match std::fs::read_link(format!("/proc/{pid}/exe")) {
         Ok(exe) => same_image(&exe, &own_image_stem()),
         Err(_) => false,
@@ -527,7 +527,7 @@ fn is_live_oryxis(pid: u32) -> bool {
 /// delivering anything; EPERM means the process exists but is not
 /// ours, which still counts as alive.
 #[cfg(all(unix, not(target_os = "linux")))]
-fn is_live_oryxis(pid: u32) -> bool {
+pub(crate) fn is_live_oryxis(pid: u32) -> bool {
     // SAFETY: kill with signal 0 only validates, it never signals.
     let rc = unsafe { libc::kill(pid as libc::pid_t, 0) };
     rc == 0
@@ -535,7 +535,7 @@ fn is_live_oryxis(pid: u32) -> bool {
 }
 
 #[cfg(not(any(target_os = "windows", unix)))]
-fn is_live_oryxis(_pid: u32) -> bool {
+pub(crate) fn is_live_oryxis(_pid: u32) -> bool {
     false
 }
 

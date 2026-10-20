@@ -9,9 +9,10 @@
 //!
 //! This is the bound. Under lock, the flush spools the rows it would
 //! have written to the vault into
-//! `~/.oryxis/runtime/spool/<vault>/<log>.spool`, one folder and one key
-//! per open vault (a soft lock is a vault's own, and the drain after its
-//! unlock must replay that vault's recordings and nothing else),
+//! `~/.oryxis/runtime/spool/<pid>/<vault>/<log>.spool`, one folder and one
+//! key per open vault of this process (a soft lock is a vault's own, and
+//! the drain after its unlock must replay that vault's recordings and
+//! nothing else; a second Oryxis process has folders of its own),
 //! each row sealed under an [`oryxis_vault::EphemeralKey`] that lives in
 //! this process alone: the file is as readable at rest as the process's
 //! memory was, which is the posture the lock already accepts, and it is
@@ -84,20 +85,26 @@ impl SessionSpool {
         Some(oryxis_core::paths::oryxis_dir()?.join("runtime").join("spool"))
     }
 
+    /// This process's folder under the spool root.
+    fn own_dir() -> Option<PathBuf> {
+        Some(Self::root()?.join(std::process::id().to_string()))
+    }
+
     /// Open vault `vault`'s spool for this process: its folder
     /// (owner-only on unix) and a fresh key. `None` when either cannot
     /// be had, which the caller reads as "keep the rows in memory", the
     /// old behaviour.
     pub(crate) fn open(vault: Uuid) -> Option<Self> {
-        Self::open_in(Self::root()?.join(vault.simple().to_string()))
+        Self::open_in(Self::own_dir()?.join(vault.simple().to_string()))
     }
 
-    /// Delete vault `vault`'s spool folder (the vault is being deleted).
+    /// Delete vault `vault`'s spool folder in this process (the vault is
+    /// being removed; its key goes with it).
     pub(crate) fn remove_for(vault: Uuid) {
-        let Some(root) = Self::root() else {
+        let Some(own) = Self::own_dir() else {
             return;
         };
-        let dir = root.join(vault.simple().to_string());
+        let dir = own.join(vault.simple().to_string());
         if dir.exists()
             && let Err(e) = std::fs::remove_dir_all(&dir)
         {
@@ -226,21 +233,51 @@ impl SessionSpool {
         rows
     }
 
-    /// Delete every spool a previous process left: sealed under a key
-    /// that died with it, they can only be removed. Runs at boot.
+    /// Delete every spool a process that is gone left: sealed under a key
+    /// that died with it, they can only be removed. A folder of a live
+    /// Oryxis process (a second window process on Linux / macOS, a
+    /// JumpList launch) is its spool in use and stays. Runs at boot.
     pub(crate) fn sweep_stale() {
         let Some(root) = Self::root() else {
             return;
         };
-        let swept = Self::sweep_dir(&root);
+        let swept = Self::sweep_dead(&root, std::process::id(), crate::tray_ipc::is_live_oryxis);
         if swept > 0 {
             tracing::info!("swept {swept} session spool file(s) from a previous run");
         }
     }
 
-    /// Remove the spool files under `dir`: its own (a build from before
-    /// the per-vault folders put them there) and each vault folder's,
-    /// the folder going too once empty. Answers how many files went.
+    /// Sweep the spool root: a process folder (named by its PID) goes
+    /// unless `live` says that process is an Oryxis still running (this
+    /// one's own folder is stale at its boot: the PID was reused); files
+    /// and folders of the layouts before the per-process one go too.
+    /// Answers how many spool files went.
+    fn sweep_dead(root: &std::path::Path, own: u32, live: impl Fn(u32) -> bool) -> usize {
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return 0;
+        };
+        let mut swept = 0usize;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let pid = path
+                .is_dir()
+                .then(|| path.file_name().and_then(|n| n.to_str()).and_then(|n| n.parse::<u32>().ok()))
+                .flatten();
+            if pid.is_some_and(|pid| pid != own && live(pid)) {
+                continue;
+            }
+            if path.is_dir() {
+                swept += Self::sweep_dir(&path);
+                let _ = std::fs::remove_dir(&path);
+            } else if path.extension().is_some_and(|ext| ext == "spool") && std::fs::remove_file(&path).is_ok() {
+                swept += 1;
+            }
+        }
+        swept
+    }
+
+    /// Remove the spool files under `dir` and its folders, each folder
+    /// going too once empty. Answers how many files went.
     fn sweep_dir(dir: &std::path::Path) -> usize {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return 0;
@@ -433,9 +470,27 @@ mod tests {
         let work = SessionSpool::open_in(root.join("work")).expect("spool");
         old.append(Uuid::new_v4(), &[PendingSessionRow::End]).expect("append");
         work.append(Uuid::new_v4(), &[PendingSessionRow::End]).expect("append");
-        assert_eq!(SessionSpool::sweep_dir(&root), 2);
+        assert_eq!(SessionSpool::sweep_dead(&root, 1, |_| false), 2);
         assert!(!root.join("work").exists(), "an emptied vault folder stayed");
         assert!(root.exists(), "the sweep removed the spool root itself");
+    }
+
+    #[test]
+    fn the_boot_sweep_spares_a_live_process_spool() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("spool");
+        let live = SessionSpool::open_in(root.join("4242").join("work")).expect("spool");
+        let dead = SessionSpool::open_in(root.join("4343").join("work")).expect("spool");
+        let reused = SessionSpool::open_in(root.join("7").join("work")).expect("spool");
+        for spool in [&live, &dead, &reused] {
+            spool.append(Uuid::new_v4(), &[PendingSessionRow::End]).expect("append");
+        }
+        // 4242 is an Oryxis still running; 7 is this process's own PID,
+        // whose folder at boot was left by an earlier process.
+        let swept = SessionSpool::sweep_dead(&root, 7, |pid| pid == 4242 || pid == 7);
+        assert_eq!(swept, 2);
+        assert_eq!(live.drain_all().len(), 1, "a running process keeps its spool");
+        assert!(!root.join("4343").exists() && !root.join("7").exists());
     }
 
 }
