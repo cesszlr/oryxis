@@ -83,6 +83,17 @@ pub(crate) fn live_mouse() -> (Option<iced::window::Id>, iced::Point) {
     )
 }
 
+/// Whether an IME text event goes on to the terminal. A focused text
+/// field takes a commit or a preedit and CAPTURES it (the fork's
+/// `text_input` handles both only while focused; nothing in the
+/// terminal widget handles IME events), so a captured one is that
+/// field's, wherever it sits: a side panel, a modal, the sidebar chat.
+/// The empty preedit that ends a composition always goes, so a field
+/// focused mid-composition never strands a ghost on the grid.
+fn ime_reaches_terminal(status: iced::event::Status, text: &str) -> bool {
+    status != iced::event::Status::Captured || text.is_empty()
+}
+
 impl Oryxis {
     pub fn subscription(&self) -> Subscription<Message> {
         // Every event is tagged with the window it happened in
@@ -106,7 +117,8 @@ impl Oryxis {
                 // etc.). Routed to the active PTY in dispatch_terminal,
                 // behind the same focus guards as KeyboardEvent. Preedit /
                 // open / close phases are handled by the OS overlay; only
-                // the final commit needs forwarding.
+                // the final commit needs forwarding. One a focused text
+                // field captured is that field's (`ime_reaches_terminal`).
                 iced::event::Event::InputMethod(
                     iced::advanced::input_method::Event::Commit(text),
                 ) => {
@@ -115,6 +127,12 @@ impl Oryxis {
                     // types nothing" report (issue #176) needs answered.
                     // Lengths only, never content: commits are what the
                     // user typed.
+                    if !ime_reaches_terminal(status, &text) {
+                        if crate::logging::is_enabled() {
+                            tracing::debug!(len = text.chars().count(), "ime-commit taken by a focused field");
+                        }
+                        return None;
+                    }
                     if crate::logging::is_enabled() {
                         tracing::debug!(len = text.chars().count(), "ime-commit delivered");
                     }
@@ -129,6 +147,9 @@ impl Oryxis {
                 iced::event::Event::InputMethod(
                     iced::advanced::input_method::Event::Preedit(text, _),
                 ) => {
+                    if !ime_reaches_terminal(status, &text) {
+                        return None;
+                    }
                     if crate::logging::is_enabled() {
                         tracing::debug!(len = text.chars().count(), "ime-preedit delivered");
                     }
@@ -788,4 +809,22 @@ fn tray_event_stream() -> impl iced::futures::Stream<Item = Message> {
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ime_reaches_terminal;
+    use iced::event::Status;
+
+    #[test]
+    fn an_ime_text_a_focused_field_captured_is_that_fields() {
+        assert!(!ime_reaches_terminal(Status::Captured, "\u{4f60}\u{597d}"));
+        assert!(ime_reaches_terminal(Status::Ignored, "\u{4f60}\u{597d}"));
+    }
+
+    #[test]
+    fn the_empty_preedit_that_ends_a_composition_always_goes() {
+        assert!(ime_reaches_terminal(Status::Captured, ""));
+        assert!(ime_reaches_terminal(Status::Ignored, ""));
+    }
 }

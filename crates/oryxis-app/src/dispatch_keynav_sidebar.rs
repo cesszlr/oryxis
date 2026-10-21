@@ -281,7 +281,9 @@ impl Oryxis {
         event: &keyboard::Event,
     ) -> Option<Task<Message>> {
         let (_side, tab) = self.engaged_sidebar_context()?;
-        if self.any_modal_blocks_input() || self.vaults.cur().panels.host_panel {
+        // The drawer as DRAWN, never the flag, which stays up behind a
+        // tab focused after the editor opened (issue #262).
+        if self.any_modal_blocks_input() || self.host_editor_visible() {
             return None;
         }
         let keyboard::Event::KeyPressed { key, modifiers, .. } = event else {

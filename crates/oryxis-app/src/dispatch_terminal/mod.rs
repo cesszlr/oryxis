@@ -1107,25 +1107,30 @@ impl Oryxis {
             // Text committed by the OS IME (composed CJK characters, etc.),
             // delivered by the global subscription separately from
             // KeyboardEvent. Forward to the PTY under the same conditions as
-            // a keystroke: no host editor panel or modal stealing focus, and
-            // the cursor not over the chat sidebar. Deliberately does NOT
+            // a keystroke: no side panel ON SCREEN or modal stealing focus,
+            // and the cursor not over the chat sidebar. Deliberately does NOT
             // gate on active_view: in workspace mode a focused terminal runs
             // under the Dashboard view, not a dedicated Terminal view, so the
-            // KeyboardEvent path doesn't check it either. When a text_input is
-            // focused it handles its own Commit and inserts the text itself;
-            // the host-panel / modal guards keep that from also hitting the
-            // session.
+            // KeyboardEvent path doesn't check it either. A commit a focused
+            // text_input took never gets here (the subscription drops a
+            // CAPTURED one); the surface guards are the second line.
+            //
+            // The panel guard reads what is DRAWN (`side_panel_open`, the
+            // keystroke path's own predicate), never the `host_panel` flag:
+            // the editor stays open behind a tab focused after it, flag up
+            // and drawer hidden, and every commit in every tab died on that
+            // flag (issue #262).
             TerminalMessage::TerminalImeCommit(text) => {
                 // Which gate a commit died on is the other half of the IME
                 // evidence (the subscription traces delivery); lengths only,
                 // never content.
                 let trace_ime = crate::logging::is_enabled();
                 let commit_len = text.chars().count();
-                if text.is_empty() || self.vaults.cur().panels.host_panel || self.any_modal_blocks_input() {
+                if text.is_empty() || self.side_panel_open() || self.any_modal_blocks_input() {
                     if trace_ime && !text.is_empty() {
                         tracing::debug!(
                             len = commit_len,
-                            host_panel = self.vaults.cur().panels.host_panel,
+                            side_panel = self.side_panel_open(),
                             modal = self.any_modal_blocks_input(),
                             "ime-commit dropped by surface gate"
                         );
@@ -1177,16 +1182,14 @@ impl Oryxis {
             // clears it. Purely visual: nothing is written to the PTY until
             // the composition commits.
             TerminalMessage::TerminalImePreedit(text) => {
-                // Same surface guards as `TerminalImeCommit`: IME events
-                // reach this subscription even while a text_input owns the
-                // composition (host panel field, modal, sidebar chat), and
-                // without these the grid would paint someone else's
-                // composition at the caret. An empty preedit (composition
-                // ended or the IME closed) always lands, so a surface
-                // opening mid-composition can never strand a ghost on the
-                // grid.
+                // Same surface guards as `TerminalImeCommit`: without them
+                // the grid would paint someone else's composition at the
+                // caret (a side panel field, a modal, the sidebar chat). An
+                // empty preedit (composition ended or the IME closed) always
+                // lands, so a surface opening mid-composition can never
+                // strand a ghost on the grid.
                 if !text.is_empty()
-                    && (self.vaults.cur().panels.host_panel
+                    && (self.side_panel_open()
                         || self.any_modal_blocks_input()
                         || self.cursor_over_sidebar())
                 {

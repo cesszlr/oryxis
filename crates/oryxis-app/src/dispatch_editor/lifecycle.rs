@@ -35,9 +35,11 @@ impl Oryxis {
                     // OpenPortForwards / edit-host hotkey), leave the
                     // terminal surface so the right-panel editor actually
                     // renders: it only shows when no tab is focused.
-                    // Without this the flag sticks true and silently
-                    // disables Ctrl+Tab MRU, IME routing and sidebar
-                    // keynav. The tab keeps running in the background.
+                    // The tab keeps running in the background. (The
+                    // flag also stays up behind a tab focused LATER,
+                    // which is why the keyboard, IME and sidebar gates
+                    // read `host_editor_visible` / `side_panel_open`,
+                    // never the flag: issue #262.)
                     if self.cur_active_tab().is_some() {
                         self.active_tab = None;
                         self.active_view = crate::state::View::Dashboard;

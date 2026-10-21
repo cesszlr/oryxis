@@ -310,7 +310,9 @@ impl Oryxis {
                 if let keyboard::Event::KeyPressed { key, modifiers, .. } = &event
                     && matches!(key, keyboard::Key::Named(keyboard::key::Named::Tab))
                     && modifiers.control()
-                    && !self.vaults.cur().panels.host_panel
+                    // The drawer as DRAWN: the flag stays up behind a tab
+                    // focused after the editor opened (issue #262).
+                    && !self.host_editor_visible()
                     && !self.any_modal_blocks_input()
                 {
                     return Ok(self.cycle_mru_step(!modifiers.shift()));
