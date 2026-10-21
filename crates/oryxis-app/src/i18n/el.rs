@@ -2686,6 +2686,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Αλλαγή vault",
         "vault_open_new_window" => "Άνοιγμα σε νέο παράθυρο",
         "vault_new" => "Νέο vault…",
+        "vault_manage" => "Διαχείριση vault…",
         "vault_lock_all" => "Κλείδωμα όλων των vault",
         "vault_lock_all_title" => "Κλείδωμα όλων των vault;",
         "vault_lock_all_body" => "Κάθε vault με κύριο κωδικό κλειδώνει και οι συνεδρίες του τερματίζονται.",

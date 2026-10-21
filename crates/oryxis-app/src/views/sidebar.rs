@@ -358,7 +358,10 @@ impl Oryxis {
                     right: 16.0,
                     bottom: 8.0,
                     left: 12.0,
-                }).boxed(),
+                })
+                .width(Length::Fill)
+                .align_x(dir_align_x())
+                .boxed(),
             );
         }
 
@@ -443,7 +446,10 @@ impl Oryxis {
             right: 16.0,
             bottom: 8.0,
             left: 16.0,
-        });
+        })
+        // The title hugs the leading edge, like the rows under it.
+        .width(Length::Fill)
+        .align_x(dir_align_x());
         let body = container(list)
             .padding(Padding {
                 top: 4.0,

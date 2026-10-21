@@ -16,6 +16,8 @@ pub enum MultiVaultMessage {
     OpenVaultInNewWindow(Uuid),
     /// "New vault…": the dialog opens in its create mode.
     ShowNewVault,
+    /// "Manage vaults…": Settings opens on its Vaults section.
+    ShowVaultSettings,
     /// Settings > Vaults: rename vault `id`.
     ShowRenameVault(Uuid),
     /// Settings > Vaults: delete vault `id` (its name typed back; the

@@ -2649,6 +2649,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Tresor wechseln",
         "vault_open_new_window" => "In neuem Fenster öffnen",
         "vault_new" => "Neuer Tresor…",
+        "vault_manage" => "Tresore verwalten…",
         "vault_lock_all" => "Alle Tresore sperren",
         "vault_lock_all_title" => "Alle Tresore sperren?",
         "vault_lock_all_body" => "Jeder Tresor mit Master-Passwort wird gesperrt, und seine Sitzungen enden.",

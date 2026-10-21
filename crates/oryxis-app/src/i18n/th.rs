@@ -2688,6 +2688,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "สลับ Vault",
         "vault_open_new_window" => "เปิดในหน้าต่างใหม่",
         "vault_new" => "Vault ใหม่…",
+        "vault_manage" => "จัดการ Vault…",
         "vault_lock_all" => "ล็อก Vault ทั้งหมด",
         "vault_lock_all_title" => "ล็อก Vault ทั้งหมดหรือไม่",
         "vault_lock_all_body" => "Vault ทุกอันที่มีรหัสผ่านหลักจะถูกล็อก และเซสชันของ Vault นั้นจะสิ้นสุด",

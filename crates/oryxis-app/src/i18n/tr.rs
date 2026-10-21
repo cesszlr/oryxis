@@ -2681,6 +2681,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Kasa değiştir",
         "vault_open_new_window" => "Yeni pencerede aç",
         "vault_new" => "Yeni kasa…",
+        "vault_manage" => "Kasaları yönet…",
         "vault_lock_all" => "Tüm kasaları kilitle",
         "vault_lock_all_title" => "Tüm kasalar kilitlensin mi?",
         "vault_lock_all_body" => "Ana parolası olan her kasa kilitlenir ve oturumları sona erer.",

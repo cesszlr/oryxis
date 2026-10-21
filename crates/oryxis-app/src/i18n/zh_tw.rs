@@ -2649,6 +2649,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "切換保險庫",
         "vault_open_new_window" => "在新視窗中開啟",
         "vault_new" => "新增保險庫…",
+        "vault_manage" => "管理保險庫…",
         "vault_lock_all" => "鎖定所有保險庫",
         "vault_lock_all_title" => "要鎖定所有保險庫嗎？",
         "vault_lock_all_body" => "所有設有主密碼的保險庫都會鎖定，其工作階段也會結束。",

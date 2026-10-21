@@ -2649,6 +2649,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Cambiar de cofre",
         "vault_open_new_window" => "Abrir en una ventana nueva",
         "vault_new" => "Nuevo cofre…",
+        "vault_manage" => "Administrar cofres…",
         "vault_lock_all" => "Bloquear todos los cofres",
         "vault_lock_all_title" => "¿Bloquear todos los cofres?",
         "vault_lock_all_body" => "Se bloquea cada cofre con contraseña maestra y terminan sus sesiones.",

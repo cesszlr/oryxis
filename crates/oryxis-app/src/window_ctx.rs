@@ -1388,12 +1388,16 @@ impl Oryxis {
         // in the top bar.
         let across = !crate::views::tab_bar::tab_bar_pos().is_side()
             || (pinned && self.vaults.cur().prefs.pinned_tabs_top_bar);
+        // Across a mirrored (RTL) strip "before" is to the right.
+        let rtl = crate::i18n::is_rtl_layout();
         let before = order
             .iter()
             .filter(|r| r.strip_id() != tab && self.ref_pinned(r) == pinned)
             .filter(|r| {
                 self.strip_chip_rect(target, r.strip_id()).is_some_and(|rect| {
-                    if across {
+                    if across && rtl {
+                        rect.center_x() > cursor.x
+                    } else if across {
                         rect.center_x() < cursor.x
                     } else {
                         rect.center_y() < cursor.y

@@ -80,11 +80,19 @@ impl Oryxis {
                     VaultChipPlace::Rail => self.vault_badge_bounds.get(),
                     VaultChipPlace::Tabs => self.vault_tab_bounds.get(),
                 };
-                // Under the control; a strip docked at the bottom is
-                // kept inside the window by the overlay's own clamp. A
-                // door never drawn (the keyboard opening a hidden
-                // switcher) hangs it under the tab bar's leading edge.
-                let (x, y) = if b.width > 0.0 { (b.x, b.y + b.height + 4.0) } else { (8.0, 44.0) };
+                // Under the control, flush with its leading edge (the
+                // whole Home pill in the strip, not its chevron); a strip
+                // docked at the bottom is kept inside the window by the
+                // overlay's own clamp. A door never drawn (the keyboard
+                // opening a hidden switcher) hangs it under the tab bar's
+                // leading edge.
+                let (x, y) = if b.width > 0.0 {
+                    (crate::widgets::leading_edge_x(b), b.y + b.height + 4.0)
+                } else if crate::i18n::is_rtl_layout() {
+                    (self.cur_window_size().width - 8.0, 44.0)
+                } else {
+                    (8.0, 44.0)
+                };
                 self.overlay = Some(OverlayState {
                     content: OverlayContent::VaultSwitcher,
                     x,
@@ -106,6 +114,12 @@ impl Oryxis {
                 self.overlay = None;
                 self.vault_dialog = Some(VaultDialog::create());
                 return crate::widgets::focus_input(iced::widget::Id::new(VAULT_DIALOG_NAME_INPUT));
+            }
+            MultiVaultMessage::ShowVaultSettings => {
+                self.overlay = None;
+                return self.update(Message::Tabs(crate::app::TabsMessage::OpenSettingsSection(
+                    crate::state::SettingsSection::Vaults,
+                )));
             }
             MultiVaultMessage::ShowRenameVault(id) => {
                 self.vault_dialog = Some(VaultDialog::rename(id, self.vault_name(id)));

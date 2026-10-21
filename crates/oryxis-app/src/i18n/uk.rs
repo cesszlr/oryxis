@@ -2681,6 +2681,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Змінити сховище",
         "vault_open_new_window" => "Відкрити в новому вікні",
         "vault_new" => "Нове сховище…",
+        "vault_manage" => "Керування сховищами…",
         "vault_lock_all" => "Заблокувати всі сховища",
         "vault_lock_all_title" => "Заблокувати всі сховища?",
         "vault_lock_all_body" => "Кожне сховище з майстер-паролем блокується, і його сеанси завершуються.",

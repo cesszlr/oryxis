@@ -2681,6 +2681,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Przełącz sejf",
         "vault_open_new_window" => "Otwórz w nowym oknie",
         "vault_new" => "Nowy sejf…",
+        "vault_manage" => "Zarządzaj sejfami…",
         "vault_lock_all" => "Zablokuj wszystkie sejfy",
         "vault_lock_all_title" => "Zablokować wszystkie sejfy?",
         "vault_lock_all_body" => "Każdy sejf z hasłem głównym zostanie zablokowany, a jego sesje się zakończą.",

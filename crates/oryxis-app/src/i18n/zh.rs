@@ -2649,6 +2649,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "切换保险库",
         "vault_open_new_window" => "在新窗口中打开",
         "vault_new" => "新建保险库…",
+        "vault_manage" => "管理保险库…",
         "vault_lock_all" => "锁定所有保险库",
         "vault_lock_all_title" => "锁定所有保险库？",
         "vault_lock_all_body" => "所有设有主密码的保险库都会被锁定，其会话随之结束。",

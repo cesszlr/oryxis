@@ -2649,6 +2649,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Сменить хранилище",
         "vault_open_new_window" => "Открыть в новом окне",
         "vault_new" => "Новое хранилище…",
+        "vault_manage" => "Управление хранилищами…",
         "vault_lock_all" => "Заблокировать все хранилища",
         "vault_lock_all_title" => "Заблокировать все хранилища?",
         "vault_lock_all_body" => "Каждое хранилище с мастер-паролем блокируется, и его сеансы завершаются.",

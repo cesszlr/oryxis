@@ -2649,6 +2649,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Cambia vault",
         "vault_open_new_window" => "Apri in una nuova finestra",
         "vault_new" => "Nuovo vault…",
+        "vault_manage" => "Gestisci vault…",
         "vault_lock_all" => "Blocca tutti i vault",
         "vault_lock_all_title" => "Bloccare tutti i vault?",
         "vault_lock_all_body" => "Ogni vault con password principale viene bloccato e le sue sessioni terminano.",

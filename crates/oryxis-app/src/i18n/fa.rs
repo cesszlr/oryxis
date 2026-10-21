@@ -2669,6 +2669,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "تغییر صندوقچه",
         "vault_open_new_window" => "باز کردن در پنجره جدید",
         "vault_new" => "صندوقچه جدید…",
+        "vault_manage" => "مدیریت صندوقچه‌ها…",
         "vault_lock_all" => "قفل کردن همه صندوقچه‌ها",
         "vault_lock_all_title" => "همه صندوقچه‌ها قفل شوند؟",
         "vault_lock_all_body" => "هر صندوقچه‌ای که رمز اصلی دارد قفل می‌شود و نشست‌هایش پایان می‌یابد.",

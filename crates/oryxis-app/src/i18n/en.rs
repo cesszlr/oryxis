@@ -2691,6 +2691,7 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "vault_switcher_tooltip" => "Switch vault",
         "vault_open_new_window" => "Open in new window",
         "vault_new" => "New vault…",
+        "vault_manage" => "Manage vaults…",
         "vault_lock_all" => "Lock all vaults",
         "vault_lock_all_title" => "Lock all vaults?",
         "vault_lock_all_body" => "Every vault with a master password locks, and its sessions end.",

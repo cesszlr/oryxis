@@ -2682,6 +2682,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Chuyển kho",
         "vault_open_new_window" => "Mở trong cửa sổ mới",
         "vault_new" => "Kho mới…",
+        "vault_manage" => "Quản lý kho…",
         "vault_lock_all" => "Khóa tất cả các kho",
         "vault_lock_all_title" => "Khóa tất cả các kho?",
         "vault_lock_all_body" => "Mọi kho có mật khẩu chính đều bị khóa và các phiên của kho đó kết thúc.",

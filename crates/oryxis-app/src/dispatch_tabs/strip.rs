@@ -143,11 +143,12 @@ impl Oryxis {
                 {
                     // Anchor under the `+` button at a fixed position (its
                     // reported bounds), not the cursor, so the popover lines
-                    // up cleanly with the button.
+                    // up cleanly with the button: from its leading edge,
+                    // so under RTL it hangs under the button too.
                     let b = self.plus_btn_bounds.get();
                     self.overlay = Some(OverlayState {
                         content: OverlayContent::SplitMenu,
-                        x: b.x,
+                        x: crate::widgets::leading_edge_x(b),
                         y: b.y + b.height,
                     });
                 }

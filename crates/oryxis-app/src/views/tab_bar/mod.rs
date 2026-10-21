@@ -655,16 +655,32 @@ impl Oryxis {
         // surrounding MouseArea makes the empty area of the strip a
         // window-drag handle, since we no longer have a separate drag
         // sibling in the row.
+        //
+        // Under RTL the strip mirrors like the bar around it: the chips
+        // run from the Home tab leftwards (`dir_row`), hugging the
+        // leading edge (a `Fill` container inside a horizontal
+        // scrollable resolves to the wider of the viewport and the
+        // chips, so the alignment places a strip that fits and changes
+        // nothing for one that scrolls), and the scroll offset counts
+        // from the right edge (`Anchor::End`), so offset 0 shows the
+        // first tabs and `tab_scroll_to_active`'s distance-from-start
+        // math holds in both directions.
+        let rtl = crate::i18n::is_rtl_layout();
         let tab_strip_inner = scrollable(
-            row(tab_items)
-                .spacing(TAB_SPACING)
-                .align_y(iced::Alignment::Center),
+            container(
+                crate::widgets::dir_row(tab_items)
+                    .spacing(TAB_SPACING)
+                    .align_y(iced::Alignment::Center),
+            )
+            .width(Length::Fill)
+            .align_x(crate::widgets::dir_align_x()),
         )
         .id(iced::widget::Id::new("tab-scroll"))
         .direction(scrollable::Direction::Horizontal(
             scrollable::Scrollbar::new()
                 .width(0.0)
-                .scroller_width(0.0),
+                .scroller_width(0.0)
+                .anchor(if rtl { scrollable::Anchor::End } else { scrollable::Anchor::Start }),
         ))
         .width(Length::Fill)
         .height(Length::Fixed(BAR_HEIGHT));

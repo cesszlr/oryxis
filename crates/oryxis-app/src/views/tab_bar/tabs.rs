@@ -94,15 +94,15 @@ pub(crate) fn area_tab<'a>(
 /// beside them opens the switcher. One pill, two buttons, the same
 /// active wash as every other area tab. `compact` (the narrow header of
 /// the side-docked strip) keeps the house and the chevron, the name in
-/// the house's tooltip. `chevron_cell` reports where the chevron was
-/// drawn: the switcher hangs from it.
+/// the house's tooltip. `pill_cell` reports where the whole pill was
+/// drawn: the switcher hangs from its leading edge.
 pub(crate) fn vault_home_tab<'a>(
     name: String,
     is_active: bool,
     solid_fill: bool,
     compact: bool,
     menu_open: bool,
-    chevron_cell: crate::widgets::BoundsCell,
+    pill_cell: crate::widgets::BoundsCell,
 ) -> Element<'a, Message> {
     let c = OryxisColors::t();
     let fg = if is_active { c.accent } else { c.text_secondary };
@@ -175,15 +175,15 @@ pub(crate) fn vault_home_tab<'a>(
     } else {
         crate::views::terminal::icon_tooltip(chevron.boxed(), crate::i18n::t("vault_switcher_tooltip"))
     };
-    let chevron = crate::widgets::bounds_reporter(chevron, chevron_cell);
     let bg: Option<Background> = is_active.then(|| active_tab_bg(OryxisColors::t().accent, solid_fill));
-    container(crate::widgets::dir_row(vec![home, chevron]).align_y(iced::Alignment::Center))
+    let pill = container(crate::widgets::dir_row(vec![home, chevron]).align_y(iced::Alignment::Center))
         .style(move |_: &iced::Theme| container::Style {
             background: bg,
             border: Border { radius: Radius::from(6.0), ..Default::default() },
             ..Default::default()
         })
-        .boxed()
+        .boxed();
+    crate::widgets::bounds_reporter(pill, pill_cell)
 }
 
 /// What [`vault_home_tab`] takes from the strip, for the strip's width

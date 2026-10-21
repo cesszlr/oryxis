@@ -2682,6 +2682,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Ganti vault",
         "vault_open_new_window" => "Buka di jendela baru",
         "vault_new" => "Vault baru…",
+        "vault_manage" => "Kelola vault…",
         "vault_lock_all" => "Kunci semua vault",
         "vault_lock_all_title" => "Kunci semua vault?",
         "vault_lock_all_body" => "Setiap vault yang punya kata sandi utama dikunci, dan sesinya berakhir.",

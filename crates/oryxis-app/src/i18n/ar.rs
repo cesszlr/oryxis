@@ -2668,6 +2668,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "تبديل الخزنة",
         "vault_open_new_window" => "فتح في نافذة جديدة",
         "vault_new" => "خزنة جديدة…",
+        "vault_manage" => "إدارة الخزائن…",
         "vault_lock_all" => "قفل كل الخزائن",
         "vault_lock_all_title" => "قفل كل الخزائن؟",
         "vault_lock_all_body" => "تُقفل كل خزنة لها كلمة مرور رئيسية، وتنتهي جلساتها.",

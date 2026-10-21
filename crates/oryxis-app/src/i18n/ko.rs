@@ -2682,6 +2682,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "볼트 전환",
         "vault_open_new_window" => "새 창에서 열기",
         "vault_new" => "새 볼트…",
+        "vault_manage" => "볼트 관리…",
         "vault_lock_all" => "모든 볼트 잠그기",
         "vault_lock_all_title" => "모든 볼트를 잠글까요?",
         "vault_lock_all_body" => "마스터 비밀번호가 있는 모든 볼트가 잠기고 해당 세션이 종료됩니다.",

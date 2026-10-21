@@ -2650,6 +2650,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "ボールトを切り替え",
         "vault_open_new_window" => "新しいウィンドウで開く",
         "vault_new" => "新しいボールト…",
+        "vault_manage" => "ボールトを管理…",
         "vault_lock_all" => "すべてのボールトをロック",
         "vault_lock_all_title" => "すべてのボールトをロックしますか？",
         "vault_lock_all_body" => "マスターパスワードのあるボールトはすべてロックされ、そのセッションは終了します。",

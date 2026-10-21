@@ -2687,6 +2687,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "वॉल्ट बदलें",
         "vault_open_new_window" => "नई विंडो में खोलें",
         "vault_new" => "नया वॉल्ट…",
+        "vault_manage" => "वॉल्ट प्रबंधित करें…",
         "vault_lock_all" => "सभी वॉल्ट लॉक करें",
         "vault_lock_all_title" => "सभी वॉल्ट लॉक करें?",
         "vault_lock_all_body" => "मास्टर पासवर्ड वाला हर वॉल्ट लॉक होगा और उसके सत्र समाप्त होंगे।",

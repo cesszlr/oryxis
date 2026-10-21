@@ -2648,6 +2648,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Changer de coffre",
         "vault_open_new_window" => "Ouvrir dans une nouvelle fenêtre",
         "vault_new" => "Nouveau coffre…",
+        "vault_manage" => "Gérer les coffres…",
         "vault_lock_all" => "Verrouiller tous les coffres",
         "vault_lock_all_title" => "Verrouiller tous les coffres ?",
         "vault_lock_all_body" => "Chaque coffre protégé par un mot de passe maître est verrouillé, et ses sessions se terminent.",

@@ -30,6 +30,19 @@ pub fn dir_align_x() -> iced::alignment::Horizontal {
     }
 }
 
+/// The x a popover anchored under `bounds` hangs from: the control's
+/// LEADING edge (its left under LTR, its right under RTL). The overlay
+/// renderer reads an anchor's `x` as the menu's leading edge and, under
+/// RTL, ends the menu there, so handing it the control's left edge
+/// under RTL drew the menu beside the control instead of under it.
+pub fn leading_edge_x(bounds: iced::Rectangle) -> f32 {
+    if crate::i18n::is_rtl_layout() {
+        bounds.x + bounds.width
+    } else {
+        bounds.x
+    }
+}
+
 /// Split the 1000-unit progress track into (filled, remaining) weights,
 /// clamping anything out of range (NaN included, which compares false and
 /// falls through `clamp` to the low end). A zero on either side means

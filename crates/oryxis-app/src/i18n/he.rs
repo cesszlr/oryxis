@@ -2687,6 +2687,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "החלפת כספת",
         "vault_open_new_window" => "פתיחה בחלון חדש",
         "vault_new" => "כספת חדשה…",
+        "vault_manage" => "ניהול כספות…",
         "vault_lock_all" => "נעילת כל הכספות",
         "vault_lock_all_title" => "לנעול את כל הכספות?",
         "vault_lock_all_body" => "כל כספת עם סיסמה ראשית ננעלת, והחיבורים שלה מסתיימים.",

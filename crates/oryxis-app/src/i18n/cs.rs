@@ -2686,6 +2686,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "vault_switcher_tooltip" => "Přepnout trezor",
         "vault_open_new_window" => "Otevřít v novém okně",
         "vault_new" => "Nový trezor…",
+        "vault_manage" => "Spravovat trezory…",
         "vault_lock_all" => "Zamknout všechny trezory",
         "vault_lock_all_title" => "Zamknout všechny trezory?",
         "vault_lock_all_body" => "Každý trezor s hlavním heslem se zamkne a jeho relace skončí.",

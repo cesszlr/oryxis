@@ -223,7 +223,8 @@ impl Oryxis {
 
     /// The switcher menu: every vault this device knows (pick one to
     /// move this window to it, the trailing button opens it in a new
-    /// window), then "New vault" and "Lock all vaults".
+    /// window), then "New vault", "Manage vaults" (Settings > Vaults)
+    /// and "Lock all vaults".
     pub(crate) fn build_menu_vault_switcher(&self) -> Element<'_, Message> {
         let c = OryxisColors::t();
         let here = self.vaults.cur().id;
@@ -290,6 +291,12 @@ impl Oryxis {
             Message::MultiVault(MultiVaultMessage::ShowNewVault),
             c.text_secondary,
         ));
+        items = items.push(self.menu_item(
+            iced_fonts::lucide::settings(),
+            t("vault_manage"),
+            Message::MultiVault(MultiVaultMessage::ShowVaultSettings),
+            c.text_secondary,
+        ));
         if self.any_vault_lockable() {
             items = items.push(self.menu_item(
                 iced_fonts::lucide::lock(),
@@ -306,7 +313,7 @@ impl Oryxis {
     pub(crate) fn vault_switcher_menu_rows(&self) -> f32 {
         let vaults = self.registered_vaults().len() as f32;
         let lock = if self.any_vault_lockable() { 1.0 } else { 0.0 };
-        vaults + 0.5 + 1.0 + lock
+        vaults + 0.5 + 2.0 + lock
     }
 
     /// Whether "Lock all vaults" has anything to lock.
