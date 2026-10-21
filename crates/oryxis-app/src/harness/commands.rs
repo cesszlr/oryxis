@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use iced::Program;
 
-use super::{Pump, RunOutcome, Session, format_text_entry, parse_quoted};
+use super::{Pump, RunOutcome, Session, check_order, format_text_entry, parse_quoted, parse_quoted_list};
 
 pub(super) const HELP: &str = "\
 instructions: click [right] \"Text\"|#id|(x, y) / click double <target>
@@ -21,6 +21,7 @@ instructions: click [right] \"Text\"|#id|(x, y) / click double <target>
               type enter|escape|tab|backspace / type ctrl+k / type ctrl+shift+f
               press enter / release tab / expect \"Text\"
 harness:      screenshot [name] / texts / find \"Text\" / absent \"Text\" (assert)
+              order \"A\" \"B\" ... (assert: each once, in reading order)
               clipboard [primary] [\"text\"] / clipboard [primary] is \"text\" (assert)
               drop hover|leave / drop \"/local/path\" (synthesized OS drag-and-drop)
               windows / window <n> (focus it) / window <n> at (x, y) (move it)
@@ -131,6 +132,22 @@ where
                 Err(reason) => out(format!("error {reason}")),
             },
             None => out("error absent wants a quoted string: absent \"Hosts\"".into()),
+        },
+        // Reading order of texts that each show once: what a reorder
+        // (tabs, columns) is checked with, since `expect` only says a
+        // text is somewhere.
+        "order" => match parse_quoted_list(rest) {
+            Some(needles) => match session.texts(program) {
+                Ok(entries) => match check_order(&entries, &needles) {
+                    Ok(()) => {
+                        session.record(command);
+                        out("ok".into());
+                    }
+                    Err(reason) => out(format!("fail order: {reason}")),
+                },
+                Err(reason) => out(format!("error {reason}")),
+            },
+            None => out("error order wants quoted strings: order \"alpha\" \"beta\"".into()),
         },
         "wait" => match rest.parse::<u64>() {
             Ok(ms) => {

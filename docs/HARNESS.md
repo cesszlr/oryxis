@@ -126,6 +126,8 @@ Plus harness meta-commands:
 | `screenshot [name]` | render the UI to `<shots>/<name>.png`, print the path |
 | `texts` | dump every visible text widget with bounds (reading order) |
 | `find "Text"` | like `texts`, filtered to matches |
+| `absent "Text"` | fail if any widget shows `Text` (the negative of `expect`) |
+| `order "A" "B" ...` | fail unless each text shows exactly once (exact match) and they read in that order: top to bottom, left to right within a row. How a reorder is asserted: an RTL strip lists its tabs in reverse |
 | `clipboard` / `clipboard "text"` | read / seed the emulated clipboard; `\n` / `\t` / `\"` / `\\` escapes decode, so multi-line content (PEM blocks) fits the line protocol |
 | `drop hover` / `drop leave` / `drop "/local/path"` | synthesized OS file drag-and-drop: the emulator has no OS to drag from, so these inject the exact messages the window subscription maps `FileHovered` / `FilesHoveredLeft` / `FileDropped` to; repeat `drop "path"` for a multi-file gesture (the app's own debounce coalesces them) |
 | `windows` / `window <n>` / `window <n> at (x, y)` | the emulated desktop: list the open windows, give the focus to the n-th (1-based, in opening order), or move it on the emulated screen. The emulator draws and instructs the FOCUSED window; a window the app opens takes the focus, and closing it hands the focus back to the previous one. A held mouse button stays with the window it was pressed in: its `move` and `release` are delivered there, in that window's coordinates, whichever window is focused |

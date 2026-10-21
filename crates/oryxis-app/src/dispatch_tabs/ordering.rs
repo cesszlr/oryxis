@@ -311,13 +311,23 @@ impl Oryxis {
         morph_order_slot(&mut self.tab_order, old, new);
     }
 
-    /// Move the tab identified by `from_id` to just before `target_id` in
-    /// `tab_order`, but only within the same pin partition (can't drag an
-    /// unpinned tab above a pinned one, matching the terminal behaviour). Used
-    /// by the unified live-slide drag. Re-anchors nothing (the storage vecs and
-    /// `active_tab` / `active_sftp` indices are untouched; only display order
-    /// changes).
-    pub(crate) fn slide_tab_in_order(&mut self, from_id: uuid::Uuid, target_id: uuid::Uuid) {
+    /// Move the tab identified by `from_id` to the seam after (`after`)
+    /// or ahead of (`!after`) `target_id` in `tab_order`, but only within
+    /// the same pin partition (can't drag an unpinned tab above a pinned
+    /// one, matching the terminal behaviour). Used by the unified
+    /// live-slide drag. Re-anchors nothing (the storage vecs and the
+    /// `active_tab` / `active_sftp` indices are untouched; only display
+    /// order changes).
+    ///
+    /// The side is the caller's and must match what the cursor is doing:
+    /// past a chip's middle (in strip order, so leftwards under RTL)
+    /// drops after it, short of it before (`slide_dragged_tab_over`).
+    pub(crate) fn slide_tab_onto(
+        &mut self,
+        from_id: uuid::Uuid,
+        target_id: uuid::Uuid,
+        after: bool,
+    ) {
         let pinned_of = |r: &crate::state::TabRef| -> bool {
             match r {
                 crate::state::TabRef::Terminal(id) => {
@@ -342,16 +352,71 @@ impl Oryxis {
             return;
         }
         let moved = self.tab_order.remove(from_pos);
-        let dest = if from_pos < to_pos { to_pos - 1 } else { to_pos };
-        self.tab_order.insert(dest, moved);
+        // No re-lookup, so a missing target can't strand the removed row
+        // out of the order.
+        self.tab_order.insert(landing_slot(from_pos, to_pos, after), moved);
+    }
+
+    /// The live slide of a reorder drag, Chrome's rule: the cursor moved
+    /// over the chip of tab `over`, at `at` inside it, and the dragged
+    /// tab lands beside that chip on the side of its middle the cursor
+    /// is on, in strip order (leftwards is "after" across an RTL strip;
+    /// a side strip's packed row of compact pins reads left to right).
+    ///
+    /// Driven by the chips' own pointer moves (`strip_tab_element`), not
+    /// by their enters nor by their drawn rectangles: widget state is
+    /// matched by position, so after a slide the chip that moved into
+    /// the slot under the cursor inherits that slot's hover and
+    /// publishes no enter; and a chip reports its rectangle in the
+    /// scrolled content's coordinates, off by the scroll once the strip
+    /// overflows. A move arrives in the chip's own space either way.
+    ///
+    /// Stable while the cursor rests: the same point re-answers the same
+    /// side and `landing_slot` returns the slot the tab already holds,
+    /// so only crossing a chip's middle moves anything. The gap the
+    /// dragged tab leaves publishes nothing.
+    pub(crate) fn slide_dragged_tab_over(&mut self, over: uuid::Uuid, at: iced::Point) {
+        let Some(from_id) = self.tab_drag.filter(|d| d.active).map(|d| d.from_id) else {
+            return;
+        };
+        if over == from_id {
+            return;
+        }
+        // Only the size is read: it does not move with the scroll.
+        let Some(size) = self.strip_chip_rect(self.cur_window(), over).map(|r| r.size()) else {
+            return;
+        };
+        let pinned = self.ref_of_tab(over).is_some_and(|r| self.ref_pinned(&r));
+        // The side strips run down, except for the pins when they live in
+        // the top bar: the same axis rule `carry_slot` uses. A side strip
+        // is never mirrored (its edge is the user's choice), and packs
+        // compact pins several per row, left to right.
+        let axis = if !crate::views::tab_bar::tab_bar_pos().is_side()
+            || (pinned && self.vaults.cur().prefs.pinned_tabs_top_bar)
+        {
+            if crate::i18n::is_rtl_layout() {
+                ChipAxis::AcrossMirrored
+            } else {
+                ChipAxis::Across
+            }
+        } else if pinned && self.vaults.cur().prefs.pinned_tab_style == "compact" {
+            ChipAxis::Across
+        } else {
+            ChipAxis::Down
+        };
+        let before = self.tab_order.clone();
+        self.slide_tab_onto(from_id, over, past_middle(at, size, axis));
+        if self.tab_order != before {
+            self.nav.hover.drop_tab_chips();
+        }
     }
 
     /// Move the tab identified by `from_id` to the very end of its own pin
     /// partition in `tab_order` (last among normal tabs, or last among pinned).
-    /// Powers the trailing drop zone so a tab can reach the rightmost slot,
-    /// which the before-the-target live-slide can never express. Idempotent:
-    /// a no-op when the tab already sits at its partition's end, so repeated
-    /// `CursorMoved`-driven calls don't thrash.
+    /// The `+` button's enter during a drag lands here: the strip's end,
+    /// which no chip's middle reaches. Idempotent: a no-op when the tab
+    /// already sits at its partition's end, so repeated events don't
+    /// thrash.
     pub(crate) fn slide_tab_to_partition_end(&mut self, from_id: uuid::Uuid) {
         let pinned_of = |r: &crate::state::TabRef| -> bool {
             match r {
@@ -432,6 +497,41 @@ fn placement_index(
             .iter()
             .position(|e| e.strip_id() == source_id)
             .map(|p| p + 1),
+    }
+}
+
+/// How a chip's middle divides it in strip order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChipAxis {
+    /// Left to right.
+    Across,
+    /// Right to left (an RTL strip).
+    AcrossMirrored,
+    /// Top to bottom (a side strip's rows).
+    Down,
+}
+
+/// Whether a point `at` inside a chip of `size` lies past the chip's
+/// middle in strip order.
+fn past_middle(at: iced::Point, size: iced::Size, axis: ChipAxis) -> bool {
+    match axis {
+        ChipAxis::Across => at.x > size.width / 2.0,
+        ChipAxis::AcrossMirrored => at.x < size.width / 2.0,
+        ChipAxis::Down => at.y > size.height / 2.0,
+    }
+}
+
+/// The insert slot for landing `moved` relative to `target`'s pre-removal
+/// slot. Past the removal a leading `from` (`from_pos < to_pos`) shifted
+/// the target one slot left, so a before-landing is `to_pos - 1` and an
+/// after-landing `to_pos`; a trailing `from` left the target in place,
+/// landing ahead (or past) it without the shift.
+fn landing_slot(from_pos: usize, to_pos: usize, after: bool) -> usize {
+    match from_pos < to_pos {
+        true if after => to_pos,
+        true => to_pos - 1,
+        false if after => to_pos + 1,
+        false => to_pos,
     }
 }
 
@@ -722,6 +822,40 @@ mod tests {
             vec![TabRef::Terminal(Uuid::from_u128(1)), TabRef::Terminal(new)],
             "no slot to inherit falls back to where a new tab lands"
         );
+    }
+
+    #[test]
+    fn the_middle_of_a_chip_is_read_along_the_strip() {
+        use super::{ChipAxis, past_middle};
+        let size = iced::Size::new(100.0, 30.0);
+        let left = iced::Point::new(20.0, 25.0);
+        let right = iced::Point::new(80.0, 5.0);
+        assert!(!past_middle(left, size, ChipAxis::Across));
+        assert!(past_middle(right, size, ChipAxis::Across));
+        // An RTL strip runs leftwards: the left half is the far one.
+        assert!(past_middle(left, size, ChipAxis::AcrossMirrored));
+        assert!(!past_middle(right, size, ChipAxis::AcrossMirrored));
+        // A side strip's row is read top to bottom, whatever the x.
+        assert!(past_middle(left, size, ChipAxis::Down));
+        assert!(!past_middle(right, size, ChipAxis::Down));
+    }
+
+    // -- landing_slot: the kink-free live-slide insert arithmetic --------
+
+    #[test]
+    fn the_landing_slot_converts_side_of_target_into_an_insert_slot() {
+        // Right of [x, y, z]: sliding x after z lands at z's slot. Left of
+        // [x, y, z]: sliding z before x lands before x's slot, which is
+        // where x sits after its own removal.
+        use super::landing_slot;
+        assert_eq!(landing_slot(0, 2, true), 2, "rightward, drop after");
+        assert_eq!(landing_slot(0, 2, false), 1, "rightward, drop before");
+        assert_eq!(landing_slot(2, 0, true), 1, "leftward, drop after");
+        assert_eq!(landing_slot(2, 0, false), 0, "leftward, drop before");
+        // The neighbours case (landing beside an adjacent chip) stays at
+        // the slot it already occupies, so a settled chip is stable.
+        assert_eq!(landing_slot(1, 0, true), 1, "already after the target");
+        assert_eq!(landing_slot(0, 1, false), 0, "already before the target");
     }
 }
 

@@ -41,10 +41,13 @@ pub enum TabsMessage {
     /// next tab's enter can arrive FIRST (see `HoverState::leave_tab`), so
     /// the clear has to know whose exit it is.
     TabUnhovered(usize),
-    /// Cursor entered the trailing drop zone (the `+` button area) during an
-    /// active tab-reorder drag: slide the dragged tab to the end of its
-    /// partition, the one slot the live-slide can't otherwise reach.
+    /// Cursor entered the `+` button during an active tab-reorder drag:
+    /// slide the dragged tab to the end of its partition.
     TabDragToEnd,
+    /// The cursor moved over the chip of tab `id` during an active
+    /// reorder drag, at this point inside the chip (so already in the
+    /// scrolled strip's own coordinates): the live slide.
+    TabDragOverChip(uuid::Uuid, iced::Point),
     ShowNewTabPicker,
     HideNewTabPicker,
     NewTabPickerSearchChanged(String),

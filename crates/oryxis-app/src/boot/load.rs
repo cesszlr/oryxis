@@ -285,10 +285,20 @@ impl Oryxis {
 
             // Layout direction (Auto / LTR / RTL). Re-hydrated after
             // unlock alongside the other UI settings so the choice
-            // survives restarts.
-            if let Ok(Some(v)) = vault.get_setting("layout_direction") {
+            // survives restarts. A missing row is Auto, applied like the
+            // language's: the direction is process-wide, and leaving it
+            // alone handed a direction the store does not hold to
+            // whatever opened next (every test after the one that
+            // picked RTL, in the harness's one process).
+            {
                 use crate::i18n::LayoutDirection;
-                LayoutDirection::set_active(LayoutDirection::from_code(&v));
+                let dir = vault
+                    .get_setting("layout_direction")
+                    .ok()
+                    .flatten()
+                    .map(|v| LayoutDirection::from_code(&v))
+                    .unwrap_or(LayoutDirection::Auto);
+                LayoutDirection::set_active(dir);
             }
 
             // App theme, re-hydrate by display name (built-in or a custom
@@ -1002,19 +1012,23 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("tab_bar_position")
                 && (v == "top" || v == "bottom" || v == "left" || v == "right")
             {
-                crate::views::tab_bar::set_tab_bar_pos(
-                    crate::views::tab_bar::TabBarPos::from_setting(&v),
-                );
                 ov.prefs.tab_bar_position = v;
             }
             if let Ok(Some(v)) = vault.get_setting("inactive_tab_style")
                 && (v == "none" || v == "border" || v == "underline")
             {
-                crate::views::tab_bar::set_inactive_tab_style(
-                    crate::views::tab_bar::InactiveTabStyle::from_setting(&v),
-                );
                 ov.prefs.inactive_tab_style = v;
             }
+            // Both are process-wide gates the renderers read: set them
+            // from the vault's preference whether or not it has a row,
+            // so a vault on the defaults does not keep the dock or the
+            // style of the one opened before it.
+            crate::views::tab_bar::set_tab_bar_pos(
+                crate::views::tab_bar::TabBarPos::from_setting(&ov.prefs.tab_bar_position),
+            );
+            crate::views::tab_bar::set_inactive_tab_style(
+                crate::views::tab_bar::InactiveTabStyle::from_setting(&ov.prefs.inactive_tab_style),
+            );
             if let Ok(Some(v)) = vault.get_setting("tab_width_mode")
                 && (v == "adaptive" || v == "uniform")
             {

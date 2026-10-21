@@ -72,11 +72,12 @@ impl Oryxis {
             TabsMessage::DuplicateInNewWindow(idx) => {
                 return self.duplicate_in_new_window(idx);
             }
+            TabsMessage::TabDragOverChip(over, at) => self.slide_dragged_tab_over(over, at),
             TabsMessage::TabDragToEnd => {
-                // Trailing drop zone: the live-slide only ever moves the
-                // dragged tab to *before* a hovered tab, so the slot after the
-                // last tab is unreachable by hovering. Entering the `+` area
-                // during an active drag fills that gap.
+                // The `+` ends the strip. Inline, the slide already put the
+                // tab last once the cursor passed the last chip's middle;
+                // docked at the edge of an overflowing strip, the last chip
+                // may be scrolled out of reach, and this is the way there.
                 if let Some(drag) = self.tab_drag.filter(|d| d.active) {
                     self.slide_tab_to_partition_end(drag.from_id);
                 }

@@ -590,11 +590,9 @@ impl Oryxis {
         // The chip itself. Centered on the cursor horizontally like the
         // strip does, and lifted half a row so the pointer sits on it
         // rather than under it.
-        if let Some((ghost, ghost_w)) = self.strip_drag_ghost_el(
-            crate::views::tab_bar::TAB_NATURAL_WIDTH,
-            false,
-            &self.privacy_terms(),
-        ) {
+        if let Some((ghost, ghost_w)) =
+            self.strip_drag_ghost_el(None, false, &self.privacy_terms())
+        {
             let x = (self.cur_mouse().x - ghost_w / 2.0)
                 .min(self.cur_window_size().width - ghost_w)
                 .max(0.0);

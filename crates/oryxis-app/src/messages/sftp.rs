@@ -96,7 +96,7 @@ pub enum SftpMessage {
     /// Mount connection `usize` into a specific pane side (regardless of the
     /// picker target). Used to re-mount a restored pinned SFTP tab's pane(s).
     SftpRemountPane(crate::state::SftpPaneSide, usize),
-    /// Cursor entered the SFTP tab at this index (hover + live-slide target).
+    /// Cursor entered the SFTP tab at this index.
     SftpTabHovered(usize),
     /// Cursor left the SFTP tab at this index. Indexed for the same reason
     /// `TabsMessage::TabUnhovered` is.

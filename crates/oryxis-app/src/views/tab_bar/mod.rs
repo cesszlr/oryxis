@@ -197,32 +197,14 @@ impl Oryxis {
         // leaves the strip the window-level layer takes over, because
         // this Stack is clipped to the bar and the ghost has to follow
         // the cursor's y down into the content (issue #112).
-        if let Some(ref ctx) = ghost_ctx
-            && self.cursor_in_tab_strip()
-            && self.dragged_tab_pinned()
-            && let Some((ghost, ghost_w)) = self.strip_drag_ghost_el(
-                ctx.drag_uniform_w,
-                ctx.compact_pins,
-                &ctx.privacy_terms,
-            )
-        {
-            let gx = (self.strip_cursor().x - ghost_w / 2.0).max(0.0);
-            let positioned: Element<'_, Message> = iced::widget::Column::<iced::Element<'_, _>>::new()
-                .push(Space::new().height(7.0).boxed())
-                .push(
-                    iced::widget::Row::<iced::Element<'_, _>>::new()
-                        .push(Space::new().width(gx).boxed())
-                        .push(ghost).boxed(),
-                )
-                .boxed();
-            return iced::widget::Stack::<iced::Element<'_, _>>::new()
-                .push(bar)
-                .push(positioned)
-                .width(Length::Fill)
-                .height(Length::Fixed(BAR_HEIGHT))
-                .boxed();
-        }
-        bar
+        let ghost = ghost_ctx
+            .as_ref()
+            .filter(|_| self.cursor_in_tab_strip() && self.dragged_tab_pinned())
+            .and_then(|ctx| {
+                self.strip_drag_ghost_el(ctx.uniform_w, ctx.compact_pins, &ctx.privacy_terms)
+            })
+            .map(|(ghost, ghost_w)| self.strip_ghost_at_cursor(ghost, ghost_w));
+        with_ghost_layer(bar, ghost, Length::Fill, Length::Fixed(BAR_HEIGHT))
     }
 
     /// One width for every tab in the horizontal strip, or `None` when
@@ -319,7 +301,6 @@ impl Oryxis {
         let close_on_right = self.vaults.cur().prefs.tab_close_button_side == "right";
         let number_px = self.tab_number_px();
         let mut session_widths = vec![TAB_MIN_WIDTH; self.tabs.len()];
-        let mut max_inactive_content = TAB_MIN_WIDTH;
         for (i, tab) in self.tabs.iter().enumerate() {
             if self.cur_active_tab() == Some(i) {
                 session_widths[i] = TAB_NATURAL_WIDTH;
@@ -331,7 +312,6 @@ impl Oryxis {
                     number_px,
                 );
                 session_widths[i] = cw;
-                max_inactive_content = max_inactive_content.max(cw);
             }
         }
         StripCtx {
@@ -341,8 +321,6 @@ impl Oryxis {
             compact_pins: self.vaults.cur().prefs.pinned_tab_style == "compact",
             solid_fill: self.vaults.cur().prefs.tab_fill_style == "solid"
                 || self.vaults.cur().prefs.performance_mode,
-            dragging_any: self.strip_drag_id().is_some(),
-            drag_uniform_w: max_inactive_content.clamp(TAB_MIN_WIDTH, TAB_NATURAL_WIDTH),
             uniform_w: None,
             session_widths,
             number_px,
@@ -508,7 +486,6 @@ impl Oryxis {
         let compact_pins = self.vaults.cur().prefs.pinned_tab_style == "compact";
         let number_px = self.tab_number_px();
         let mut session_widths = vec![TAB_MIN_WIDTH; n_tabs];
-        let mut max_inactive_content = TAB_MIN_WIDTH;
         for (i, tab) in self.tabs.iter().enumerate() {
             if tab.pinned && compact_pins {
                 session_widths[i] = CHIP_W;
@@ -522,7 +499,6 @@ impl Oryxis {
                     number_px,
                 );
                 session_widths[i] = cw;
-                max_inactive_content = max_inactive_content.max(cw);
             }
         }
         let n_f = n_tabs as f32;
@@ -556,11 +532,6 @@ impl Oryxis {
                 }
             }
         }
-        // Uniform width used while a tab is mid-drag, so the strip
-        // geometry stays stable as the dragged slot slides (the
-        // active/inactive width difference otherwise bounces the seam).
-        // Sized to the widest inactive content so no label clips.
-        let drag_uniform_w = max_inactive_content.clamp(TAB_MIN_WIDTH, TAB_NATURAL_WIDTH);
         // True overflow: even at TAB_MIN_WIDTH (compact pins at CHIP_W)
         // the tabs don't fit, so the scrollable actually scrolls. This
         // is the trigger that docks the "+" at the strip edge; the
@@ -593,11 +564,10 @@ impl Oryxis {
         // terminal). `false` = terminal index into `self.tabs`, `true` = SFTP
         // index into `self.sftp_tabs`. Within a pin partition, terminals come
         // before SFTP tabs (cross-type drag-interleave is a later refinement).
-        // While a drag is active every tab renders at the inactive width so
-        // the strip geometry is uniform. The active-vs-inactive width
-        // difference otherwise shifts positions on each live-slide swap and
-        // bounces the dragged tab back and forth over a seam.
-        let dragging_any = self.strip_drag_id().is_some();
+        // Chips keep their own allocated widths mid-drag: a reorder is a
+        // permutation, so no swap resizes anything and the strip never
+        // bounces (the old uniform drag width made every chip resize on
+        // pickup and again on release).
         // One terms pass for the whole strip: Privacy Mode redacts the
         // rendered tab labels (issue #78) and must not rebuild the
         // hostname list per tab.
@@ -615,8 +585,6 @@ impl Oryxis {
             close_armed: self.cur_nav().hover.tab_close_armed,
             compact_pins,
             solid_fill,
-            dragging_any,
-            drag_uniform_w,
             uniform_w: self.uniform_tab_width(close_on_right, compact_pins, approx_strip_width),
             session_widths,
             number_px,
@@ -630,9 +598,9 @@ impl Oryxis {
         // edge instead, just before the right cluster, so it can never
         // scroll out of reach with the tabs.
         // Wrapped in a MouseArea so entering the `+` during an active tab
-        // drag drops the dragged tab at the end of its partition (the trailing
-        // slot the live-slide can't reach). The handler no-ops when no drag is
-        // in flight, so normal `+` clicks are unaffected.
+        // drag lands the dragged tab at the end of its partition (see
+        // `TabDragToEnd`). The handler no-ops when no drag is in flight,
+        // so normal `+` clicks are unaffected.
         let plus_btn: Element<'_, Message> = MouseArea::new(crate::widgets::bounds_reporter(
             new_tab_btn(!strip_overflow),
             self.plus_btn_bounds.clone(),
@@ -824,32 +792,53 @@ impl Oryxis {
         // Floating ghost of the tab being dragged. The bar spans the window's
         // top-left, so window-space cursor x maps directly to bar-local x. The
         // ghost is a plain (non-interactive) container, so the tab MouseAreas
-        // underneath still receive the hover events that drive the live-slide.
+        // underneath keep their hover.
         // Only while the cursor is still on the strip: past that the
         // window-level layer draws it, free in both axes (issue #112).
         let drag_ghost_el = self
             .cursor_in_tab_strip()
-            .then(|| self.strip_drag_ghost_el(drag_uniform_w, compact_pins, &ctx.privacy_terms))
+            .then(|| self.strip_drag_ghost_el(ctx.uniform_w, compact_pins, &ctx.privacy_terms))
             .flatten();
-        if let Some((ghost, ghost_w)) = drag_ghost_el {
-            let gx = (self.strip_cursor().x - ghost_w / 2.0).max(0.0);
-            let positioned: Element<'_, Message> = iced::widget::Column::<iced::Element<'_, _>>::new()
-                .push(Space::new().height(7.0).boxed())
-                .push(
-                    iced::widget::Row::<iced::Element<'_, _>>::new()
-                        .push(Space::new().width(gx).boxed())
-                        .push(ghost).boxed(),
-                )
-                .boxed();
-            return iced::widget::Stack::<iced::Element<'_, _>>::new()
-                .push(bar)
-                .push(positioned)
-                .width(Length::Fill)
-                .height(Length::Fixed(BAR_HEIGHT))
-                .boxed();
-        }
-        bar
+        let ghost = drag_ghost_el.map(|(ghost, ghost_w)| self.strip_ghost_at_cursor(ghost, ghost_w));
+        with_ghost_layer(bar, ghost, Length::Fill, Length::Fixed(BAR_HEIGHT))
     }
+
+    /// A horizontal bar's drag ghost, centred on the strip cursor's x.
+    fn strip_ghost_at_cursor<'a>(
+        &self,
+        ghost: Element<'a, Message>,
+        ghost_w: f32,
+    ) -> Element<'a, Message> {
+        let gx = (self.strip_cursor().x - ghost_w / 2.0).max(0.0);
+        iced::widget::Column::<iced::Element<'_, _>>::new()
+            .push(Space::new().height(7.0).boxed())
+            .push(
+                iced::widget::Row::<iced::Element<'_, _>>::new()
+                    .push(Space::new().width(gx).boxed())
+                    .push(ghost).boxed(),
+            )
+            .boxed()
+    }
+}
+
+/// A tab bar with its drag ghost layered over it, in a Stack that is
+/// there with or without a ghost. Widget state is matched by position,
+/// so a Stack that came and went with the ghost rebuilt every widget of
+/// the bar on pickup and again when the cursor left the strip: the
+/// strip's scroll offset went back to the start and every chip lost its
+/// hover.
+pub(crate) fn with_ghost_layer<'a>(
+    bar: Element<'a, Message>,
+    ghost: Option<Element<'a, Message>>,
+    width: Length,
+    height: Length,
+) -> Element<'a, Message> {
+    iced::widget::Stack::<iced::Element<'_, _>>::new()
+        .push(bar)
+        .push(ghost.unwrap_or_else(|| iced::widget::Column::<iced::Element<'_, _>>::new().boxed()))
+        .width(width)
+        .height(height)
+        .boxed()
 }
 
 impl Oryxis {

@@ -1129,6 +1129,61 @@ fn parse_quoted(raw: &str) -> Option<String> {
     }
 }
 
+/// Extracts every double-quoted argument of `raw`, in order (`order
+/// "a" "b"`). `None` when something outside the quotes is not
+/// whitespace, or when there are none.
+fn parse_quoted_list(raw: &str) -> Option<Vec<String>> {
+    let mut items = Vec::new();
+    let mut rest = raw.trim();
+    while !rest.is_empty() {
+        let inner = rest.strip_prefix('"')?;
+        let end = inner.find('"')?;
+        if end == 0 {
+            return None;
+        }
+        items.push(inner[..end].to_owned());
+        rest = inner[end + 1..].trim_start();
+    }
+    (!items.is_empty()).then_some(items)
+}
+
+/// The `order "a" "b" ...` assertion: every needle is on screen exactly
+/// once (an exact text match, so a needle cannot pass on a longer label
+/// that contains it) and they read in the given order: top to bottom,
+/// left to right within a row, two texts sharing a row when their
+/// vertical spans overlap. What a reorder test needs: a mirrored (RTL)
+/// strip lists its tabs in reverse, a side strip top to bottom.
+fn check_order(entries: &[(String, Rectangle)], needles: &[String]) -> Result<(), String> {
+    let mut found: Vec<(&str, Rectangle)> = Vec::new();
+    for needle in needles {
+        let hits: Vec<Rectangle> = entries
+            .iter()
+            .filter(|(text, _)| text == needle)
+            .map(|(_, bounds)| *bounds)
+            .collect();
+        match hits.as_slice() {
+            [bounds] => found.push((needle, *bounds)),
+            [] => return Err(format!("{needle:?} is not on screen")),
+            many => return Err(format!("{needle:?} is on screen {} times", many.len())),
+        }
+    }
+    for pair in found.windows(2) {
+        let ((a, ra), (b, rb)) = (pair[0], pair[1]);
+        let same_row = ra.y < rb.y + rb.height && rb.y < ra.y + ra.height;
+        let before = if same_row { ra.x < rb.x } else { ra.y < rb.y };
+        if !before {
+            return Err(format!(
+                "{a:?} @ ({}, {}) does not come before {b:?} @ ({}, {})",
+                ra.x.round(),
+                ra.y.round(),
+                rb.x.round(),
+                rb.y.round(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Keeps screenshot names filesystem-safe.
 fn sanitize_name(name: &str) -> String {
     name.chars()
@@ -1148,6 +1203,39 @@ mod tests {
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn text_at(text: &str, x: f32, y: f32) -> (String, Rectangle) {
+        (text.to_owned(), Rectangle { x, y, width: 40.0, height: 16.0 })
+    }
+
+    #[test]
+    fn order_lists_quoted_needles() {
+        assert_eq!(
+            parse_quoted_list(r#""alpha"  "beta gamma" "x""#),
+            Some(args(&["alpha", "beta gamma", "x"])),
+        );
+        assert_eq!(parse_quoted_list(r#""alpha" beta"#), None);
+        assert_eq!(parse_quoted_list(r#""alpha" """#), None);
+        assert_eq!(parse_quoted_list(""), None);
+    }
+
+    #[test]
+    fn order_reads_rows_left_to_right_then_down() {
+        let row = [text_at("beta", 300.0, 12.0), text_at("alpha", 100.0, 14.0), text_at("gamma", 500.0, 12.0)];
+        assert_eq!(check_order(&row, &args(&["alpha", "beta", "gamma"])), Ok(()));
+        assert!(check_order(&row, &args(&["beta", "alpha", "gamma"])).is_err());
+        let column = [text_at("one", 10.0, 100.0), text_at("two", 10.0, 140.0)];
+        assert_eq!(check_order(&column, &args(&["one", "two"])), Ok(()));
+        assert!(check_order(&column, &args(&["two", "one"])).is_err());
+    }
+
+    #[test]
+    fn order_wants_each_needle_exactly_once() {
+        let twice = [text_at("alpha", 10.0, 10.0), text_at("alpha", 60.0, 10.0), text_at("alphabet", 120.0, 10.0)];
+        assert!(check_order(&twice, &args(&["alpha"])).unwrap_err().contains("2 times"));
+        assert!(check_order(&twice, &args(&["alph"])).unwrap_err().contains("not on screen"));
+        assert_eq!(check_order(&twice, &args(&["alphabet"])), Ok(()));
     }
 
     /// Unwraps the emulator-booting variant.

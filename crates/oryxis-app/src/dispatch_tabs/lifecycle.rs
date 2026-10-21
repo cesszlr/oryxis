@@ -7,10 +7,37 @@
 use iced::Task;
 use oryxis_core::models::cloud::TransportKind;
 
-use crate::app::{SettingsMessage, SshMessage, CloudMessage, Message, Oryxis, TabsMessage};
+use crate::app::{
+    SettingsMessage, SftpMessage, SshMessage, CloudMessage, Message, Oryxis, TabsMessage,
+};
 use crate::state::View;
 
 impl Oryxis {
+    /// Chrome's drop rule: a released reorder drag selects the tab it
+    /// released. Mid-drag the chip draws as the gap, so iced's button can
+    /// never answer the release with a select (a button only publishes
+    /// for a release whose press began on it); this sends what the chip
+    /// would have. A dormant pin connects, as a click on it does.
+    pub(crate) fn activate_dropped_tab(&mut self, id: uuid::Uuid) -> Task<Message> {
+        if let Some(idx) = self.tabs.iter().position(|t| t._id == id) {
+            self.handle_select_tab(idx)
+        } else if let Some(idx) = self.sftp_tabs.iter().position(|t| t.id == id) {
+            Task::done(Message::Sftp(SftpMessage::SelectSftpTab(idx)))
+        } else if let Some(kind) = crate::state::PanelKind::ALL
+            .iter()
+            .find(|k| k.tab_id() == id)
+        {
+            // The panel chips select through the view, their one route.
+            Task::done(Message::Navigation(crate::app::NavigationMessage::ChangeView(
+                kind.view(),
+            )))
+        } else {
+            // Merged into another tab: its chip is gone, nothing to
+            // select.
+            Task::none()
+        }
+    }
+
     pub(super) fn handle_select_tab(&mut self, idx: usize) -> Task<Message> {
         // A tab another window shows (reached from a list of every tab,
         // or by a stale follow-up): select it THERE and bring that

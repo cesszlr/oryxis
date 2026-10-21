@@ -103,20 +103,6 @@ impl Oryxis {
                 self.nav.hover.tab = Some(idx);
                 // Terminal / SFTP hover are mutually exclusive (one cursor).
                 self.nav.hover.sftp_tab = None;
-                // Live-slide: while a drag is active, entering another tab in
-                // the same group slides the dragged tab into that slot right
-                // away. Stable because after the move the dragged tab sits
-                // under the cursor, so it won't re-trigger until the cursor
-                // crosses into a genuinely different tab.
-                if let Some(drag) = self.tab_drag.filter(|d| d.active)
-                    && let Some(target) = self.tabs.get(idx).map(|t| t._id)
-                    && drag.from_id != target
-                {
-                    // Reorders `tab_order` (display) only; storage vecs and the
-                    // active pointers are untouched. Same-partition guard is in
-                    // `slide_tab_in_order`.
-                    self.slide_tab_in_order(drag.from_id, target);
-                }
                 return self.arm_tab_close_dwell();
             }
             TabsMessage::TabUnhovered(idx) => {

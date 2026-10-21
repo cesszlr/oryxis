@@ -1,6 +1,6 @@
 //! SFTP tab lifecycle arms split out of `dispatch_sftp`: select /
 //! close / confirm-close / pin / close-others, the tab context menu,
-//! tab hover (reorder-drag live-slide) and the new-tab entry point.
+//! tab hover and the new-tab entry point.
 //! Called from `handle_sftp`.
 
 #![allow(clippy::result_large_err)]
@@ -169,15 +169,6 @@ impl Oryxis {
                 self.nav.hover.sftp_tab = Some(idx);
                 // Terminal / SFTP hover are mutually exclusive (one cursor).
                 self.nav.hover.tab = None;
-                // Live-slide: while a drag is active, entering this SFTP tab
-                // slides the dragged tab (terminal or SFTP) into its slot in
-                // the unified `tab_order`.
-                if let Some(drag) = self.tab_drag.filter(|d| d.active)
-                    && let Some(target) = self.sftp_tabs.get(idx).map(|t| t.id)
-                    && drag.from_id != target
-                {
-                    self.slide_tab_in_order(drag.from_id, target);
-                }
                 // An SFTP chip carries its X in a reserved trailing slot,
                 // so it has no dwell of its own to wait for. It still
                 // opens a hover episode: that is what retires the timer

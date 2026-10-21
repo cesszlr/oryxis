@@ -32,6 +32,9 @@
 //!   "text"` ASSERTS it (a mismatch fails the test). Every clipboard
 //!   access in the app goes through the iced runtime, so the emulated
 //!   clipboard sees the app's own copies too
+//! - `absent "Text"` ASSERTS that nothing on screen shows the text;
+//!   `order "A" "B" ...` that each shows exactly once and they read in
+//!   that order (top to bottom, left to right within a row)
 //! - `find "Text"` / `texts`: walk the widget tree and report. Never
 //!   fails, so it is not an assertion (`expect` is). Its other effect
 //!   is the one tests actually reach for: the walk REBUILDS the tree,
@@ -369,6 +372,22 @@ where
                     }
                 }
                 Err(reason) => Some(format!("{head}: {reason}")),
+            },
+            // Reading order of texts that each show once (`check_order`):
+            // the assertion a reorder test needs, since `expect` only says
+            // a text is somewhere.
+            "order" => match super::parse_quoted_list(rest) {
+                None => Some(format!("{head}: order wants quoted strings")),
+                Some(needles) => match session.texts(program) {
+                    Ok(entries) => match super::check_order(&entries, &needles) {
+                        Ok(()) => {
+                            println!("== ok");
+                            None
+                        }
+                        Err(reason) => Some(format!("{head}: {reason}")),
+                    },
+                    Err(reason) => Some(format!("{head}: {reason}")),
+                },
             },
             "find" | "texts" => match session.texts(program) {
                 Ok(entries) => {

@@ -19,10 +19,6 @@ pub(crate) struct StripCtx {
     pub(crate) close_armed: bool,
     pub(crate) compact_pins: bool,
     pub(crate) solid_fill: bool,
-    /// A tab drag is active: every tab renders at the uniform drag
-    /// width so the strip geometry stays stable while slots slide.
-    pub(crate) dragging_any: bool,
-    pub(crate) drag_uniform_w: f32,
     /// Uniform chip width for the vertical strip; `None` = horizontal
     /// allocation (active natural / content-hugged / precomputed).
     pub(crate) uniform_w: Option<f32>,
@@ -147,12 +143,21 @@ impl Oryxis {
             StripEntry::Sftp(idx) => self.sftp_tabs[idx].id,
             StripEntry::Panel(kind) => kind.tab_id(),
         };
+        // During a reorder drag begun in this window every other chip
+        // reports the cursor's moves over it, in its own coordinates:
+        // the live slide (`slide_dragged_tab_over`). The wrapper is
+        // always there (widget state is matched by position) and carries
+        // `on_move` alone: an `on_enter` would take the entering move.
+        let mut chip = MouseArea::new(self.strip_tab_chip(ctx, entry, slot));
+        if self
+            .tab_drag
+            .is_some_and(|d| d.active && d.from_id != id && self.floats_here())
+        {
+            chip = chip.on_move(move |at| Message::Tabs(TabsMessage::TabDragOverChip(id, at)));
+        }
         // Every chip reports where it was drawn: a tab carried over
         // this strip from another window takes its slot from them.
-        crate::widgets::bounds_reporter(
-            self.strip_tab_chip(ctx, entry, slot),
-            self.strip_chip_cell(id),
-        )
+        crate::widgets::bounds_reporter(chip.boxed(), self.strip_chip_cell(id))
     }
 
     fn strip_tab_chip(
@@ -172,9 +177,7 @@ impl Oryxis {
             let is_active = self.cur_active_tab().is_none() && self.cur_view() == kind.view();
             let label = self.panel_tab_label(kind);
             let width = ctx.uniform_w.unwrap_or_else(|| {
-                if ctx.dragging_any {
-                    ctx.drag_uniform_w
-                } else if is_active {
+                if is_active {
                     TAB_NATURAL_WIDTH
                 } else {
                     panel_tab_width(&label, ctx.number_px)
@@ -182,7 +185,7 @@ impl Oryxis {
             });
             let is_dragging = self.strip_drag_id() == Some(kind.tab_id());
             if is_dragging {
-                return Space::new().width(width).height(TAB_HEIGHT).boxed();
+                return Space::new().width(width).height(TAB_ROW_HEIGHT).boxed();
             }
             return panel_tab(
                 kind,
@@ -243,12 +246,10 @@ impl Oryxis {
                     )
                 };
             // Width mirrors the terminal model: NATURAL when active,
-            // content-hugged otherwise, uniform during a drag; the
-            // vertical strip pins every row to its uniform width.
+            // content-hugged otherwise; the vertical strip pins every
+            // row to its uniform width.
             let width = ctx.uniform_w.unwrap_or_else(|| {
-                if ctx.dragging_any {
-                    ctx.drag_uniform_w
-                } else if is_active {
+                if is_active {
                     TAB_NATURAL_WIDTH
                 } else {
                     tab_content_width(&display_label, ctx.close_on_right, false, ctx.number_px)
@@ -259,7 +260,7 @@ impl Oryxis {
             let is_dragging = self.strip_drag_id() == Some(tab.id);
             if is_dragging {
                 let gap_w = if ctx.compact_pins && tab.pinned { CHIP_W } else { width };
-                return Space::new().width(gap_w).height(TAB_HEIGHT).boxed();
+                return Space::new().width(gap_w).height(TAB_ROW_HEIGHT).boxed();
             } else if ctx.compact_pins && tab.pinned {
                 return sftp_pinned_chip(idx, is_active, badge_accent, host_accent, ctx.solid_fill, number);
             }
@@ -303,20 +304,13 @@ impl Oryxis {
             .auto_label(self.tab_auto_title(tab))
             .trim_end_matches(" (disconnected)");
         let detected_os = self.tab_detected_os(base_label);
-        // During a drag every tab is uniform (drag width); otherwise
-        // each tab uses its own allocated width (active = NATURAL,
-        // inactive = content-hugged, possibly shrunk under overflow);
-        // vertical rows are always the strip's uniform width.
-        // `unwrap_or_else`, not `unwrap_or`: the horizontal fallback
-        // indexes `session_widths`, which is empty in vertical mode and
-        // must not be evaluated eagerly.
-        let width = ctx.uniform_w.unwrap_or_else(|| {
-            if ctx.dragging_any {
-                ctx.drag_uniform_w
-            } else {
-                ctx.session_widths[idx]
-            }
-        });
+        // During a drag every chip keeps its own allocated width: the
+        // strip only permutes, so the total never changes and a swap
+        // can't bounce the geometry (Chrome keeps chip sizes through a
+        // reorder too). `unwrap_or_else`, not `unwrap_or`: the
+        // horizontal fallback indexes `session_widths`, which is empty
+        // in vertical mode and must not be evaluated eagerly.
+        let width = ctx.uniform_w.unwrap_or_else(|| ctx.session_widths[idx]);
         // Per-host accent override: when this tab points at a
         // saved connection that has a custom `color`, tint the
         // active-tab fill and the tab text with that color
@@ -503,8 +497,11 @@ impl Oryxis {
             .map(|next| (self.tab_surface(idx), next));
         if is_dragging {
             // The dragged tab floats as a ghost following the cursor;
-            // leave a same-width gap here that the other tabs slide
-            // around as the reorder happens.
+            // leave a gap the size of its chip here that the other tabs
+            // slide around as the reorder happens. The chip renders at
+            // `TAB_ROW_HEIGHT` (its button's padding included): a gap of
+            // the content box made every row under it in a side strip
+            // jump 10 px up on pickup.
             let gap_w = if tab.pinned && ctx.compact_pins {
                 pinned_chip_width(mode)
             } else {
@@ -512,7 +509,7 @@ impl Oryxis {
             };
             Space::new()
                 .width(gap_w)
-                .height(TAB_HEIGHT)
+                .height(TAB_ROW_HEIGHT)
                 .boxed()
         } else if tab.pinned && ctx.compact_pins {
             // Chrome-style: icon-only chip, fixed width, stuck left.
@@ -600,14 +597,36 @@ impl Oryxis {
     /// plus its width. `None` when no drag is active. The caller
     /// positions it over its strip: the horizontal bars track the
     /// cursor's x, the vertical strip its y.
+    ///
+    /// The ghost is as wide as the gap the tab leaves in this strip,
+    /// read from where that gap was last drawn, so one never differs
+    /// from the other (a shrunk overflowing strip, the side strip's
+    /// rows, a hybrid pin). Before the gap has been drawn once (a tab
+    /// carried in from another window), `slot_w` (the side strip's row
+    /// width) or the tab's own allocation stands in.
     pub(crate) fn strip_drag_ghost_el(
         &self,
-        drag_uniform_w: f32,
+        slot_w: Option<f32>,
         compact_pins: bool,
         privacy_terms: &[String],
     ) -> Option<(Element<'_, Message>, f32)> {
+        let close_on_right = self.vaults.cur().prefs.tab_close_button_side == "right";
+        let number_px = self.tab_number_px();
         let dragged = self.strip_drag_id()?;
+        let drawn_w = self
+            .strip_chip_rect(self.cur_window(), dragged)
+            .map(|rect| rect.width);
+        let width_or = |compact: bool, own: &dyn Fn() -> f32| -> f32 {
+            drawn_w.unwrap_or_else(|| {
+                if compact {
+                    CHIP_W
+                } else {
+                    slot_w.unwrap_or_else(own)
+                }
+            })
+        };
         if let Some(tab) = self.tabs.iter().find(|t| t._id == dragged) {
+            let idx = self.tabs.iter().position(|t| t._id == dragged);
             let lookup_label = tab
                 .auto_label(self.tab_auto_title(tab))
                 .trim_end_matches(" (disconnected)")
@@ -635,12 +654,19 @@ impl Oryxis {
             let accent = sg_color
                 .filter(|_| self.host_accent_enabled())
                 .unwrap_or_else(|| OryxisColors::t().accent);
-            let ghost_w = if compact { CHIP_W } else { drag_uniform_w };
+            let ghost_w = width_or(compact, &|| {
+                if self.cur_active_tab() == idx {
+                    TAB_NATURAL_WIDTH
+                } else {
+                    tab_content_width(&base_label, close_on_right, tab.pane_count() > 1, number_px)
+                }
+            });
             Some((
                 drag_ghost(base_label, detected_os, compact, ghost_w, accent, self.vaults.cur().prefs.tab_accent_text, sg_icon, sg_color),
                 ghost_w,
             ))
         } else if let Some(sftp_tab) = self.sftp_tabs.iter().find(|t| t.id == dragged) {
+            let idx = self.sftp_tabs.iter().position(|t| t.id == dragged);
             let detected_os = self.tab_detected_os(&sftp_tab.label);
             let brand = self.vaults.cur().connections
                 .iter()
@@ -661,7 +687,25 @@ impl Oryxis {
                 .flatten()
                 .unwrap_or_else(|| OryxisColors::t().accent);
             let compact = sftp_tab.pinned && compact_pins;
-            let ghost_w = if compact { CHIP_W } else { drag_uniform_w };
+            let is_active = self.cur_active_tab().is_none()
+                && self.cur_view() == View::Sftp
+                && self.cur_active_sftp() == idx;
+            let ghost_w = width_or(compact, &|| {
+                if is_active {
+                    TAB_NATURAL_WIDTH
+                } else {
+                    tab_content_width(
+                        &self.privacy_display_label(
+                            &sftp_tab.label,
+                            sftp_tab.display_label(),
+                            privacy_terms,
+                        ),
+                        close_on_right,
+                        false,
+                        number_px,
+                    )
+                }
+            });
             Some((
                 sftp_drag_ghost(
                     self.privacy_display_label(
@@ -686,10 +730,17 @@ impl Oryxis {
                 .into_iter()
                 .find(|k| k.tab_id() == dragged)
                 .map(|kind| {
-                    (
-                        panel_drag_ghost(kind, &self.panel_tab_label(kind), drag_uniform_w),
-                        drag_uniform_w,
-                    )
+                    let label = self.panel_tab_label(kind);
+                    let is_active =
+                        self.cur_active_tab().is_none() && self.cur_view() == kind.view();
+                    let ghost_w = width_or(false, &|| {
+                        if is_active {
+                            TAB_NATURAL_WIDTH
+                        } else {
+                            panel_tab_width(&label, number_px)
+                        }
+                    });
+                    (panel_drag_ghost(kind, &label, ghost_w), ghost_w)
                 })
         }
     }

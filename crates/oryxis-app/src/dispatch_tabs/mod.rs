@@ -127,6 +127,7 @@ impl Oryxis {
                 | TabsMessage::DuplicateTab(..)
                 | TabsMessage::DuplicateInNewWindow(..)
                 | TabsMessage::TabDragToEnd
+                | TabsMessage::TabDragOverChip(..)
                 | TabsMessage::TabBarWheel(..)
                 | TabsMessage::ShowTabMenu(..)
                 | TabsMessage::ShowTabBarMenu

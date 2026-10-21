@@ -151,6 +151,18 @@ impl HoverState {
         self.tab_hover_seq
     }
 
+    /// A reorder slid the strip under the cursor. Widget state is matched
+    /// by position, so the chip that held the hover may have moved out
+    /// from under the cursor without an exit, and the one that moved in
+    /// inherits a hovered slot without an enter: no chip's hover (nor the
+    /// close X its dwell armed) holds until the next enter.
+    pub(crate) fn drop_tab_chips(&mut self) {
+        self.tab = None;
+        self.sftp_tab = None;
+        self.panel_tab = None;
+        self.begin_tab_hover();
+    }
+
     /// Whether any strip chip is under the cursor.
     pub(crate) fn any_tab_chip(&self) -> bool {
         self.tab.is_some() || self.sftp_tab.is_some() || self.panel_tab.is_some()
