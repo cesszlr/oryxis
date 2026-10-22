@@ -111,6 +111,17 @@ pub(crate) fn pty_bytes(
     option_sides: OptionSides,
 ) -> Option<Vec<u8>> {
     let mods = press.modifiers;
+    // Whether a held Alt is Meta. On Linux/Windows a bare Alt always is
+    // (AltGr never reaches the Meta path: it is Ctrl+Alt on Windows and
+    // no modifier on Linux). On macOS the Option key COMPOSES by default
+    // and Meta is the per-host `OptionAsMeta` quirk, per side.
+    let alt_is_meta = match platform {
+        Platform::MacOs => quirks
+            .option_as_meta
+            .is_meta(option_sides.left, option_sides.right),
+        _ => true,
+    };
+    let named_mods = named_key_modifiers(press.key, mods, alt_is_meta);
 
     // macOS: Cmd is the platform's shortcut modifier; every unregistered
     // Cmd combo is swallowed so it never leaks into the PTY as text
@@ -141,7 +152,7 @@ pub(crate) fn pty_bytes(
             esc.extend_from_slice(&ctrl);
             return Some(esc);
         }
-        return key_to_named_bytes(press.key, &mods, app_cursor, quirks);
+        return key_to_named_bytes(press.key, &named_mods, app_cursor, quirks);
     }
 
     // Ctrl+Shift + a cursor / editing / function key gets the xterm
@@ -181,7 +192,7 @@ pub(crate) fn pty_bytes(
                     | keyboard::key::Named::F12
             )
         ) {
-            return key_to_named_bytes(press.key, &mods, app_cursor, quirks);
+            return key_to_named_bytes(press.key, &named_mods, app_cursor, quirks);
         }
         return None;
     }
@@ -193,7 +204,7 @@ pub(crate) fn pty_bytes(
         if let Some(ctrl) = ctrl_key_bytes(press.key) {
             return Some(ctrl);
         }
-        return key_to_named_bytes(press.key, &mods, app_cursor, quirks);
+        return key_to_named_bytes(press.key, &named_mods, app_cursor, quirks);
     }
 
     // A Space that composed something else is typing, not Space: on
@@ -230,25 +241,16 @@ pub(crate) fn pty_bytes(
         None
     };
     let mut bytes = numpad_text
-        .or_else(|| key_to_named_bytes(press.key, &mods, app_cursor, quirks))
+        .or_else(|| key_to_named_bytes(press.key, &named_mods, app_cursor, quirks))
         .or_else(|| press.text.map(|t| t.as_bytes().to_vec()));
 
     // Meta-sends-escape: Alt+<char> is the ESC-prefixed character, the
     // form readline / bash / zsh / vim / emacs / tmux bind their Meta
-    // keymaps to. On Linux/Windows a bare Alt is always Meta (AltGr
-    // never reaches here: it is Ctrl+Alt on Windows and no modifier on
-    // Linux). On macOS the Option key COMPOSES by default and Meta is
-    // the per-host `OptionAsMeta` quirk, per side. Named keys already
-    // fold their modifier in via key_to_named_bytes, so this only
-    // touches literal characters.
+    // keymaps to. Named keys already folded their Alt in through
+    // key_to_named_bytes (`named_key_modifiers` decided whether it
+    // counts), so this only touches literal characters.
     if mods.alt() {
-        let meta = match platform {
-            Platform::MacOs => quirks
-                .option_as_meta
-                .is_meta(option_sides.left, option_sides.right),
-            _ => true,
-        };
-        if meta {
+        if alt_is_meta {
             if let keyboard::Key::Character(c) = press.key {
                 let ch: Vec<u8> = if platform == Platform::MacOs {
                     // The Option layer must not leak into the Meta
@@ -282,6 +284,33 @@ pub(crate) fn pty_bytes(
     }
 
     bytes.filter(|b| !b.is_empty())
+}
+
+/// The modifiers a named key is encoded under. A key that TYPES something
+/// of its own (Enter, Tab, Escape, Space) takes Alt the way a character
+/// does, as Meta, so a composing macOS Option is dropped from it:
+/// Option+Enter stays a plain CR, as in alacritty with `option_as_alt` off.
+/// Backspace and Shift+Tab keep Option either way (alacritty's default
+/// bindings send `ESC DEL` and `ESC ESC [ Z` whatever `option_as_alt`
+/// says; Option+Delete is the macOS word delete), and the keys with a CSI
+/// form (arrows, Home, F-keys, ...) always report it in the xterm
+/// parameter. An Option+Space that composes (NBSP) is typed by the
+/// composing branch of the Meta step in `pty_bytes`.
+fn named_key_modifiers(
+    key: &keyboard::Key,
+    mods: keyboard::Modifiers,
+    alt_is_meta: bool,
+) -> keyboard::Modifiers {
+    use keyboard::key::Named;
+    let types = match key {
+        keyboard::Key::Named(Named::Enter | Named::Escape | Named::Space) => true,
+        keyboard::Key::Named(Named::Tab) => !mods.shift(),
+        _ => false,
+    };
+    if alt_is_meta || !types {
+        return mods;
+    }
+    mods.difference(keyboard::Modifiers::ALT)
 }
 
 /// xterm modifier parameter: `1 + Shift(1) + Alt(2) + Ctrl(4)`. Returns 1 when
@@ -345,28 +374,34 @@ pub(crate) fn key_to_named_bytes(
     // Linux console F1-F5: `ESC [ [ A..E`, no modified form.
     let linux_fn = |letter: u8| -> Vec<u8> { vec![0x1b, b'[', b'[', letter] };
 
+    // The keys with no CSI form (Enter, Backspace, Tab, Escape, Space)
+    // carry Alt as xterm's meta-sends-escape and kitty's legacy encoder
+    // do: an ESC in front of what the key sends without it (Alt+Backspace
+    // = `ESC DEL`, readline's backward-kill-word; Alt+Enter = `ESC CR`;
+    // Alt+Shift+Tab = `ESC ESC [ Z`). Whether a macOS Option counts is
+    // the caller's call (`named_key_modifiers`).
+    let meta = |plain: &[u8]| -> Vec<u8> {
+        if modifiers.alt() {
+            [b"\x1b", plain].concat()
+        } else {
+            plain.to_vec()
+        }
+    };
+
     use keyboard::key::Named;
     let bytes: Vec<u8> = match named {
-        Named::Enter => b"\r".to_vec(),
+        Named::Enter => meta(b"\r"),
         // Backspace encoding is per-host (PuTTY Control-? vs Control-H);
-        // Ctrl+Backspace sends the flipped code. Alt+Backspace prefixes
-        // with ESC (0x1b) for readline's backward-kill-word. DEFAULT
-        // (`Del127`) keeps plain Backspace = DEL (0x7f), today's behaviour.
-        Named::Backspace => {
-            let byte = quirks.backspace.byte(modifiers.control());
-            if modifiers.alt() {
-                vec![0x1b, byte]
-            } else {
-                vec![byte]
-            }
-        }
+        // Ctrl+Backspace sends the flipped code. DEFAULT (`Del127`) keeps
+        // plain Backspace = DEL (0x7f), today's behaviour.
+        Named::Backspace => meta(&[quirks.backspace.byte(modifiers.control())]),
         // Shift+Tab is back-tab (CBT); plain Tab stays HT.
-        Named::Tab if modifiers.shift() => b"\x1b[Z".to_vec(),
-        Named::Tab => b"\t".to_vec(),
-        Named::Escape => b"\x1b".to_vec(),
+        Named::Tab if modifiers.shift() => meta(b"\x1b[Z"),
+        Named::Tab => meta(b"\t"),
+        Named::Escape => meta(b"\x1b"),
         // Ctrl+Space is NUL (xterm), the emacs set-mark muscle memory.
-        Named::Space if modifiers.control() => vec![0x00],
-        Named::Space => b" ".to_vec(),
+        Named::Space if modifiers.control() => meta(&[0x00]),
+        Named::Space => meta(b" "),
         Named::ArrowUp => csi_letter(b'A'),
         Named::ArrowDown => csi_letter(b'B'),
         Named::ArrowRight => csi_letter(b'C'),
@@ -734,6 +769,99 @@ mod tests {
         assert_eq!(p.on(Platform::Linux).unwrap(), b"\x1bb");
     }
 
+    // ── Alt on the keys with no CSI form (Enter, Backspace, Tab, ...) ──
+
+    #[test]
+    fn alt_named_typing_keys_are_meta_on_linux_and_windows() {
+        // xterm meta-sends-escape / kitty legacy: ESC + the plain form.
+        // `text` is what winit reports for these keys (a C0 byte or a
+        // space), which must not win over the named encoding.
+        let cases: [(Named, Modifiers, Option<&'static str>, &[u8]); 7] = [
+            (Named::Backspace, Modifiers::ALT, Some("\u{8}"), b"\x1b\x7f"),
+            (Named::Enter, Modifiers::ALT, Some("\r"), b"\x1b\r"),
+            (Named::Escape, Modifiers::ALT, Some("\u{1b}"), b"\x1b\x1b"),
+            (Named::Tab, Modifiers::ALT, Some("\t"), b"\x1b\t"),
+            (Named::Tab, Modifiers::ALT.union(Modifiers::SHIFT), None, b"\x1b\x1b[Z"),
+            (Named::Space, Modifiers::ALT, Some(" "), b"\x1b "),
+            // Ctrl+Alt+Space is ESC NUL (xterm), Ctrl+Space's NUL as Meta.
+            // With a space in `text` it is AltGr typing one instead (the
+            // Ctrl+Alt branch reads composition first), so no text here.
+            (Named::Space, CTRL_ALT, None, b"\x1b\x00"),
+        ];
+        for (named, mods, text, want) in cases {
+            let p = Press::named(named).mods(mods).text(text);
+            for platform in [Platform::Linux, Platform::Windows] {
+                assert_eq!(p.on(platform).unwrap(), want, "{named:?} {mods:?} on {platform:?}");
+            }
+        }
+        // Numpad Enter under Alt is the same key: its CR text is control.
+        let p = Press::named(Named::Enter).mods(Modifiers::ALT).text(Some("\r")).numpad();
+        assert_eq!(p.on(Platform::Linux).unwrap(), b"\x1b\r");
+    }
+
+    #[test]
+    fn alt_backspace_follows_the_host_backspace_mode() {
+        let ctrl_h = TerminalQuirks { backspace: BackspaceMode::CtrlH, ..Default::default() };
+        let p = Press::named(Named::Backspace).mods(Modifiers::ALT);
+        assert_eq!(
+            p.encode(Platform::Linux, &ctrl_h, OptionSides::default()).unwrap(),
+            b"\x1b\x08"
+        );
+        // Ctrl+Alt: the ESC-prefixed flipped code (also how a Windows
+        // AltGr+Backspace arrives: Ctrl+Alt with no composed text).
+        let p = Press::named(Named::Backspace).mods(CTRL_ALT);
+        assert_eq!(p.on(Platform::Windows).unwrap(), b"\x1b\x08");
+        assert_eq!(
+            p.encode(Platform::Linux, &ctrl_h, OptionSides::default()).unwrap(),
+            b"\x1b\x7f"
+        );
+    }
+
+    #[test]
+    fn macos_option_backspace_and_back_tab_are_meta_even_when_composing() {
+        // Option+Delete is the macOS word delete and composes nothing;
+        // alacritty sends ESC DEL (and ESC ESC [ Z for Option+Shift+Tab)
+        // whatever `option_as_alt` says.
+        let left = OptionSides { left: true, right: false };
+        let p = Press::named(Named::Backspace).mods(Modifiers::ALT).text(Some("\u{7f}"));
+        assert_eq!(p.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(), b"\x1b\x7f");
+        let p = Press::named(Named::Tab).mods(Modifiers::ALT.union(Modifiers::SHIFT));
+        assert_eq!(p.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(), b"\x1b\x1b[Z");
+        // A key with a CSI form reports Option in its parameter as before.
+        let p = Press::named(Named::ArrowLeft).mods(Modifiers::ALT);
+        assert_eq!(p.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(), b"\x1b[1;3D");
+    }
+
+    #[test]
+    fn macos_option_on_typing_keys_follows_option_as_meta() {
+        let left = OptionSides { left: true, right: false };
+        let right = OptionSides { left: false, right: true };
+        let enter = Press::named(Named::Enter).mods(Modifiers::ALT).text(Some("\r"));
+        let escape = Press::named(Named::Escape).mods(Modifiers::ALT).text(Some("\u{1b}"));
+        let tab = Press::named(Named::Tab).mods(Modifiers::ALT).text(Some("\t"));
+        let nbsp = Press::named(Named::Space).mods(Modifiers::ALT).composes("\u{a0}");
+        // Composing Option (the default): the key's own byte, and the
+        // composed NBSP for Space.
+        assert_eq!(enter.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(), b"\r");
+        assert_eq!(escape.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(), b"\x1b");
+        assert_eq!(tab.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(), b"\t");
+        assert_eq!(
+            nbsp.encode(Platform::MacOs, &DEFAULT_QUIRKS, left).unwrap(),
+            "\u{a0}".as_bytes()
+        );
+        // Option as Meta: ESC + the plain form, the NBSP never leaking in.
+        let both = TerminalQuirks { option_as_meta: OptionAsMeta::Both, ..Default::default() };
+        assert_eq!(enter.encode(Platform::MacOs, &both, left).unwrap(), b"\x1b\r");
+        assert_eq!(escape.encode(Platform::MacOs, &both, left).unwrap(), b"\x1b\x1b");
+        assert_eq!(tab.encode(Platform::MacOs, &both, left).unwrap(), b"\x1b\t");
+        assert_eq!(nbsp.encode(Platform::MacOs, &both, left).unwrap(), b"\x1b ");
+        // Per side: only the Meta side prefixes.
+        let only_left =
+            TerminalQuirks { option_as_meta: OptionAsMeta::OnlyLeft, ..Default::default() };
+        assert_eq!(enter.encode(Platform::MacOs, &only_left, left).unwrap(), b"\x1b\r");
+        assert_eq!(enter.encode(Platform::MacOs, &only_left, right).unwrap(), b"\r");
+    }
+
     #[test]
     fn numpad_numlock_prefers_the_digit_text() {
         // NumLock-on numpad 7 arrives as Named::Home with text "7".
@@ -841,6 +969,23 @@ mod tests {
             nq(Named::Backspace, Modifiers::CTRL.union(Modifiers::ALT), false, &ctrl_h),
             b"\x1b\x7f"
         );
+    }
+
+    #[test]
+    fn alt_folds_into_the_keys_with_no_csi_form() {
+        // Unmodified forms are unchanged.
+        assert_eq!(nb(Named::Enter, Modifiers::empty(), false), b"\r");
+        assert_eq!(nb(Named::Escape, Modifiers::empty(), false), b"\x1b");
+        assert_eq!(nb(Named::Tab, Modifiers::empty(), false), b"\t");
+        assert_eq!(nb(Named::Space, Modifiers::empty(), false), b" ");
+        // Alt is an ESC in front of the plain form.
+        assert_eq!(nb(Named::Enter, Modifiers::ALT, false), b"\x1b\r");
+        assert_eq!(nb(Named::Escape, Modifiers::ALT, false), b"\x1b\x1b");
+        assert_eq!(nb(Named::Tab, Modifiers::ALT, false), b"\x1b\t");
+        assert_eq!(nb(Named::Tab, Modifiers::ALT.union(Modifiers::SHIFT), false), b"\x1b\x1b[Z");
+        assert_eq!(nb(Named::Space, Modifiers::ALT, false), b"\x1b ");
+        assert_eq!(nb(Named::Space, Modifiers::CTRL.union(Modifiers::ALT), false), b"\x1b\x00");
+        assert_eq!(nb(Named::Enter, Modifiers::CTRL.union(Modifiers::ALT), false), b"\x1b\r");
     }
 
     #[test]

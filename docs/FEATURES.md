@@ -321,6 +321,9 @@ coming next, see the [Roadmap](../README.md#roadmap).
   so modifier-aware TUIs see the combo. On macOS the Option key composes
   characters like every native terminal, with a per-host "Option as Meta"
   override (off / left / right / both) for readline and emacs users.
+  Alt+Backspace (Option+Delete on macOS) sends `ESC DEL`, the shell's
+  delete-previous-word, and Alt+Enter, Alt+Tab, Alt+Escape and Alt+Space
+  send ESC before the key as xterm does (on macOS, when Option is Meta).
 - **System mono font enumeration**, configurable font size (10-24px,
   `Ctrl + = / - / 0`), bold-to-bright colors, scrollback reset on keypress
   (on by default: typing jumps back to the live edge, so a scrolled-up
