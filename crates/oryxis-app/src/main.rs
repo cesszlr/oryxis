@@ -53,6 +53,7 @@ mod dispatch_monitor_dash;
 mod dispatch_net_tools;
 mod dispatch_tmux;
 mod dispatch_mcp;
+mod dispatch_mcp_sudo;
 mod dispatch_sync;
 mod dispatch_proxy_identity;
 mod dispatch_relay_deploy;

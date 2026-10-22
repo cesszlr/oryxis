@@ -123,6 +123,9 @@ impl Oryxis {
                     | Modal::ProxyCommand
                     // Security prompt: Deny is the default-ringed action.
                     | Modal::AgentConfirm
+                    // Same class (`oryxis-mcp` asking for sudo with the
+                    // stored password): Deny is the default-ringed action.
+                    | Modal::McpSudoConfirm
                     // Save-confirmation for an edit watch: Yes is the
                     // default-ringed action, Esc skips the save.
                     | Modal::SftpEditPrompt

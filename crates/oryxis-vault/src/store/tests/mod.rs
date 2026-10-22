@@ -38,6 +38,7 @@ mod identities;
 mod inheritance;
 mod keys;
 mod logs;
+mod mcp_consent;
 mod portable;
 mod portable_hardening;
 mod settings;

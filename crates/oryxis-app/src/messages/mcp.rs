@@ -58,4 +58,16 @@ pub enum McpMessage {
     /// carried the password was rewritten without it, `Err(msg)` on a
     /// rewrite failure.
     McpVaultPwStripResult(Result<(), String>),
+    /// The consent folder changed (`oryxis_vault::mcp_consent`): a
+    /// request was posted, or a claim came or went. Claims what this
+    /// instance can ask and drops the dialogs whose request was withdrawn.
+    McpSudoScanned(oryxis_vault::mcp_consent::Scan),
+    /// A request this instance claimed, delivered in the window the user
+    /// works in so the dialog floats there.
+    McpSudoClaimed(Box<oryxis_vault::mcp_consent::SudoRequest>),
+    /// The person's answer to the dialog on screen.
+    McpSudoAnswered(oryxis_vault::mcp_consent::Decision),
+    /// The request with this id reached its deadline (armed at the
+    /// claim, queued or not): refuse it.
+    McpSudoExpired(String),
 }

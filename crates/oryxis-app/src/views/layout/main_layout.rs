@@ -493,6 +493,23 @@ impl Oryxis {
             );
         }
 
+        // `oryxis-mcp` asking to hand a host's stored password to sudo:
+        // the agent prompt's class, with a deadline of its own. A click
+        // outside refuses, as Deny does.
+        if let Some(ref card) = self.mcp_sudo.pending {
+            return wrap_with_resize(
+                crate::widgets::modal_overlay(
+                    base,
+                    self.build_mcp_sudo_dialog(card),
+                    Some(Message::Mcp(crate::messages::McpMessage::McpSudoAnswered(
+                        oryxis_vault::mcp_consent::Decision::Deny,
+                    ))),
+                    0.0,
+                ),
+                resize_overlay,
+            );
+        }
+
         // "A highlight rule wants to run a snippet" (C6): the same class
         // of prompt as the agent one above, and for the same reason, so
         // it sits with it. Clicking outside refuses.

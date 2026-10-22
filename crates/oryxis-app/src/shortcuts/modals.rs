@@ -40,6 +40,7 @@ impl Oryxis {
             // screen is what decides where it is drawn.
             Modal::ProxyCommand => self.pending_proxy_command.is_some(),
             Modal::AgentConfirm => self.agent.pending_confirm.is_some(),
+            Modal::McpSudoConfirm => self.mcp_sudo.pending.is_some(),
             Modal::TriggerConfirm => self.trigger_confirm.is_some(),
             Modal::TerminalLinkConfirm => self.link_confirm.is_some(),
             Modal::TerminalSaveOutput => self.save_output.is_some(),
@@ -155,6 +156,17 @@ impl Oryxis {
             Modal::AgentConfirm => {
                 if let Some(card) = self.agent.pending_confirm.take() {
                     card.respond(false);
+                }
+            }
+            // Esc refuses, and the refusal is written for the waiting
+            // server; the next queued question takes the screen.
+            Modal::McpSudoConfirm => {
+                if let Some(card) = self.mcp_sudo.take_pending() {
+                    self.mcp_sudo_answer(
+                        &card.request,
+                        oryxis_vault::mcp_consent::Decision::Deny,
+                        Some(oryxis_vault::mcp_consent::DenyReason::Person),
+                    );
                 }
             }
             // Esc refuses, and the refusal is remembered for the

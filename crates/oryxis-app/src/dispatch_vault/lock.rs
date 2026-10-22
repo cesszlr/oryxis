@@ -156,6 +156,9 @@ impl Oryxis {
                     // The ssh-agent goes dark (keys ungated) while locked;
                     // the listener stays up so a `git` sees an empty agent.
                     self.agent_on_lock();
+                    // A sudo question from `oryxis-mcp` for this vault is
+                    // refused: its answer could not be signed.
+                    self.mcp_sudo_on_lock();
                     // Floats, pickers, the SFTP buffer's dialogs, the
                     // monitor and the pending dial prompts are the app's
                     // (one each), swept only when this vault's; see
@@ -216,6 +219,8 @@ impl Oryxis {
                         self.vaults.cur_mut().master_password = None;
                         // ssh-agent goes dark on lock (listener stays up).
                         self.agent_on_lock();
+                        // And `oryxis-mcp`'s sudo questions for this vault.
+                        self.mcp_sudo_on_lock();
                         // And the MCP panel's typed confirm buffer.
                         self.vaults.cur_mut().mcp.vault_pw_prompt = None;
                         self.vaults.cur_mut().mcp.vault_pw_error = false;

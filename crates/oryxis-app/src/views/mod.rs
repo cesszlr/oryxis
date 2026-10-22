@@ -28,6 +28,7 @@ pub(crate) mod onboarding;
 pub(crate) mod plugins_panel;
 pub(crate) mod port_forwards;
 pub(crate) mod proxy_command;
+pub(crate) mod mcp_sudo;
 pub(crate) mod session_group_panel;
 pub(crate) mod settings;
 pub(crate) mod settings_themes;

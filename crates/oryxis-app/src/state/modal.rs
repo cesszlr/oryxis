@@ -99,6 +99,12 @@ pub(crate) enum Modal {
     /// the signature (the safe default). In `ESC_ORDER` next to `HostKey`
     /// so the Esc router and the modal-keynav router both reach it.
     AgentConfirm,
+    /// "Let sudo use the password stored for this host?" asked by
+    /// `oryxis-mcp` (`mcp_sudo.pending`, `oryxis_vault::mcp_consent`).
+    /// A security prompt of the `AgentConfirm` class: what it allows is
+    /// root on a remote machine for an AI client, so it blocks input,
+    /// Deny is the default row, and Esc (or a click outside) refuses.
+    McpSudoConfirm,
     /// Read-only viewer for a key's attached OpenSSH certificate
     /// (`cert_viewer`, B2). Carries no secret (public cert material), so
     /// Esc simply closes it; it is in `ESC_ORDER` in the lightweight
@@ -204,6 +210,7 @@ impl Modal {
         Modal::SftpEditReopen,
         Modal::SftpPicker,
         Modal::AgentConfirm,
+        Modal::McpSudoConfirm,
         Modal::CertificateViewer,
         Modal::MonitorKill,
         Modal::HighlightRuleEditor,
@@ -246,6 +253,11 @@ impl Modal {
         Modal::ProxyCommand,
         // Sibling security prompt: Esc denies the signature (safe default).
         Modal::AgentConfirm,
+        // Same class: Esc refuses to hand the stored password to sudo
+        // for an AI client (safe default), and the refusal reaches the
+        // waiting server as an answer. Drawn right under the agent's in
+        // the `main_layout` chain.
+        Modal::McpSudoConfirm,
         // Same class: Esc refuses to let remote output type into the
         // session, and the refusal sticks for the session.
         Modal::TriggerConfirm,
@@ -344,6 +356,7 @@ impl Modal {
             | Modal::SftpEditReopen
             | Modal::SftpPicker
             | Modal::AgentConfirm
+            | Modal::McpSudoConfirm
             | Modal::CertificateViewer
             | Modal::MonitorKill
             | Modal::HighlightRuleEditor
@@ -403,6 +416,7 @@ mod tests {
                 | Modal::SftpEditReopen
                 | Modal::SftpPicker
                 | Modal::AgentConfirm
+                | Modal::McpSudoConfirm
                 | Modal::CertificateViewer
                 | Modal::MonitorKill
                 | Modal::HighlightRuleEditor
@@ -416,7 +430,7 @@ mod tests {
                 | Modal::VaultDialog => {}
             }
         }
-        assert_eq!(Modal::ALL.len(), 45, "add the new variant to Modal::ALL");
+        assert_eq!(Modal::ALL.len(), 46, "add the new variant to Modal::ALL");
         // Every Esc-closeable modal must also be a known modal.
         for m in Modal::ESC_ORDER {
             assert!(Modal::ALL.contains(m));

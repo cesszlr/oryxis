@@ -671,6 +671,10 @@ pub async fn handle_ssh_execute(
         .and_then(|v| v.as_u64())
         .unwrap_or(DEFAULT_TIMEOUT_SECS)
         .clamp(1, MAX_TIMEOUT_SECS);
+    let sudo = params
+        .and_then(|p| p.get("sudo"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     let id = Uuid::parse_str(id_str).map_err(|_| "Invalid UUID".to_string())?;
 
@@ -696,15 +700,31 @@ pub async fn handle_ssh_execute(
         Err(e) => return Err(e.into()),
     };
     let resolve_ms = started.elapsed().as_millis();
-    tracing::debug!(host = %plan.label, command, "ssh_execute command");
+    tracing::debug!(host = %plan.label, command, sudo, "ssh_execute command");
 
     let timeout = std::time::Duration::from_secs(timeout_secs);
     let endpoints = plan.endpoints.clone();
     // Only what THIS dial refuses may describe its failure.
     served.refusals.clear_endpoints(&endpoints);
-    let outcome = served.pool.exec(plan, command, timeout, cancel).await;
+    let outcome = if sudo {
+        match crate::sudo::execute(server, served, &plan, command, timeout, cancel).await {
+            Ok(root) => Ok((root.run, Some(root.mode))),
+            Err(crate::sudo::SudoFailure::Pool(failure)) => Err(failure),
+            Err(crate::sudo::SudoFailure::NotRun(text)) => {
+                tracing::info!(
+                    host = %plan.label,
+                    elapsed_ms = started.elapsed().as_millis(),
+                    reason = %text,
+                    "ssh_execute sudo not run"
+                );
+                return Err(text);
+            }
+        }
+    } else {
+        served.pool.exec(&plan, command, None, timeout, cancel).await.map(|run| (run, None))
+    };
     match outcome {
-        Ok(run) => {
+        Ok((run, sudo_mode)) => {
             tracing::info!(
                 host = %run.label,
                 endpoint = %run.endpoint,
@@ -713,14 +733,19 @@ pub async fn handle_ssh_execute(
                 dial_ms = run.dial_ms,
                 exec_ms = run.exec_ms,
                 exit_code = run.result.exit_code,
+                sudo = sudo_mode.unwrap_or("no"),
                 "ssh_execute done"
             );
-            Ok(json!({
+            let mut answer = json!({
                 "exit_code": run.result.exit_code,
                 "stdout": run.result.stdout,
                 "stderr": run.result.stderr,
                 "vault": served.slug,
-            }))
+            });
+            if let Some(mode) = sudo_mode {
+                answer["sudo"] = json!(mode);
+            }
+            Ok(answer)
         }
         Err(e) => {
             tracing::info!(

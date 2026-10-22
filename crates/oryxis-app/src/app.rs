@@ -1301,6 +1301,9 @@ pub struct Oryxis {
     // ssh-agent socket. Feature-gated (off by default), in-core (the
     // signing oracle needs the unlocked vault in-process).
     pub(crate) agent: crate::state::AgentState,
+    // ── `oryxis-mcp` asking to hand a host's stored password to sudo
+    // (`oryxis_vault::mcp_consent`): app-wide, one dialog on screen.
+    pub(crate) mcp_sudo: crate::state::McpSudoState,
 }
 
 

@@ -85,6 +85,10 @@ fn base_tools() -> Vec<Value> {
                     "timeout_secs": {
                         "type": "integer",
                         "description": "Timeout in seconds for the command (default: 30, max: 180)"
+                    },
+                    "sudo": {
+                        "type": "boolean",
+                        "description": "Run the command as root through sudo (default: false). The command runs under `sh` as root with stdin closed; do not prefix it with `sudo` yourself. When sudo needs the login's password, Oryxis asks the user, in the Oryxis app, to let sudo use the password stored for this host (this command only, or every sudo call to this host until this MCP server exits); the call then waits up to 10 s for Oryxis to show the question and up to 60 s for the answer. Passwordless sudo and a root login ask nobody. The answer's `sudo` field says which path ran: `root_login`, `passwordless` or `stored_password`."
                     }
                 },
                 "required": ["id", "command"]

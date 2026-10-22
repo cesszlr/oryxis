@@ -188,10 +188,14 @@ impl Pool {
     /// command. A dial dropped mid-flight takes its connection with it
     /// (nothing was pooled yet); a cancelled command closes its channel
     /// and leaves the connection for the next call.
+    ///
+    /// `stdin`, when given, is written to the command and followed by
+    /// EOF. A retry on a dead link sends it again: nothing read it.
     pub async fn exec(
         &self,
-        plan: DialPlan,
+        plan: &DialPlan,
         command: &str,
+        stdin: Option<&[u8]>,
         run_timeout: Duration,
         mut cancel: watch::Receiver<bool>,
     ) -> Result<PoolRun, Box<PoolFailure>> {
@@ -234,7 +238,7 @@ impl Pool {
                         // disconnect goes out on the drop.
                         guard.take();
                         let conn = tokio::select! {
-                            dialled = dial(&plan) => dialled?,
+                            dialled = dial(plan) => dialled?,
                             () = cancelled(&mut cancel) => {
                                 return Err(fail("connect", SshError::Cancelled));
                             }
@@ -253,13 +257,19 @@ impl Pool {
 
             let exec_started = Instant::now();
             match conn
-                .exec_capture(command, None, OPEN_TIMEOUT, run_timeout, Some(cancel.clone()))
+                .exec_capture(
+                    command,
+                    stdin.map(<[u8]>::to_vec),
+                    OPEN_TIMEOUT,
+                    run_timeout,
+                    Some(cancel.clone()),
+                )
                 .await
             {
                 Ok(result) => {
                     return Ok(PoolRun {
-                        label: plan.label,
-                        endpoint: plan.endpoint,
+                        label: plan.label.clone(),
+                        endpoint: plan.endpoint.clone(),
                         reused,
                         dial_ms,
                         exec_ms: exec_started.elapsed().as_millis(),
@@ -294,7 +304,7 @@ impl Pool {
                                 "pool: pooled connection refused a channel, running on a one-off connection"
                             );
                             return self
-                                .exec_overflow(&plan, command, run_timeout, cancel, &fail)
+                                .exec_overflow(plan, command, stdin, run_timeout, cancel, &fail)
                                 .await;
                         }
                         ChannelVerdict::Other => return Err(fail("exec", SshError::Channel(why))),
@@ -312,6 +322,7 @@ impl Pool {
         &self,
         plan: &DialPlan,
         command: &str,
+        stdin: Option<&[u8]>,
         run_timeout: Duration,
         mut cancel: watch::Receiver<bool>,
         fail: &(impl Fn(&'static str, SshError) -> Box<PoolFailure> + ?Sized),
@@ -324,7 +335,7 @@ impl Pool {
         let dial_ms = dial_started.elapsed().as_millis();
         let exec_started = Instant::now();
         let outcome = conn
-            .exec_capture(command, None, OPEN_TIMEOUT, run_timeout, Some(cancel))
+            .exec_capture(command, stdin.map(<[u8]>::to_vec), OPEN_TIMEOUT, run_timeout, Some(cancel))
             .await;
         let exec_ms = exec_started.elapsed().as_millis();
         let _ = tokio::time::timeout(Duration::from_secs(1), conn.disconnect()).await;

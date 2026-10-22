@@ -539,6 +539,7 @@ impl Oryxis {
                 pending_perf_mode_toast: false,
                 download_mirror,
                 agent: crate::state::AgentState::default(),
+                mcp_sudo: crate::state::McpSudoState::default(),
                 tray_menu_signature: 0,
                 jumplist_signature: 0,
                 jumplist_window_tagged: false,

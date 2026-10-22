@@ -219,6 +219,13 @@ impl Oryxis {
             McpMessage::McpVaultPwStripResult(res) => {
                 self.vaults.cur_mut().mcp.vault_pw_strip_status = Some(res);
             }
+            // The sudo approvals `oryxis-mcp` asks for (`dispatch_mcp_sudo`).
+            m @ (McpMessage::McpSudoScanned(_)
+            | McpMessage::McpSudoClaimed(_)
+            | McpMessage::McpSudoAnswered(_)
+            | McpMessage::McpSudoExpired(_)) => {
+                return self.handle_mcp_sudo(m).unwrap_or_else(crate::dispatch::unrouted);
+            }
         }
         Task::none()
     }

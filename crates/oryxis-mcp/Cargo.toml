@@ -21,6 +21,9 @@ uuid = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 chrono = { workspace = true }
+zeroize = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+# Paused time for the consent waits (`sudo::tests`).
+tokio = { workspace = true, features = ["test-util"] }

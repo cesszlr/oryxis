@@ -44,6 +44,8 @@ impl Oryxis {
         // reaper dies with the process, and the next launch may be days
         // away (issue #251). The client keeps what it already read.
         crate::remote_desktop::sweep_stale_credentials();
+        // A sudo question from `oryxis-mcp` nobody can see any more.
+        self.mcp_sudo_on_exit();
     }
 
     /// Gracefully drain the plugin subprocesses (flush logs / close SDK

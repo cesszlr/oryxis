@@ -4,6 +4,7 @@ mod pool;
 mod protocol;
 mod server;
 mod stdio;
+mod sudo;
 #[cfg(test)]
 mod tests;
 mod tools;

@@ -759,10 +759,15 @@ fn deep_link_stream() -> impl iced::futures::Stream<Item = Message> {
     // The vault-change marker rides the same poll: seeded here, so a
     // bump from before this process started fires nothing.
     let watch = oryxis_vault::change_notice::ChangeWatch::new();
-    iced::futures::stream::unfold((Vec::<Message>::new(), watch), |(mut queue, mut watch)| async {
+    // The sudo approvals `oryxis-mcp` posts ride it too
+    // (`oryxis_vault::mcp_consent`), reported only when something is
+    // waiting for a claim or the set of claims changed.
+    let consent = ConsentWatch::default();
+    let state = (Vec::<Message>::new(), watch, consent);
+    iced::futures::stream::unfold(state, |(mut queue, mut watch, mut consent)| async {
         loop {
             if let Some(msg) = queue.pop() {
-                return Some((msg, (queue, watch)));
+                return Some((msg, (queue, watch, consent)));
             }
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             // Two inboxes, two messages: a `ssh://` link prefills a
@@ -785,9 +790,46 @@ fn deep_link_stream() -> impl iced::futures::Stream<Item = Message> {
                         writer: notice.writer,
                     })
                 }))
+                .chain(consent.poll().map(|scan| {
+                    Message::Mcp(crate::messages::McpMessage::McpSudoScanned(scan))
+                }))
                 .collect();
         }
     })
+}
+
+/// The deep-link loop's look at the sudo consent folder.
+#[derive(Default)]
+struct ConsentWatch {
+    claimed: Vec<String>,
+    /// The last scan reported requests waiting for a claim.
+    had_posted: bool,
+}
+
+impl ConsentWatch {
+    /// A scan worth an update: a request waits for a claim, a claim came
+    /// or went (a withdrawn request takes its dialog down), or the last
+    /// scan had requests waiting. That last one is what catches a claim
+    /// made AND withdrawn between two polls: the claimed set reads empty
+    /// both times, and the dialog it raised would stay up.
+    fn poll(&mut self) -> Option<oryxis_vault::mcp_consent::Scan> {
+        let dir = oryxis_vault::mcp_consent::consent_dir()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let scan = oryxis_vault::mcp_consent::scan(&dir, now);
+        self.next(scan)
+    }
+
+    fn next(&mut self, scan: oryxis_vault::mcp_consent::Scan) -> Option<oryxis_vault::mcp_consent::Scan> {
+        let had_posted = std::mem::replace(&mut self.had_posted, !scan.posted.is_empty());
+        if !had_posted && scan.posted.is_empty() && scan.claimed == self.claimed {
+            return None;
+        }
+        self.claimed = scan.claimed.clone();
+        Some(scan)
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -809,6 +851,57 @@ fn tray_event_stream() -> impl iced::futures::Stream<Item = Message> {
             }
         }
     })
+}
+
+#[cfg(test)]
+mod consent_watch_tests {
+    use super::ConsentWatch;
+    use oryxis_vault::mcp_consent::{Scan, SudoRequest};
+
+    fn posted() -> Scan {
+        Scan {
+            posted: vec![SudoRequest {
+                id: SudoRequest::new_id().unwrap(),
+                vault_id: uuid::Uuid::new_v4(),
+                vault_label: "V".into(),
+                host_id: uuid::Uuid::new_v4(),
+                host_label: "h".into(),
+                login: "u".into(),
+                address: "h:22".into(),
+                route: Vec::new(),
+                client: None,
+                command: "id".into(),
+                created_unix: 0,
+            }],
+            claimed: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_quiet_folder_reports_nothing() {
+        let mut w = ConsentWatch::default();
+        assert!(w.next(Scan::default()).is_none());
+        assert!(w.next(Scan::default()).is_none());
+    }
+
+    #[test]
+    fn a_claim_made_and_withdrawn_between_two_polls_still_reports() {
+        let mut w = ConsentWatch::default();
+        assert!(w.next(posted()).is_some());
+        // Claimed and withdrawn before this poll: the folder is empty
+        // again, and the dialog the claim raised has to hear about it.
+        assert!(w.next(Scan::default()).is_some());
+        assert!(w.next(Scan::default()).is_none());
+    }
+
+    #[test]
+    fn a_claim_that_comes_or_goes_reports() {
+        let mut w = ConsentWatch::default();
+        let held = Scan { posted: Vec::new(), claimed: vec!["a".repeat(32)] };
+        assert!(w.next(held.clone()).is_some());
+        assert!(w.next(held).is_none());
+        assert!(w.next(Scan::default()).is_some());
+    }
 }
 
 #[cfg(test)]

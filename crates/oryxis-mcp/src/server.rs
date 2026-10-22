@@ -46,6 +46,15 @@ pub struct Served {
     pub pool: Pool,
     /// Host keys this vault's strict dials refused, for `accept_host_key`.
     pub refusals: Arc<crate::hostkey::RefusalLog>,
+    /// "Allow for this session" answers of the app: (host id, the
+    /// route's [`crate::handlers::DialPlan::signature`]). Held for this
+    /// process only; a host whose address, login or route changed asks
+    /// again.
+    sudo_grants: Mutex<std::collections::HashSet<(uuid::Uuid, u64)>>,
+    /// One sudo question at a time per vault: a second call waits for
+    /// the first answer, which may be a session grant it can reuse,
+    /// instead of stacking a second dialog for the same host.
+    pub sudo_gate: tokio::sync::Mutex<()>,
 }
 
 impl Served {
@@ -57,7 +66,19 @@ impl Served {
             vault: Mutex::new(vault),
             pool: Pool::new(),
             refusals: Arc::new(crate::hostkey::RefusalLog::default()),
+            sudo_grants: Mutex::default(),
+            sudo_gate: tokio::sync::Mutex::new(()),
         }
+    }
+
+    /// Whether the app granted sudo with the stored password to `host`
+    /// over the route `signature` for the rest of this process.
+    pub fn sudo_granted(&self, host: uuid::Uuid, signature: u64) -> bool {
+        lock_or_recover(&self.sudo_grants).contains(&(host, signature))
+    }
+
+    pub fn grant_sudo(&self, host: uuid::Uuid, signature: u64) {
+        lock_or_recover(&self.sudo_grants).insert((host, signature));
     }
 
     /// The vault, for one synchronous read. A poisoned lock is
@@ -101,6 +122,9 @@ pub fn tagged(value: Value, slug: &str) -> Value {
 /// blocking a `ping`.
 pub struct Server {
     vaults: Vec<Served>,
+    /// `clientInfo.name` from the client's `initialize`: self-reported,
+    /// shown in the app's sudo dialog as the client's own name.
+    client: Mutex<Option<String>>,
 }
 
 impl Server {
@@ -118,7 +142,7 @@ impl Server {
 
     /// A server for `vaults`, in registry order.
     pub fn with_vaults(vaults: Vec<Served>) -> Arc<Self> {
-        Arc::new(Self { vaults })
+        Arc::new(Self { vaults, client: Mutex::default() })
     }
 
     /// The first vault's store (tests of the single-vault shape).
@@ -131,6 +155,11 @@ impl Server {
     #[cfg(test)]
     pub fn refusals(&self) -> Arc<crate::hostkey::RefusalLog> {
         Arc::clone(&self.vaults[0].refusals)
+    }
+
+    /// The client's name for itself, if it gave one.
+    pub fn client_name(&self) -> Option<String> {
+        lock_or_recover(&self.client).clone()
     }
 
     /// Every vault served.
@@ -255,19 +284,28 @@ impl Server {
         cancel: watch::Receiver<bool>,
     ) -> JsonRpcResponse {
         match method {
-            "initialize" => JsonRpcResponse::success(
-                id,
-                json!({
-                    "protocolVersion": negotiate_protocol_version(params),
-                    "capabilities": {
-                        "tools": {}
-                    },
-                    "serverInfo": {
-                        "name": "oryxis-mcp",
-                        "version": env!("CARGO_PKG_VERSION")
-                    }
-                }),
-            ),
+            "initialize" => {
+                // Bounded and printable: it lands in a dialog.
+                let name = params
+                    .and_then(|p| p.pointer("/clientInfo/name"))
+                    .and_then(|v| v.as_str())
+                    .map(|n| n.chars().filter(|c| !c.is_control()).take(64).collect::<String>())
+                    .filter(|n| !n.trim().is_empty());
+                *lock_or_recover(&self.client) = name;
+                JsonRpcResponse::success(
+                    id,
+                    json!({
+                        "protocolVersion": negotiate_protocol_version(params),
+                        "capabilities": {
+                            "tools": {}
+                        },
+                        "serverInfo": {
+                            "name": "oryxis-mcp",
+                            "version": env!("CARGO_PKG_VERSION")
+                        }
+                    }),
+                )
+            }
 
             // Mandatory in every MCP revision: reply with an empty result so
             // health checks don't read a -32601 as a dead server.
@@ -354,4 +392,8 @@ impl Server {
             _ => JsonRpcResponse::error(id, -32601, format!("Method not found: {}", method)),
         }
     }
+}
+
+fn lock_or_recover<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|poison| poison.into_inner())
 }

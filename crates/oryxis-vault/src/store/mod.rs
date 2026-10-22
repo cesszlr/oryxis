@@ -509,6 +509,7 @@ mod keys;
 mod known_hosts;
 mod login_scripts;
 mod logs;
+mod mcp_consent;
 mod proxy_trust;
 pub mod rebuild;
 mod schema;
