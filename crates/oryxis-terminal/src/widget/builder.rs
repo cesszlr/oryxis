@@ -16,6 +16,8 @@ impl<Message> TerminalView<Message> {
             right_click_copy: false,
             mouse_bindings: None,
             right_click_action: RightClickAction::default(),
+            cursor_shape: TerminalCursorShape::default(),
+            cursor_blink: false,
             reset_scroll_on_output: false,
             bold_is_bright: true,
             keyword_highlight: true,
@@ -229,6 +231,16 @@ impl<Message> TerminalView<Message> {
     /// the row (panes without a probed transport).
     pub fn with_net_hud(mut self, net: Option<NetHud>) -> Self {
         self.net_hud = net;
+        self
+    }
+
+    /// The caret this pane draws until its program picks one (DECSCUSR),
+    /// and whether that caret blinks. Only the focused pane of a focused
+    /// window blinks, and the blink rests after a while with nothing
+    /// happening (see `widget/blink.rs`).
+    pub fn with_cursor_style(mut self, shape: TerminalCursorShape, blink: bool) -> Self {
+        self.cursor_shape = shape;
+        self.cursor_blink = blink;
         self
     }
 

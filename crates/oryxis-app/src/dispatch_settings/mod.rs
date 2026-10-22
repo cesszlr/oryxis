@@ -296,6 +296,8 @@ impl Oryxis {
             | SettingsMessage::SidebarDefaultTabChanged(..)
             | SettingsMessage::ToggleCarefulPaste
             | SettingsMessage::ToggleBoldIsBright
+            | SettingsMessage::TerminalCursorShapeChanged(..)
+            | SettingsMessage::ToggleTerminalCursorBlink
             | SettingsMessage::TerminalOpacityChanged(..)
             | SettingsMessage::TerminalBgImageBrowse
             | SettingsMessage::TerminalBgImagePicked(..)

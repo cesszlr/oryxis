@@ -115,6 +115,33 @@ impl Oryxis {
     /// the variables modal instead of sending raw braces; everything
     /// else sends immediately. Returns the first input's focus task
     /// when the modal opens.
+    /// Put a snippet on the snippet bar or take it off, saved at once (a
+    /// card menu's row, issue #266). An editor open on the same snippet
+    /// follows, or its Save would write the old answer back.
+    fn set_snippet_show_in_bar(&mut self, id: uuid::Uuid, on: bool) -> Task<Message> {
+        let Some(mut snip) = self.vaults.cur().snippets.iter().find(|s| s.id == id).cloned() else {
+            return Task::none();
+        };
+        if snip.show_in_bar == on {
+            return Task::none();
+        }
+        snip.show_in_bar = on;
+        snip.updated_at = chrono::Utc::now();
+        let Some(vault) = &self.vaults.cur().store else {
+            return Task::none();
+        };
+        if let Err(e) = vault.save_snippet(&snip) {
+            tracing::warn!("snippet bar: could not save {}: {e}", snip.id);
+            self.set_toast(e.to_string());
+            return Task::none();
+        }
+        if self.vaults.cur().snippet_form.editing_id == Some(id) {
+            self.vaults.cur_mut().snippet_form.show_in_bar = on;
+        }
+        self.load_data_from_vault();
+        Task::none()
+    }
+
     fn snippet_send_or_prompt(&mut self, idx: usize, run: bool) -> Task<Message> {
         let Some(snip) = self.vaults.cur().snippets.get(idx) else {
             return Task::none();
@@ -286,6 +313,7 @@ impl Oryxis {
                 self.vaults.cur_mut().snippet_form.hotkey = None;
                 self.vaults.cur_mut().snippet_form.hotkey_capturing = false;
                 self.vaults.cur_mut().snippet_form.install = false;
+                self.vaults.cur_mut().snippet_form.show_in_bar = false;
                 self.vaults.cur_mut().snippet_form.editing_id = None;
                 self.vaults.cur_mut().snippet_form.error = None;
                 self.reset_snippet_group_combo();
@@ -299,6 +327,25 @@ impl Oryxis {
             SnippetMessage::SnippetTagsChanged(v) => self.vaults.cur_mut().snippet_form.tags_input = v,
             SnippetMessage::ToggleSnippetInstall => {
                 self.vaults.cur_mut().snippet_form.install = !self.vaults.cur_mut().snippet_form.install;
+            }
+            SnippetMessage::ToggleSnippetShowInBar => {
+                let form = &mut self.vaults.cur_mut().snippet_form;
+                form.show_in_bar = !form.show_in_bar;
+            }
+            SnippetMessage::SetSnippetShowInBar(id, on) => {
+                self.snippet_context_menu = None;
+                self.overlay = None;
+                return self.set_snippet_show_in_bar(id, on);
+            }
+            SnippetMessage::SnippetBarRun(id) => {
+                if let Some(idx) = self.vaults.cur().snippets.iter().position(|s| s.id == id) {
+                    return self.snippet_send_or_prompt(idx, true);
+                }
+            }
+            SnippetMessage::SnippetBarPaste(id) => {
+                if let Some(idx) = self.vaults.cur().snippets.iter().position(|s| s.id == id) {
+                    return self.snippet_send_or_prompt(idx, false);
+                }
             }
             m @ (SnippetMessage::SnippetStepCommandAction(..)
             | SnippetMessage::SnippetStepAdd
@@ -433,6 +480,7 @@ impl Oryxis {
                         .and_then(crate::hotkeys::HotkeyBinding::parse);
                     ov.snippet_form.hotkey_capturing = false;
                     ov.snippet_form.install = snip.install;
+                    ov.snippet_form.show_in_bar = snip.show_in_bar;
                     ov.snippet_form.editing_id = Some(snip.id);
                     ov.snippet_form.error = None;
                     self.reset_snippet_group_combo();
@@ -461,6 +509,11 @@ impl Oryxis {
                 snip.tags = crate::util::parse_tags(&self.vaults.cur().snippet_form.tags_input);
                 snip.hotkey = self.vaults.cur().snippet_form.hotkey.map(|b| b.serialize());
                 snip.install = self.vaults.cur().snippet_form.install;
+                snip.show_in_bar = self.vaults.cur().snippet_form.show_in_bar;
+                // An edit is a change sync has to carry: LWW compares this
+                // stamp, and an edited snippet that kept its old one never
+                // reached a peer that already held it.
+                snip.updated_at = chrono::Utc::now();
                 if let Some(vault) = &self.vaults.cur().store {
                     match vault.save_snippet(&snip) {
                         Ok(()) => {

@@ -38,6 +38,13 @@ pub struct Snippet {
     /// what search, previews and an older build read.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub steps: Vec<SnippetStep>,
+    /// A button for it sits in the snippet bar under the terminal
+    /// (issue #266): a click runs it on the pane in front, a right-click
+    /// pastes it. The bar exists only while some snippet carries this.
+    /// Omitted from the wire while false, so a snippet that is not on the
+    /// bar serializes as it always did.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub show_in_bar: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -55,6 +62,7 @@ impl Snippet {
             hotkey: None,
             install: false,
             steps: Vec::new(),
+            show_in_bar: false,
             created_at: now,
             updated_at: now,
         }
@@ -319,5 +327,17 @@ mod tests {
         let json = r#"{"id":"00000000-0000-0000-0000-000000000000","label":"x","command":"uptime","description":null,"tags":[],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}"#;
         let snip: Snippet = serde_json::from_str(json).unwrap();
         assert_eq!(snip.actions(), vec![SnippetStep::Command { text: "uptime".into() }]);
+        assert!(!snip.show_in_bar, "a snippet of old is not on the bar");
+    }
+
+    #[test]
+    fn the_bar_flag_rides_the_wire_only_when_set() {
+        let mut snip = Snippet::new("ls", "ls -la");
+        let off = serde_json::to_value(&snip).unwrap();
+        assert!(off.get("show_in_bar").is_none(), "off is the old shape");
+        snip.show_in_bar = true;
+        let on = serde_json::to_string(&snip).unwrap();
+        let back: Snippet = serde_json::from_str(&on).unwrap();
+        assert!(back.show_in_bar);
     }
 }

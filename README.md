@@ -146,7 +146,8 @@ matching installer. Windows binaries are Authenticode-signed (see
 - **Snippets that run a sequence.** One snippet can type commands, wait
   for a command to finish or for a line in its output, copy or save what
   it printed, and call other snippets, all on the terminal you started it
-  on, with variables asked once.
+  on, with variables asked once. The ones you use most can sit as buttons
+  in a snippet bar under the terminal.
 - **As many windows as you like.** One process, any number of windows,
   each with its own tabs, hosts screen and search. Drag a tab past the
   edge to tear it off, drop it on another window's tab bar to dock it,

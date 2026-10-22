@@ -42,6 +42,7 @@ mod perf;
 pub mod search;
 mod selection;
 mod state;
+mod blink;
 mod builder;
 mod draw;
 mod events;
@@ -75,6 +76,31 @@ pub enum RightClickAction {
     /// Extend the current selection to the click point (xterm), moving
     /// its nearer boundary, then copy.
     Extend,
+}
+
+/// The caret a pane draws until the program running in it asks for
+/// another (DECSCUSR, `CSI Ps SP q`). The user's pick is handed to the
+/// emulator as its DEFAULT style, never as an override: a remote that
+/// sets a shape wins, and its `CSI 0 SP q` (reset) comes back to this.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub enum TerminalCursorShape {
+    /// A filled cell (every terminal's factory caret).
+    #[default]
+    Block,
+    /// A vertical bar at the cell's leading edge.
+    Bar,
+    /// A line along the cell's bottom edge.
+    Underline,
+}
+
+impl TerminalCursorShape {
+    pub(crate) fn to_ansi(self) -> CursorShape {
+        match self {
+            Self::Block => CursorShape::Block,
+            Self::Bar => CursorShape::Beam,
+            Self::Underline => CursorShape::Underline,
+        }
+    }
 }
 
 pub(crate) use clipboard::set_clipboard_text;
@@ -320,6 +346,20 @@ pub struct TerminalWidgetState {
     /// the first draw. Stored in a `Cell` so the immutable-`&State` draw can
     /// update it. `RenderKey` is `Copy`, so no allocation on the hot path.
     last_render_key: std::cell::Cell<Option<RenderKey>>,
+    /// Cursor blink (see `widget/blink.rs`): when the current run of
+    /// blinking began, `None` while the caret does not blink. Restarted
+    /// by a key, by output (the epoch below moving) and by the window
+    /// coming back, so the caret is solid while something happens.
+    blink_anchor: Option<std::time::Instant>,
+    /// The `render_epoch` the blink last saw, so new output restarts it.
+    blink_epoch: Option<u64>,
+    /// The blink's current phase: the caret is in its OFF half. Written
+    /// by the `RedrawRequested` arm, read by the draw that follows it.
+    cursor_blink_off: bool,
+    /// The window holding this pane lost the OS focus. Negative so the
+    /// derived `Default` reads "focused": the first event a widget sees
+    /// is never a focus change.
+    window_unfocused: bool,
 }
 
 /// Everything a single grid geometry depends on, other than the content
@@ -387,6 +427,13 @@ struct RenderKey {
     /// query change / step / rebuild / open / close so the match overlay
     /// invalidates the cached grid geometry.
     search_generation: u64,
+    /// The default caret handed to the emulator: a settings change moves
+    /// no epoch, so without it the cached grid kept the old shape until
+    /// the next output.
+    cursor_shape: TerminalCursorShape,
+    cursor_blink: bool,
+    /// The blink's OFF half (`TerminalWidgetState::cursor_blink_off`).
+    cursor_blink_off: bool,
     font: Font,
     font_size: f32,
     cell_w: f32,
@@ -578,6 +625,12 @@ pub struct TerminalView<Message = ()> {
     /// What a right-click does (PuTTY's three schemes). The single
     /// authority for the gesture; see [`RightClickAction`].
     right_click_action: RightClickAction,
+    /// The caret's shape and whether it blinks while the program in the
+    /// pane has not chosen its own (see [`TerminalCursorShape`]). Applied
+    /// to the emulator's default style on every draw, a no-op when
+    /// unchanged.
+    cursor_shape: TerminalCursorShape,
+    cursor_blink: bool,
     /// Jump back to the live edge on new terminal output (PuTTY's "reset
     /// scrollback on display activity").
     reset_scroll_on_output: bool,

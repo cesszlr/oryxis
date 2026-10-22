@@ -21,10 +21,17 @@ Several encrypted vaults can be open at once, each with its own master password,
 - An `.oryxis` export can be imported as a new vault.
 - The window title names the vault when there are several.
 - MCP plugin 0.1.13 serves every vault it can open: `ORYXIS_VAULT_PASSWORD_<SLUG>` and `ORYXIS_MCP_TOKEN_<SLUG>` per vault (the first keeps the plain names), `--vault <slug>` for one, a `vault` field in every answer, a `vault` parameter on every tool, and `list_vaults`; Settings > MCP Server writes each vault's variables into the same client entry.
+- A snippet bar under the terminal: a snippet marked "Show in snippet bar" (in its editor or its card's menu) gets a button there; a click runs it, a right-click pastes it (#266, requested by @MmYyF).
+- Settings > Terminal sets the cursor's shape (block, bar, underline) and whether it blinks; a program that picks its own cursor keeps it (#266).
 
 ### Changed
 - Device-level settings (language, window geometry, tray, renderer, updates, offline mode, local programs and folders, the SSH agent, the sync listen port and device name, shortcuts) now live in `~/.oryxis/device.json`, copied once from the vault on first start.
 - A second Oryxis process no longer removes the first one's spooled recordings at start.
+- Sync protocol 11 (snapshot format 7) carries the snippet bar: update every synced device, an older one is refused at the handshake.
+
+### Fixed
+- A cursor the program hides (htop, `tput civis`) stays hidden.
+- An edited snippet reaches the other synced devices.
 
 ## [0.21.0] - 2026-10-16
 

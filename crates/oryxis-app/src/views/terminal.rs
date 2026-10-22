@@ -233,6 +233,17 @@ impl Oryxis {
                     } else {
                         grid.boxed()
                     };
+                // The snippet bar (issue #266) under the panes, so "the
+                // terminal above" is the one it types into. Its slot is
+                // always pushed: a bar that comes and goes must not
+                // change the index the grid's widget state is found at.
+                let term_with_toggle: Element<'_, Message> = column![
+                    term_with_toggle,
+                    self.snippet_bar().unwrap_or_else(|| Space::new().boxed()),
+                ]
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .boxed();
 
                 // The session-group editor renders here, as a sibling of the
                 // grid inside the terminal area, the same way the chat sidebar
@@ -682,6 +693,10 @@ impl Oryxis {
             .with_font_name(&self.vaults.cur().terminal_font_name)
             .with_font_weight(self.vaults.cur().terminal_font_weight.font_weight())
             .with_text_dilation(self.vaults.cur().terminal_text_thickness.px())
+            .with_cursor_style(
+                self.vaults.cur().prefs.terminal_cursor_shape.to_widget(),
+                self.vaults.cur().prefs.terminal_cursor_blink,
+            )
             .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
             .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
             .with_terminal_chords(self.terminal_chord_resolver())

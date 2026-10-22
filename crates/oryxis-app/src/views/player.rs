@@ -218,6 +218,8 @@ impl Oryxis {
                 .with_font_name(&self.vaults.cur().terminal_font_name)
                 .with_font_weight(self.vaults.cur().terminal_font_weight.font_weight())
                 .with_text_dilation(self.vaults.cur().terminal_text_thickness.px())
+                // The user's caret, never blinking: a replay is read, not typed into.
+                .with_cursor_style(self.vaults.cur().prefs.terminal_cursor_shape.to_widget(), false)
                 .with_copy_on_select(self.vaults.cur().prefs.copy_on_select)
                 .with_right_click_copy(self.vaults.cur().prefs.right_click_copy)
                 // Same right-click scheme as a live pane. Without it the

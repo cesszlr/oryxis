@@ -93,6 +93,12 @@ pub(crate) struct AppPrefs {
     /// with the focused host's tags. Persisted as `snippet_tag_filter`.
     pub(crate) snippet_tag_filter: bool,
     pub(crate) bold_is_bright: bool,
+    /// The caret's shape while the program has not set one. Persisted as
+    /// `terminal_cursor_shape`; default block.
+    pub(crate) terminal_cursor_shape: crate::util::CursorShapeMode,
+    /// Whether that caret blinks. Persisted as `terminal_cursor_blink`;
+    /// default off (a program's DECSCUSR / DECSET 12 can still ask).
+    pub(crate) terminal_cursor_blink: bool,
     /// Terminal background opacity in percent, 100 = opaque (the
     /// default). Persisted as `terminal_opacity`. Kept here only so
     /// Settings can render the picker: the render path reads
@@ -605,6 +611,8 @@ impl Default for AppPrefs {
             command_history_file: false,
             snippet_tag_filter: false,
             bold_is_bright: true,
+            terminal_cursor_shape: crate::util::CursorShapeMode::default(),
+            terminal_cursor_blink: false,
             terminal_opacity: 100,
             terminal_bg_image: String::new(),
             terminal_bg_fit: oryxis_terminal::BgFit::default().as_str().to_string(),

@@ -1,4 +1,4 @@
-viewport: 1200x750
+viewport: 1200x812
 mode: Zen
 -----
 # A snippet holds a list of actions and runs them in order on one pane:
@@ -22,12 +22,12 @@ settle
 # value is not text-selectable.
 click (990.00, 145.00)
 type "two steps"
-click (990.00, 550.00)
+click (990.00, 612.00)
 type "echo first-step"
 click "Add action"
 settle 250
 # The second row's kind picker.
-click (957.00, 616.00)
+click (957.00, 678.00)
 settle 250
 click "Wait for the command to finish"
 settle 250
@@ -38,7 +38,7 @@ settle 250
 scroll (0, -400)
 settle 250
 # The third row's kind picker.
-click (957.00, 536.00)
+click (957.00, 598.00)
 settle 250
 click "App action"
 settle 250
@@ -53,13 +53,13 @@ settle 250
 scroll (0, -600)
 settle 250
 # The fourth row's kind picker, then its seconds field.
-click (957.00, 535.00)
+click (957.00, 597.00)
 settle 250
 click "Wait"
 settle 250
 scroll (0, -600)
 settle 250
-click (990.00, 582.00)
+click (990.00, 644.00)
 type ctrl+a
 type "3"
 click "Add action"
@@ -67,7 +67,7 @@ settle 250
 scroll (0, -600)
 settle 250
 # The fifth row's command editor.
-click (990.00, 582.00)
+click (990.00, 644.00)
 type "echo second-step"
 click "Save"
 settle 300

@@ -602,6 +602,14 @@ impl Oryxis {
             Space::new().height(4),
             self.snippet_hotkey_row(false),
             Space::new().height(12),
+            // The snippet bar under the terminal (issue #266): this
+            // editor sits beside it, so the switch is here too.
+            crate::widgets::toggle_row(
+                t("snippet_show_in_bar"),
+                self.vaults.cur().snippet_form.show_in_bar,
+                Message::Snippet(SnippetMessage::ToggleSnippetShowInBar),
+            ),
+            Space::new().height(12),
             text(t("snippet_actions")).size(12).color(c.text_secondary),
             Space::new().height(4),
             self.snippet_steps_editor(false),

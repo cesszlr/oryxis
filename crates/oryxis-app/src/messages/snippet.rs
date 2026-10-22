@@ -14,6 +14,16 @@ pub enum SnippetMessage {
     SnippetTagsChanged(String),
     /// Snippet editor: flip the install-script category (issue #147).
     ToggleSnippetInstall,
+    /// Snippet editor: flip "show in the snippet bar" (issue #266).
+    ToggleSnippetShowInBar,
+    /// A snippet card's menu: put the snippet on the snippet bar or take
+    /// it off, saved at once. By id: the menu outlives a reload.
+    SetSnippetShowInBar(uuid::Uuid, bool),
+    /// Snippet bar: a button's click, Run on the tab in front. By id,
+    /// resolved when it arrives, never an index baked into the view.
+    SnippetBarRun(uuid::Uuid),
+    /// Snippet bar: a button's right-click, Paste (no Enter).
+    SnippetBarPaste(uuid::Uuid),
     /// Snippets sidebar: toggle "only snippets tagged like this host".
     ToggleSnippetTagFilter,
     /// Vault Snippets: open/close the tag-filter dropdown.

@@ -421,10 +421,31 @@ impl Oryxis {
     }
 
     pub(crate) fn build_menu_snippet_actions(&self, idx: usize) -> Element<'_, Message> {
-        column![
+        // The snippet bar row names the way it goes (issue #266). Counted
+        // in `overlay_menu_height` (three rows; a snippet gone under the
+        // menu draws two, and the menu closes with the reload anyway).
+        let bar_row = self.vaults.cur().snippets.get(idx).map(|snip| {
+            let (key, icon) = if snip.show_in_bar {
+                ("snippet_bar_remove", iced_fonts::lucide::panel_bottom_close())
+            } else {
+                ("snippet_bar_add", iced_fonts::lucide::panel_bottom_open())
+            };
+            self.menu_item(
+                icon,
+                crate::i18n::t(key),
+                Message::Snippet(SnippetMessage::SetSnippetShowInBar(snip.id, !snip.show_in_bar)),
+                OryxisColors::t().text_secondary,
+            )
+        });
+        let mut items = column![
             self.menu_item(iced_fonts::lucide::pencil(), crate::i18n::t("edit"), Message::Snippet(SnippetMessage::EditSnippet(idx)), OryxisColors::t().text_secondary),
-            self.menu_item(iced_fonts::lucide::trash(), crate::i18n::t("delete"), Message::Snippet(SnippetMessage::RequestDeleteSnippet(idx)), OryxisColors::t().error),
-        ].boxed()
+        ];
+        if let Some(row) = bar_row {
+            items = items.push(row);
+        }
+        items
+            .push(self.menu_item(iced_fonts::lucide::trash(), crate::i18n::t("delete"), Message::Snippet(SnippetMessage::RequestDeleteSnippet(idx)), OryxisColors::t().error))
+            .boxed()
     }
 
     /// Kebab menu on a port-forward rule card. Edit is here even though

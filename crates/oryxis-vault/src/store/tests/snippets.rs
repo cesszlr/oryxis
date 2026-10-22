@@ -170,3 +170,17 @@ fn a_snippet_of_old_keeps_no_steps_in_the_vault() {
     assert!(back.steps.is_empty());
     assert_eq!(back.command, "ls -la");
 }
+
+#[test]
+fn snippet_bar_membership_round_trips_through_the_vault() {
+    let vault = unlocked_vault();
+    let mut snip = Snippet::new("restart", "systemctl restart nginx");
+    snip.show_in_bar = true;
+    vault.save_snippet(&snip).unwrap();
+    let back = vault.list_snippets().unwrap().into_iter().find(|s| s.id == snip.id).unwrap();
+    assert!(back.show_in_bar);
+    snip.show_in_bar = false;
+    vault.save_snippet(&snip).unwrap();
+    let back = vault.list_snippets().unwrap().into_iter().find(|s| s.id == snip.id).unwrap();
+    assert!(!back.show_in_bar, "taken off the bar stays off");
+}

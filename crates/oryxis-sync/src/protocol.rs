@@ -94,7 +94,12 @@ use uuid::Uuid;
 /// it saves writes the snippet back without its actions, and LWW carries
 /// that copy to every peer. The bump turns silent loss into the loud
 /// version reject; `SNAPSHOT_VERSION` moves 5 -> 6 in lockstep.
-pub const PROTOCOL_VERSION: u32 = 10;
+///
+/// v11 is a field again: `Snippet.show_in_bar` (the snippet bar, issue
+/// #266). A v10 peer would drop it on its next save of the snippet and
+/// LWW would carry the snippet off the bar everywhere, so the bump keeps
+/// the two apart; `SNAPSHOT_VERSION` moves 6 -> 7 in lockstep.
+pub const PROTOCOL_VERSION: u32 = 11;
 
 /// Entity types that can be synced.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, SchemaWrite, SchemaRead)]
@@ -1004,7 +1009,7 @@ mod tests {
         );
         assert_eq!(
             (EntityType::ALL.len(), PROTOCOL_VERSION),
-            (11, 10),
+            (11, 11),
             "adding an EntityType variant is a wire break: bump PROTOCOL_VERSION \
              (and SNAPSHOT_VERSION in lockstep) and update this pin"
         );

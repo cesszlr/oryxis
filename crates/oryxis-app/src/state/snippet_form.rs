@@ -35,6 +35,8 @@ pub(crate) struct SnippetForm {
     pub(crate) hotkey_capturing: bool,
     /// "Install script" category toggle (issue #147).
     pub(crate) install: bool,
+    /// "Show in the snippet bar" toggle (issue #266).
+    pub(crate) show_in_bar: bool,
     pub(crate) error: Option<String>,
 }
 
@@ -50,6 +52,7 @@ impl Default for SnippetForm {
             hotkey: None,
             hotkey_capturing: false,
             install: false,
+            show_in_bar: false,
             error: None,
         }
     }

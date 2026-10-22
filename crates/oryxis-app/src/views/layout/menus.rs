@@ -74,6 +74,8 @@ impl Oryxis {
             // "Check for updates" / "Remove downloaded files" +
             // translations on one line.
             OverlayContent::PluginActions(_) => 230.0,
+            // "Remove from snippet bar" + translations on one line.
+            OverlayContent::SnippetActions(_) => 260.0,
             OverlayContent::CloudDiscoverGroupPicker => {
                 let b = self.vaults.cur().cloud_discover.default_group_combo_bounds.get();
                 if b.width > 0.0 { b.width } else { 308.0 }
@@ -199,6 +201,8 @@ impl Oryxis {
             OverlayContent::PluginActions(_) => 3.0,
             OverlayContent::SessionGroupActions(_) => 4.0,
             OverlayContent::FolderActions(_) => 4.0,
+            // Edit, the snippet bar row, Delete.
+            OverlayContent::SnippetActions(_) => 3.0,
             // Both counted next to their builders, whose rows are
             // conditional (`split_menu_rows` / `tab_bar_menu_rows`).
             OverlayContent::SplitMenu => self.split_menu_rows(),

@@ -341,6 +341,33 @@ impl TerminalBackend {
         self.term.set_options(self.config.clone());
     }
 
+    /// Set the caret the emulator draws while the program has not asked
+    /// for one: alacritty's DEFAULT style, which DECSCUSR overrides and
+    /// `CSI 0 SP q` returns to, so the user's pick never takes a shape
+    /// away from vim or a shell that sets its own.
+    ///
+    /// No-op when unchanged, for the same reason as
+    /// [`Self::set_word_delimiters`]: the widget hands it over on every
+    /// draw, and `set_options` damages the whole grid.
+    pub fn set_default_cursor_style(
+        &mut self,
+        shape: crate::widget::TerminalCursorShape,
+        blinking: bool,
+    ) {
+        let style = alacritty_terminal::vte::ansi::CursorStyle { shape: shape.to_ansi(), blinking };
+        if self.config.default_cursor_style == style {
+            return;
+        }
+        self.config.default_cursor_style = style;
+        self.term.set_options(self.config.clone());
+    }
+
+    /// Whether the caret blinks now: the program's DECSCUSR / DECSET 12
+    /// choice when it made one, else the default style.
+    pub fn cursor_blinking(&self) -> bool {
+        self.term.cursor_style().blinking
+    }
+
     /// Feed raw bytes from PTY into the terminal emulator.
     pub fn process(&mut self, bytes: &[u8]) {
         // Strip screen's `ESC k … ST` window titles first (issue #88): the

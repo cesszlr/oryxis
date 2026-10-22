@@ -426,6 +426,8 @@ impl VaultStore {
         // Snippet actions: a JSON array, NULL for the snippet of old whose
         // one action is `command` (the column then stays the whole truth).
         let _ = self.db.execute_batch("ALTER TABLE snippets ADD COLUMN steps TEXT;");
+        // Snippet bar membership (issue #266). NULL/0 = not on the bar.
+        let _ = self.db.execute_batch("ALTER TABLE snippets ADD COLUMN show_in_bar INTEGER;");
         // Session-recording timing (asciicast export): milliseconds since
         // the log's started_at, stamped at capture time. NULL on chunks
         // recorded before this column existed (exported with a fixed

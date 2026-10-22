@@ -289,6 +289,10 @@ pub enum SettingsMessage {
     /// Flip the careful-paste guard (warn before multi-line paste).
     ToggleCarefulPaste,
     ToggleBoldIsBright,
+    /// The caret's shape changed from the settings pick (localized
+    /// "Block / Bar / Underline" label).
+    TerminalCursorShapeChanged(String),
+    ToggleTerminalCursorBlink,
     TogglePaneBorderInactive,
     /// Settings: give every pane of a split tab its own title bar
     /// (issue #208).

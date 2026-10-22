@@ -52,6 +52,10 @@ where
             // against the grid as it is NOW, so `i32::MAX` means "the very
             // top" (the transcript viewer opens there) after any reflow
             // between the queue and this draw.
+            // The user's caret, as the emulator's DEFAULT style (a program's
+            // DECSCUSR still wins). Handed over here as well as on the
+            // blink's redraw because not every frame starts with one.
+            s.backend.set_default_cursor_style(self.cursor_shape, self.cursor_blink);
             if let Some(target) = s.pending_scroll.take() {
                 s.scroll_viewport_to(target);
             }
@@ -126,6 +130,9 @@ where
                 0
             },
             search_generation,
+            cursor_shape: self.cursor_shape,
+            cursor_blink: self.cursor_blink,
+            cursor_blink_off: widget_state.cursor_blink_off,
             font: self.font,
             font_size: self.font_size,
             cell_w,
@@ -993,29 +1000,36 @@ where
             let cy = visible_cursor_row as f32 * cell_h + TERM_PAD_TOP;
             // Paint the caret shape at an arbitrary cell origin, shared by
             // the normal caret and the end of an inline IME composition.
-            let paint_cursor = |frame: &mut Frame, x: f32| match cursor.shape {
-                CursorShape::Block => {
+            // A hidden caret (the program's DECTCEM off) and the blink's
+            // off half paint nothing; the catch-all this replaced drew
+            // a dimmed block for a hidden one.
+            let caret = super::blink::caret_paint(cursor.shape, widget_state.cursor_blink_off);
+            let paint_cursor = |frame: &mut Frame, x: f32| match caret {
+                super::blink::CaretPaint::Nothing => {}
+                super::blink::CaretPaint::Block => {
                     frame.fill_rectangle(
                         Point::new(x, cy),
                         Size::new(cell_w, cell_h),
                         Color { a: 0.7, ..palette.cursor },
                     );
                 }
-                CursorShape::Beam => {
+                super::blink::CaretPaint::Bar => {
                     frame.fill_rectangle(Point::new(x, cy), Size::new(2.0, cell_h), palette.cursor);
                 }
-                CursorShape::Underline => {
+                super::blink::CaretPaint::Underline => {
                     frame.fill_rectangle(
                         Point::new(x, cy + cell_h - 2.0),
                         Size::new(cell_w, 2.0),
                         palette.cursor,
                     );
                 }
-                _ => {
-                    frame.fill_rectangle(
-                        Point::new(x, cy),
-                        Size::new(cell_w, cell_h),
-                        Color { a: 0.5, ..palette.cursor },
+                super::blink::CaretPaint::Hollow => {
+                    frame.stroke(
+                        &canvas::Path::rectangle(
+                            Point::new(x + 0.5, cy + 0.5),
+                            Size::new(cell_w - 1.0, cell_h - 1.0),
+                        ),
+                        canvas::Stroke::default().with_color(palette.cursor).with_width(1.0),
                     );
                 }
             };

@@ -138,6 +138,8 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     e(S::Terminal, "cmd_history_file", "command history text file log append export"),
     e(S::Terminal, "snippet_output_dir", "snippet save file output folder directory steps actions"),
     e(S::Terminal, "smart_contrast", "smart contrast readability colors legibility blue"),
+    e(S::Terminal, "terminal_cursor_shape", "cursor caret shape block bar beam underline line"),
+    e(S::Terminal, "terminal_cursor_blink", "cursor caret blink blinking flash"),
     e(S::Terminal, "terminal_opacity", "opacity transparency transparent translucent background see through blur glass"),
     e(S::Terminal, "terminal_bg_image", "background image picture wallpaper photo backdrop"),
     e(S::Terminal, "terminal_bg_fit", "background image fit cover contain stretch tile scale"),

@@ -419,6 +419,21 @@ impl Oryxis {
                     if self.vaults.cur().prefs.bold_is_bright { "true" } else { "false" },
                 );
             }
+            SettingsMessage::TerminalCursorShapeChanged(name) => {
+                use crate::util::CursorShapeMode;
+                if let Some(shape) = CursorShapeMode::ALL
+                    .iter()
+                    .find(|m| crate::i18n::t(m.label_key()) == name)
+                {
+                    self.vaults.cur_mut().prefs.terminal_cursor_shape = *shape;
+                    self.persist_setting("terminal_cursor_shape", shape.code());
+                }
+            }
+            SettingsMessage::ToggleTerminalCursorBlink => {
+                let blink = !self.vaults.cur().prefs.terminal_cursor_blink;
+                self.vaults.cur_mut().prefs.terminal_cursor_blink = blink;
+                self.persist_setting("terminal_cursor_blink", if blink { "true" } else { "false" });
+            }
             SettingsMessage::TerminalOpacityChanged(v) => {
                 let percent = v
                     .trim_end_matches('%')

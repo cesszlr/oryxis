@@ -785,6 +785,20 @@ self.keynav_ring_content(kb_selected, card_el)
                 ),
             ),
             Space::new().height(14),
+            // A button in the snippet bar under the terminal (issue #266).
+            self.panel_nav_slot(
+                crate::keynav::RowAction::activate(Message::Snippet(
+                    SnippetMessage::ToggleSnippetShowInBar,
+                )),
+                10.0,
+                crate::widgets::toggle_row_desc(
+                    t("snippet_show_in_bar"),
+                    t("snippet_show_in_bar_desc"),
+                    self.vaults.cur().snippet_form.show_in_bar,
+                    Message::Snippet(SnippetMessage::ToggleSnippetShowInBar),
+                ),
+            ),
+            Space::new().height(14),
             text(t("snippet_actions")).size(12).color(OryxisColors::t().text_secondary),
             Space::new().height(4),
             // One card per action; a single command reads like the

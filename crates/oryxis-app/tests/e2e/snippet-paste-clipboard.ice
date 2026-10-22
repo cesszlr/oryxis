@@ -1,4 +1,4 @@
-viewport: 1200x750
+viewport: 1200x812
 mode: Zen
 -----
 # A snippet's paste step reads the clipboard when it runs. With "Confirm
@@ -29,7 +29,7 @@ settle
 # text_input's value is not text-selectable.
 click (990.00, 145.00)
 type "paste it"
-click (957.00, 504.00)
+click (957.00, 566.00)
 settle 250
 click "Paste clipboard and run"
 settle 250
@@ -37,7 +37,7 @@ expect "Confirm before pasting"
 click "Add action"
 settle 250
 # The second row's kind picker.
-click (957.00, 651.00)
+click (957.00, 713.00)
 settle 250
 click "Wait for the command to finish"
 settle 250
@@ -48,7 +48,7 @@ settle 250
 scroll (0, -400)
 settle 250
 # The third row's kind picker.
-click (957.00, 536.00)
+click (957.00, 598.00)
 settle 250
 click "App action"
 settle 250
@@ -65,12 +65,12 @@ click "SNIPPET"
 settle
 click (990.00, 145.00)
 type "waits"
-click (957.00, 504.00)
+click (957.00, 566.00)
 settle 250
 click "Wait for output"
 settle 250
 # The pattern field.
-click (990.00, 550.00)
+click (990.00, 612.00)
 type "never-appears-in-output"
 click "Save"
 settle 300
@@ -79,17 +79,17 @@ click "SNIPPET"
 settle
 click (990.00, 145.00)
 type "paste late"
-click (957.00, 504.00)
+click (957.00, 566.00)
 settle 250
 click "Wait"
 settle 250
 # The seconds field.
-click (990.00, 570.00)
+click (990.00, 632.00)
 type ctrl+a
 type "3"
 click "Add action"
 settle 250
-click (957.00, 636.00)
+click (957.00, 698.00)
 settle 250
 click "Run another snippet"
 settle 250
@@ -98,7 +98,7 @@ settle 250
 click "Pick a snippet"
 settle 250
 # The picker's first option, "paste it".
-click (990.00, 506.00)
+click (990.00, 568.00)
 settle 250
 click "Save"
 settle 300

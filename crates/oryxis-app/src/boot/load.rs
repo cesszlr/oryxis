@@ -633,6 +633,12 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("bold_is_bright") {
                 ov.prefs.bold_is_bright = v == "true";
             }
+            if let Ok(Some(v)) = vault.get_setting("terminal_cursor_shape") {
+                ov.prefs.terminal_cursor_shape = crate::util::CursorShapeMode::from_code(&v);
+            }
+            if let Ok(Some(v)) = vault.get_setting("terminal_cursor_blink") {
+                ov.prefs.terminal_cursor_blink = v == "true";
+            }
             if let Ok(Some(v)) = vault.get_setting("pane_border_inactive") {
                 ov.prefs.pane_border_inactive = v == "true";
             }

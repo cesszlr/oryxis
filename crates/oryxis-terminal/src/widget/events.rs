@@ -475,6 +475,13 @@ where
             widget_state.ever_focused = true;
         }
 
+        // The caret's blink (`widget/blink.rs`): the redraw the runtime
+        // was asked for, the window's focus, and the keys that restart
+        // the run. The window events end here, nothing below reads them.
+        if let Some(result) = self.on_cursor_blink(widget_state, event) {
+            return result;
+        }
+
         // Presses inside a resize strip belong to whatever contains this
         // pane, not to the terminal: they are how a `pane_grid` divider is
         // grabbed. Declining here (rather than handling and forwarding) is

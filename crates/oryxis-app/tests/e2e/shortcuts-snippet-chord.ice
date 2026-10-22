@@ -19,7 +19,7 @@ settle
 # text-selectable.
 click (990.00, 145.00)
 type "deploy"
-click (990.00, 550.00)
+click (990.00, 612.00)
 type "echo deploy"
 click "Record"
 settle 250

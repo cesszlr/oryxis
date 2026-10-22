@@ -485,6 +485,55 @@ impl RightClickMode {
     }
 }
 
+/// The terminal caret's shape while the program in the pane has not
+/// picked one (Settings > Terminal). Persisted as `code()` in
+/// `terminal_cursor_shape`; a program's DECSCUSR still wins, see
+/// `oryxis_terminal::TerminalCursorShape`.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub(crate) enum CursorShapeMode {
+    #[default]
+    Block,
+    Bar,
+    Underline,
+}
+
+impl CursorShapeMode {
+    pub(crate) const ALL: [CursorShapeMode; 3] =
+        [CursorShapeMode::Block, CursorShapeMode::Bar, CursorShapeMode::Underline];
+
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            CursorShapeMode::Block => "block",
+            CursorShapeMode::Bar => "bar",
+            CursorShapeMode::Underline => "underline",
+        }
+    }
+
+    pub(crate) fn from_code(code: &str) -> Self {
+        match code {
+            "bar" => CursorShapeMode::Bar,
+            "underline" => CursorShapeMode::Underline,
+            _ => CursorShapeMode::Block,
+        }
+    }
+
+    pub(crate) fn label_key(self) -> &'static str {
+        match self {
+            CursorShapeMode::Block => "cursor_shape_block",
+            CursorShapeMode::Bar => "cursor_shape_bar",
+            CursorShapeMode::Underline => "cursor_shape_underline",
+        }
+    }
+
+    pub(crate) fn to_widget(self) -> oryxis_terminal::TerminalCursorShape {
+        match self {
+            CursorShapeMode::Block => oryxis_terminal::TerminalCursorShape::Block,
+            CursorShapeMode::Bar => oryxis_terminal::TerminalCursorShape::Bar,
+            CursorShapeMode::Underline => oryxis_terminal::TerminalCursorShape::Underline,
+        }
+    }
+}
+
 /// How terminal teaching hints (the "hold Shift to select" mouse-capture
 /// toast, the "hold Ctrl and click" link toast) are surfaced. Default
 /// `Once`: each hint shows a single time per terminal pane, enough to teach

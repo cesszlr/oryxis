@@ -828,3 +828,17 @@ fn snippet_steps_survive_export_and_import() {
     assert_eq!(got[0].steps, snip.steps);
     assert_eq!(got[0].command, "uptime");
 }
+
+#[test]
+fn snippet_bar_membership_survives_export_and_import() {
+    let vault = unlocked_vault_with("alpha");
+    let mut snip = Snippet::new("restart", "systemctl restart nginx");
+    snip.show_in_bar = true;
+    vault.save_snippet(&snip).unwrap();
+    let data = export_vault(&vault, "export-pw", all_options()).unwrap();
+    let target = unlocked_vault_with("bravo");
+    import_vault(&target, &data, "export-pw", &ExportSelection::all(), None).unwrap();
+    let got = target.list_snippets().unwrap();
+    assert_eq!(got.len(), 1);
+    assert!(got[0].show_in_bar);
+}
