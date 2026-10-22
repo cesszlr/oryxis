@@ -349,9 +349,17 @@ pub(crate) fn key_to_named_bytes(
     let bytes: Vec<u8> = match named {
         Named::Enter => b"\r".to_vec(),
         // Backspace encoding is per-host (PuTTY Control-? vs Control-H);
-        // Ctrl+Backspace sends the flipped code. DEFAULT (`Del127`) keeps
-        // plain Backspace = DEL (0x7f), today's behaviour.
-        Named::Backspace => vec![quirks.backspace.byte(modifiers.control())],
+        // Ctrl+Backspace sends the flipped code. Alt+Backspace prefixes
+        // with ESC (0x1b) for readline's backward-kill-word. DEFAULT
+        // (`Del127`) keeps plain Backspace = DEL (0x7f), today's behaviour.
+        Named::Backspace => {
+            let byte = quirks.backspace.byte(modifiers.control());
+            if modifiers.alt() {
+                vec![0x1b, byte]
+            } else {
+                vec![byte]
+            }
+        }
         // Shift+Tab is back-tab (CBT); plain Tab stays HT.
         Named::Tab if modifiers.shift() => b"\x1b[Z".to_vec(),
         Named::Tab => b"\t".to_vec(),
@@ -821,6 +829,18 @@ mod tests {
         let ctrl_h = TerminalQuirks { backspace: BackspaceMode::CtrlH, ..Default::default() };
         assert_eq!(nq(Named::Backspace, Modifiers::empty(), false, &ctrl_h), b"\x08");
         assert_eq!(nq(Named::Backspace, Modifiers::CTRL, false, &ctrl_h), b"\x7f");
+        // Alt+Backspace sends ESC + BS/DEL for readline's backward-kill-word.
+        assert_eq!(nb(Named::Backspace, Modifiers::ALT, false), b"\x1b\x7f");
+        assert_eq!(nq(Named::Backspace, Modifiers::ALT, false, &ctrl_h), b"\x1b\x08");
+        // Ctrl+Alt+Backspace sends ESC + flipped code.
+        assert_eq!(
+            nb(Named::Backspace, Modifiers::CTRL.union(Modifiers::ALT), false),
+            b"\x1b\x08"
+        );
+        assert_eq!(
+            nq(Named::Backspace, Modifiers::CTRL.union(Modifiers::ALT), false, &ctrl_h),
+            b"\x1b\x7f"
+        );
     }
 
     #[test]
