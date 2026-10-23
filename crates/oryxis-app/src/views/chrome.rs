@@ -35,9 +35,11 @@ pub(crate) const NATIVE_FRAME: bool = cfg!(target_os = "macos");
 /// Physical because AppKit never moves them for a right-to-left layout.
 pub(crate) const TRAFFIC_LIGHT_INSET: f32 = 78.0;
 
-/// Height of a standard AppKit title bar. With the content running
-/// underneath it, its vertical centre is where the traffic lights sit.
-pub(crate) const MACOS_TITLE_BAR_HEIGHT: f32 = 28.0;
+/// Height of the AppKit title bar under the unified compact toolbar style
+/// (`NSWindowToolbarStyleUnifiedCompact`). With the content running
+/// underneath it, its vertical centre (y = 20.0 in the 40.0 pt bar) is
+/// where the traffic lights sit, matching `BAR_HEIGHT`.
+pub(crate) const MACOS_TITLE_BAR_HEIGHT: f32 = 40.0;
 
 /// The traffic-light corner of a bar: an empty drag area, since the
 /// buttons AppKit draws over it take their own clicks and the rest of the
