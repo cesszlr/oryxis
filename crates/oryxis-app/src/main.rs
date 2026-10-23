@@ -134,7 +134,6 @@ mod ansi_render;
 mod session_group_helpers;
 mod palette;
 mod paste_guard;
-mod platform_macos;
 mod settings_index;
 mod remote_desktop;
 mod session_redact;
@@ -875,6 +874,17 @@ fn main() -> iced::Result {
                 title_hidden: true,
                 titlebar_transparent: true,
                 fullsize_content_view: true,
+                // AppKit would turn a press on the content under the
+                // title bar into a window drag before we see it, and a
+                // tab dragged along the strip would take the window with
+                // it (PR #267). Every press is ours; the empty stretches
+                // of the bars move the window themselves (`WindowDrag`).
+                mouse_down_can_move_window: false,
+                // The compact toolbar style makes AppKit's title bar as
+                // tall as our bar (`MACOS_TITLE_BAR_HEIGHT`), so the
+                // traffic lights sit on its centre line. Its empty
+                // toolbar hides with the menu bar in native fullscreen.
+                unified_titlebar_compact: true,
             },
             ..Default::default()
         });
@@ -886,11 +896,6 @@ fn main() -> iced::Result {
     if let Some(options) = harness_options {
         return harness::run(application, options);
     }
-
-    // Prevent AppKit from automatically dragging the window when clicking/dragging
-    // on views (such as tabs) in the transparent title bar area.
-    #[cfg(target_os = "macos")]
-    platform_macos::disable_view_window_dragging();
 
     application.run()
 }
