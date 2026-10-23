@@ -29,15 +29,21 @@ use crate::theme::OryxisColors;
 /// Everywhere else the window is undecorated and the chrome is ours.
 pub(crate) const NATIVE_FRAME: bool = cfg!(target_os = "macos");
 
-/// Width reserved at the PHYSICAL left of a bar for the traffic lights
-/// (three 14 pt buttons from x = 7 with 6 pt gaps is ~61 pt, plus the
-/// breathing room AppKit's own toolbars leave before the first item).
-/// Physical because AppKit never moves them for a right-to-left layout.
+/// Width reserved at the PHYSICAL left of a bar for the traffic lights,
+/// plus the breathing room AppKit's own toolbars leave before the first
+/// item. Under the compact toolbar style they span x = 11 to 71 pt
+/// (macOS 26, read off the screenshots of PR #267; 7 to 66 pt without a
+/// toolbar). Physical because AppKit never moves them for a
+/// right-to-left layout.
 pub(crate) const TRAFFIC_LIGHT_INSET: f32 = 78.0;
 
-/// Height of a standard AppKit title bar. With the content running
-/// underneath it, its vertical centre is where the traffic lights sit.
-pub(crate) const MACOS_TITLE_BAR_HEIGHT: f32 = 28.0;
+/// Height of AppKit's title bar under the compact toolbar style
+/// (`unified_titlebar_compact`, `main.rs`), the same as our bar's
+/// `BAR_HEIGHT`. With the content running underneath it, its vertical
+/// centre is where the traffic lights sit: 20 pt down, read off the
+/// screenshots of PR #267 (a plain title bar is 28 pt and left them about
+/// 6 pt above the centre of ours).
+pub(crate) const MACOS_TITLE_BAR_HEIGHT: f32 = 40.0;
 
 /// The traffic-light corner of a bar: an empty drag area, since the
 /// buttons AppKit draws over it take their own clicks and the rest of the
