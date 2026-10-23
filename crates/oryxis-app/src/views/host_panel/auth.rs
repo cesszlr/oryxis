@@ -127,7 +127,13 @@ impl Oryxis {
                     // fragment, and this String is frame-local. The
                     // selection stays a borrow (cloned by the widget).
                     key_selected.clone(),
-                    Some(&key_selected),
+                    // No key is NO selection, never the "(none)" row as
+                    // one: the label is the placeholder, so the box reads
+                    // empty and a click opens on every key. As a selection
+                    // it was text in the input, and any rebuild of the
+                    // combo's state (a new version) wrote it back into an
+                    // OPEN box and filtered the list down to "(none)".
+                    self.vaults.cur().editor_form.selected_key.as_ref(),
                     |v| Message::Editor(EditorMessage::EditorKeyChanged(v)),
                 )
                 .on_open(Message::Editor(EditorMessage::EditorKeyComboOpened))

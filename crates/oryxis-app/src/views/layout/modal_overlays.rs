@@ -160,16 +160,16 @@ impl Oryxis {
                     .size(12)
                     .color(OryxisColors::t().text_secondary),
                 Space::new().height(4),
-                // Wrap the combo row in `bounds_reporter` so the
+                // Wrap the combo row in `anchor_reporter` so the
                 // toggle handler can read its on-screen rect and
                 // anchor the picker overlay right below it. The
                 // cell lives on Oryxis state; the wrapper here
-                // just writes to it on every draw pass. Wrapping
+                // just writes to it on every update. Wrapping
                 // the whole row (input + chevron) means the menu
                 // can mirror the full combo width by default,
                 // covering the empty area between the input and
                 // the chevron edge.
-                crate::widgets::bounds_reporter(
+                crate::widgets::anchor_reporter(
                     dir_row(vec![
                         container(group_input)
                             .width(Length::Fill)
@@ -283,7 +283,7 @@ impl Oryxis {
         {
             let menu = self.render_overlay_menu(ovl);
             // Width matches the combo's measured width from the
-            // bounds_reporter (falls back to 308 on the very
+            // anchor_reporter (falls back to 308 on the very
             // first open when the cell is still zeroed). Height
             // clamp keeps tall menus on-screen.
             let combo = self.vaults.cur().cloud_discover.default_group_combo_bounds.get();

@@ -62,9 +62,9 @@ impl Oryxis {
                 if self.vaults.cur().cloud_discover.default_group_picker_open {
                     self.vaults.cur_mut().cloud_discover.default_group_picker_search.clear();
                     // Anchor the menu off the live combo bounds
-                    // captured by the `bounds_reporter` wrapping the
+                    // captured by the `anchor_reporter` wrapping the
                     // Import-into row. `BoundsCell` value is the
-                    // last-rendered screen-space rect of the combo
+                    // screen-space rect (scroll applied) of the combo
                     // (input + chevron). Menu's top sits 6 px below
                     // the combo's bottom; left edge matches combo
                     // left so the dropdown visually replaces the
@@ -78,6 +78,10 @@ impl Oryxis {
                         x,
                         y,
                     });
+                    // A search picker: the keys go to its filter at once.
+                    return Ok(crate::widgets::focus_input(iced::widget::Id::new(
+                        crate::state::CLOUD_GROUP_PICKER_SEARCH_ID,
+                    )));
                 } else if matches!(
                     self.overlay.as_ref().map(|o| &o.content),
                     Some(crate::state::OverlayContent::CloudDiscoverGroupPicker)
@@ -87,6 +91,8 @@ impl Oryxis {
             }
             CloudMessage::CloudDiscoverDefaultGroupPickerSearchChanged(v) => {
                 self.vaults.cur_mut().cloud_discover.default_group_picker_search = v;
+                // A new query is a new list: see `PaletteQueryChanged`.
+                self.keynav.modal.selected = None;
             }
             // The parent routed us here, so a message that is not
             // in this family is a grouping mistake. Hand it back

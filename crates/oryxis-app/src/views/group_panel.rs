@@ -152,7 +152,7 @@ impl Oryxis {
             })
             .boxed(),
         );
-        let parent_combo: Element<'_, Message> = crate::widgets::bounds_reporter(
+        let parent_combo: Element<'_, Message> = crate::widgets::anchor_reporter(
             dir_row(vec![
                 container(parent_input)
                     .width(Length::Fill)

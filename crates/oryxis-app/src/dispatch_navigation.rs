@@ -381,10 +381,16 @@ impl Oryxis {
                             self.cur_mouse().y + 26.0
                         },
                     });
+                    // A search picker: the keys go to its filter at once.
+                    return crate::widgets::focus_input(iced::widget::Id::new(
+                        crate::state::GROUP_PICKER_SEARCH_ID,
+                    ));
                 }
             }
             NavigationMessage::GroupPickerSearchChanged(v) => {
                 self.vaults.cur_mut().group_picker_search = v;
+                // A new query is a new list: see `PaletteQueryChanged`.
+                self.keynav.modal.selected = None;
             }
             NavigationMessage::GroupPickerPick(target, label) => {
                 use crate::state::{GroupPickerTarget, OverlayContent};

@@ -787,6 +787,7 @@ impl Oryxis {
             crate::i18n::t("search_groups"),
             &self.vaults.cur().cloud_discover.default_group_picker_search,
         )
+        .id(iced::widget::Id::new(crate::state::CLOUD_GROUP_PICKER_SEARCH_ID))
         .on_input(
             |v| Message::Cloud(CloudMessage::CloudDiscoverDefaultGroupPickerSearchChanged(v)),
         )
@@ -952,6 +953,7 @@ impl Oryxis {
             crate::i18n::t("search_groups"),
             &self.vaults.cur().group_picker_search,
         )
+        .id(iced::widget::Id::new(crate::state::GROUP_PICKER_SEARCH_ID))
         .on_input(|v| Message::Navigation(NavigationMessage::GroupPickerSearchChanged(v)))
         .padding(8)
         .width(Length::Fixed(menu_content_width))

@@ -56,6 +56,17 @@ impl Oryxis {
         .style(crate::widgets::rounded_input_style)
         .align_x(dir_align_x())
         .boxed();
+        // The field's keyboard row is recorded BEFORE the clear button's
+        // (the password field's eye, same order): the clear row comes and
+        // goes with the value, and recorded first it slid in at the
+        // field's own index on the first letter typed, so the selection
+        // that named the field moved onto the × and its reveal scrolled
+        // the drawer under the caret.
+        let parent_input = self.panel_nav_slot(
+            crate::keynav::RowAction::input(iced::widget::Id::new("editor-parent-group")),
+            10.0,
+            parent_input,
+        );
 
         // The clear (×) empties the field in one click: the explicit
         // "remove from group" the user asked for, since a cleared field
@@ -105,15 +116,11 @@ impl Oryxis {
             .align_x(clear_align)
             .align_y(iced::alignment::Vertical::Center)
             .padding(clear_pad);
-        let input_with_clear: Element<'_, Message> = self.panel_nav_slot(
-            crate::keynav::RowAction::input(iced::widget::Id::new("editor-parent-group")),
-            10.0,
-            iced::widget::Stack::<iced::Element<'_, _>>::new()
-                .push(parent_input)
-                .push(clear_overlay.boxed())
-                .width(Length::Fill)
-                .boxed(),
-        );
+        let input_with_clear: Element<'_, Message> = iced::widget::Stack::<iced::Element<'_, _>>::new()
+            .push(parent_input)
+            .push(clear_overlay.boxed())
+            .width(Length::Fill)
+            .boxed();
 
         // The chevron is its own keyboard row: Enter opens the picker,
         // same as a click.
@@ -151,7 +158,7 @@ impl Oryxis {
             })
             .boxed(),
         );
-        crate::widgets::bounds_reporter(
+        crate::widgets::anchor_reporter(
             dir_row(vec![
                 container(input_with_clear)
                     .width(Length::Fill)

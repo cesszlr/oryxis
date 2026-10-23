@@ -17,7 +17,7 @@ use crate::app::{NavigationMessage, SessionGroupMessage, Message, Oryxis};
 use crate::i18n::t;
 use crate::os_icon::BrandIcon;
 use crate::theme::OryxisColors;
-use crate::widgets::{bounds_reporter, dir_align_x, dir_row, panel_field, panel_section};
+use crate::widgets::{anchor_reporter, dir_align_x, dir_row, panel_field, panel_section};
 
 /// A pressable element built on `MouseArea` (see module docs for why not
 /// `button`). The pointer cursor matches the rest of the chrome.
@@ -113,7 +113,7 @@ impl Oryxis {
             }).boxed(),
             Message::Navigation(NavigationMessage::ToggleGroupPicker(crate::state::GroupPickerTarget::SessionGroupFolder)),
         );
-        let folder_combo: Element<'_, Message> = bounds_reporter(
+        let folder_combo: Element<'_, Message> = anchor_reporter(
             dir_row(vec![
                 self.panel_nav_slot(
                     crate::keynav::RowAction::input(iced::widget::Id::new(

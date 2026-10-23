@@ -16,8 +16,10 @@ pub(crate) fn new_bounds_cell() -> BoundsCell {
     )))
 }
 
-/// Wraps `content` and writes the laid-out screen-space bounds to
-/// `cell` on every `draw` pass. Lets other code (typically context-
+/// Wraps `content` and writes the laid-out bounds to `cell` on every
+/// `draw` pass. They are the screen rect only outside any scrollable:
+/// under one they are content-space, off by its scroll offset (a
+/// popover anchor under a scrolled panel takes [`anchor_reporter`]). Lets other code (typically context-
 /// menu anchor logic) read the widget's on-screen rect synchronously
 /// instead of going through the async `Operation` round-trip. Cell
 /// value reflects the LAST rendered frame, which is what every
@@ -28,6 +30,43 @@ pub(crate) fn bounds_reporter<'a, Message: 'a>(
     content: impl Into<Element<'a, Message>>,
     cell: BoundsCell,
 ) -> Element<'a, Message> {
+    reporter(content, cell, ReportAt::Draw)
+}
+
+/// [`bounds_reporter`] for a popover ANCHOR: writes the rect the user
+/// SEES, with every ancestor scrollable's offset applied.
+///
+/// `draw` cannot give that rect: it receives content-space bounds while
+/// the scroll translation lives in the renderer (see
+/// [`press_hit_reporter`]), so a dropdown anchored there under a
+/// scrolled panel opened lower by exactly the scroll offset. `overlay`
+/// is the one pass that is handed the accumulated translation (each
+/// scrollable subtracts its own offset on the way down), and the
+/// runtime walks it at the start of EVERY update, so the cell is
+/// current before the click that reads it is handled. The cell stays
+/// zeroed until the first update reaches the widget; the anchor sites
+/// fall back to the cursor for that case.
+pub(crate) fn anchor_reporter<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    cell: BoundsCell,
+) -> Element<'a, Message> {
+    reporter(content, cell, ReportAt::Overlay)
+}
+
+/// Which pass of [`reporter`] writes the cell.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReportAt {
+    /// Content-space bounds, every frame.
+    Draw,
+    /// Screen-space bounds (scroll applied), every update.
+    Overlay,
+}
+
+fn reporter<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+    cell: BoundsCell,
+    at: ReportAt,
+) -> Element<'a, Message> {
     use iced::advanced::widget::{tree, Operation, Tree, Widget};
     use iced::advanced::{layout, mouse, overlay, renderer, Layout, Shell};
     use iced::{Event, Length as L, Rectangle, Size, Vector};
@@ -35,6 +74,7 @@ pub(crate) fn bounds_reporter<'a, Message: 'a>(
     struct BoundsReporter<'a, Message> {
         content: Element<'a, Message>,
         cell: BoundsCell,
+        at: ReportAt,
     }
 
     impl<Message> iced::advanced::widget::Meta for BoundsReporter<'_, Message> {}
@@ -71,11 +111,11 @@ pub(crate) fn bounds_reporter<'a, Message: 'a>(
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            // Draw runs after final positioning, so `layout.bounds()`
-            // here is the screen-space rect (offset by parent
-            // translations). Cache it so anchor lookups in `update`
-            // hit the correct on-screen coordinates.
-            self.cell.set(layout.bounds());
+            // Content-space: a scrollable ancestor's offset lives in
+            // the renderer's transform, not in `layout`.
+            if self.at == ReportAt::Draw {
+                self.cell.set(layout.bounds());
+            }
             self.content
                 .draw(tree, renderer, theme, style, layout, cursor, viewport);
         }
@@ -124,6 +164,9 @@ pub(crate) fn bounds_reporter<'a, Message: 'a>(
             translation: Vector,
             window: Size,
         ) -> Vec<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+            if self.at == ReportAt::Overlay {
+                self.cell.set(layout.bounds() + translation);
+            }
             self.content.overlay(
                 tree,
                 layout,
@@ -138,6 +181,7 @@ pub(crate) fn bounds_reporter<'a, Message: 'a>(
     BoundsReporter {
         content: content.into(),
         cell,
+        at,
     }.boxed()
 }
 

@@ -502,6 +502,14 @@ pub(crate) const NEW_TAB_PICKER_SEARCH_ID: &str = "new-tab-picker-search";
 /// the first keystroke.
 pub(crate) const TAB_JUMP_SEARCH_ID: &str = "tab-jump-search";
 
+/// Widget id of the group picker popover's search input (every
+/// `GroupPickerTarget`), same contract: opening it from a combo's
+/// chevron lands focus here, so typing filters at once.
+pub(crate) const GROUP_PICKER_SEARCH_ID: &str = "group-picker-search";
+
+/// The cloud import dialog's group picker search, same contract.
+pub(crate) const CLOUD_GROUP_PICKER_SEARCH_ID: &str = "cloud-group-picker-search";
+
 /// Internal message type for SSH connection streams.
 pub(crate) enum SshStreamMsg {
     Progress(ConnectionStep, String), // (step, log message)
