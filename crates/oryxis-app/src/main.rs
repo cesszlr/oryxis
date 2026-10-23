@@ -134,6 +134,7 @@ mod ansi_render;
 mod session_group_helpers;
 mod palette;
 mod paste_guard;
+mod platform_macos;
 mod settings_index;
 mod remote_desktop;
 mod session_redact;
@@ -885,6 +886,11 @@ fn main() -> iced::Result {
     if let Some(options) = harness_options {
         return harness::run(application, options);
     }
+
+    // Prevent AppKit from automatically dragging the window when clicking/dragging
+    // on views (such as tabs) in the transparent title bar area.
+    #[cfg(target_os = "macos")]
+    platform_macos::disable_view_window_dragging();
 
     application.run()
 }

@@ -621,6 +621,8 @@ impl Oryxis {
         if let Some(settings) = crate::app::WINDOW_SETTINGS.get() {
             let (id, open) = iced::window::open(settings.clone());
             crate::app::set_resident_window(id);
+            #[cfg(target_os = "macos")]
+            crate::platform_macos::disable_view_window_dragging();
             tasks.insert(0, open.discard());
         }
         // The app's own fetches (release lookup, the CJK face the
