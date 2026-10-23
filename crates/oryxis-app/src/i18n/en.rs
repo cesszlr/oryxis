@@ -2346,7 +2346,7 @@ pub(super) fn lookup(key: &str) -> &'static str {
         "plugins" => "Plugins",
         "features_and_plugins" => "Features & Plugins",
         "update_replace_failed" => "Couldn't replace the running app automatically. Open the release page to update manually.",
-        "update_close_other_windows" => "Close the other Oryxis windows and try again. The update can't replace the app while another window is running.",
+        "update_quit_other_instances" => "Another Oryxis process is still running this app, maybe hidden in the system tray (closing its window only hides it there). Quit it from the tray icon, then try again.",
         "features" => "Features",
         "feature_ai_desc" => "In-terminal AI chat that can run commands on the connected server.",
         "feature_sftp_desc" => "Browse and transfer files over SSH with a dual-pane manager.",

@@ -2234,7 +2234,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "plugins" => "Eklentiler",
         "features_and_plugins" => "Özellikler ve eklentiler",
         "update_replace_failed" => "Çalışan uygulama otomatik olarak değiştirilemedi. Elle güncellemek için sürüm sayfasını açın.",
-        "update_close_other_windows" => "Diğer Oryxis pencerelerini kapatıp yeniden deneyin. Başka bir pencere açıkken güncelleme uygulamayı değiştiremez.",
+        "update_quit_other_instances" => "Başka bir Oryxis işlemi bu uygulamayı hâlâ çalıştırıyor, belki sistem tepsisinde gizli (penceresini kapatmak onu yalnızca oraya gizler). Tepsi simgesinden kapatın, ardından yeniden deneyin.",
         "features" => "Özellikler",
         "feature_ai_desc" => "Bağlı sunucuda komut çalıştırabilen terminal içi yapay zeka sohbeti.",
         "feature_sftp_desc" => "Çift bölmeli yöneticiyle SSH üzerinden dosya gezin ve aktar.",

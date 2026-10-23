@@ -2142,7 +2142,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "plugins" => "外掛程式",
         "features_and_plugins" => "功能與外掛程式",
         "update_replace_failed" => "無法自動取代執行中的應用程式。請開啟發佈頁面手動更新。",
-        "update_close_other_windows" => "請關閉其他 Oryxis 視窗後再試一次。只要還有其他視窗在執行，更新就無法替換應用程式。",
+        "update_quit_other_instances" => "另一個 Oryxis 程序仍在執行此應用程式，可能隱藏在系統匣中（關閉它的視窗只會把它藏到系統匣）。請從系統匣圖示結束它，然後再試一次。",
         "features" => "功能",
         "feature_ai_desc" => "終端機內的 AI 聊天，可在已連線的伺服器上執行指令。",
         "feature_sftp_desc" => "透過 SSH 用雙面板管理器瀏覽和傳輸檔案。",

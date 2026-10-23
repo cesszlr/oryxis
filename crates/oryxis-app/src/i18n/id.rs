@@ -2234,7 +2234,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "plugins" => "Plugin",
         "features_and_plugins" => "Fitur & plugin",
         "update_replace_failed" => "Tidak dapat mengganti aplikasi yang sedang berjalan secara otomatis. Buka halaman rilis untuk memperbarui secara manual.",
-        "update_close_other_windows" => "Tutup jendela Oryxis lainnya lalu coba lagi. Pembaruan tidak dapat mengganti aplikasi selama jendela lain masih berjalan.",
+        "update_quit_other_instances" => "Proses Oryxis lain masih menjalankan aplikasi ini, mungkin tersembunyi di baki sistem (menutup jendelanya hanya menyembunyikannya di sana). Keluarkan dari ikon baki, lalu coba lagi.",
         "features" => "Fitur",
         "feature_ai_desc" => "Obrolan AI dalam terminal yang dapat menjalankan perintah di server yang terhubung.",
         "feature_sftp_desc" => "Jelajahi dan transfer berkas lewat SSH dengan pengelola dua panel.",

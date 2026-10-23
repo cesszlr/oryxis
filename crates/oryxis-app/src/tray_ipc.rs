@@ -140,9 +140,12 @@ fn write_atomic(path: &PathBuf, bytes: &[u8]) -> std::io::Result<()> {
     fs::rename(&tmp, path)
 }
 
-/// Child-side API. The current process announces itself, updates
-/// its state on window events, polls for commands, and unregisters
-/// on shutdown.
+/// Per-process API (every process, the primary included, since deep
+/// links). The current process announces itself, updates its state on
+/// window events and polls for commands. Nothing removes its row while
+/// it runs: a row is how a launcher finds a live instance to forward
+/// to. A row outlives its process until a scan's liveness check
+/// (`is_live_oryxis`) sweeps it.
 pub struct Child;
 
 impl Child {
@@ -155,8 +158,8 @@ impl Child {
     }
 
     /// Write the initial instance file with the given title (and
-    /// an empty tabs list, `is_hidden = false`). Called once at
-    /// child boot after we detect we're not the primary.
+    /// an empty tabs list, `is_hidden = false`). Called once at boot,
+    /// whatever the role.
     pub fn register(title: impl Into<String>) {
         Self::write_state(InstanceState {
             pid: current_pid(),
@@ -179,16 +182,6 @@ impl Child {
         };
         if let Err(e) = write_atomic(&path, &bytes) {
             tracing::warn!("tray_ipc: write {:?}: {e}", path);
-        }
-    }
-
-    /// Remove the instance file. Best-effort: the primary's sweep
-    /// will eventually clean it up via the PID-liveness check, but
-    /// calling this on graceful shutdown shaves a tick of staleness
-    /// off the user-facing menu.
-    pub fn unregister() {
-        if let Some(path) = Self::instance_path() {
-            let _ = fs::remove_file(path);
         }
     }
 
@@ -511,6 +504,83 @@ pub(crate) fn is_live_oryxis(pid: u32) -> bool {
     }
     let image = std::ffi::OsString::from_wide(&image[..len as usize]);
     same_image(std::path::Path::new(&image), &own_image_stem())
+}
+
+/// How many OTHER processes run this very executable file, by its full
+/// path. Asked by the in-place update before it hands the swap to its
+/// helper: Windows refuses to replace an image any process still runs,
+/// so a sibling the swap cannot see ends in "Access is denied" and a
+/// relaunch of the old build. The registry above cannot answer this:
+/// it holds what processes chose to write (a row can be missing, and a
+/// row of a copy installed elsewhere locks nothing here), while the
+/// process table is what the file lock actually follows.
+///
+/// The stem filter keeps the canonicalize (a file open) to the few
+/// candidates; the full-path comparison then leaves out a portable
+/// copy in another folder. A process this user cannot query (another
+/// user's session) is not counted: none of it is readable from here.
+#[cfg(target_os = "windows")]
+pub(crate) fn other_processes_on_own_image() -> usize {
+    use std::os::windows::ffi::OsStringExt as _;
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::ProcessStatus::K32EnumProcesses;
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    let Ok(own) = std::env::current_exe().and_then(std::fs::canonicalize) else {
+        return 0;
+    };
+    let own_stem = own_image_stem();
+    // The table can grow between the size probe and the read: retry
+    // with a larger buffer while the answer fills it whole.
+    let mut pids: Vec<u32> = vec![0; 1024];
+    let count = loop {
+        let cb = (pids.len() * std::mem::size_of::<u32>()) as u32;
+        let mut needed = 0u32;
+        // SAFETY: the buffer is `cb` bytes of writable u32s and
+        // `needed` receives the byte count written.
+        if unsafe { K32EnumProcesses(pids.as_mut_ptr(), cb, &mut needed) } == 0 {
+            return 0;
+        }
+        if needed < cb {
+            break needed as usize / std::mem::size_of::<u32>();
+        }
+        pids.resize(pids.len() * 2, 0);
+    };
+    let self_pid = current_pid();
+    let mut image = vec![0u16; 32_768];
+    pids[..count]
+        .iter()
+        .filter(|&&pid| pid != 0 && pid != self_pid)
+        .filter(|&&pid| {
+            let mut len = image.len() as u32;
+            // SAFETY: as in `is_live_oryxis`: the handle is checked and
+            // closed on every path, the buffer outlives the query.
+            let ok = unsafe {
+                let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+                if h.is_null() {
+                    return false;
+                }
+                let ok = QueryFullProcessImageNameW(
+                    h,
+                    PROCESS_NAME_WIN32,
+                    image.as_mut_ptr(),
+                    &mut len,
+                );
+                CloseHandle(h);
+                ok != 0
+            };
+            if !ok {
+                return false;
+            }
+            let path = std::path::PathBuf::from(std::ffi::OsString::from_wide(
+                &image[..len as usize],
+            ));
+            same_image(&path, &own_stem)
+                && std::fs::canonicalize(&path).is_ok_and(|p| p == own)
+        })
+        .count()
 }
 
 #[cfg(target_os = "linux")]

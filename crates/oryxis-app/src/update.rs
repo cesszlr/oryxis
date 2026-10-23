@@ -784,14 +784,17 @@ pub fn apply_binary_update(downloaded: &std::path::Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         // The helper waits for THIS pid and then replaces the exe, but a
-        // second Oryxis window is its own process running the same file,
-        // and Windows refuses to delete/replace a running image. The
-        // move would burn its whole retry budget against the sibling's
-        // lock and relaunch the old build, an admin token included (the
-        // lock is not a permission problem). Refuse up front, while the
-        // modal is still on screen to explain what to do.
-        if !crate::tray_ipc::Primary::list_instances().is_empty() {
-            return Err(crate::i18n::t("update_close_other_windows").to_string());
+        // second Oryxis process running the same file (a second launch,
+        // one hidden in the tray by close-to-tray) holds it, and Windows
+        // refuses to delete/replace a running image. The move would burn
+        // its whole retry budget against the sibling's lock and relaunch
+        // the old build, an admin token included (the lock is not a
+        // permission problem). Refuse up front, while the modal is still
+        // on screen to explain what to do. Asked of the process table,
+        // not the tray registry: a process missing from the registry
+        // still holds the file.
+        if crate::tray_ipc::other_processes_on_own_image() > 0 {
+            return Err(crate::i18n::t("update_quit_other_instances").to_string());
         }
         // A running .exe can't be overwritten in place, and on a
         // protected install dir (Program Files) it can't even be renamed

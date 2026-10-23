@@ -2345,7 +2345,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "plugins" => "Pluginy",
         "features_and_plugins" => "Funkce a pluginy",
         "update_replace_failed" => "Běžící aplikaci se nepodařilo automaticky nahradit. Otevřete stránku vydání a aktualizujte ručně.",
-        "update_close_other_windows" => "Zavřete ostatní okna Oryxis a zkuste to znovu. Dokud běží jiné okno, aktualizace nemůže aplikaci nahradit.",
+        "update_quit_other_instances" => "Tuto aplikaci stále spouští jiný proces Oryxis, možná skrytý v oznamovací oblasti (zavřením jeho okna se tam jen skryje). Ukončete ho z ikony v oznamovací oblasti a zkuste to znovu.",
         "features" => "Funkce",
         "feature_ai_desc" => "AI chat v terminálu, který může spouštět příkazy na připojeném serveru.",
         "feature_sftp_desc" => "Procházení a přenos souborů přes SSH ve dvoupanelovém správci.",

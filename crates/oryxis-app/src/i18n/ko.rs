@@ -2235,7 +2235,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "plugins" => "플러그인",
         "features_and_plugins" => "기능 및 플러그인",
         "update_replace_failed" => "실행 중인 앱을 자동으로 교체할 수 없습니다. 릴리스 페이지를 열어 수동으로 업데이트하세요.",
-        "update_close_other_windows" => "다른 Oryxis 창을 닫은 뒤 다시 시도하세요. 다른 창이 실행 중인 동안에는 업데이트가 앱을 교체할 수 없습니다.",
+        "update_quit_other_instances" => "다른 Oryxis 프로세스가 아직 이 앱을 실행 중입니다. 시스템 트레이에 숨겨져 있을 수 있습니다(창을 닫으면 트레이로 숨겨질 뿐입니다). 트레이 아이콘에서 종료한 뒤 다시 시도하세요.",
         "features" => "기능",
         "feature_ai_desc" => "연결된 서버에서 명령을 실행할 수 있는 터미널 내 AI 채팅.",
         "feature_sftp_desc" => "이중 창 관리자로 SSH를 통해 파일을 탐색하고 전송합니다.",

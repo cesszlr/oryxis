@@ -2135,7 +2135,7 @@ pub(super) fn lookup(key: &str) -> Option<&'static str> {
         "plugins" => "Plugins",
         "features_and_plugins" => "Funciones y complementos",
         "update_replace_failed" => "No se pudo reemplazar la app en ejecución automáticamente. Abre la página de la versión para actualizar manualmente.",
-        "update_close_other_windows" => "Cierra las demás ventanas de Oryxis e inténtalo de nuevo. La actualización no puede reemplazar la app mientras otra ventana está abierta.",
+        "update_quit_other_instances" => "Otro proceso de Oryxis sigue ejecutando esta app, quizá oculto en la bandeja del sistema (cerrar su ventana solo lo oculta allí). Ciérralo desde el icono de la bandeja e inténtalo de nuevo.",
         "features" => "Funciones",
         "feature_ai_desc" => "Chat de IA en la terminal que puede ejecutar comandos en el servidor conectado.",
         "feature_sftp_desc" => "Explora y transfiere archivos por SSH con un gestor de doble panel.",

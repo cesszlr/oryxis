@@ -272,8 +272,12 @@ impl Oryxis {
                     // and no tray to surface them. try_acquire_mutex
                     // succeeds when nobody else owns the mutex; the
                     // first child to win the race becomes the new
-                    // primary, installs the tray, and unregisters
-                    // its own IPC row.
+                    // primary and installs the tray. Its IPC row
+                    // STAYS: every process registers one, the primary
+                    // included (main.rs), because a deep-link or CLI
+                    // launcher reads the registry to find a live
+                    // instance to forward to; the primary's own menu
+                    // skips its row by pid.
                     if crate::tray::try_acquire_mutex() {
                         tracing::info!("tray IPC: promoting to primary (old primary gone)");
                         crate::app::APP_IS_PRIMARY
@@ -281,7 +285,6 @@ impl Oryxis {
                         if let Err(e) = crate::tray::install() {
                             tracing::warn!("tray install on promotion: {e}");
                         }
-                        crate::tray_ipc::Child::unregister();
                     }
                 }
 
