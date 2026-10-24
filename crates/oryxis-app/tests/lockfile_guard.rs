@@ -178,6 +178,36 @@ fn windows_sys_edges_stay_on_the_newest_line() {
     );
 }
 
+/// The oldest `tokio` the lock may carry. 1.54.0 was yanked for
+/// RUSTSEC-2026-0384 (CVE-2026-115567): `Interval::poll_tick` on the
+/// multi-thread runtime races the time driver and frees a timer entry
+/// the driver still fires, a use-after-free in safe Rust that upstream
+/// reproduced as panics and heap corruption. The app runs on iced's
+/// multi-thread runtime and polls `Interval`s on paths a user reaches
+/// (the sync snapshot ticker, the SFTP drop progress tick, the relay),
+/// so that version is a crash shipped. A yanked version already in the
+/// lock still builds under `--locked`, so no other gate sees it: this
+/// one does. Raise the floor, never lower it.
+const TOKIO_FLOOR: &str = "1.54.1";
+
+#[test]
+fn tokio_stays_at_or_above_the_advisory_floor() {
+    let lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock");
+    let lock = std::fs::read_to_string(&lock_path).expect("read workspace Cargo.lock");
+
+    let versions = package_versions(&lock, "tokio");
+    assert!(!versions.is_empty(), "tokio not found in Cargo.lock; if it left the graph, delete this test");
+    let floor = version_key(TOKIO_FLOOR);
+    let below: Vec<&String> = versions.iter().filter(|v| version_key(v) < floor).collect();
+    assert!(
+        below.is_empty(),
+        "Cargo.lock carries tokio {below:?}, below {TOKIO_FLOOR} (RUSTSEC-2026-0384: a \
+         use-after-free in tokio::time::Interval; 1.54.0 is yanked). Rewrite the tokio \
+         block's version and checksum by hand to a release at or above the floor and \
+         validate with `--locked`."
+    );
+}
+
 /// One `[[package]]` block of Cargo.lock.
 struct LockPackage {
     name: String,
