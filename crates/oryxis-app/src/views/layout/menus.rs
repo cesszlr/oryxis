@@ -111,6 +111,9 @@ impl Oryxis {
             // Host labels and identity names on one line, plus the
             // "Enter to send" hint under them.
             OverlayContent::PasswordSuggest { .. } => 260.0,
+            // A command line on one row each, elided past the box: wide
+            // enough that an ordinary command reads whole.
+            OverlayContent::HistorySuggest { .. } => super::menu_history_suggest::POPUP_WIDTH,
             // The clipboard rows carry their chord on the trailing edge
             // (issue #187), so the widest label and the longest chord
             // have to fit on one line together: at 150 the paste-selection
@@ -137,6 +140,14 @@ impl Oryxis {
         if let OverlayContent::PasswordSuggest { entries, .. } = &overlay.content {
             return super::menu_password_suggest::password_suggest_layout(
                 entries,
+                self.cur_window_size().height,
+            )
+            .total;
+        }
+        // Measured too, for the same flip: uniform rows, counted.
+        if let OverlayContent::HistorySuggest { entries, .. } = &overlay.content {
+            return super::menu_history_suggest::history_suggest_layout(
+                entries.len(),
                 self.cur_window_size().height,
             )
             .total;
@@ -233,7 +244,8 @@ impl Oryxis {
     /// whose height this layer never learns).
     pub(crate) fn overlay_menu_y(&self, overlay: &OverlayState, menu_height: f32) -> f32 {
         let pivot = match &overlay.content {
-            OverlayContent::PasswordSuggest { caret_top, .. } => Some(*caret_top),
+            OverlayContent::PasswordSuggest { caret_top, .. }
+            | OverlayContent::HistorySuggest { caret_top, .. } => Some(*caret_top),
             _ => None,
         };
         popover_y(
@@ -437,6 +449,12 @@ impl Oryxis {
                 prompt_for,
                 ..
             } => self.build_menu_password_suggest(entries, *selected, prompt_for.as_deref()),
+            OverlayContent::HistorySuggest {
+                entries,
+                typed,
+                selected,
+                ..
+            } => self.build_menu_history_suggest(entries, typed, *selected),
         };
 
         // Min-height (so a single-item menu reads as a real button-

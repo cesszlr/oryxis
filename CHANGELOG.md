@@ -24,6 +24,7 @@ Several encrypted vaults can be open at once, each with its own master password,
 - A snippet bar under the terminal: a snippet marked "Show in snippet bar" (in its editor or its card's menu) gets a button there; a click runs it, a right-click pastes it (#266, requested by @MmYyF).
 - Settings > Terminal sets the cursor's shape (block, bar, underline) and whether it blinks; a program that picks its own cursor keeps it (#266).
 - Settings > Interface picks what Ctrl+Tab walks: recent use (the default) or the tab bar's own order, the Windows Terminal way.
+- Typing at a prompt offers the commands run before on that host that start with (or contain) the text, under the line: Down picks, Enter completes, Shift+Enter runs, Esc hides; off under Settings > Terminal > Capture command history (#266, requested by @MmYyF).
 
 ### Changed
 - Device-level settings (language, window geometry, tray, renderer, updates, offline mode, local programs and folders, the SSH agent, the sync listen port and device name, shortcuts) now live in `~/.oryxis/device.json`, copied once from the vault on first start.

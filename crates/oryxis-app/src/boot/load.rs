@@ -624,6 +624,9 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("terminal_password_autofill") {
                 ov.prefs.terminal_password_autofill = v == "true";
             }
+            if let Ok(Some(v)) = vault.get_setting("terminal_history_suggest") {
+                ov.prefs.terminal_history_suggest = v == "true";
+            }
             if let Ok(Some(v)) = vault.get_setting("terminal_link_confirm") {
                 ov.prefs.terminal_link_confirm = v == "true";
             }

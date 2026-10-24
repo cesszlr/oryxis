@@ -333,6 +333,16 @@ impl Oryxis {
                     if self.vaults.cur().prefs.terminal_password_autofill { "true" } else { "false" },
                 );
             }
+            SettingsMessage::ToggleTerminalHistorySuggest => {
+                let on = !self.vaults.cur().prefs.terminal_history_suggest;
+                self.vaults.cur_mut().prefs.terminal_history_suggest = on;
+                // Off means "do not offer", not "not next time": a popup
+                // already on screen goes with it.
+                if !on {
+                    self.dismiss_history_suggest();
+                }
+                self.persist_setting("terminal_history_suggest", if on { "true" } else { "false" });
+            }
             SettingsMessage::ToggleTerminalLinkConfirm => {
                 self.vaults.cur_mut().prefs.terminal_link_confirm = !self.vaults.cur_mut().prefs.terminal_link_confirm;
                 // Turning it off does not answer a question already on

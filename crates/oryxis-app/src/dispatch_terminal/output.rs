@@ -970,6 +970,13 @@ impl Oryxis {
                 let suggest_open_on = self.password_suggest_pane();
                 let mut raise_password_suggest = false;
                 let mut dismiss_stale_suggest = false;
+                // History suggestions (issue #266): the same two reads
+                // as the password popup, for the same reasons (the gates
+                // need the whole app, the open popup keeps being probed
+                // so a line that stops being a command line closes it).
+                let history_pane = self.history_suggest_target();
+                let history_open_on = self.history_suggest_pane();
+                let mut history_probe: Option<crate::dispatch_history_suggest::HistoryProbe> = None;
                 if let Some((tab_idx, pane)) = self
                     .tabs
                     .iter_mut()
@@ -1163,6 +1170,19 @@ impl Oryxis {
                         }
                         if autofill_read {
                             prompt_now = state.password_prompt_at_cursor();
+                        }
+                        // History suggestions (issue #266): read after
+                        // `process` and after the marks above moved
+                        // `pane.prompt`, so the typed line is judged at
+                        // the prompt this very batch drew. Only for a
+                        // pane with a write to answer, or one whose
+                        // popup is up.
+                        if (history_pane == Some(pane_id) || history_open_on == Some(pane_id))
+                            && (pane.history_suggest.pending || history_open_on == Some(pane_id))
+                        {
+                            history_probe = Some(
+                                crate::dispatch_history_suggest::probe_history_suggest(pane, &state),
+                            );
                         }
                         // Alternate-screen edge detection, against the
                         // pane's remembered side (updated below, the
@@ -1509,6 +1529,12 @@ impl Oryxis {
                     self.show_password_suggest(pane_id);
                 } else if dismiss_stale_suggest {
                     self.dismiss_password_suggest_for(pane_id);
+                }
+                // History suggestions: open, refresh or close the popup
+                // for what the probe found, now that the overlay slot is
+                // writable.
+                if let Some(probe) = history_probe {
+                    self.refresh_history_suggest(pane_id, probe);
                 }
                 // Arm the one-shot flush for a synchronized update that
                 // stalled with output buffered. Fires `flush_sync` at the

@@ -291,6 +291,7 @@ impl Oryxis {
             | SettingsMessage::ToggleScrollbackResetKeypress
             | SettingsMessage::ToggleScrollbackResetOutput
             | SettingsMessage::ToggleTerminalPasswordAutofill
+            | SettingsMessage::ToggleTerminalHistorySuggest
             | SettingsMessage::ToggleTerminalLinkConfirm
             | SettingsMessage::ToggleTerminalLinkTunnel
             | SettingsMessage::TerminalRightClickChanged(..)

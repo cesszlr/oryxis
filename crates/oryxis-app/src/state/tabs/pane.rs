@@ -106,6 +106,28 @@ pub(crate) enum PromptState {
     Busy,
 }
 
+/// Per-pane state of the history-suggest popup (issue #266), the one
+/// that offers commands from the host's history as the user types.
+///
+/// The popup is driven from the OUTPUT funnel, not from the keystroke:
+/// what the user typed is only known to be a command line once its echo
+/// is on the grid at a prompt, which is the same evidence the history
+/// capture itself demands. So a user write marks the pane `pending`, and
+/// the next output batch for it reads the line back and decides.
+#[derive(Debug, Default)]
+pub(crate) struct HistorySuggestState {
+    /// A user write reached this pane since the last probe. Consumed by
+    /// the probe that finds the echo (or finds nothing to complete),
+    /// kept while the grid has not caught up with the mirror yet.
+    pub pending: bool,
+    /// Esc, or a pick, holds the popup down for the rest of this line:
+    /// cleared when the line is submitted or emptied.
+    pub muted: bool,
+    /// The host's history (most recently used first), decrypted once per
+    /// composed line and dropped when the line is submitted or emptied.
+    pub pool: Option<Vec<String>>,
+}
+
 /// A command submitted while `AtPrompt` whose echo had not reached the grid
 /// yet (a paste with a trailing newline arrives before the round trip). The
 /// echoed line is read back from these coordinates when `OutputStart`
@@ -830,6 +852,9 @@ pub(crate) struct Pane {
     /// undo the dismissal. The retry after a wrong password lands on a
     /// new row, which is why the row is part of the identity.
     pub password_prompt_sig: Option<(String, i64)>,
+    /// History suggestions while typing (issue #266): see
+    /// [`HistorySuggestState`] and `dispatch_history_suggest.rs`.
+    pub history_suggest: HistorySuggestState,
     /// `Some` while a ZMODEM transfer owns this pane's byte stream: output
     /// is diverted to the driver (not the emulator) and input is frozen.
     /// Cleared when the transfer ends, which resumes the terminal.
@@ -996,6 +1021,7 @@ impl Pane {
             triggers: std::collections::HashMap::new(),
             mosh_ambiguous_width: None,
             password_prompt_sig: None,
+            history_suggest: HistorySuggestState::default(),
             zmodem: None,
             drop_upload: None,
             pending_drop_sources: Vec::new(),

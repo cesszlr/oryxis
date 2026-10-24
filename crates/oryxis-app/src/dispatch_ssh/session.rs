@@ -402,6 +402,7 @@ impl Oryxis {
                     // would silently drop it. Scoped to the pane, since
                     // a split tab's siblings are still live.
                     self.dismiss_password_suggest_for(pane_id);
+                    self.dismiss_history_suggest_for(pane_id);
                     // Same for a confirmation still on screen: it asks
                     // about a session that no longer exists.
                     self.reset_triggers_for_pane(pane_id);

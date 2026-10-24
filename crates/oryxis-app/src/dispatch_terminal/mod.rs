@@ -234,6 +234,9 @@ impl Oryxis {
                 // with it. This is also the popup's click-outside
                 // dismissal, since it renders without a backdrop.
                 self.dismiss_password_suggest();
+                // The history popup goes the same way: a click is the
+                // user placing the caret, not picking a row.
+                self.dismiss_history_suggest();
                 // The History tab is per-host; follow the focused pane.
                 if self.sidebar_tab_shown(crate::state::TerminalSidebarTab::History) {
                     self.refresh_command_history();
@@ -770,6 +773,13 @@ impl Oryxis {
             | TerminalMessage::PasswordSuggestDismiss
             | TerminalMessage::PasswordSuggestScrolled(_)) => {
                 return self.handle_password_suggest(m);
+            }
+            // ── History-suggest popup (issue #266) ──
+            m @ (TerminalMessage::HistorySuggestNavigate(_)
+            | TerminalMessage::HistorySuggestPick(..)
+            | TerminalMessage::HistorySuggestDismiss
+            | TerminalMessage::HistorySuggestScrolled(_)) => {
+                return self.handle_history_suggest(m);
             }
             // ── Broadcast input (C2) ──
             TerminalMessage::ToggleTabBroadcast(idx) => {

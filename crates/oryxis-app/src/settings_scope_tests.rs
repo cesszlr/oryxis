@@ -62,7 +62,7 @@ const VAULT_KEYS: &[&str] = &[
     "tab_uniform_size", "tab_width_mode", "terminal_auto_title", "terminal_bell_mode",
     "terminal_bg_dim", "terminal_bg_fit", "terminal_bg_image", "terminal_clipboard_access",
     "terminal_cursor_blink", "terminal_cursor_shape", "terminal_font_name", "terminal_font_size", "terminal_font_weight",
-    "terminal_highlight_rules", "terminal_hint_mode", "terminal_link_confirm",
+    "terminal_highlight_rules", "terminal_history_suggest", "terminal_hint_mode", "terminal_link_confirm",
     "terminal_link_tunnel", "terminal_notification", "terminal_opacity",
     "terminal_password_autofill", "terminal_right_click", "terminal_sidebar_side",
     "terminal_text_thickness", "terminal_theme", "terminal_theme_override",

@@ -328,6 +328,14 @@ impl Oryxis {
                 if let Some(task) = self.handle_password_suggest_key(&event) {
                     return Ok(task);
                 }
+                // History suggestions (issue #266): the same contract,
+                // over a command line instead of a prompt. Printable
+                // keys pass through untouched (the next echo refilters
+                // the rows), so this takes only Esc, Down, and Up /
+                // Enter once engaged. See dispatch_history_suggest.rs.
+                if let Some(task) = self.handle_history_suggest_key(&event) {
+                    return Ok(task);
+                }
                 // Modal / overlay-menu keyboard layer: while a
                 // navigable dialog, dropdown or the burger menu is
                 // open it owns movement + activation keys (Esc stays

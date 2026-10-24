@@ -237,9 +237,11 @@ coming next, see the [Roadmap](../README.md#roadmap).
 - **Per-host command history.** Captured via shell-integration marks
   (OSC 133) with a raw-input fallback, encrypted at rest, redacted before
   storage, surfaced in a sidebar History tab: most-frequent shortlist,
-  recent list, search, re-run, paste-without-execute, delete. Local-only
-  by design (never synced, never exported); optional plain-text export and
-  per-host live-append log. Inside tmux the screen belongs to tmux, so
+  recent list, search, re-run, paste-without-execute, delete. While you
+  type at the prompt, the commands run before on that host that start
+  with (or contain) the text appear under the line; Enter completes it,
+  Shift+Enter runs it. Local-only by design (never synced, never
+  exported); optional plain-text export and per-host live-append log. Inside tmux the screen belongs to tmux, so
   capture needs the shell's own report: see the
   [tmux guide](TMUX.md).
 - **Session recording.** The encrypted session logs capture timing and

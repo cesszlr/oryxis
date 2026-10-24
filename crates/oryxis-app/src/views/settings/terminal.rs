@@ -131,6 +131,41 @@ impl Oryxis {
         ].boxed()
     }
 
+    /// Sub-row for the history suggestions while typing (issue #266),
+    /// nested under the capture toggle like the key row below and shown
+    /// only while it is on: without the capture there is no history to
+    /// offer and the mirror the suggestions read is not fed, so a hidden
+    /// row is an OFF row (`history_suggest_enabled` reads both).
+    fn history_suggest_row(&self) -> Element<'_, Message> {
+        if !self.vaults.cur().prefs.command_history {
+            return Space::new().boxed();
+        }
+        let indent = if crate::i18n::is_rtl_layout() {
+            Padding { right: 22.0, ..Padding::ZERO }
+        } else {
+            Padding { left: 22.0, ..Padding::ZERO }
+        };
+        column![
+            Space::new().height(10),
+            container(self.nav_toggle_row(
+                crate::i18n::t("terminal_history_suggest"),
+                self.vaults.cur().prefs.terminal_history_suggest,
+                Message::Settings(SettingsMessage::ToggleTerminalHistorySuggest),
+            ))
+            .width(Length::Fill)
+            .padding(indent),
+            Space::new().height(4),
+            container(
+                text(crate::i18n::t("terminal_history_suggest_desc"))
+                    .size(11)
+                    .color(crate::theme::OryxisColors::t().text_muted),
+            )
+            .width(Length::Fill)
+            .padding(indent),
+        ]
+        .boxed()
+    }
+
     /// Sub-row for the shell-integration key: what it is for, the Copy
     /// button that puts the snippet (key already substituted) on the
     /// clipboard, and Rotate.
@@ -941,6 +976,7 @@ impl Oryxis {
             Space::new().height(10),
             self.nav_toggle_row(crate::i18n::t("command_history_capture"), self.vaults.cur().prefs.command_history, Message::Settings(SettingsMessage::ToggleCommandHistory)),
             self.shell_integration_row(),
+            self.history_suggest_row(),
             Space::new().height(10),
             self.nav_toggle_row(crate::i18n::t("cmd_history_file"), self.vaults.cur().prefs.command_history_file, Message::CommandHistory(CommandHistoryMessage::ToggleCommandHistoryFile)),
             self.command_history_dir_row(),

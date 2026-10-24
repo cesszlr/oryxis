@@ -61,6 +61,21 @@ pub enum TerminalMessage {
     /// selection would leave the viewport, instead of yanking the list
     /// on every arrow press (same contract as the SFTP row list).
     PasswordSuggestScrolled(f32),
+    /// History-suggest popup (issue #266). Move the selection by `i32`
+    /// rows, wrapping; the first move ENGAGES the popup, and until then
+    /// Enter still belongs to the shell.
+    HistorySuggestNavigate(i32),
+    /// Put the command at `usize` on the line (the rest of it after the
+    /// typed prefix, or the whole command over an erased line), and
+    /// submit it when `bool` is set (Shift+Enter). The row rides in the
+    /// message for the same reason the password pick's does: a click
+    /// must work where no hover ever fired.
+    HistorySuggestPick(usize, bool),
+    /// Close the popup and keep it down until the line is submitted or
+    /// emptied (Esc). Typing never sends this: the next echo refilters.
+    HistorySuggestDismiss,
+    /// Scroll offset of the popup's row list, from its own `on_scroll`.
+    HistorySuggestScrolled(f32),
     /// Broadcast input (C2): arm / disarm fan-out of keystrokes, pastes and
     /// snippets to every pane of the tab at `usize`. Toggled by the status
     /// segment, the tab context menu and the `ToggleBroadcastInput` hotkey.

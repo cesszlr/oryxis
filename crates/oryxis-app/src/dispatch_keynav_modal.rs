@@ -71,8 +71,12 @@ impl Oryxis {
                 // once the user engages it, which
                 // `handle_password_suggest_key` decides earlier in the
                 // router. Letting the generic layer claim it would eat
-                // Up/Down/Enter from the shell underneath.
-                OC::SplitMenu | OC::ToolbarSearch | OC::PasswordSuggest { .. } => return None,
+                // Up/Down/Enter from the shell underneath. The history
+                // popup (#266) is the same shape over a command line.
+                OC::SplitMenu
+                | OC::ToolbarSearch
+                | OC::PasswordSuggest { .. }
+                | OC::HistorySuggest { .. } => return None,
                 OC::GroupPicker(_) | OC::CloudDiscoverGroupPicker => SurfaceFamily::Picker,
                 _ => SurfaceFamily::Menu,
             };

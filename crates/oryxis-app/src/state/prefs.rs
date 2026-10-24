@@ -67,6 +67,11 @@ pub(crate) struct AppPrefs {
     /// default ON. Nothing is ever sent without the user picking a row:
     /// the popup is a suggestion, not an autofill that types itself.
     pub(crate) terminal_password_autofill: bool,
+    /// Offer commands from the host's history as the user types at a
+    /// prompt (issue #266). Persisted as `terminal_history_suggest`;
+    /// default on, effective only while `command_history` is (the row
+    /// is nested under it). See `dispatch_history_suggest.rs`.
+    pub(crate) terminal_history_suggest: bool,
     /// Ask before handing a link from a REMOTE pane to the browser
     /// (default on, VS Code's behaviour for a remote window). The URL is
     /// text a remote host printed, and an OSC 8 link's label can differ
@@ -609,6 +614,7 @@ impl Default for AppPrefs {
             scrollback_reset_output: false,
             paste_guard: true,
             terminal_password_autofill: true,
+            terminal_history_suggest: true,
             terminal_link_confirm: true,
             terminal_link_tunnel: true,
             command_history: true,

@@ -351,7 +351,9 @@ impl Oryxis {
         // interactions (FocusPane, typing, tab switch) instead.
         let is_hover_popover = matches!(
             overlay.content,
-            OverlayContent::SplitMenu | OverlayContent::PasswordSuggest { .. }
+            OverlayContent::SplitMenu
+                | OverlayContent::PasswordSuggest { .. }
+                | OverlayContent::HistorySuggest { .. }
         );
 
         // Position the menu, clamping to window bounds to prevent clipping.

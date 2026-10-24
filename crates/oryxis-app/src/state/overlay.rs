@@ -178,6 +178,40 @@ pub(crate) enum OverlayContent {
         /// `Password:`).
         prompt_for: Option<String>,
     },
+    /// Commands from the pane host's history that complete the line
+    /// being typed (issue #266). The password popup's contract, applied
+    /// to text: anchored at the terminal caret, non-modal (it owns keys
+    /// only once Down engages it), and it never sends anything on its
+    /// own: a pick puts the command on the line, and only Shift+Enter
+    /// runs it.
+    HistorySuggest {
+        pane_id: Uuid,
+        /// The matches for the line as it read when the popup was last
+        /// refreshed: commands that extend it first, then commands that
+        /// contain it, most recently used first within each group.
+        entries: Vec<HistorySuggestion>,
+        /// The line the entries were matched against, as the mirror
+        /// held it: a pick appends the rest of an extending command to
+        /// it, or erases it before a containing command.
+        typed: String,
+        /// KEYBOARD-only, `None` until Down engages the popup (same
+        /// rule as the password popup, for the same Enter reason).
+        selected: Option<usize>,
+        /// Window-space top edge of the caret's cell, the flip pivot.
+        caret_top: f32,
+        /// Scroll offset of the row list once it overflows.
+        scroll: f32,
+    },
+}
+
+/// One history command offered as a completion of the typed line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HistorySuggestion {
+    pub command: String,
+    /// The command STARTS with the typed line, so a pick types only the
+    /// rest. When false the typed line is found inside the command and
+    /// a pick replaces the whole line.
+    pub extends_typed: bool,
 }
 
 /// One offerable credential: what to show, and where to read it from.

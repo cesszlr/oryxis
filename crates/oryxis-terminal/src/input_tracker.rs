@@ -65,6 +65,31 @@ impl InputTracker {
         *self = Self::default();
     }
 
+    /// The line being composed, when the mirror can vouch for it: the text
+    /// as typed, with the cursor at its END, no edit this tracker cannot
+    /// model since the line began, no paste in flight and no UTF-8 scalar
+    /// half-read. `None` otherwise. What the history suggestions complete
+    /// against: a prefix is only a prefix while typing goes on at the end
+    /// of it, and a tainted line (history recall, tab completion) no
+    /// longer says what the remote editor holds.
+    pub fn composing_line(&self) -> Option<String> {
+        if self.tainted
+            || self.in_paste
+            || !self.pending_utf8.is_empty()
+            || self.cursor != self.chars.len()
+        {
+            return None;
+        }
+        Some(self.chars.iter().collect())
+    }
+
+    /// Whether the mirror holds nothing: the line was submitted, aborted
+    /// (Ctrl+C) or never started. A tainted empty line still counts as
+    /// empty; the taint only says the NEXT text is unknowable.
+    pub fn line_is_empty(&self) -> bool {
+        self.chars.is_empty() && !self.in_paste
+    }
+
     /// Feed bytes headed to the PTY. Returns the lines completed by an Enter
     /// inside this chunk, in order.
     pub fn feed(&mut self, bytes: &[u8]) -> Vec<SubmittedLine> {
@@ -320,6 +345,43 @@ mod tests {
         let mut lines = tracker.feed(bytes);
         assert_eq!(lines.len(), 1, "expected exactly one submitted line");
         lines.remove(0)
+    }
+
+    /// The composing line is what the history popup completes against,
+    /// so it has to vanish exactly when the mirror stops being the
+    /// truth: a caret moved off the end, a tainting edit, a paste still
+    /// open; and come back clean after a submit or a Ctrl+C.
+    #[test]
+    fn composing_line_is_offered_only_while_the_mirror_vouches_for_it() {
+        let mut t = InputTracker::new();
+        assert_eq!(t.composing_line().as_deref(), Some(""));
+        assert!(t.line_is_empty());
+        t.feed(b"git sta");
+        assert_eq!(t.composing_line().as_deref(), Some("git sta"));
+        assert!(!t.line_is_empty());
+        // Left: the caret is no longer at the end, typing would insert
+        // in the middle, so nothing is a prefix any more.
+        t.feed(b"\x1b[D");
+        assert_eq!(t.composing_line(), None);
+        t.feed(b"\x1b[C");
+        assert_eq!(t.composing_line().as_deref(), Some("git sta"));
+        // Tab completion taints the line for good.
+        t.feed(b"\t");
+        assert_eq!(t.composing_line(), None);
+        // Ctrl+C starts a clean line.
+        t.feed(b"\x03");
+        assert!(t.line_is_empty());
+        assert_eq!(t.composing_line().as_deref(), Some(""));
+        // Inside a bracketed paste the line is not composed yet; once the
+        // paste closes the pasted text is the line.
+        t.feed(b"\x1b[200~echo hi");
+        assert_eq!(t.composing_line(), None);
+        assert!(!t.line_is_empty());
+        t.feed(b"\x1b[201~");
+        assert_eq!(t.composing_line().as_deref(), Some("echo hi"));
+        // A submit empties it.
+        t.feed(b"\r");
+        assert!(t.line_is_empty());
     }
 
     #[test]

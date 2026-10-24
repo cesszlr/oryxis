@@ -375,6 +375,12 @@ impl Oryxis {
         for (log_id, off, cmd) in session_cmds {
             self.record_session_command(&log_id, off, &cmd);
         }
+        // History suggestions (issue #266) follow the mirror this fed:
+        // an emptied line closes the popup at once, a line that goes on
+        // is answered by the next output batch.
+        if want_history {
+            self.history_suggest_after_input(tab_idx);
+        }
     }
 
     /// Persist one captured command and keep the open History tab live.

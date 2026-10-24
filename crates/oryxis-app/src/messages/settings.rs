@@ -277,6 +277,9 @@ pub enum SettingsMessage {
     /// Offer stored credentials at a password prompt (issue #117),
     /// toggled in Settings > Terminal.
     ToggleTerminalPasswordAutofill,
+    /// Settings > Terminal: offer commands from the host's history while
+    /// typing (issue #266). Nested under the capture toggle.
+    ToggleTerminalHistorySuggest,
     /// Ask before opening a link from a remote pane, toggled in
     /// Settings > Terminal.
     ToggleTerminalLinkConfirm,

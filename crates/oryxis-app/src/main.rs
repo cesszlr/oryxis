@@ -32,6 +32,7 @@ mod dispatch_keynav_sidebar;
 mod dispatch_local;
 mod dispatch_login_script;
 mod dispatch_password_suggest;
+mod dispatch_history_suggest;
 mod dispatch_keys;
 mod dispatch_known_hosts;
 mod dispatch_tray;

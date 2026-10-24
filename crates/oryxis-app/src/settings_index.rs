@@ -118,6 +118,7 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     e(S::Terminal, "scrollback", "scrollback lines history buffer rows limit"),
     e(S::Terminal, "scrollback_reset_keypress", "scrollback reset keypress jump bottom"),
     e(S::Terminal, "terminal_password_autofill", "password autofill sudo suggest credential prompt"),
+    e(S::Terminal, "terminal_history_suggest", "history suggest suggestions autocomplete complete commands typing recall popup"),
     e(S::Terminal, "terminal_link_confirm", "link url open browser confirm ask ctrl click"),
     e(S::Terminal, "terminal_link_tunnel", "link callback tunnel port forward oauth sso login redirect"),
     e(S::Terminal, "scrollback_reset_output", "scrollback reset output activity jump bottom"),

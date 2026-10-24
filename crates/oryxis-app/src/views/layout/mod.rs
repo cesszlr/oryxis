@@ -23,6 +23,7 @@ const RESIZE_EDGE: f32 = 5.0;
 mod chrome;
 mod main_layout;
 mod menu_card;
+mod menu_history_suggest;
 mod menu_password_suggest;
 mod menu_vault;
 mod modal_dialogs;
@@ -38,6 +39,11 @@ pub(crate) use menu_vault::menu_divider;
 pub(crate) use menu_password_suggest::{
     password_suggest_layout, password_suggest_row_height, password_suggest_row_top,
     password_suggest_rows_height, SCROLL_ID as PASSWORD_SUGGEST_SCROLL_ID,
+};
+// Same for the history popup (issue #266).
+pub(crate) use menu_history_suggest::{
+    history_suggest_layout, HISTORY_SUGGEST_ROW_H, HISTORY_SUGGEST_ROW_GAP,
+    SCROLL_ID as HISTORY_SUGGEST_SCROLL_ID,
 };
 
 impl Oryxis {
