@@ -17,16 +17,21 @@
 //!    question off the screen: the app sees its claim gone.
 //!
 //! An answer that allows carries a tag: HMAC-SHA256 under the vault's
-//! master key over the request id (random, 128 bits, minted by the
-//! server), the vault, the host and the decision
-//! ([`crate::VaultStore::mcp_consent_tag`]). The server accepts an
-//! allowance only with a tag it recomputes itself, so a process that can
-//! write the runtime folder (the AI client's own shell tool runs as the
-//! user) cannot approve by writing a file. What that stops is a forged
-//! FILE, not a forger with the key: a vault without a master password
-//! derives its key from the file alone, and a client config that embeds
-//! the vault password hands it to whoever reads that config. A refusal
-//! needs no tag: forging one only refuses.
+//! master key over the WHOLE request as the app read it (the id, random,
+//! 128 bits, minted by the server; the vault and host; the login, the
+//! address, the route, the client's name and the command verbatim) and
+//! the decision ([`crate::VaultStore::mcp_consent_tag`]). The server
+//! accepts an allowance only with a tag it recomputes over the request
+//! it HOLDS, so a process that can write the runtime folder (the AI
+//! client's own shell tool runs as the user) cannot approve by writing a
+//! file, and cannot rewrite the posted request either: a command (or a
+//! host address) swapped in the file before the app claimed it is what
+//! the person reads and tags, and that tag does not verify against the
+//! command the server would run. What that stops is a forged FILE, not a
+//! forger with the key: a vault without a master password derives its
+//! key from the file alone, and a client config that embeds the vault
+//! password hands it to whoever reads that config. A refusal needs no
+//! tag: forging one only refuses.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -312,19 +317,20 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
     out
 }
 
-/// The bytes the tag covers. Unit separators keep the fields apart.
-pub(crate) fn tag_message(request: &SudoRequest, decision: Decision) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(128);
-    for part in [
-        request.id.as_str(),
-        &request.vault_id.to_string(),
-        &request.host_id.to_string(),
-        decision.wire(),
-    ] {
-        msg.push(0x1f);
-        msg.extend_from_slice(part.as_bytes());
-    }
-    msg
+/// The bytes the tag covers: the whole request as JSON (every field the
+/// person reads, so a field added later is covered without anyone
+/// remembering to list it) and the decision, a unit separator before
+/// each. Both sides serialize the same struct: a request the app
+/// deserialized from the file re-serializes to the server's bytes only
+/// when every field reads the same.
+pub(crate) fn tag_message(request: &SudoRequest, decision: Decision) -> Result<Vec<u8>, serde_json::Error> {
+    let request = serde_json::to_vec(request)?;
+    let mut msg = Vec::with_capacity(request.len() + 16);
+    msg.push(0x1f);
+    msg.extend_from_slice(&request);
+    msg.push(0x1f);
+    msg.extend_from_slice(decision.wire().as_bytes());
+    Ok(msg)
 }
 
 pub(crate) fn hex(bytes: &[u8]) -> String {

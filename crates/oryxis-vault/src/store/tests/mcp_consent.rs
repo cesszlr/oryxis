@@ -81,3 +81,55 @@ fn a_locked_vault_neither_tags_nor_verifies() {
     assert!(matches!(vault.mcp_consent_tag(&r, Decision::Once), Err(VaultError::Locked)));
     assert!(!vault.verify_mcp_consent_tag(&r, Decision::Once, &tag));
 }
+
+#[test]
+fn the_tag_binds_every_field_the_person_reads() {
+    // The app tags the request AS IT READ IT from the folder, the server
+    // checks the tag against the request IT HOLDS. A process that can
+    // write the folder (the agent's own shell) may rewrite the posted
+    // file between the post and the claim; whatever it changes, the
+    // dialog's approval must not carry over to the server's request.
+    let vault = unlocked_vault();
+    let r = request();
+    let tag = vault.mcp_consent_tag(&r, Decision::Once).unwrap();
+    assert!(vault.verify_mcp_consent_tag(&r, Decision::Once, &tag));
+
+    let mut swapped_command = r.clone();
+    swapped_command.command = "uptime".into();
+    assert!(
+        !vault.verify_mcp_consent_tag(&swapped_command, Decision::Once, &tag),
+        "an approval of \"id\" must not run another command"
+    );
+    let mut swapped_login = r.clone();
+    swapped_login.login = "root".into();
+    assert!(!vault.verify_mcp_consent_tag(&swapped_login, Decision::Once, &tag));
+    let mut swapped_address = r.clone();
+    swapped_address.address = "10.0.0.6:22".into();
+    assert!(!vault.verify_mcp_consent_tag(&swapped_address, Decision::Once, &tag));
+    let mut swapped_route = r.clone();
+    swapped_route.route = vec!["bastion (jump.example:22)".into()];
+    assert!(!vault.verify_mcp_consent_tag(&swapped_route, Decision::Once, &tag));
+    let mut swapped_client = r.clone();
+    swapped_client.client = Some("some agent".into());
+    assert!(!vault.verify_mcp_consent_tag(&swapped_client, Decision::Once, &tag));
+    let mut swapped_labels = r.clone();
+    swapped_labels.host_label = "db".into();
+    assert!(!vault.verify_mcp_consent_tag(&swapped_labels, Decision::Once, &tag));
+    let mut swapped_time = r.clone();
+    swapped_time.created_unix = 1;
+    assert!(!vault.verify_mcp_consent_tag(&swapped_time, Decision::Once, &tag));
+}
+
+#[test]
+fn a_request_read_back_from_its_file_tags_like_the_original() {
+    // The app never holds the server's struct, only what it deserialized
+    // from the posted file: the two must agree byte for byte.
+    let vault = unlocked_vault();
+    let mut r = request();
+    r.route = vec!["bastion (jump.example:22)".into()];
+    r.client = Some("agent".into());
+    r.command = "apt-get update && apt-get -y upgrade\n# second line\n".into();
+    let read_back: SudoRequest = serde_json::from_slice(&serde_json::to_vec(&r).unwrap()).unwrap();
+    let tag = vault.mcp_consent_tag(&read_back, Decision::Session).unwrap();
+    assert!(vault.verify_mcp_consent_tag(&r, Decision::Session, &tag));
+}

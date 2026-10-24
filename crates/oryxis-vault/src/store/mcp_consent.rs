@@ -29,25 +29,32 @@ impl VaultStore {
         decision: Decision,
     ) -> Result<String, VaultError> {
         let key = self.require_unlocked()?;
+        let message = tag_message(request, decision)
+            .map_err(|e| VaultError::Crypto(format!("sudo consent request does not serialize: {e}")))?;
         let mut mac = consent_mac(key);
-        mac.update(&tag_message(request, decision));
+        mac.update(&message);
         Ok(crate::mcp_consent::hex(&mac.finalize().into_bytes()))
     }
 
     /// Whether `tag` is this vault's tag for `decision` on `request`,
-    /// compared in constant time. A locked vault or a malformed tag is
-    /// `false`: never an allowance by default.
+    /// compared in constant time. A locked vault, a malformed tag or a
+    /// request that does not serialize is `false`: never an allowance by
+    /// default.
     pub fn verify_mcp_consent_tag(
         &self,
         request: &SudoRequest,
         decision: Decision,
         tag: &str,
     ) -> bool {
-        let (Ok(key), Some(tag)) = (self.require_unlocked(), crate::mcp_consent::unhex(tag)) else {
+        let (Ok(key), Some(tag), Ok(message)) = (
+            self.require_unlocked(),
+            crate::mcp_consent::unhex(tag),
+            tag_message(request, decision),
+        ) else {
             return false;
         };
         let mut mac = consent_mac(key);
-        mac.update(&tag_message(request, decision));
+        mac.update(&message);
         mac.verify_slice(&tag).is_ok()
     }
 }
