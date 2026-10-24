@@ -158,6 +158,32 @@ impl Oryxis {
         }
     }
 
+    /// The update funnel's: a card that reached the screen in this
+    /// update is scrolled to its head. The dialog is one scrollable in
+    /// one widget slot, and the next queued request takes it inside the
+    /// update that answers the one before (an answer, Esc, its deadline,
+    /// the vault locking, the server withdrawing it): no frame goes by
+    /// with the slot empty, so the card would open at the offset the
+    /// previous one was answered at, its buttons on screen and its
+    /// host, login and warnings above the fold. In the window that
+    /// draws the card (`floats_here`): the handover raises nothing, so
+    /// `claim_floats` does not move it.
+    pub(crate) fn mcp_sudo_housekeeping(&mut self) -> Option<Task<Message>> {
+        if !self.mcp_sudo.came_up() {
+            return None;
+        }
+        let window = self.float_window.filter(|w| {
+            self.extra_windows.contains_key(w) || self.window_ctx.as_ref().is_some_and(|c| c.id == *w)
+        });
+        Some(self.run_in_window(window, |_| {
+            iced::widget::operation::scrollable::scroll_to(
+                iced::widget::Id::new(crate::views::mcp_sudo::MCP_SUDO_CARD_SCROLL_ID),
+                iced::widget::scrollable::AbsoluteOffset { x: 0.0, y: 0.0 },
+                iced::widget::operation::Animation::Instant,
+            )
+        }))
+    }
+
     /// The acting vault is locking (soft or manual) or going away: its
     /// questions are refused, the other vaults' stay up.
     pub(crate) fn mcp_sudo_on_lock(&mut self) {

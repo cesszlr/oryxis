@@ -34,6 +34,10 @@ use crate::state::McpSudoCard;
 use crate::theme::OryxisColors;
 use crate::widgets::{dir_align_x, dir_row, panel_field, styled_button};
 
+/// The card's scrollable, for the scroll back to its head when the next
+/// request takes the screen (`mcp_sudo_housekeeping`).
+pub(crate) const MCP_SUDO_CARD_SCROLL_ID: &str = "mcp-sudo-card-scroll";
+
 impl Oryxis {
     /// The dialog for the request on screen. Deny is the default row
     /// (Enter refuses unless the ring moved), and Esc / a click outside
@@ -156,13 +160,17 @@ impl Oryxis {
         // takes its own height, a long one makes the card as tall as the
         // window and scrolls, the buttons after the command's last line.
         // Always a scrollable, so the tree keeps its shape from one
-        // request to the next.
+        // request to the next; the same slot keeps the offset too, and a
+        // queued request taking the screen is scrolled back to its head
+        // by id (`mcp_sudo_housekeeping`), or it would open on the
+        // buttons of a card whose head nobody read.
         container(
             scrollable(
                 column![info, Space::new().height(16), buttons]
                     .padding(24)
                     .width(Length::Fill),
             )
+            .id(iced::widget::Id::new(MCP_SUDO_CARD_SCROLL_ID))
             .width(Length::Fill)
             .height(Length::Shrink),
         )

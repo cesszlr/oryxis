@@ -297,6 +297,9 @@ impl Oryxis {
         // ends with it, whichever path closed the pane; one waiting on
         // the Save Output dialog goes on once it is answered.
         extra.extend(self.snippet_runs_housekeeping());
+        // A queued sudo approval that took the screen in this update is
+        // scrolled to its head, whichever path answered the one before.
+        extra.extend(self.mcp_sudo_housekeeping());
         // Extra windows: close the ones left without a tab, bring the
         // main window forward when one of its verbs was used elsewhere.
         extra.extend(self.window_housekeeping());

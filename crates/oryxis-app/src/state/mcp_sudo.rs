@@ -20,6 +20,8 @@ pub(crate) struct McpSudoState {
     pub pending: Option<McpSudoCard>,
     /// Claimed requests waiting for the dialog ahead of them.
     pub queue: VecDeque<McpSudoCard>,
+    /// The request whose card [`Self::came_up`] last reported.
+    shown: Option<String>,
 }
 
 impl McpSudoState {
@@ -69,6 +71,20 @@ impl McpSudoState {
         if self.pending.is_none() {
             self.pending = self.queue.pop_front();
         }
+    }
+
+    /// `true` once for every card that reaches the screen, the first
+    /// time it is asked after the card went up. The dialog is one
+    /// scrollable in one widget slot, so the next card is drawn with the
+    /// offset the previous one was answered at (iced keeps widget state
+    /// by position); the caller scrolls the card back to its head.
+    pub fn came_up(&mut self) -> bool {
+        let now = self.pending.as_ref().map(|c| c.request.id.as_str());
+        if now == self.shown.as_deref() {
+            return false;
+        }
+        self.shown = now.map(str::to_owned);
+        now.is_some()
     }
 
     pub fn holds(&self, id: &str) -> bool {
@@ -164,6 +180,29 @@ mod tests {
         assert_eq!(st.pending.as_ref().unwrap().request.id, a.request.id);
         assert!(st.queue.is_empty());
         assert!(st.remove_where(|r| r.id == "nope").is_empty());
+    }
+
+    #[test]
+    fn every_card_reaching_the_screen_comes_up_once() {
+        let v = Uuid::new_v4();
+        let mut st = McpSudoState::default();
+        assert!(!st.came_up(), "nothing on screen");
+        let (a, b, c) = (card(v), card(v), card(v));
+        st.push(a);
+        assert!(st.came_up());
+        assert!(!st.came_up(), "the same card, asked again");
+        st.push(b.clone());
+        assert!(!st.came_up(), "a queued card is not on screen");
+        // The answer puts the next one up in the same update: it comes
+        // up too, however it got there.
+        st.take_pending();
+        assert_eq!(st.pending.as_ref().map(|c| c.request.id.as_str()), Some(b.request.id.as_str()));
+        assert!(st.came_up());
+        assert!(!st.came_up());
+        st.remove_where(|r| r.id == b.request.id);
+        assert!(!st.came_up(), "an empty screen comes up as nothing");
+        st.push(c);
+        assert!(st.came_up(), "a card after an empty screen");
     }
 
     #[test]
