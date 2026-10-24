@@ -446,6 +446,9 @@ pub enum SettingsMessage {
     SettingRestoreTabsConnectChanged(String),
     /// Land on the tab that was active at the last close (issue #229).
     SettingToggleRestoreLastActiveTab,
+    /// What Ctrl+Tab walks: `"recent"` (MRU) or `"strip"` (the bar's
+    /// order). See `tab_cycle::TabSwitchOrder`.
+    SettingTabSwitchOrderChanged(String),
     SettingToggleShowTabStatusDot,
     SettingToggleSftpEnabled,
     SettingNavOrientationChanged(String),

@@ -993,6 +993,9 @@ impl Oryxis {
             if let Ok(Some(v)) = vault.get_setting("restore_last_active_tab") {
                 ov.prefs.restore_last_active_tab = v == "true";
             }
+            if let Ok(Some(v)) = vault.get_setting("tab_switch_order") {
+                ov.prefs.tab_switch_order = crate::tab_cycle::TabSwitchOrder::from_code(&v);
+            }
             if let Ok(Some(v)) = vault.get_setting("show_tab_status_dot") {
                 ov.prefs.show_tab_status_dot = v == "true";
             }

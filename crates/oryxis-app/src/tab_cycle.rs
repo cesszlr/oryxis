@@ -1,21 +1,73 @@
-//! Ctrl+Tab "switch by last use" (MRU) tab cycling, modelled on the OS
-//! Alt+Tab: repeated single presses toggle the two most-recently-used tabs,
-//! and holding Ctrl while pressing Tab several times walks further back
-//! through the recency stack. The previewed tab is only promoted to the
-//! front of the MRU when Ctrl is released, so a held run of presses walks a
-//! stable snapshot instead of reshuffling the order under itself (which is
-//! what makes a single repeated press bounce between just the two most
-//! recent, yet two presses reach the previous-previous tab).
+//! Ctrl+Tab tab cycling, in one of two orders (`tab_switch_order`,
+//! Settings > Interface):
 //!
+//! - **Recent use** (the default since 0.9.0): "switch by last use" (MRU),
+//!   modelled on the OS Alt+Tab. Repeated single presses toggle the two
+//!   most-recently-used tabs, and holding Ctrl while pressing Tab several
+//!   times walks further back through the recency stack. The previewed tab
+//!   is only promoted to the front of the MRU when Ctrl is released, so a
+//!   held run of presses walks a stable snapshot instead of reshuffling the
+//!   order under itself (which is what makes a single repeated press bounce
+//!   between just the two most recent, yet two presses reach the
+//!   previous-previous tab).
+//! - **Strip order**: Windows Terminal's default (`tabSwitcherMode:
+//!   inOrder`): every press steps from the tab in front to its neighbour in
+//!   the strip, pinned tabs first, exactly as the bar draws them. The order
+//!   does not move under the user's hand, so there is no snapshot and no
+//!   commit on release; the MRU keeps recording switches regardless, so a
+//!   later flip back to recent use starts warm.
+//!
+//! Both cover OPEN tabs only. Home stays reachable via Ctrl+1 and Alt+arrow,
+//! and a dormant restored tab (a pin or a last-session chip never opened
+//! this session) is skipped in both orders, because selecting it is what
+//! dials it: a walk that reconnects every host it passes is not a walk.
 //! Contrast with Alt+Left/Right (`CycleTabs` in `shortcuts.rs`), which steps
-//! positionally through the visible strip with Home included. Ctrl+Tab is
-//! MRU and covers open tabs only; Home stays reachable via Ctrl+1 and
-//! Alt+arrow.
+//! positionally through every selectable chip, dormant ones included, where
+//! activation is deliberate.
 
 use iced::Task;
 
 use crate::app::{Message, Oryxis};
 use crate::state::TabRef;
+
+/// What Ctrl+Tab walks. Persisted as `tab_switch_order` (a vault
+/// setting: the strip it orders belongs to the vault's windows).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum TabSwitchOrder {
+    /// Most recently used first, the OS Alt+Tab shape.
+    #[default]
+    Recent,
+    /// The strip's own order, the Windows Terminal default.
+    Strip,
+}
+
+impl TabSwitchOrder {
+    pub(crate) const ALL: [TabSwitchOrder; 2] = [TabSwitchOrder::Recent, TabSwitchOrder::Strip];
+
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            TabSwitchOrder::Recent => "recent",
+            TabSwitchOrder::Strip => "strip",
+        }
+    }
+
+    /// Anything but the one other value reads as the default, so a row
+    /// written by a newer build with a third order falls back rather
+    /// than failing the boot read.
+    pub(crate) fn from_code(code: &str) -> Self {
+        match code {
+            "strip" => TabSwitchOrder::Strip,
+            _ => TabSwitchOrder::Recent,
+        }
+    }
+
+    pub(crate) fn label_key(self) -> &'static str {
+        match self {
+            TabSwitchOrder::Recent => "tab_switch_order_recent",
+            TabSwitchOrder::Strip => "tab_switch_order_strip",
+        }
+    }
+}
 
 /// An in-progress Ctrl+Tab run: a snapshot of the MRU order taken at the
 /// first press plus the cursor each subsequent press advances. The live
@@ -128,11 +180,45 @@ impl Oryxis {
         order
     }
 
-    /// Handle one Ctrl+Tab (`forward`) / Ctrl+Shift+Tab (`!forward`) press.
-    /// Starts a run on the first press (snapshotting the MRU) and advances
-    /// the cursor on each later press while Ctrl stays held. Returns the
-    /// `Task` that activates the previewed tab.
-    pub(crate) fn cycle_mru_step(&mut self, forward: bool) -> Task<Message> {
+    /// Handle one Ctrl+Tab (`forward`) / Ctrl+Shift+Tab (`!forward`) press
+    /// in whichever order the vault's setting picks. The ONE entry the key
+    /// router calls, so the setting is read in exactly one place.
+    pub(crate) fn cycle_tab_step(&mut self, forward: bool) -> Task<Message> {
+        match self.vaults.cur().prefs.tab_switch_order {
+            TabSwitchOrder::Recent => self.cycle_mru_step(forward),
+            TabSwitchOrder::Strip => self.cycle_strip_step(forward),
+        }
+    }
+
+    /// The strip-order press: step from the tab in front to its neighbour
+    /// in the visible strip (pinned first), wrapping at either end. No run
+    /// state: the strip does not reorder itself on a switch, so every press
+    /// reads the live order and the Ctrl release has nothing to commit.
+    /// Off a tab (Home, a vault view) a forward press lands on the first
+    /// chip and a backward one on the last, which is where Alt+arrow from
+    /// Home lands too.
+    fn cycle_strip_step(&self, forward: bool) -> Task<Message> {
+        let order: Vec<TabRef> = self
+            .ordered_tab_refs()
+            .into_iter()
+            .filter(|r| self.tab_ref_select_msg(r).is_some() && !self.tab_ref_dormant(r))
+            .collect();
+        let start = self
+            .active_tab_ref()
+            .and_then(|a| order.iter().position(|r| *r == a));
+        let Some(idx) = cycle_start_cursor(order.len(), start, forward) else {
+            return Task::none();
+        };
+        match self.tab_ref_select_msg(&order[idx]) {
+            Some(msg) => Task::done(msg),
+            None => Task::none(),
+        }
+    }
+
+    /// The recent-use press. Starts a run on the first press (snapshotting
+    /// the MRU) and advances the cursor on each later press while Ctrl
+    /// stays held. Returns the `Task` that activates the previewed tab.
+    fn cycle_mru_step(&mut self, forward: bool) -> Task<Message> {
         let cycle = match self.tab_cycle.as_mut() {
             // Continuing a held run: advance the snapshot cursor.
             Some(cycle) => {
@@ -241,6 +327,30 @@ mod tests {
         assert_eq!(cycle_start_cursor(3, None, false), Some(2));
         // A single open tab is still reachable from a non-tab surface.
         assert_eq!(cycle_start_cursor(1, None, true), Some(0));
+    }
+
+    /// The setting round-trips through its code, and an unknown code (a
+    /// newer build's third order) reads as the default instead of
+    /// failing the boot read.
+    #[test]
+    fn switch_order_codes_round_trip_and_default() {
+        for order in TabSwitchOrder::ALL {
+            assert_eq!(TabSwitchOrder::from_code(order.code()), order);
+        }
+        assert_eq!(TabSwitchOrder::from_code("spiral"), TabSwitchOrder::Recent);
+        assert_eq!(TabSwitchOrder::from_code(""), TabSwitchOrder::Recent);
+    }
+
+    /// Strip order has no run: a press from the last chip wraps to the
+    /// first, and the start cursor is the same pure function the MRU run
+    /// opens with, so Home (no active tab) lands on the first chip
+    /// forward and the last one backward.
+    #[test]
+    fn strip_order_steps_from_the_active_chip_and_wraps() {
+        assert_eq!(cycle_start_cursor(3, Some(2), true), Some(0));
+        assert_eq!(cycle_start_cursor(3, Some(0), false), Some(2));
+        assert_eq!(cycle_start_cursor(3, None, true), Some(0));
+        assert_eq!(cycle_start_cursor(3, None, false), Some(2));
     }
 
     #[test]

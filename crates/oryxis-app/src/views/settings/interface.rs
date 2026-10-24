@@ -310,6 +310,28 @@ impl Oryxis {
                 |v| Message::Settings(SettingsMessage::SettingDuplicateTabPositionChanged(v)),
             ),
             Space::new().height(8),
+            // What Ctrl+Tab walks. Token-as-value like the rows above: the
+            // option list is the enum's codes, the display closure resolves
+            // each to its label, and the handler parses the code back.
+            self.nav_pick_row(
+                crate::i18n::t("tab_switch_order"),
+                crate::tab_cycle::TabSwitchOrder::ALL
+                    .iter()
+                    .map(|o| o.code().to_string())
+                    .collect(),
+                self.vaults.cur().prefs.tab_switch_order.code().to_string(),
+                |s: &String| {
+                    crate::i18n::t(crate::tab_cycle::TabSwitchOrder::from_code(s).label_key())
+                        .to_string()
+                },
+                200.0,
+                |v| Message::Settings(SettingsMessage::SettingTabSwitchOrderChanged(v)),
+            ),
+            Space::new().height(4),
+            text(crate::i18n::t("tab_switch_order_desc"))
+                .size(11)
+                .color(OryxisColors::t().text_muted),
+            Space::new().height(8),
             self.nav_toggle_row(
                 crate::i18n::t("show_tab_host_address_label"),
                 self.vaults.cur().prefs.show_tab_host_address,

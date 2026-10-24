@@ -242,6 +242,15 @@ impl Oryxis {
                 self.vaults.cur_mut().prefs.restore_tabs_connect = normalized.into();
                 self.persist_setting("restore_tabs_connect", normalized);
             }
+            SettingsMessage::SettingTabSwitchOrderChanged(val) => {
+                let order = crate::tab_cycle::TabSwitchOrder::from_code(&val);
+                self.vaults.cur_mut().prefs.tab_switch_order = order;
+                // A recent-use run still open (Ctrl held across the click,
+                // or stranded by a lost focus) is settled now: its snapshot
+                // describes an order the next press no longer walks.
+                self.commit_tab_cycle();
+                self.persist_setting("tab_switch_order", order.code());
+            }
             SettingsMessage::SettingToggleRestoreLastActiveTab => {
                 self.vaults.cur_mut().prefs.restore_last_active_tab = !self.vaults.cur_mut().prefs.restore_last_active_tab;
                 self.persist_setting(

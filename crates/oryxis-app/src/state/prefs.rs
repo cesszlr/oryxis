@@ -276,6 +276,10 @@ pub(crate) struct AppPrefs {
     /// app comes up, one at a time and in place, so the strip is live
     /// without a click). Only read while the restore itself is on.
     pub(crate) restore_tabs_connect: String,
+    /// What Ctrl+Tab walks: recent use (MRU, the default) or the strip's
+    /// own order (Windows Terminal's default). Persisted as
+    /// `tab_switch_order`; read by `tab_cycle::cycle_tab_step`.
+    pub(crate) tab_switch_order: crate::tab_cycle::TabSwitchOrder,
     /// Land on the tab that was active when the app was last closed,
     /// instead of Hosts (issue #229). Off by default: boot opening on
     /// Hosts is the #206 promise. Only read while the restore is on,
@@ -652,6 +656,7 @@ impl Default for AppPrefs {
             pinned_tab_style: "compact".into(),
             restore_tabs_on_launch: false,
             restore_tabs_connect: "selected".into(),
+            tab_switch_order: crate::tab_cycle::TabSwitchOrder::default(),
             restore_last_active_tab: false,
             duplicate_tab_position: "next".into(),
             tab_slot_includes_home: false,

@@ -255,6 +255,7 @@ impl Oryxis {
             | SettingsMessage::SettingToggleRestoreTabsOnLaunch
             | SettingsMessage::SettingRestoreTabsConnectChanged(..)
             | SettingsMessage::SettingToggleRestoreLastActiveTab
+            | SettingsMessage::SettingTabSwitchOrderChanged(..)
             | SettingsMessage::SettingToggleShowTabStatusDot
             | SettingsMessage::SettingNavOrientationChanged(..)
             | SettingsMessage::ToggleNavRailExpanded

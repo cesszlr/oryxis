@@ -255,8 +255,9 @@ coming next, see the [Roadmap](../README.md#roadmap).
   content itself, not just titles, decrypting on demand with a bounded
   scan, and can filter to the hosts a given command ever ran on.
 - **Pinned & reorderable tabs.** Pin tabs (restored on next launch, lazy
-  reconnect), drag to reorder, rename, MRU switching with Ctrl+Tab, and an
-  optional bottom tab bar.
+  reconnect), drag to reorder, rename, Ctrl+Tab switching by recent use or
+  in the strip's order (Settings > Interface), and an optional bottom tab
+  bar.
 - **Last session's tabs come back (opt-in).** Settings > Interface can
   bring every tab that was open back as a dormant chip at launch, the
   way a pin does; nothing dials until you select it.

@@ -75,6 +75,7 @@ pub(crate) static SETTINGS_INDEX: &[SettingsIndexEntry] = &[
     e(S::Interface, "tab_number_style", "tab number index numbering prefix badge icon slot ctrl digit"),
     e(S::Interface, "tab_number_slot_align", "align shortcuts ctrl digit home slot offset first tab"),
     e(S::Interface, "duplicate_tab_position", "duplicate tab position next beside end start append copy"),
+    e(S::Interface, "tab_switch_order", "ctrl tab switch order cycle recent use mru strip order windows terminal"),
     e(S::Interface, "show_tab_host_address_label", "tab host address ip port second line show"),
     e(S::Interface, "show_tab_status_dot", "tab status dot connection indicator"),
     e(S::Interface, "tab_accent_text", "tab text accent color tint"),

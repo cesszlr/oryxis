@@ -58,7 +58,7 @@ const VAULT_KEYS: &[&str] = &[
     "sync_signaling_token", "sync_signaling_url", "sync_transport", "sync_webdav_password",
     "sync_webdav_url", "sync_webdav_user", "tab_accent_color", "tab_accent_line",
     "tab_accent_text", "tab_accent_wash", "tab_bar_position", "tab_close_button_side",
-    "tab_fill_style", "tab_number_style", "tab_slot_includes_home", "tab_slots_home_migrated",
+    "tab_fill_style", "tab_number_style", "tab_slot_includes_home", "tab_slots_home_migrated", "tab_switch_order",
     "tab_uniform_size", "tab_width_mode", "terminal_auto_title", "terminal_bell_mode",
     "terminal_bg_dim", "terminal_bg_fit", "terminal_bg_image", "terminal_clipboard_access",
     "terminal_cursor_blink", "terminal_cursor_shape", "terminal_font_name", "terminal_font_size", "terminal_font_weight",
