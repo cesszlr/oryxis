@@ -407,16 +407,19 @@ mod selection_tests {
         assert_eq!(state.get_selection_text(&sel), "专用发票");
     }
 
+    /// The text a double click at `(col, line)` smart-selects, `None`
+    /// where the caller falls back to delimiter-word selection.
+    fn smart_text(state: &TerminalState, line: i32, col: u16) -> Option<String> {
+        crate::widget::smart_span_at(&state.backend.term, &state.palette, line, col)
+            .map(|(start, end)| state.get_selection_text(&Selection { start, end, block: false }))
+    }
+
     #[test]
     fn smart_select_grabs_whole_url() {
         // A click anywhere inside the URL returns the full token span,
         // even though "/" and ":" are word delimiters that would split it.
         let state = state_with(&["see https://example.com x"]);
-        let (c0, c1) =
-            crate::widget::smart_span_at(&state.backend.term, &state.palette, 0, 8)
-                .expect("URL should be detected");
-        let sel = Selection { start: (c0, 0), end: (c1, 0), block: false };
-        assert_eq!(state.get_selection_text(&sel), "https://example.com");
+        assert_eq!(smart_text(&state, 0, 8).as_deref(), Some("https://example.com"));
     }
 
     #[test]
@@ -424,7 +427,58 @@ mod selection_tests {
         // A click on a non-token word returns None so the caller falls
         // back to delimiter-word selection.
         let state = state_with(&["see https://example.com x"]);
-        assert!(crate::widget::smart_span_at(&state.backend.term, &state.palette, 0, 1).is_none());
+        assert_eq!(smart_text(&state, 0, 1), None);
+    }
+
+    #[test]
+    fn smart_select_takes_the_path_under_the_click_not_its_token() {
+        // Discussion #268: one whitespace token holding two paths. The
+        // click decides which path; the assignment's name is no path and
+        // falls back to the word the delimiters give.
+        let state = state_with(&["all_files=/path/to/file1,/path/to/file2"]);
+        assert_eq!(smart_text(&state, 0, 12).as_deref(), Some("/path/to/file1"));
+        assert_eq!(smart_text(&state, 0, 36).as_deref(), Some("/path/to/file2"));
+        assert_eq!(smart_text(&state, 0, 2), None);
+        // The `=` and the `,` are in no token either.
+        assert_eq!(smart_text(&state, 0, 9), None);
+        assert_eq!(smart_text(&state, 0, 24), None);
+    }
+
+    #[test]
+    fn smart_select_leaves_the_prose_punctuation_after_a_url() {
+        // The whitespace token is `https://example.com).`; the URL ends
+        // before the `)`, and a click on the `)` is on no token.
+        let state = state_with(&["(see https://example.com)."]);
+        assert_eq!(smart_text(&state, 0, 10).as_deref(), Some("https://example.com"));
+        assert_eq!(smart_text(&state, 0, 24), None);
+    }
+
+    #[test]
+    fn smart_select_prefers_the_widest_token_containing_the_click() {
+        // An IP inside a path: both detectors claim the digits, the path
+        // wins because it is what the click is inside of.
+        let state = state_with(&["tail /var/log/10.0.0.1.log"]);
+        assert_eq!(smart_text(&state, 0, 16).as_deref(), Some("/var/log/10.0.0.1.log"));
+        // A bare IP followed by a port: the IP, the port is not part of it.
+        let state = state_with(&["ssh 192.168.0.1:2222 now"]);
+        assert_eq!(smart_text(&state, 0, 6).as_deref(), Some("192.168.0.1"));
+    }
+
+    #[test]
+    fn smart_select_keeps_the_home_marker_of_a_path() {
+        let state = state_with(&["ls ~/.config/oryxis x"]);
+        assert_eq!(smart_text(&state, 0, 8).as_deref(), Some("~/.config/oryxis"));
+        assert_eq!(smart_text(&state, 0, 3).as_deref(), Some("~/.config/oryxis"));
+    }
+
+    #[test]
+    fn smart_select_follows_a_url_across_the_wrap() {
+        // 20 columns: the URL soft-wraps onto the second row, and the
+        // selection is the whole link, as Ctrl+click opens it.
+        let mut state = TerminalState::new_no_pty(20, 6).unwrap();
+        state.process(b"see https://example.com/abc/def x");
+        assert_eq!(smart_text(&state, 0, 8).as_deref(), Some("https://example.com/abc/def"));
+        assert_eq!(smart_text(&state, 1, 2).as_deref(), Some("https://example.com/abc/def"));
     }
 
     #[test]

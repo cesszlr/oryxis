@@ -1561,18 +1561,16 @@ where
                         state.start_selection((col, line), widget_state.modifiers.alt());
                     }
                     2 => {
-                        // Smart-select: a double-click inside a URL / IP /
-                        // path grabs the whole token instead of the
-                        // delimiter word. Falls back to word.
-                        if let Some((c0, c1)) =
+                        // Smart-select: a double-click INSIDE a URL / IP /
+                        // path grabs that token (a wrapped URL across its
+                        // rows) instead of the delimiter word. Anywhere
+                        // else, the rest of the same whitespace token
+                        // included, falls back to word.
+                        if let Some((start, end)) =
                             smart_span_at(&state.backend.term, &state.palette, line, col)
                         {
                             widget_state.select_anchor = None;
-                            state.set_selection(Selection {
-                                start: (c0, line),
-                                end: (c1, line),
-                                block: false,
-                            });
+                            state.set_selection(Selection { start, end, block: false });
                         } else {
                             widget_state.select_anchor = Some((SelectGranularity::Word, false));
                             let sel = self.semantic_selection(

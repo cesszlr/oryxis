@@ -691,14 +691,19 @@ pub(crate) fn detect_highlights(
             let mut i = 0;
             while i < len {
                 if bytes[i] == b'/' {
-                    if i > 0 {
-                        let prev = bytes[i - 1];
-                        if prev.is_ascii_alphanumeric() || prev == b'_' || prev == b'-' || prev == b'.' {
-                            i += 1;
-                            continue;
-                        }
+                    let is_tok = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b'.';
+                    if i > 0 && is_tok(bytes[i - 1]) {
+                        i += 1;
+                        continue;
                     }
-                    let start = i;
+                    // `~/bin` is one path, the home marker included: the
+                    // span starts on a `~` standing alone before the slash
+                    // (a `~` glued to a word, `a~/b`, is not one).
+                    let start = if i > 0 && bytes[i - 1] == b'~' && (i == 1 || !is_tok(bytes[i - 2])) {
+                        i - 1
+                    } else {
+                        i
+                    };
                     let mut j = i + 1;
                     while j < len {
                         let b = bytes[j];
@@ -1352,22 +1357,36 @@ pub(crate) fn osc8_scheme_allowed(uri: &str) -> bool {
     )
 }
 
-/// Smart-select span for double-click: if the cell at grid-line `line`,
-/// column `col` falls inside a detected URL / IP / path token, return its
-/// `(start_col, end_col)` (inclusive). Returns `None` otherwise (caller
-/// falls back to delimiter-word selection). Numbers are excluded, they are
-/// too granular to be a useful "word" target. Reads the grid directly by
-/// line so it stays correct when scrolled into history (unlike
-/// `url_at_cell`, which indexes by on-screen row number and so only
-/// matches the live screen).
+/// Smart-select target of a double click: the URL, IP or path the cell
+/// at grid-line `line`, column `col` is INSIDE, as the inclusive
+/// `(start, end)` cells of a flowing selection. `None` when no such
+/// token contains the cell, and the caller falls back to delimiter-word
+/// selection. Containment, not overlap: `all_files=/path/to/file1,/path/to/file2`
+/// is one whitespace token with two paths in it, and a double click on
+/// `file1` means that path while one on `all_files` means the word the
+/// delimiters give (discussion #268 had the whole token come back for
+/// both). Numbers are excluded, they are too granular to be a useful
+/// "word" target. Reads the grid directly by line so it stays correct
+/// when scrolled into history.
+///
+/// A URL is read by `url_run_at_cell`, so one that soft-wraps selects
+/// whole across its rows, the way Ctrl+click opens it and the hover
+/// underlines it. The other kinds are row-local; when several contain
+/// the cell (an IP inside a path: `/var/log/10.0.0.1.log`) the widest
+/// wins, the detectors' own order (URL, IP, path) decides nothing here.
 pub(crate) fn smart_span_at(
     term: &alacritty_terminal::Term<crate::backend::EventProxy>,
     palette: &TerminalPalette,
     line: i32,
     col: u16,
-) -> Option<(u16, u16)> {
+) -> Option<((u16, i32), (u16, i32))> {
     use alacritty_terminal::grid::Dimensions;
     use alacritty_terminal::index::{Column, Line};
+    if let Some((_, segments)) = url_run_at_cell(term, line, col) {
+        let (l0, c0, _) = *segments.first()?;
+        let (l1, _, c1) = *segments.last()?;
+        return Some(((c0, l0), (c1, l1)));
+    }
     let grid = term.grid();
     let l = Line(line);
     if l < grid.topmost_line() || l > grid.bottommost_line() {
@@ -1375,41 +1394,29 @@ pub(crate) fn smart_span_at(
     }
     let row = &grid[l];
     let ncols = grid.columns();
-    let mut present = vec![false; ncols];
     let mut cols: Vec<(u16, char)> = Vec::new();
     for ci in 0..ncols {
         let c = row[Column(ci)].c;
         if c != ' ' && c != '\0' {
-            present[ci] = true;
             cols.push((ci as u16, c));
         }
     }
-    if cols.is_empty() || !present.get(col as usize).copied().unwrap_or(false) {
+    if cols.is_empty() {
         return None;
     }
-    // Expand to the whitespace-bounded token containing the click.
-    let mut left = col;
-    while left > 0 && present[left as usize - 1] {
-        left -= 1;
-    }
-    let mut right = col;
-    while (right as usize + 1) < ncols && present[right as usize + 1] {
-        right += 1;
-    }
-    // Trigger only when that token overlaps a detected URL / IP / path
-    // highlight, so plain prose words still fall through to delimiter-word
-    // selection. The highlighter's own URL span may be shorter than the
-    // token (its matcher is loose), hence the overlap test rather than a
-    // containment test. `detect_highlights` takes (row, cells) pairs; a
-    // single synthetic row 0 is enough as long as we match on the same key.
+    // `detect_highlights` takes (row, cells) pairs; a single synthetic
+    // row 0 is enough as long as we match on the same key.
     let rows = [ScanRow { row: 0, cols, wraps_at: None }];
-    let hit = detect_highlights(&rows, palette, false, &[], PrivacyClasses::default()).into_iter().any(|h| {
-        h.row == 0
-            && h.kind != HighlightKind::Number
-            && h.start_col <= right
-            && h.end_col >= left
-    });
-    hit.then_some((left, right))
+    detect_highlights(&rows, palette, false, &[], PrivacyClasses::default())
+        .into_iter()
+        .filter(|h| {
+            h.row == 0
+                && h.kind != HighlightKind::Number
+                && h.start_col <= col
+                && col <= h.end_col
+        })
+        .max_by_key(|h| h.end_col - h.start_col)
+        .map(|h| ((h.start_col, line), (h.end_col, line)))
 }
 
 #[cfg(test)]
