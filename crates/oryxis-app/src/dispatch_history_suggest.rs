@@ -23,6 +23,12 @@
 //!   answers only while it can vouch for the line (caret at the end, no
 //!   history recall, no tab completion, no paste in flight); a tainted
 //!   line gets no popup, since nothing says what the remote editor holds.
+//!   A pick reads it AGAIN at pick time: the popup's rows were matched
+//!   against the line as it was at the last echo, and a keystroke can
+//!   land between that echo and the pick (a Down + Enter burst, a click
+//!   inside one round trip), so the bytes typed are computed against the
+//!   line the mirror holds now, and a line it cannot vouch for types
+//!   nothing.
 //!
 //! Inside tmux the popup does not open: the outer grid is the alternate
 //! screen for the whole session, and the shell's own report (`OSC 633 ;
@@ -139,25 +145,30 @@ pub(crate) fn rank_history(pool: &[String], typed: &str) -> Vec<HistorySuggestio
     out
 }
 
-/// The bytes a pick types into the pane: the rest of an extending command
-/// after what is already on the line, or one erase per typed character
-/// (the pane's own Backspace byte, so an appliance on Ctrl+H reads it
-/// too) followed by the whole command; a Carriage Return when the pick
-/// runs it. The text rides a bracketed paste when the terminal asked for
-/// one, so a command with a tab or a newline in it lands literally.
+/// The bytes a pick types into the pane to turn `typed`, the line the
+/// mirror holds NOW, into `command`: the rest of the command when it
+/// extends the line, else one erase per typed character (the pane's own
+/// Backspace byte, so an appliance on Ctrl+H reads it too) followed by
+/// the whole command; a Carriage Return when the pick runs it. Whether
+/// the command extends the line is decided here, on the live line, not
+/// on the row's flag: the row was classified against the line as it was
+/// at the last echo. The text rides a bracketed paste when the terminal
+/// asked for one, so a command with a tab or a newline in it lands
+/// literally.
 pub(crate) fn completion_bytes(
     typed: &str,
-    entry: &HistorySuggestion,
+    command: &str,
     backspace: u8,
     bracketed: bool,
     run: bool,
 ) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let text: &str = if entry.extends_typed && entry.command.starts_with(typed) {
-        &entry.command[typed.len()..]
-    } else {
-        bytes.extend(std::iter::repeat_n(backspace, typed.chars().count()));
-        &entry.command
+    let text: &str = match command.strip_prefix(typed) {
+        Some(rest) => rest,
+        None => {
+            bytes.extend(std::iter::repeat_n(backspace, typed.chars().count()));
+            command
+        }
     };
     bytes.extend(oryxis_terminal::wrap_paste(text, bracketed));
     if run {
@@ -499,18 +510,26 @@ impl Oryxis {
                 self.dismiss_history_suggest();
             }
             TerminalMessage::HistorySuggestPick(idx, run) => {
-                let Some((pane_id, entries, typed, _)) = self.history_suggest_state() else {
+                let Some((pane_id, entries, _, _)) = self.history_suggest_state() else {
                     return Task::none();
                 };
                 let Some(entry) = entries.get(idx).cloned() else {
                     return Task::none();
                 };
-                let typed = typed.to_string();
                 self.overlay = None;
                 let Some(tab_idx) = self.pane_tab_index(pane_id) else {
                     return Task::none();
                 };
                 let Some(pane) = self.pane_by_id_mut(pane_id) else {
+                    return Task::none();
+                };
+                // The line as the mirror holds it NOW, not as the popup
+                // matched it: a keystroke between the last echo and the
+                // pick (a Down + Enter burst, a click inside one round
+                // trip) would otherwise be typed over, or erased one
+                // short. A line the mirror cannot vouch for any more
+                // (tainted, caret moved) gets nothing typed into it.
+                let Some(typed) = pane.input_tracker.composing_line() else {
                     return Task::none();
                 };
                 // The completed line is not offered against again: a
@@ -524,7 +543,7 @@ impl Oryxis {
                     .map(|s| s.bracketed_paste_enabled())
                     .unwrap_or(false);
                 let backspace = pane.quirks.backspace.byte(false);
-                let bytes = completion_bytes(&typed, &entry, backspace, bracketed, run);
+                let bytes = completion_bytes(&typed, &entry.command, backspace, bracketed, run);
                 // Through the capture funnel: the mirror ends up holding
                 // the whole line, and a run records the command's use
                 // like a typed one. Ring-preserving, like the History
@@ -634,30 +653,40 @@ mod tests {
 
     #[test]
     fn a_pick_types_the_rest_or_erases_and_retypes() {
-        let extends = HistorySuggestion {
-            command: "git status --short".into(),
-            extends_typed: true,
-        };
-        assert_eq!(completion_bytes("git sta", &extends, 0x7f, false, false), b"tus --short");
-        assert_eq!(completion_bytes("git sta", &extends, 0x7f, false, true), b"tus --short\r");
+        let extends = "git status --short";
+        assert_eq!(completion_bytes("git sta", extends, 0x7f, false, false), b"tus --short");
+        assert_eq!(completion_bytes("git sta", extends, 0x7f, false, true), b"tus --short\r");
         // Bracketed paste wraps the text, the Enter stays outside it.
-        let wrapped = completion_bytes("git sta", &extends, 0x7f, true, true);
+        let wrapped = completion_bytes("git sta", extends, 0x7f, true, true);
         assert!(wrapped.starts_with(b"\x1b[200~tus --short\x1b[201~"));
         assert_eq!(wrapped.last(), Some(&b'\r'));
         // A containing match erases what was typed, one Backspace per
         // CHARACTER (not per byte: `ça` is two chars), with the pane's
         // own Backspace byte, then types the whole command.
-        let contains = HistorySuggestion {
-            command: "sudo git stash".into(),
-            extends_typed: false,
-        };
+        let contains = "sudo git stash";
         assert_eq!(
-            completion_bytes("git sta", &contains, 0x08, false, false),
+            completion_bytes("git sta", contains, 0x08, false, false),
             b"\x08\x08\x08\x08\x08\x08\x08sudo git stash"
         );
         assert_eq!(
-            completion_bytes("ça", &contains, 0x7f, false, false),
+            completion_bytes("ça", contains, 0x7f, false, false),
             b"\x7f\x7fsudo git stash"
+        );
+    }
+
+    /// The row was matched against `echo HI`; by the time of the pick
+    /// the mirror holds `echo HIS` (a keystroke inside one round trip).
+    /// The bytes are computed against the LIVE line: the rest after
+    /// `echo HIS`, never the rest after the stale prefix, which would
+    /// have typed `echo HISST_ONE`. And a line the keystroke took past
+    /// the command (`echo HIX`) is erased whole, one Backspace per
+    /// character of the LIVE line.
+    #[test]
+    fn a_pick_completes_the_line_the_mirror_holds_now_not_the_one_the_row_saw() {
+        assert_eq!(completion_bytes("echo HIS", "echo HIST_ONE", 0x7f, false, false), b"T_ONE");
+        assert_eq!(
+            completion_bytes("echo HIX", "echo HIST_ONE", 0x7f, false, false),
+            b"\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7fecho HIST_ONE"
         );
     }
 

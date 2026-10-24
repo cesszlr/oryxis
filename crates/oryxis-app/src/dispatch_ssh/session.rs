@@ -370,6 +370,10 @@ impl Oryxis {
                         // anything any more (issue #117).
                         p.login_script = None;
                         p.password_prompt_sig = None;
+                        // A line composed on the dead shell is over:
+                        // the pending probe, the mute and the pool go
+                        // (the reconnect's first line reloads the pool).
+                        p.history_suggest = Default::default();
                         // Trigger grants and cooldowns belong to the
                         // session they were given for (C6): permission
                         // to let REMOTE output type into this shell must

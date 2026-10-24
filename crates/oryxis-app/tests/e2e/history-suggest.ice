@@ -88,7 +88,20 @@ screenshot hist-completed
 type enter
 wait 1200
 
-# 4. The shell's own marks. With OSC 133 the line is read from the B
+# 4. The mouse path: a click on a row completes the line too. The popup
+#    has no backdrop (the terminal is right under it), so the click has
+#    to land on the row, not on the canvas.
+type "echo HI"
+wait 1500
+expect "From this host's history"
+click "echo HIST_ONE"
+wait 1200
+absent "From this host's history"
+screenshot hist-clicked
+type ctrl+c
+wait 600
+
+# 5. The shell's own marks. With OSC 133 the line is read from the B
 #    mark's coordinates; only the command that extends the prefix is
 #    offered, and Shift+Enter completes AND runs it, which "Copy Last
 #    Command + Output" (unbound, so through the palette) proves exactly.
