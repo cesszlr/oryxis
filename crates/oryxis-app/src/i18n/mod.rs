@@ -420,6 +420,17 @@ pub fn line_count(n: usize) -> String {
     }
 }
 
+/// "1 character" / "N characters", the same shape as [`line_count`].
+/// Used by the MCP sudo dialog beside the line count: one long line is
+/// one line, and the count of characters is what says how long.
+pub fn char_count(n: usize) -> String {
+    if n == 1 {
+        t("char_count_one").to_string()
+    } else {
+        format!("{} {}", n, t("char_count_other"))
+    }
+}
+
 fn translate(key: &str, lang: Language) -> &'static str {
     match lang {
         Language::English => en::lookup(key),

