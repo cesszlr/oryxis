@@ -38,7 +38,9 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use oryxis_ssh::ExecResult;
-use oryxis_vault::mcp_consent::{self, Decision, DenyReason, Status, SudoRequest, MAX_COMMAND_BYTES};
+use oryxis_vault::mcp_consent::{
+    self, Decision, DenyReason, EncodeError, Status, SudoRequest, MAX_COMMAND_BYTES, MAX_REQUEST_BYTES,
+};
 use zeroize::Zeroizing;
 
 /// The probe: exits 0 only when sudo needs no password (NOPASSWD, or a
@@ -57,9 +59,11 @@ const DECISION_GRACE: Duration = Duration::from_secs(5);
 
 /// Why `command` cannot run under sudo at all, before the dial (and
 /// whatever path the probe would take): `None` when its size is within
-/// [`MAX_COMMAND_BYTES`]. The app refuses a request file past its own
-/// cap too, unread; this check is what keeps a legitimate request under
-/// it. A longer job belongs in a script on the host.
+/// [`MAX_COMMAND_BYTES`], the cap on what a person is asked to READ,
+/// counted in the command's own bytes. The app's cap is on the request
+/// FILE, in the bytes of the JSON it reads, and [`request_too_long`] is
+/// what keeps a request under that one. A longer job belongs in a
+/// script on the host.
 pub fn command_too_long(command: &str) -> Option<String> {
     (command.len() > MAX_COMMAND_BYTES).then(|| {
         format!(
@@ -69,6 +73,28 @@ pub fn command_too_long(command: &str) -> Option<String> {
             MAX_COMMAND_BYTES
         )
     })
+}
+
+/// Why `request` cannot be asked, before its file is posted: `None` when
+/// the file stays within [`MAX_REQUEST_BYTES`] (`mcp_consent::encode`).
+/// The command's cap counts its raw bytes; the file's counts the JSON the
+/// app reads, where a line break, a quote, a backslash or a control byte
+/// of the command is an escape of two to six bytes, so a command under
+/// [`MAX_COMMAND_BYTES`] can still make a file the app removes unread,
+/// which this side could only report as the request vanishing. Measured
+/// where the file is born, so the agent reads the size and the remedy.
+pub fn request_too_long(request: &SudoRequest) -> Option<String> {
+    match mcp_consent::encode(request) {
+        Ok(_) => None,
+        Err(EncodeError::TooLarge { bytes }) => Some(format!(
+            "The sudo request for Oryxis is {bytes} bytes once written out (the command's {} bytes with every line break, \
+             quote, backslash and control character counted as the escape it is written as, plus the host, login and \
+             route); it may be at most {MAX_REQUEST_BYTES} bytes, since the user may have to read it in Oryxis before \
+             approving. Put the work in a script on the host and run that instead. Nothing ran.",
+            request.command.len()
+        )),
+        Err(e) => Some(format!("The sudo request for Oryxis could not be written out: {e}. Nothing ran.")),
+    }
 }
 
 /// What the probe found.
@@ -400,6 +426,9 @@ async fn approve(
             .map(|d| d.as_secs())
             .unwrap_or(0),
     };
+    if let Some(too_long) = request_too_long(&request) {
+        return Err(SudoFailure::NotRun(too_long));
+    }
     tracing::info!(host = %plan.label, vault = %served.slug, request = %request.id, "sudo: asking the app");
     let verify =
         |posted: &[u8], decision: Decision, tag: &str| served.vault().verify_mcp_consent_tag(posted, decision, tag);
@@ -509,6 +538,41 @@ mod tests {
         assert_eq!(command_too_long(&"x".repeat(MAX_COMMAND_BYTES)), None, "the cap is inclusive");
         let text = command_too_long(&"x".repeat(MAX_COMMAND_BYTES + 1)).unwrap();
         assert!(text.contains("32769 bytes") && text.contains("at most 32768 bytes"), "{text}");
+        assert!(text.ends_with("Nothing ran."));
+    }
+
+    #[test]
+    fn a_request_whose_file_outgrows_the_cap_does_not_run() {
+        let with = |command: String| SudoRequest {
+            id: SudoRequest::new_id().unwrap(),
+            vault_id: uuid::Uuid::new_v4(),
+            vault_label: "Personal".into(),
+            host_id: uuid::Uuid::new_v4(),
+            host_label: "web".into(),
+            login: "deploy".into(),
+            address: "10.0.0.5:22".into(),
+            route: vec!["bastion (1.2.3.4:22)".into()],
+            client: Some("claude-code".into()),
+            command,
+            created_unix: 1_700_000_000,
+        };
+        // A command at its own cap of plain bytes: within both caps.
+        let plain = with("x".repeat(MAX_COMMAND_BYTES));
+        assert_eq!(command_too_long(&plain.command), None);
+        assert_eq!(request_too_long(&plain), None);
+        // The same length of line breaks passes the command's cap (raw
+        // bytes) and not the file's (each one is `\n` there): refused
+        // here, with the size and the remedy, never posted for the app
+        // to remove unread.
+        let escaped = with("\n".repeat(MAX_COMMAND_BYTES));
+        assert_eq!(command_too_long(&escaped.command), None);
+        let text = request_too_long(&escaped).unwrap();
+        let file = serde_json::to_vec(&escaped).unwrap().len();
+        assert!(file as u64 > MAX_REQUEST_BYTES);
+        assert!(
+            text.contains(&format!("is {file} bytes")) && text.contains(&format!("at most {MAX_REQUEST_BYTES} bytes")),
+            "{text}"
+        );
         assert!(text.ends_with("Nothing ran."));
     }
 

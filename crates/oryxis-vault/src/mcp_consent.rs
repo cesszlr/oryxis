@@ -66,11 +66,51 @@ pub const MAX_COMMAND_BYTES: usize = 32 * 1024;
 
 /// The most a request FILE may weigh: the command at its cap plus room
 /// for every other field (labels, a long jump route, the client's name).
-/// A server never posts past it; a file over it was written by someone
-/// else (the runtime folder's other writer runs as the user), and the
-/// app neither reads nor lays it out: the scan removes it and a claim
-/// refuses it, so a forged file of any size costs the app nothing.
+/// Counted over the file's bytes, which are JSON: a line break, a quote,
+/// a backslash or a control byte in the command is written as its escape
+/// (two to six bytes), so a command under [`MAX_COMMAND_BYTES`] can make
+/// a file over this cap. [`encode`] measures the file as [`post`] writes
+/// it, the server runs it before posting and `post` refuses past it, so
+/// no server writes a file the app removes unread; a file over the cap
+/// was written by someone else (the runtime folder's other writer runs
+/// as the user), and the app neither reads nor lays it out: the scan
+/// removes it and a claim refuses it, so a forged file of any size costs
+/// the app nothing.
 pub const MAX_REQUEST_BYTES: u64 = (MAX_COMMAND_BYTES + 16 * 1024) as u64;
+
+/// Why a request cannot become a file.
+#[derive(Debug)]
+pub enum EncodeError {
+    /// The file would weigh `bytes`, over [`MAX_REQUEST_BYTES`].
+    TooLarge { bytes: usize },
+    /// The request does not serialize (nothing in [`SudoRequest`] can
+    /// make this happen; kept for the type's sake, never swallowed).
+    Json(serde_json::Error),
+}
+
+impl std::fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EncodeError::TooLarge { bytes } => {
+                write!(f, "request file of {bytes} bytes over the {MAX_REQUEST_BYTES} byte cap")
+            }
+            EncodeError::Json(e) => write!(f, "request does not serialize: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for EncodeError {}
+
+/// The request as its file carries it, the bytes the answer's tag covers.
+/// Refused past [`MAX_REQUEST_BYTES`]: the one measure of the file, taken
+/// by the server before anything is posted and by [`post`] itself.
+pub fn encode(request: &SudoRequest) -> Result<Vec<u8>, EncodeError> {
+    let bytes = serde_json::to_vec(request).map_err(EncodeError::Json)?;
+    if bytes.len() as u64 > MAX_REQUEST_BYTES {
+        return Err(EncodeError::TooLarge { bytes: bytes.len() });
+    }
+    Ok(bytes)
+}
 
 /// Where requests and answers live, `None` when the home directory is
 /// unknown.
@@ -221,13 +261,16 @@ fn path_of(dir: &Path, id: &str, ext: &str) -> PathBuf {
 }
 
 /// Post `request` (server side). Returns the bytes written: the server
-/// verifies the answer's tag over them.
+/// verifies the answer's tag over them. A request whose file would be
+/// over [`MAX_REQUEST_BYTES`] is refused ([`encode`]) and nothing is
+/// written: the app would remove such a file unread, and the server
+/// would read that as the request vanishing.
 pub fn post(dir: &Path, request: &SudoRequest) -> std::io::Result<Vec<u8>> {
     if !valid_id(&request.id) {
         return Err(std::io::Error::other("malformed request id"));
     }
+    let bytes = encode(request).map_err(std::io::Error::other)?;
     create_private_dir(dir)?;
-    let bytes = serde_json::to_vec(request).map_err(std::io::Error::other)?;
     write_atomic(&path_of(dir, &request.id, "request"), &bytes)?;
     Ok(bytes)
 }
@@ -549,6 +592,35 @@ mod tests {
         let capped = SudoRequest { command: "x".repeat(MAX_COMMAND_BYTES), ..r.clone() };
         std::fs::write(&file, serde_json::to_vec(&capped).unwrap()).unwrap();
         assert_eq!(scan(&dir, now()).posted.len(), 1);
+        assert!(claim(&dir, &r.id).is_some());
+    }
+
+    #[test]
+    fn post_refuses_a_request_whose_file_outgrows_the_cap() {
+        // The command cap counts raw bytes, the file cap the JSON the
+        // app reads: a line break is two bytes there, so a command AT
+        // the command cap made of line breaks makes a file over the file
+        // cap, which the app removes unread. The server never writes it.
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let r = request(&dir);
+        withdraw(&dir, &r.id);
+        let file = dir.join(format!("{}.request", r.id));
+        let escaped = SudoRequest { command: "\n".repeat(MAX_COMMAND_BYTES), ..r.clone() };
+        let bytes = serde_json::to_vec(&escaped).unwrap().len();
+        assert!(bytes as u64 > MAX_REQUEST_BYTES, "{bytes}");
+        match encode(&escaped) {
+            Err(EncodeError::TooLarge { bytes: measured }) => assert_eq!(measured, bytes),
+            other => panic!("{other:?}"),
+        }
+        let err = post(&dir, &escaped).unwrap_err();
+        assert!(err.to_string().contains(&format!("{bytes} bytes")), "{err}");
+        assert!(!file.exists(), "nothing written");
+        // The same command of plain bytes is within both caps.
+        let plain = SudoRequest { command: "x".repeat(MAX_COMMAND_BYTES), ..r.clone() };
+        let written = post(&dir, &plain).unwrap();
+        assert_eq!(written, encode(&plain).unwrap());
+        assert_eq!(std::fs::read(&file).unwrap(), written);
         assert!(claim(&dir, &r.id).is_some());
     }
 
