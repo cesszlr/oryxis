@@ -170,10 +170,21 @@ impl Oryxis {
     /// host, login and warnings above the fold. In the window that
     /// draws the card (`floats_here`): the handover raises nothing, so
     /// `claim_floats` does not move it.
+    ///
+    /// The keyboard ring starts over with the card too. Every card is
+    /// the same `ModalSurface`, so a selection the previous one left
+    /// (the ring Tabbed onto Allow, or the cursor resting on it, which
+    /// selects without drawing a ring) survives the handover as far as
+    /// the key router is concerned, and the next Enter would fire that
+    /// row on a card nobody read, its buttons below the fold. Dropped
+    /// here, where every path that seats a card meets (an answer, Esc,
+    /// a deadline, a lock, a withdrawal), so the card opens on Deny.
     pub(crate) fn mcp_sudo_housekeeping(&mut self) -> Option<Task<Message>> {
         if !self.mcp_sudo.came_up() {
             return None;
         }
+        self.keynav.modal.selected = None;
+        self.keynav.modal.kbd.set(false);
         Some(self.mcp_sudo_scroll_card(false))
     }
 
