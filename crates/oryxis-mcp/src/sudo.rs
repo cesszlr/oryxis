@@ -38,7 +38,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use oryxis_ssh::ExecResult;
-use oryxis_vault::mcp_consent::{self, Decision, DenyReason, Status, SudoRequest};
+use oryxis_vault::mcp_consent::{self, Decision, DenyReason, Status, SudoRequest, MAX_COMMAND_BYTES};
 use zeroize::Zeroizing;
 
 /// The probe: exits 0 only when sudo needs no password (NOPASSWD, or a
@@ -55,16 +55,11 @@ const POLL: Duration = Duration::from_millis(250);
 /// arrives before this side gives up.
 const DECISION_GRACE: Duration = Duration::from_secs(5);
 
-/// The most a command may weigh to run under sudo, in bytes. The person
-/// may have to READ it in the app's dialog before the password goes, and
-/// the agent decides how long it is: past this, the dialog is a wall of
-/// text nobody judges, and the window spends its frames shaping it. A
-/// longer job belongs in a script on the host. Checked before anything
-/// is dialled, whatever path the probe would take.
-pub const MAX_COMMAND_BYTES: usize = 32 * 1024;
-
-/// Why `command` cannot run under sudo at all, before the dial: `None`
-/// when its size is fine.
+/// Why `command` cannot run under sudo at all, before the dial (and
+/// whatever path the probe would take): `None` when its size is within
+/// [`MAX_COMMAND_BYTES`]. The app refuses a request file past its own
+/// cap too, unread; this check is what keeps a legitimate request under
+/// it. A longer job belongs in a script on the host.
 pub fn command_too_long(command: &str) -> Option<String> {
     (command.len() > MAX_COMMAND_BYTES).then(|| {
         format!(

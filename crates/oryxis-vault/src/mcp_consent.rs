@@ -57,6 +57,21 @@ pub const DECISION_WINDOW: Duration = Duration::from_secs(60);
 /// mid-question) and the app's scan removes it.
 pub const STALE_AFTER: Duration = Duration::from_secs(5 * 60);
 
+/// The most a command may weigh to run under sudo, in bytes. The person
+/// may have to READ it in the app's dialog before the password goes, and
+/// the agent decides how long it is: past this, the dialog is a wall of
+/// text nobody judges, and the window spends its frames shaping it. The
+/// server refuses a longer command before anything is dialled.
+pub const MAX_COMMAND_BYTES: usize = 32 * 1024;
+
+/// The most a request FILE may weigh: the command at its cap plus room
+/// for every other field (labels, a long jump route, the client's name).
+/// A server never posts past it; a file over it was written by someone
+/// else (the runtime folder's other writer runs as the user), and the
+/// app neither reads nor lays it out: the scan removes it and a claim
+/// refuses it, so a forged file of any size costs the app nothing.
+pub const MAX_REQUEST_BYTES: u64 = (MAX_COMMAND_BYTES + 16 * 1024) as u64;
+
 /// Where requests and answers live, `None` when the home directory is
 /// unknown.
 pub fn consent_dir() -> Option<PathBuf> {
@@ -66,6 +81,17 @@ pub fn consent_dir() -> Option<PathBuf> {
 
 /// What the server asks: everything the person needs to decide, and
 /// nothing secret (the password stays in the server).
+///
+/// The app and the plugin are released on their own tags, so the two
+/// sides of this file are often different builds. A field one side does
+/// not know is dropped on read and covered by the tag all the same (the
+/// tag is over the bytes), which settles a NEWER server. A newer APP
+/// reads files the older server posts, so **every field added here
+/// carries `#[serde(default)]`**: a required field would make `claim`
+/// fail on every request of the installed plugin, and the agent would
+/// read "not picked up" while the app sits there unlocked.
+/// `a_file_of_the_first_shape_still_claims` pins the shape of the first
+/// release.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SudoRequest {
     /// 32 lowercase hex digits, random: the file name and the nonce the
@@ -244,16 +270,32 @@ pub fn withdraw(dir: &Path, id: &str) {
 }
 
 /// Take request `id` for this app instance (app side). `None` when
-/// another instance took it first or the server withdrew it; else the
-/// request as claimed, with the bytes it was read from.
+/// another instance took it first, the server withdrew it, or the file
+/// is not a request this build can ask (over [`MAX_REQUEST_BYTES`], or
+/// unreadable: logged, since a plugin and an app of different builds
+/// would otherwise read as "nobody picked it up"); else the request as
+/// claimed, with the bytes it was read from.
 pub fn claim(dir: &Path, id: &str) -> Option<Claimed> {
     if !valid_id(id) {
         return None;
     }
+    let posted = path_of(dir, id, "request");
+    if std::fs::metadata(&posted).ok()?.len() > MAX_REQUEST_BYTES {
+        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request file over the size cap, removed unread");
+        let _ = std::fs::remove_file(&posted);
+        return None;
+    }
     let claimed = path_of(dir, id, "claimed");
-    std::fs::rename(path_of(dir, id, "request"), &claimed).ok()?;
+    std::fs::rename(&posted, &claimed).ok()?;
     let bytes = std::fs::read(&claimed).ok()?;
-    let request = serde_json::from_slice::<SudoRequest>(&bytes).ok().filter(|r| r.id == id)?;
+    let request = match serde_json::from_slice::<SudoRequest>(&bytes) {
+        Ok(request) if request.id == id => request,
+        Ok(_) => return None,
+        Err(e) => {
+            tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request does not parse (plugin and app of different builds?): {e}");
+            return None;
+        }
+    };
     Some(Claimed { request, bytes })
 }
 
@@ -274,8 +316,9 @@ pub fn answer(dir: &Path, id: &str, answer: &Answer) -> std::io::Result<()> {
 }
 
 /// Read the folder (app side): the requests waiting for a claim and the
-/// live claims. Removes debris older than [`STALE_AFTER`], and a request
-/// past its claim window (its server has stopped waiting for it).
+/// live claims. Removes debris older than [`STALE_AFTER`], a request
+/// past its claim window (its server has stopped waiting for it), and a
+/// request file over [`MAX_REQUEST_BYTES`], unread.
 pub fn scan(dir: &Path, now_unix: u64) -> Scan {
     let mut out = Scan::default();
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -289,10 +332,10 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
         ) else {
             continue;
         };
-        let age = entry
-            .metadata()
-            .and_then(|m| m.modified())
-            .ok()
+        let metadata = entry.metadata().ok();
+        let age = metadata
+            .as_ref()
+            .and_then(|m| m.modified().ok())
             .and_then(|t| t.elapsed().ok())
             .unwrap_or_default();
         if !valid_id(stem) {
@@ -308,6 +351,11 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
         }
         match ext {
             "request" => {
+                if metadata.as_ref().is_some_and(|m| m.len() > MAX_REQUEST_BYTES) {
+                    tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request file over the size cap, removed unread");
+                    let _ = std::fs::remove_file(&path);
+                    continue;
+                }
                 let Some(request) = std::fs::read(&path)
                     .ok()
                     .and_then(|b| serde_json::from_slice::<SudoRequest>(&b).ok())
@@ -482,6 +530,49 @@ mod tests {
         assert_eq!(claimed.request.command, "uptime", "the person reads the swapped command");
         assert_ne!(claimed.bytes, bytes);
         assert_ne!(tag_message(&claimed.bytes, Decision::Once), tag_message(&bytes, Decision::Once));
+    }
+
+    #[test]
+    fn an_oversized_request_is_removed_unread_by_scan_and_claim() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let r = request(&dir);
+        let big = SudoRequest { command: "x".repeat(MAX_REQUEST_BYTES as usize), ..r.clone() };
+        let file = dir.join(format!("{}.request", r.id));
+        std::fs::write(&file, serde_json::to_vec(&big).unwrap()).unwrap();
+        assert!(scan(&dir, now()).posted.is_empty(), "never offered");
+        assert!(!file.exists(), "removed by the scan");
+        std::fs::write(&file, serde_json::to_vec(&big).unwrap()).unwrap();
+        assert_eq!(claim(&dir, &r.id), None, "never claimed");
+        assert!(!file.exists() && !dir.join(format!("{}.claimed", r.id)).exists());
+        // At the server's own cap the request goes through.
+        let capped = SudoRequest { command: "x".repeat(MAX_COMMAND_BYTES), ..r.clone() };
+        std::fs::write(&file, serde_json::to_vec(&capped).unwrap()).unwrap();
+        assert_eq!(scan(&dir, now()).posted.len(), 1);
+        assert!(claim(&dir, &r.id).is_some());
+    }
+
+    #[test]
+    fn a_file_of_the_first_shape_still_claims() {
+        // The request file as the first plugin release (mcp 0.1.14)
+        // posts it, with the two optional fields of that shape left out.
+        // A newer app adds fields with `#[serde(default)]` only, so this
+        // file claims on every later build; a required field would turn
+        // every request of an installed plugin into "not picked up".
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        let id = "0123456789abcdef0123456789abcdef";
+        let first_shape = format!(
+            "{{\"id\":\"{id}\",\"vault_id\":\"11111111-2222-4333-8444-555555555555\",\"vault_label\":\"Personal\",\
+             \"host_id\":\"66666666-7777-4888-8999-000000000000\",\"host_label\":\"web\",\"login\":\"deploy\",\
+             \"address\":\"10.0.0.5:22\",\"command\":\"id\",\"created_unix\":0}}"
+        );
+        std::fs::write(dir.join(format!("{id}.request")), first_shape.as_bytes()).unwrap();
+        let claimed = claim(&dir, id).expect("the first release's file claims on this build");
+        assert_eq!(claimed.request.command, "id");
+        assert!(claimed.request.route.is_empty() && claimed.request.client.is_none());
+        assert_eq!(claimed.bytes, first_shape.as_bytes());
     }
 
     #[test]
