@@ -4,12 +4,12 @@ All notable changes to Oryxis are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.22.0] - 2026-10-24
 
-Several encrypted vaults can be open at once, each with its own master password, settings, sync and MCP exposure; every window works on one of them.
+Several encrypted vaults can be open at once, each with its own master password, settings, sync and MCP exposure, and every window works on one of them. The terminal suggests the host's past commands as you type, Ctrl+Tab can walk the tab bar's own order, the caret takes a shape, and the MCP plugin runs a command as root only after you approve it on screen.
 
 ### Added
-- Several vaults: Settings > Vaults creates, renames, locks, removes and deletes vaults, and opens a vault file from anywhere (a USB key); the file of a vault that is not there is reported, never replaced.
+- Several vaults: Settings > Vaults creates, renames, locks, removes and deletes vaults, and opens a vault file from anywhere; a file that is not there is reported, never replaced.
 - The Home tab carries the vault the window works on and its switcher; Settings > Vaults moves the switcher to the toolbar or hides it with a single vault.
 - A shortcut per vault, plus "Next vault", "Previous vault" and "Open vault switcher" (unbound), and "Vault: <name>", "New vault…" and "Lock all vaults" in the command palette.
 - The app opens the last vault used; Settings > Vaults can ask which vault to open at start instead.
@@ -17,24 +17,44 @@ Several encrypted vaults can be open at once, each with its own master password,
 - A deep link, a JumpList entry or `--connect` opens the vault that holds the host; the tray's recent hosts list every open vault's.
 - Settings rows that apply to the whole device (language, renderer, folders, the SSH agent, updates, shortcuts) carry a badge; the rest belong to the vault.
 - The SSH agent serves the keys of every unlocked vault; with several, a key's comment names its vault.
-- Every vault syncs on its own (folder, Git, WebDAV, SFTP, relay); two vaults pointed at one target are refused; P2P sync listens on one port for every vault, a remote device pairs with one vault per computer, and peers on older builds keep working.
+- Every vault syncs on its own; two vaults on one target are refused, P2P sync listens on one port, and a remote device pairs with one vault per computer.
 - An `.oryxis` export can be imported as a new vault.
 - The window title names the vault when there are several.
-- MCP plugin 0.1.13 serves every vault it can open: `ORYXIS_VAULT_PASSWORD_<SLUG>` and `ORYXIS_MCP_TOKEN_<SLUG>` per vault (the first keeps the plain names), `--vault <slug>` for one, a `vault` field in every answer, a `vault` parameter on every tool, and `list_vaults`; Settings > MCP Server writes each vault's variables into the same client entry.
-- A snippet bar under the terminal: a snippet marked "Show in snippet bar" (in its editor or its card's menu) gets a button there; a click runs it, a right-click pastes it (#266, requested by @MmYyF).
+- MCP plugin 0.1.13 serves every vault it can open: `ORYXIS_VAULT_PASSWORD_<SLUG>` and `ORYXIS_MCP_TOKEN_<SLUG>` per vault (the first keeps the plain names), `--vault <slug>` for one.
+- Every MCP answer carries a `vault` field, every tool takes a `vault` parameter, `list_vaults` lists them; Settings > MCP Server writes each vault's variables into the same client entry.
+- MCP plugin 0.1.14: `ssh_execute` takes `sudo: true`; the stored password reaches sudo only after you approve the command in Oryxis, once or for the session.
+- A snippet bar under the terminal: a snippet marked "Show in snippet bar" gets a button there; a click runs it, a right-click pastes it (#266, requested by @MmYyF).
 - Settings > Terminal sets the cursor's shape (block, bar, underline) and whether it blinks; a program that picks its own cursor keeps it (#266).
 - Settings > Interface picks what Ctrl+Tab walks: recent use (the default) or the tab bar's own order, the Windows Terminal way.
-- Typing at a prompt offers the commands run before on that host that start with (or contain) the text, under the line: Down picks, Enter completes, Shift+Enter runs, Esc hides; off under Settings > Terminal > Capture command history (#266, requested by @MmYyF).
+- Typing at a prompt offers the commands run before on that host, under the line: Down picks, Enter completes, Shift+Enter runs, Esc hides (#266, requested by @MmYyF).
+- The suggestions switch off under Settings > Terminal > Capture command history.
+- A snippet step that pastes the clipboard on the run's terminal and presses Enter, with a confirmation first by default (#257, by @hamidrg20001379).
+- A dragged tab follows the cursor as in Chrome and lands beside the chip under it; the drop selects it (#263, by @shideqin).
+- The tab strip and its popovers follow a right-to-left layout; the vault switcher gains "Manage vaults…".
+- A focused field anywhere in the window (the find bar, a sidebar search, the chat, a dialog) keeps the input method's candidate window (#264, by @cesszlr).
+- Alt+Backspace (Option+Delete on macOS) deletes the word before the cursor; Alt with Enter, Escape, Tab and Space sends ESC before the key (#265, by @cesszlr).
+- An SFTP operation that fails (a transfer, a rename, a delete, a new entry) says so above the listing, which stays.
 
 ### Changed
-- Device-level settings (language, window geometry, tray, renderer, updates, offline mode, local programs and folders, the SSH agent, the sync listen port and device name, shortcuts) now live in `~/.oryxis/device.json`, copied once from the vault on first start.
-- A second Oryxis process no longer removes the first one's spooled recordings at start.
 - Sync protocol 11 (snapshot format 7) carries the snippet bar: update every synced device, an older one is refused at the handshake.
+- Device-level settings (language, window geometry, tray, renderer, updates, offline mode, local programs and folders, the SSH agent, shortcuts) now live in `~/.oryxis/device.json`, copied once from the vault.
+- A command sent to sudo through the MCP plugin may weigh at most 32 KiB, since you may have to read it before approving.
 
 ### Fixed
 - A cursor the program hides (htop, `tput civis`) stays hidden.
 - An edited snippet reaches the other synced devices.
-- A double click on a path or URL selects that path or URL, not the text glued to it; a URL that wraps selects whole, and `~/` keeps its `~` (#268, reported by @britarok2).
+- A double click on a path or URL selects that path or URL, not the text glued to it; a wrapped URL selects whole ([discussion #268](https://github.com/wilsonglasser/oryxis/discussions/268), @britarok2).
+- Ctrl+C with nothing selected leaves the clipboard alone, and Cmd+C copies a selected UI text on macOS (#258, reported by @DualTachyon).
+- macOS: dragging a tab no longer moves the window, and the traffic lights sit on the top bar's centre line (#267, by @cesszlr).
+- macOS: a file dropped from Finder arrives by its path on every drop surface.
+- Windows: typing with an input method no longer freezes the app when the caret moves.
+- A committed input-method composition no longer lingers in a text field, and IME text reaches the tab while the host editor waits behind it (#262, reported by @cesszlr).
+- Windows: the in-place update waits for every process running the app, the one hidden in the tray included.
+- The host editor's group picker opens under its field in a scrolled drawer and takes the keys at once.
+- A snippet's wait for a command's end reads the output a synchronized update held back (#260, by @hamidrg20001379).
+- A history suggestion completes the line as it is at the pick.
+- A pairing link another vault on this device already holds is refused before anything is stored, and turning sync on into a target another vault uses says so.
+- A second Oryxis process no longer removes the first one's spooled recordings at start.
 
 ## [0.21.0] - 2026-10-16
 

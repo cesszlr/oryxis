@@ -23,8 +23,8 @@
   <img src="resources/screen_1.gif" width="720" alt="Oryxis em ação: conectando, executando snippets, navegando por SFTP">
 </p>
 
-> Este documento é uma tradução do README em inglês posterior à v0.21.0
-> (sincronizado em 2026-10-16). A documentação detalhada
+> Este documento é uma tradução do README em inglês posterior à v0.22.0
+> (sincronizado em 2026-10-24). A documentação detalhada
 > ([tour de funcionalidades](docs/FEATURES.md),
 > [arquitetura](docs/ARCHITECTURE.md)) permanece em inglês.
 
@@ -78,6 +78,12 @@ binários de Windows são assinados com Authenticode.
   Touch ID / keyring do Linux), bloqueio automático por inatividade e
   preenchimento automático de TOTP para hosts com 2FA e senhas do
   cofre oferecidas nos prompts de `sudo` (nunca enviadas sozinhas).
+- **Vários cofres**: Trabalho e Pessoal em arquivos criptografados
+  separados, cada um com sua senha mestra, configurações, sincronização
+  e exposição ao MCP, abertos ao mesmo tempo: cada janela trabalha num
+  cofre e troca na hora pela aba Início, por um atalho por cofre ou pela
+  paleta, enquanto as abas do outro cofre continuam rodando. Dois cofres
+  nunca compartilham uma chave.
 - **O pipeline SSH completo**: autenticação automática, jump hosts em
   cadeia, proxies SOCKS / HTTP / de comando, encaminhamento de agente,
   port forwarding independente `-L`/`-R`/`-D` e scripts de login
@@ -113,12 +119,15 @@ binários de Windows são assinados com Authenticode.
   imagem de fundo opcionais, Nerd Fonts embutidas mais um pacote de
   fontes baixáveis (JetBrains Mono, Fira Code, MesloLGS e outras), abas
   inteligentes que sinalizam comandos demorados, histórico de comandos
-  por host e um ajuste por host da largura ambígua do leste asiático
+  por host sugerido enquanto você digita, um cursor no formato que você
+  escolher e um ajuste por host da largura ambígua do leste asiático
   para as TUIs CJK alinharem.
 - **Snippets que rodam uma sequência**: um snippet pode digitar
   comandos, esperar um comando terminar ou uma linha aparecer na saída,
   copiar ou salvar o que ele imprimiu e chamar outros snippets, tudo no
   terminal em que você o iniciou, com as variáveis perguntadas uma vez.
+  Os que você mais usa podem virar botões numa barra de snippets abaixo
+  do terminal.
 - **Quantas janelas quiser**: um processo, qualquer número de janelas,
   cada uma com suas abas, sua tela de hosts e sua busca. Arraste uma aba
   para fora da borda para destacá-la, solte-a na barra de abas de outra
@@ -147,15 +156,17 @@ binários de Windows são assinados com Authenticode.
   chave: Anthropic, OpenAI, Gemini ou compatível) com camadas de
   segurança para execução automática, além de um
   [servidor MCP](docs/FEATURES.md#mcp-server) que expõe seus hosts a
-  clientes de IA como o Claude Code, se instala em sete deles e cria ou
-  edita hosts quando você permite.
+  clientes de IA como o Claude Code, se instala em sete deles, cria ou
+  edita hosts quando você permite e roda um comando como root só depois
+  que você aprova na tela.
 - **Sincronização P2P, sem nuvem**: criptografia de ponta a ponta
   (X25519 + XChaCha20-Poly1305) sobre QUIC; mDNS na rede local e
   signaling/relay [auto-hospedado](SELF_HOSTING.md) entre redes. Sem
   conta, sem servidor de fornecedor.
 - **Teclado em primeiro lugar**: conexão rápida `user@host` (Ctrl+K),
-  troca de abas por uso recente, navegação completa por teclado até o
-  último toggle e todos os atalhos reconfiguráveis, ou comece pelas
+  Ctrl+Tab por uso recente ou pela ordem da barra de abas, navegação
+  completa por teclado até o último toggle e todos os atalhos
+  reconfiguráveis, ou comece pelas
   teclas do Windows Terminal, do Tabby ou do iTerm2.
 - **Privado por padrão**: zero telemetria, mascaramento com Modo
   Privacidade, uma proteção de colagem que mostra o que você está
@@ -210,17 +221,19 @@ vulnerabilidades por canal privado.
 
 O Oryxis lança pequeno e com frequência (aproximadamente semanal), e
 as funcionalidades entram assim que ficam prontas. A última versão
-estável é a **v0.21.0**; o histórico completo está no
+estável é a **v0.22.0**; o histórico completo está no
 [CHANGELOG.md](CHANGELOG.md) e o roadmap interativo na
 [discussão de roadmap](https://github.com/wilsonglasser/oryxis/discussions/67).
 Entregues desde a 0.15.0: painéis divididos e o console SFTP, o modo
 offline com seu bundle, Alibaba Cloud e Tencent Cloud, o painel de
 ferramentas de rede, o deploy do relay em um clique, chaves de
 segurança nativas, várias janelas num só processo, snippets que rodam
-uma sequência de ações, predefinições de atalhos de outros terminais e
-a reconstrução de um cofre danificado. Entre as frentes em andamento:
-múltiplos cofres, o kit de operações com IA e o Ctrl+Tab na ordem da
-própria barra de abas como opção.
+uma sequência de ações, predefinições de atalhos de outros terminais,
+a reconstrução de um cofre danificado, vários cofres abertos ao mesmo
+tempo, o Ctrl+Tab na ordem da própria barra de abas, o histórico de
+comandos sugerido enquanto você digita, a barra de snippets, o formato
+do cursor e o `sudo` pelo plugin MCP com aprovação na tela. Em
+andamento: o kit de operações com IA.
 
 ## Contribuindo
 

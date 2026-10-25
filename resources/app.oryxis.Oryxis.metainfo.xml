@@ -69,6 +69,19 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.22.0" date="2026-10-24">
+      <description>
+        <p>
+          Several encrypted vaults can be open at once, each with its own
+          master password, settings, sync and MCP exposure, and every
+          window works on one of them. The terminal suggests the host's
+          past commands as you type, Ctrl+Tab can walk the tab bar's own
+          order, the caret takes a shape, and the MCP plugin runs a
+          command as root only after you approve it on screen.
+        </p>
+      </description>
+      <url>https://github.com/wilsonglasser/oryxis/releases/tag/v0.22.0</url>
+    </release>
     <release version="0.21.0" date="2026-10-16">
       <description>
         <p>

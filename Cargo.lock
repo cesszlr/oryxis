@@ -5325,7 +5325,7 @@ dependencies = [
 
 [[package]]
 name = "oryxis-app"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
