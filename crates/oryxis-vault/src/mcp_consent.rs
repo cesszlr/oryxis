@@ -215,6 +215,9 @@ pub enum DenyReason {
     /// The app quit, or hid its window to the tray, while the question
     /// was up.
     AppClosed,
+    /// The app could not read the request file (a plugin and an app of
+    /// different builds, or a file nobody posted).
+    Unreadable,
 }
 
 /// The answer file.
@@ -323,23 +326,72 @@ pub fn claim(dir: &Path, id: &str) -> Option<Claimed> {
         return None;
     }
     let posted = path_of(dir, id, "request");
-    if std::fs::metadata(&posted).ok()?.len() > MAX_REQUEST_BYTES {
-        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request file over the size cap, removed unread");
+    if !is_plain_file(&posted) {
+        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request is not a plain file, removed unread");
         let _ = std::fs::remove_file(&posted);
         return None;
     }
     let claimed = path_of(dir, id, "claimed");
     std::fs::rename(&posted, &claimed).ok()?;
-    let bytes = std::fs::read(&claimed).ok()?;
+    let Some(bytes) = read_request_file(&claimed) else {
+        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request file over the size cap, removed unread");
+        let _ = std::fs::remove_file(&claimed);
+        return None;
+    };
     let request = match serde_json::from_slice::<SudoRequest>(&bytes) {
         Ok(request) if request.id == id => request,
-        Ok(_) => return None,
+        Ok(_) => {
+            tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request names another id, refused");
+            refuse_unreadable(dir, id);
+            return None;
+        }
         Err(e) => {
-            tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request does not parse (plugin and app of different builds?): {e}");
+            tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request does not parse (plugin and app of different builds?), refused: {e}");
+            refuse_unreadable(dir, id);
             return None;
         }
     };
     Some(Claimed { request, bytes })
+}
+
+/// Whether `path` is a regular file and not a link to one (`lstat`): the
+/// runtime folder's other writer runs as the user and may plant a
+/// symlink to something huge, a FIFO (opening one blocks until a writer
+/// shows up) or a device. None of those was posted by a server.
+fn is_plain_file(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
+}
+
+/// Read a request file through ONE handle, bounded by
+/// [`MAX_REQUEST_BYTES`]: the size is taken on the opened handle, not
+/// on a path a writer could swap under us, and the read stops at the cap
+/// whatever the file grew to meanwhile. `None` when it is not a regular
+/// file within the cap.
+fn read_request_file(path: &Path) -> Option<Vec<u8>> {
+    use std::io::Read as _;
+    if !is_plain_file(path) {
+        return None;
+    }
+    let file = std::fs::File::open(path).ok()?;
+    let meta = file.metadata().ok()?;
+    if !meta.is_file() || meta.len() > MAX_REQUEST_BYTES {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(meta.len() as usize);
+    file.take(MAX_REQUEST_BYTES + 1).read_to_end(&mut bytes).ok()?;
+    (bytes.len() as u64 <= MAX_REQUEST_BYTES).then_some(bytes)
+}
+
+/// A claimed request this app cannot read is answered at once with
+/// [`DenyReason::Unreadable`], so the server tells its agent now (a
+/// plugin and an app of different builds, most likely) instead of
+/// reading a live claim until the decision window runs out.
+fn refuse_unreadable(dir: &Path, id: &str) {
+    let refusal = Answer { decision: Decision::Deny, reason: Some(DenyReason::Unreadable), tag: String::new() };
+    if let Err(e) = answer(dir, id, &refusal) {
+        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo refusal not written: {e}");
+        let _ = std::fs::remove_file(path_of(dir, id, "claimed"));
+    }
 }
 
 /// Answer request `id` (app side) and drop the claim. A request whose
@@ -361,7 +413,10 @@ pub fn answer(dir: &Path, id: &str, answer: &Answer) -> std::io::Result<()> {
 /// Read the folder (app side): the requests waiting for a claim and the
 /// live claims. Removes debris older than [`STALE_AFTER`], a request
 /// past its claim window (its server has stopped waiting for it), and a
-/// request file over [`MAX_REQUEST_BYTES`], unread.
+/// request that is not a plain file within [`MAX_REQUEST_BYTES`],
+/// unread. A request file this build cannot read is claimed and refused
+/// as [`DenyReason::Unreadable`] here, so it is read once, not on every
+/// poll, and its server learns now.
 pub fn scan(dir: &Path, now_unix: u64) -> Scan {
     let mut out = Scan::default();
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -375,10 +430,12 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
         ) else {
             continue;
         };
-        let metadata = entry.metadata().ok();
-        let age = metadata
-            .as_ref()
-            .and_then(|m| m.modified().ok())
+        // `DirEntry::metadata` is an `lstat`: a link's own age, never
+        // its target's.
+        let age = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
             .and_then(|t| t.elapsed().ok())
             .unwrap_or_default();
         if !valid_id(stem) {
@@ -394,16 +451,16 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
         }
         match ext {
             "request" => {
-                if metadata.as_ref().is_some_and(|m| m.len() > MAX_REQUEST_BYTES) {
-                    tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request file over the size cap, removed unread");
+                let Some(bytes) = read_request_file(&path) else {
+                    tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request is not a plain file within the size cap, removed unread");
                     let _ = std::fs::remove_file(&path);
                     continue;
-                }
-                let Some(request) = std::fs::read(&path)
-                    .ok()
-                    .and_then(|b| serde_json::from_slice::<SudoRequest>(&b).ok())
-                    .filter(|r| r.id == stem)
-                else {
+                };
+                let Some(request) = serde_json::from_slice::<SudoRequest>(&bytes).ok().filter(|r| r.id == stem) else {
+                    tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request does not parse (plugin and app of different builds?), refused");
+                    if std::fs::rename(&path, path_of(dir, stem, "claimed")).is_ok() {
+                        refuse_unreadable(dir, stem);
+                    }
                     continue;
                 };
                 if now_unix.saturating_sub(request.created_unix) > CLAIM_WINDOW.as_secs() {
@@ -626,25 +683,90 @@ mod tests {
 
     #[test]
     fn a_file_of_the_first_shape_still_claims() {
-        // The request file as the first plugin release (mcp 0.1.14)
-        // posts it, with the two optional fields of that shape left out.
-        // A newer app adds fields with `#[serde(default)]` only, so this
-        // file claims on every later build; a required field would turn
-        // every request of an installed plugin into "not picked up".
+        // The request file byte for byte as the first plugin release
+        // (mcp 0.1.14) posts it (`post` writes every field, `route` and
+        // `client` included), and the same with the two defaulted fields
+        // left out. A newer app adds fields with `#[serde(default)]`
+        // only, so both claim on every later build; a required field
+        // would turn every request of an installed plugin into a refusal.
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join(DIR_NAME);
         std::fs::create_dir_all(&dir).unwrap();
         let id = "0123456789abcdef0123456789abcdef";
-        let first_shape = format!(
+        let as_posted = format!(
             "{{\"id\":\"{id}\",\"vault_id\":\"11111111-2222-4333-8444-555555555555\",\"vault_label\":\"Personal\",\
              \"host_id\":\"66666666-7777-4888-8999-000000000000\",\"host_label\":\"web\",\"login\":\"deploy\",\
-             \"address\":\"10.0.0.5:22\",\"command\":\"id\",\"created_unix\":0}}"
+             \"address\":\"10.0.0.5:22\",\"route\":[],\"client\":null,\"command\":\"id\",\"created_unix\":0}}"
         );
-        std::fs::write(dir.join(format!("{id}.request")), first_shape.as_bytes()).unwrap();
-        let claimed = claim(&dir, id).expect("the first release's file claims on this build");
-        assert_eq!(claimed.request.command, "id");
-        assert!(claimed.request.route.is_empty() && claimed.request.client.is_none());
-        assert_eq!(claimed.bytes, first_shape.as_bytes());
+        let fields_left_out = as_posted.replace("\"route\":[],\"client\":null,", "");
+        assert_ne!(as_posted, fields_left_out);
+        // The literal above IS what this build's `post` writes.
+        let built: SudoRequest = serde_json::from_str(&as_posted).unwrap();
+        assert_eq!(serde_json::to_string(&built).unwrap(), as_posted, "post writes exactly this shape");
+        for shape in [as_posted, fields_left_out] {
+            std::fs::write(dir.join(format!("{id}.request")), shape.as_bytes()).unwrap();
+            let claimed = claim(&dir, id).expect("the first release's file claims on this build");
+            assert_eq!(claimed.request.command, "id");
+            assert!(claimed.request.route.is_empty() && claimed.request.client.is_none());
+            assert_eq!(claimed.bytes, shape.as_bytes());
+            std::fs::remove_file(dir.join(format!("{id}.claimed"))).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_request_this_build_cannot_read_is_refused_at_once() {
+        // Not left as a live claim the server would wait a minute on.
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        let unreadable = Answer { decision: Decision::Deny, reason: Some(DenyReason::Unreadable), tag: String::new() };
+        // Found by the scan: refused there, read once.
+        let a = SudoRequest::new_id().unwrap();
+        std::fs::write(dir.join(format!("{a}.request")), b"{\"id\":").unwrap();
+        assert!(scan(&dir, now()).posted.is_empty());
+        assert_eq!(status(&dir, &a), Status::Answered(unreadable.clone()));
+        assert!(!dir.join(format!("{a}.claimed")).exists());
+        // Rewritten between the scan and the claim: refused by the claim.
+        let (r, _) = posted(&dir);
+        std::fs::write(dir.join(format!("{}.request", r.id)), b"not json").unwrap();
+        assert_eq!(claim(&dir, &r.id), None);
+        assert_eq!(status(&dir, &r.id), Status::Answered(unreadable.clone()));
+        // A body naming another id is refused the same way.
+        let (r, bytes) = posted(&dir);
+        let other = SudoRequest::new_id().unwrap();
+        std::fs::write(dir.join(format!("{other}.request")), &bytes).unwrap();
+        assert_eq!(claim(&dir, &other), None);
+        assert_eq!(status(&dir, &other), Status::Answered(unreadable));
+        assert_eq!(status(&dir, &r.id), Status::Posted, "the honest one is untouched");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_request_that_is_not_a_plain_file_is_removed_unread() {
+        // The folder's other writer (the agent's shell, as the user) may
+        // plant a symlink to something huge, or a socket: neither is
+        // opened, let alone read, on either path.
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        let big = tmp.path().join("big");
+        std::fs::write(&big, vec![b'x'; (MAX_REQUEST_BYTES as usize) * 4]).unwrap();
+        let (r, _) = posted(&dir);
+        let request = dir.join(format!("{}.request", r.id));
+        std::fs::remove_file(&request).unwrap();
+        std::os::unix::fs::symlink(&big, &request).unwrap();
+        assert!(scan(&dir, now()).posted.is_empty(), "a link is never offered");
+        assert!(std::fs::symlink_metadata(&request).is_err(), "removed by the scan");
+        std::os::unix::fs::symlink(&big, &request).unwrap();
+        assert_eq!(claim(&dir, &r.id), None, "a link is never claimed");
+        assert!(std::fs::symlink_metadata(&request).is_err());
+        assert!(!dir.join(format!("{}.claimed", r.id)).exists());
+        assert_eq!(std::fs::read(&big).unwrap().len(), (MAX_REQUEST_BYTES as usize) * 4, "the target is untouched");
+
+        let socket = dir.join(format!("{}.request", SudoRequest::new_id().unwrap()));
+        let _held = std::os::unix::net::UnixDatagram::bind(&socket).unwrap();
+        assert!(scan(&dir, now()).posted.is_empty());
+        assert!(std::fs::symlink_metadata(&socket).is_err(), "a socket is removed unread");
     }
 
     #[test]

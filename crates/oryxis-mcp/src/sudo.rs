@@ -464,6 +464,10 @@ fn consent_text(e: &ConsentError, host: &str, vault: &str) -> String {
         ConsentError::Refused(Some(DenyReason::AppClosed)) => format!(
             "Oryxis was closed (or hidden to the tray) while the sudo approval for {host} was up. Nothing ran."
         ),
+        ConsentError::Refused(Some(DenyReason::Unreadable)) => format!(
+            "Oryxis could not read the sudo approval request for {host}: the Oryxis app and this MCP plugin are most likely different releases. \
+             Ask the user to update both to the same release. Nothing ran."
+        ),
         ConsentError::Refused(_) => format!(
             "The user refused to let sudo use the password stored for {host}. Nothing ran; do not retry unless the user asks."
         ),
