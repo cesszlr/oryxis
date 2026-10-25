@@ -334,7 +334,7 @@ impl Oryxis {
                 if matches!(family, SurfaceFamily::Confirm | SurfaceFamily::Picker)
                     && len > 0
                 {
-                    self.modal_nav_step(surface, !modifiers.shift());
+                    return Some(self.modal_nav_step(surface, !modifiers.shift()));
                 }
                 Some(Task::none())
             }
@@ -342,8 +342,7 @@ impl Oryxis {
                 if len == 0 {
                     return Some(Task::none());
                 }
-                self.modal_nav_step(surface, matches!(named, Named::ArrowDown));
-                Some(Task::none())
+                Some(self.modal_nav_step(surface, matches!(named, Named::ArrowDown)))
             }
             Named::ArrowLeft | Named::ArrowRight => {
                 let rtl = crate::i18n::is_rtl_layout();
@@ -370,7 +369,7 @@ impl Oryxis {
                     return Some(task);
                 }
                 if len > 0 {
-                    self.modal_nav_step(surface, forward);
+                    return Some(self.modal_nav_step(surface, forward));
                 }
                 Some(Task::none())
             }
@@ -380,7 +379,7 @@ impl Oryxis {
                 }
                 let idx = if matches!(named, Named::Home) { 0 } else { len - 1 };
                 self.keynav.modal.selected = Some((surface, idx));
-                Some(Task::none())
+                Some(self.modal_nav_reveal(surface))
             }
             _ => None,
         }
@@ -410,12 +409,27 @@ impl Oryxis {
     }
 
     /// Move the selection one step (wrapping), starting from the
-    /// effective position (explicit selection or surface default).
-    fn modal_nav_step(&mut self, surface: ModalSurface, forward: bool) {
+    /// effective position (explicit selection or surface default), and
+    /// bring the ring on screen where the surface needs it.
+    fn modal_nav_step(&mut self, surface: ModalSurface, forward: bool) -> Task<Message> {
         let len = self.keynav.modal.items.borrow().len();
         let cur = self.modal_nav_effective(surface);
         if let Some(next) = index_move(len, cur, forward) {
             self.keynav.modal.selected = Some((surface, next));
+        }
+        self.modal_nav_reveal(surface)
+    }
+
+    /// The ring moved on `surface`. Most confirms keep their buttons
+    /// outside any scroll, so nothing to do; the sudo dialog's buttons
+    /// come after the agent's command inside one scrollable card, so the
+    /// ring on a button (Tab, an arrow, End) scrolls the card to its end:
+    /// the row the next Enter fires, and the command's tail above it, on
+    /// screen.
+    fn modal_nav_reveal(&mut self, surface: ModalSurface) -> Task<Message> {
+        match surface {
+            ModalSurface::Modal(Modal::McpSudoConfirm) => self.mcp_sudo_scroll_card(true),
+            _ => Task::none(),
         }
     }
 

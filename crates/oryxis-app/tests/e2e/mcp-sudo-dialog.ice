@@ -7,7 +7,11 @@ mode: Zen
 # send, so the command's size is said beside it, the paste guard's
 # content warnings stand above it, and the buttons come after the last
 # line (the card scrolls when it outgrows the window). A box of a fixed
-# height would show "uptime" and hide the rest below its fold.
+# height would show "uptime" and hide the rest below its fold. The
+# keyboard ring moving onto a button (Tab) scrolls the card to its end,
+# so Enter never fires an Allow that was below the fold: the proof is a
+# text click on Deny, the one instruction the emulator refuses on a
+# target the card has scrolled off (expect / absent are scroll-blind).
 #
 # The request crosses on disk (`oryxis_vault::mcp_consent`), so the
 # fixture is a saved Local host (the recipe of history-suggest.ice)
@@ -53,8 +57,9 @@ expect "Command (42 lines, 61 characters)"
 expect "Downloads and pipes straight into a shell"
 screenshot mcp-sudo-dialog
 # The card outgrew the window: the buttons sit after the command's last
-# line, reached by scrolling the card.
-scroll (0, -3000) (600, 400)
+# line, below the fold. Tab moves the ring from Deny to Allow this
+# command and the card follows: the button row is on screen now.
+type tab
 settle 300
 screenshot mcp-sudo-dialog-end
 expect "Allow this command"

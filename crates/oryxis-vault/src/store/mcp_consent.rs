@@ -3,7 +3,7 @@ use super::*;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
-use crate::mcp_consent::{tag_message, Decision, SudoRequest};
+use crate::mcp_consent::{tag_message, Decision};
 
 /// Domain-separation context, so the master key's use as an HMAC key
 /// here can never collide with another derivation.
@@ -20,41 +20,27 @@ fn consent_mac(key: &[u8]) -> Hmac<Sha256> {
 }
 
 impl VaultStore {
-    /// The tag an app puts on its answer to `request` (see
+    /// The tag an app puts on its answer to a request (see
     /// [`crate::mcp_consent`]): HMAC-SHA256 under this vault's master
-    /// key, hex. Needs the vault unlocked.
-    pub fn mcp_consent_tag(
-        &self,
-        request: &SudoRequest,
-        decision: Decision,
-    ) -> Result<String, VaultError> {
+    /// key over the request file's bytes as the app read them
+    /// (`Claimed::bytes`) and the decision, hex. Needs the vault unlocked.
+    pub fn mcp_consent_tag(&self, request: &[u8], decision: Decision) -> Result<String, VaultError> {
         let key = self.require_unlocked()?;
-        let message = tag_message(request, decision)
-            .map_err(|e| VaultError::Crypto(format!("sudo consent request does not serialize: {e}")))?;
         let mut mac = consent_mac(key);
-        mac.update(&message);
+        mac.update(&tag_message(request, decision));
         Ok(crate::mcp_consent::hex(&mac.finalize().into_bytes()))
     }
 
-    /// Whether `tag` is this vault's tag for `decision` on `request`,
-    /// compared in constant time. A locked vault, a malformed tag or a
-    /// request that does not serialize is `false`: never an allowance by
+    /// Whether `tag` is this vault's tag for `decision` on the request
+    /// whose posted bytes are `request`, compared in constant time. A
+    /// locked vault or a malformed tag is `false`: never an allowance by
     /// default.
-    pub fn verify_mcp_consent_tag(
-        &self,
-        request: &SudoRequest,
-        decision: Decision,
-        tag: &str,
-    ) -> bool {
-        let (Ok(key), Some(tag), Ok(message)) = (
-            self.require_unlocked(),
-            crate::mcp_consent::unhex(tag),
-            tag_message(request, decision),
-        ) else {
+    pub fn verify_mcp_consent_tag(&self, request: &[u8], decision: Decision, tag: &str) -> bool {
+        let (Ok(key), Some(tag)) = (self.require_unlocked(), crate::mcp_consent::unhex(tag)) else {
             return false;
         };
         let mut mac = consent_mac(key);
-        mac.update(&message);
+        mac.update(&tag_message(request, decision));
         mac.verify_slice(&tag).is_ok()
     }
 }

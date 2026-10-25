@@ -55,6 +55,27 @@ const POLL: Duration = Duration::from_millis(250);
 /// arrives before this side gives up.
 const DECISION_GRACE: Duration = Duration::from_secs(5);
 
+/// The most a command may weigh to run under sudo, in bytes. The person
+/// may have to READ it in the app's dialog before the password goes, and
+/// the agent decides how long it is: past this, the dialog is a wall of
+/// text nobody judges, and the window spends its frames shaping it. A
+/// longer job belongs in a script on the host. Checked before anything
+/// is dialled, whatever path the probe would take.
+pub const MAX_COMMAND_BYTES: usize = 32 * 1024;
+
+/// Why `command` cannot run under sudo at all, before the dial: `None`
+/// when its size is fine.
+pub fn command_too_long(command: &str) -> Option<String> {
+    (command.len() > MAX_COMMAND_BYTES).then(|| {
+        format!(
+            "The command is {} bytes; a command for sudo may be at most {} bytes, since the user may have to read it in Oryxis before approving. \
+             Put the work in a script on the host and run that instead. Nothing ran.",
+            command.len(),
+            MAX_COMMAND_BYTES
+        )
+    })
+}
+
 /// What the probe found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Probe {
@@ -178,15 +199,16 @@ pub enum ConsentError {
 }
 
 /// Post `request`, wait for the answer, and check its tag with
-/// `verify`. Every file of the request is removed on the way out,
-/// whatever the outcome.
+/// `verify`, handed the bytes the request was posted as (the tag covers
+/// them, see [`mcp_consent`]). Every file of the request is removed on
+/// the way out, whatever the outcome.
 pub async fn ask(
     dir: &std::path::Path,
     request: &SudoRequest,
-    verify: impl Fn(Decision, &str) -> bool,
+    verify: impl Fn(&[u8], Decision, &str) -> bool,
     mut cancel: tokio::sync::watch::Receiver<bool>,
 ) -> Result<Decision, ConsentError> {
-    mcp_consent::post(dir, request).map_err(|e| ConsentError::Io(e.to_string()))?;
+    let posted_bytes = mcp_consent::post(dir, request).map_err(|e| ConsentError::Io(e.to_string()))?;
     let id = request.id.as_str();
     let posted = Instant::now();
     let mut claimed_at: Option<Instant> = None;
@@ -195,7 +217,7 @@ pub async fn ask(
             Status::Answered(answer) => {
                 break if !answer.decision.allows() {
                     Err(ConsentError::Refused(answer.reason))
-                } else if verify(answer.decision, &answer.tag) {
+                } else if verify(&posted_bytes, answer.decision, &answer.tag) {
                     Ok(answer.decision)
                 } else {
                     Err(ConsentError::BadTag)
@@ -267,6 +289,9 @@ pub async fn execute(
     cancel: tokio::sync::watch::Receiver<bool>,
 ) -> Result<RootRun, SudoFailure> {
     let label = plan.label.as_str();
+    if let Some(too_long) = command_too_long(command) {
+        return Err(SudoFailure::NotRun(too_long));
+    }
     if plan.auth_conn.username.as_deref() == Some("root") {
         let run = served.pool.exec(plan, command, None, timeout, cancel).await?;
         return Ok(RootRun { run, mode: "root_login" });
@@ -381,7 +406,8 @@ async fn approve(
             .unwrap_or(0),
     };
     tracing::info!(host = %plan.label, vault = %served.slug, request = %request.id, "sudo: asking the app");
-    let verify = |decision: Decision, tag: &str| served.vault().verify_mcp_consent_tag(&request, decision, tag);
+    let verify =
+        |posted: &[u8], decision: Decision, tag: &str| served.vault().verify_mcp_consent_tag(posted, decision, tag);
     let outcome = ask(&dir, &request, verify, cancel).await;
     tracing::info!(host = %plan.label, request = %request.id, outcome = ?outcome, "sudo: the app answered");
     match outcome {
@@ -399,8 +425,9 @@ async fn approve(
 fn consent_text(e: &ConsentError, host: &str, vault: &str) -> String {
     match e {
         ConsentError::NotPickedUp => format!(
-            "sudo on {host} needs the user's approval in Oryxis, and no Oryxis window with the vault \"{vault}\" unlocked picked up the request within {} s. \
-             Ask the user to open Oryxis and unlock that vault, then call again. Nothing ran.",
+            "sudo on {host} needs the user's approval in Oryxis, and no Oryxis window that could ask picked up the request within {} s: \
+             Oryxis is not running, its window is hidden to the tray, or the vault \"{vault}\" is locked there. \
+             Ask the user to bring up the Oryxis window with that vault unlocked, then call again. Nothing ran.",
             mcp_consent::CLAIM_WINDOW.as_secs()
         ),
         ConsentError::Refused(Some(DenyReason::TimedOut)) | ConsentError::TimedOut => format!(
@@ -479,6 +506,15 @@ mod tests {
         assert_eq!(password_stdin("a\nb", "id").unwrap_err(), StdinError::PasswordLineBreak);
         assert_eq!(password_stdin("a\rb", "id").unwrap_err(), StdinError::PasswordLineBreak);
         assert_eq!(password_stdin("a", "i\0d").unwrap_err(), StdinError::CommandNul);
+    }
+
+    #[test]
+    fn a_command_past_the_cap_does_not_run() {
+        assert_eq!(command_too_long("id"), None);
+        assert_eq!(command_too_long(&"x".repeat(MAX_COMMAND_BYTES)), None, "the cap is inclusive");
+        let text = command_too_long(&"x".repeat(MAX_COMMAND_BYTES + 1)).unwrap();
+        assert!(text.contains("32769 bytes") && text.contains("at most 32768 bytes"), "{text}");
+        assert!(text.ends_with("Nothing ran."));
     }
 
     #[test]
@@ -654,9 +690,38 @@ exec "$@"
                 reason: None,
                 tag: "good".into(),
             });
-            let got = ask(&dir, &r, |d, tag| d == Decision::Session && tag == "good", no_cancel()).await;
+            let got = ask(&dir, &r, |_, d, tag| d == Decision::Session && tag == "good", no_cancel()).await;
             assert_eq!(got, Ok(Decision::Session));
             assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
+        }
+
+        #[tokio::test]
+        async fn the_tag_is_checked_over_the_bytes_the_server_posted() {
+            // The app tags the file as IT read it; this side checks over
+            // what IT wrote. A file rewritten in between (the agent's
+            // shell swapping the command) is a tag over other bytes.
+            let tmp = tempfile::tempdir().unwrap();
+            let dir = tmp.path().join("c");
+            let r = request();
+            let expected = serde_json::to_vec(&r).unwrap();
+            let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            app(dir.clone(), r.id.clone(), Answer {
+                decision: Decision::Once,
+                reason: None,
+                tag: "good".into(),
+            });
+            let got = ask(
+                &dir,
+                &r,
+                |posted, _, tag| {
+                    seen.lock().unwrap().extend_from_slice(posted);
+                    tag == "good"
+                },
+                no_cancel(),
+            )
+            .await;
+            assert_eq!(got, Ok(Decision::Once));
+            assert_eq!(*seen.lock().unwrap(), expected);
         }
 
         #[tokio::test]
@@ -669,7 +734,7 @@ exec "$@"
                 reason: None,
                 tag: "forged".into(),
             });
-            let got = ask(&dir, &r, |_, tag| tag == "good", no_cancel()).await;
+            let got = ask(&dir, &r, |_, _, tag| tag == "good", no_cancel()).await;
             assert_eq!(got, Err(ConsentError::BadTag));
         }
 
@@ -683,7 +748,7 @@ exec "$@"
                 reason: Some(DenyReason::Locked),
                 tag: String::new(),
             });
-            let got = ask(&dir, &r, |_, _| true, no_cancel()).await;
+            let got = ask(&dir, &r, |_, _, _| true, no_cancel()).await;
             assert_eq!(got, Err(ConsentError::Refused(Some(DenyReason::Locked))));
         }
 
@@ -696,7 +761,7 @@ exec "$@"
             let asking = tokio::spawn({
                 let dir = dir.clone();
                 let r = r.clone();
-                async move { ask(&dir, &r, |_, _| true, rx).await }
+                async move { ask(&dir, &r, |_, _, _| true, rx).await }
             });
             tokio::time::sleep(Duration::from_millis(100)).await;
             assert_eq!(mcp_consent::status(&dir, &r.id), Status::Posted);
@@ -710,7 +775,7 @@ exec "$@"
             let tmp = tempfile::tempdir().unwrap();
             let dir = tmp.path().join("c");
             let r = request();
-            let got = ask(&dir, &r, |_, _| true, no_cancel()).await;
+            let got = ask(&dir, &r, |_, _, _| true, no_cancel()).await;
             assert_eq!(got, Err(ConsentError::NotPickedUp));
             assert_eq!(mcp_consent::status(&dir, &r.id), Status::Gone);
         }

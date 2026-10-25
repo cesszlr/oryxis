@@ -21,9 +21,9 @@ impl Oryxis {
     pub(crate) fn handle_mcp_sudo(&mut self, message: McpMessage) -> Result<Task<Message>, McpMessage> {
         match message {
             McpMessage::McpSudoScanned(scan) => Ok(self.mcp_sudo_scanned(scan)),
-            McpMessage::McpSudoClaimed(request) => {
-                let id = request.id.clone();
-                if !self.mcp_sudo.push(McpSudoCard { request: *request }) {
+            McpMessage::McpSudoClaimed(claimed) => {
+                let id = claimed.request.id.clone();
+                if !self.mcp_sudo.push(McpSudoCard::new(*claimed)) {
                     return Ok(Task::none());
                 }
                 Ok(Task::perform(
@@ -34,13 +34,13 @@ impl Oryxis {
             McpMessage::McpSudoAnswered(decision) => {
                 if let Some(card) = self.mcp_sudo.take_pending() {
                     let reason = (!decision.allows()).then_some(DenyReason::Person);
-                    self.mcp_sudo_answer(&card.request, decision, reason);
+                    self.mcp_sudo_answer(&card, decision, reason);
                 }
                 Ok(Task::none())
             }
             McpMessage::McpSudoExpired(id) => {
                 for card in self.mcp_sudo.remove_where(|r| r.id == id) {
-                    self.mcp_sudo_answer(&card.request, Decision::Deny, Some(DenyReason::TimedOut));
+                    self.mcp_sudo_answer(&card, Decision::Deny, Some(DenyReason::TimedOut));
                 }
                 Ok(Task::none())
             }
@@ -72,20 +72,20 @@ impl Oryxis {
             let Some(window) = self.mcp_sudo_window(&request) else {
                 continue;
             };
-            let Some(request) = mcp_consent::claim(&dir, &request.id) else {
+            let Some(claimed) = mcp_consent::claim(&dir, &request.id) else {
                 continue;
             };
             tracing::info!(
                 target = "oryxis::mcp",
-                request = %request.id,
-                host = %request.host_label,
-                vault = %request.vault_label,
+                request = %claimed.request.id,
+                host = %claimed.request.host_label,
+                vault = %claimed.request.vault_label,
                 "sudo approval asked"
             );
             // Raised in that window, so the floating layer is its own
             // (`claim_floats`).
-            let vault = request.vault_id;
-            let msg = Message::ForVault(vault, Box::new(Message::Mcp(McpMessage::McpSudoClaimed(Box::new(request)))));
+            let vault = claimed.request.vault_id;
+            let msg = Message::ForVault(vault, Box::new(Message::Mcp(McpMessage::McpSudoClaimed(Box::new(claimed)))));
             let msg = match window.or_else(crate::app::resident_window_id) {
                 Some(w) => Message::InWindow(w, Box::new(msg)),
                 None => msg,
@@ -122,19 +122,21 @@ impl Oryxis {
         })
     }
 
-    /// Write the answer to `request`. An allowance is signed with its
-    /// vault's key; a vault that cannot sign (locked meanwhile) turns it
-    /// into a refusal, never an unsigned allowance.
-    pub(crate) fn mcp_sudo_answer(&self, request: &SudoRequest, decision: Decision, reason: Option<DenyReason>) {
+    /// Write the answer to `card`'s request. An allowance is signed with
+    /// its vault's key over the request file's bytes as this app read
+    /// them; a vault that cannot sign (locked meanwhile) turns it into a
+    /// refusal, never an unsigned allowance.
+    pub(crate) fn mcp_sudo_answer(&self, card: &McpSudoCard, decision: Decision, reason: Option<DenyReason>) {
         let Some(dir) = mcp_consent::consent_dir() else {
             return;
         };
+        let request = &card.request;
         let signed = || {
             self.vaults
                 .all()
                 .find(|v| v.id == request.vault_id)
                 .and_then(|v| v.store.as_ref())
-                .and_then(|s| s.mcp_consent_tag(request, decision).ok())
+                .and_then(|s| s.mcp_consent_tag(&card.bytes, decision).ok())
         };
         let answer = match (decision.allows(), decision.allows().then(signed).flatten()) {
             (true, Some(tag)) => Answer { decision, reason: None, tag },
@@ -172,16 +174,30 @@ impl Oryxis {
         if !self.mcp_sudo.came_up() {
             return None;
         }
+        Some(self.mcp_sudo_scroll_card(false))
+    }
+
+    /// Scroll the dialog's card to its head, or to its end (the buttons
+    /// come after the command's last line): the keyboard ring moving onto
+    /// a button brings that row, and the command's tail above it, on
+    /// screen, so Enter never fires an Allow nobody saw. Run in the window
+    /// that draws the card (`floats_here`): the handover of a queued
+    /// request raises nothing, so `claim_floats` does not move it.
+    pub(crate) fn mcp_sudo_scroll_card(&mut self, to_end: bool) -> Task<Message> {
+        use iced::widget::operation::{scrollable, Animation};
         let window = self.float_window.filter(|w| {
             self.extra_windows.contains_key(w) || self.window_ctx.as_ref().is_some_and(|c| c.id == *w)
         });
-        Some(self.run_in_window(window, |_| {
-            iced::widget::operation::scrollable::scroll_to(
-                iced::widget::Id::new(crate::views::mcp_sudo::MCP_SUDO_CARD_SCROLL_ID),
-                iced::widget::scrollable::AbsoluteOffset { x: 0.0, y: 0.0 },
-                iced::widget::operation::Animation::Instant,
-            )
-        }))
+        let id = || iced::widget::Id::new(crate::views::mcp_sudo::MCP_SUDO_CARD_SCROLL_ID);
+        if to_end {
+            self.run_in_window(window, move |_| {
+                scrollable::snap_to(id(), scrollable::RelativeOffset { x: None, y: Some(1.0) }, Animation::Instant)
+            })
+        } else {
+            self.run_in_window(window, move |_| {
+                scrollable::scroll_to(id(), scrollable::AbsoluteOffset { x: 0.0, y: 0.0 }, Animation::Instant)
+            })
+        }
     }
 
     /// The acting vault is locking (soft or manual) or going away: its
@@ -189,7 +205,7 @@ impl Oryxis {
     pub(crate) fn mcp_sudo_on_lock(&mut self) {
         let vault = self.vaults.current_id();
         for card in self.mcp_sudo.remove_where(|r| r.vault_id == vault) {
-            self.mcp_sudo_answer(&card.request, Decision::Deny, Some(DenyReason::Locked));
+            self.mcp_sudo_answer(&card, Decision::Deny, Some(DenyReason::Locked));
         }
     }
 
@@ -198,7 +214,7 @@ impl Oryxis {
     /// agent now rather than at its deadline.
     pub(crate) fn mcp_sudo_on_exit(&mut self) {
         for card in self.mcp_sudo.remove_where(|_| true) {
-            self.mcp_sudo_answer(&card.request, Decision::Deny, Some(DenyReason::AppClosed));
+            self.mcp_sudo_answer(&card, Decision::Deny, Some(DenyReason::AppClosed));
         }
     }
 }

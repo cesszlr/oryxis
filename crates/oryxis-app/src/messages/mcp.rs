@@ -62,9 +62,10 @@ pub enum McpMessage {
     /// request was posted, or a claim came or went. Claims what this
     /// instance can ask and drops the dialogs whose request was withdrawn.
     McpSudoScanned(oryxis_vault::mcp_consent::Scan),
-    /// A request this instance claimed, delivered in the window the user
+    /// A request this instance claimed (with the bytes it was read from,
+    /// which the answer's tag covers), delivered in the window the user
     /// works in so the dialog floats there.
-    McpSudoClaimed(Box<oryxis_vault::mcp_consent::SudoRequest>),
+    McpSudoClaimed(Box<oryxis_vault::mcp_consent::Claimed>),
     /// The person's answer to the dialog on screen.
     McpSudoAnswered(oryxis_vault::mcp_consent::Decision),
     /// The request with this id reached its deadline (armed at the

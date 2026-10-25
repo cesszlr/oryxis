@@ -17,21 +17,24 @@
 //!    question off the screen: the app sees its claim gone.
 //!
 //! An answer that allows carries a tag: HMAC-SHA256 under the vault's
-//! master key over the WHOLE request as the app read it (the id, random,
-//! 128 bits, minted by the server; the vault and host; the login, the
-//! address, the route, the client's name and the command verbatim) and
-//! the decision ([`crate::VaultStore::mcp_consent_tag`]). The server
-//! accepts an allowance only with a tag it recomputes over the request
-//! it HOLDS, so a process that can write the runtime folder (the AI
-//! client's own shell tool runs as the user) cannot approve by writing a
-//! file, and cannot rewrite the posted request either: a command (or a
-//! host address) swapped in the file before the app claimed it is what
-//! the person reads and tags, and that tag does not verify against the
-//! command the server would run. What that stops is a forged FILE, not a
-//! forger with the key: a vault without a master password derives its
-//! key from the file alone, and a client config that embeds the vault
-//! password hands it to whoever reads that config. A refusal needs no
-//! tag: forging one only refuses.
+//! master key over the BYTES of the request file as the app read them
+//! at the claim ([`Claimed::bytes`]) and the decision
+//! ([`crate::VaultStore::mcp_consent_tag`]). The server accepts an
+//! allowance only with a tag it recomputes over the bytes it POSTED
+//! ([`post`] returns them), so a process that can write the runtime
+//! folder (the AI client's own shell tool runs as the user) cannot
+//! approve by writing a file, and cannot rewrite the posted request
+//! either: a command (or a host address) swapped in the file before the
+//! app claimed it is what the person reads and tags, and those bytes are
+//! not the server's. The bytes, not a re-serialization of the struct: the
+//! app and the plugin are released on their own tags, and a field one
+//! side knows and the other does not would otherwise turn every
+//! allowance into a bad tag until both were on the same build; over the
+//! bytes, a field this build has never heard of is covered all the same.
+//! What that stops is a forged FILE, not a forger with the key: a vault
+//! without a master password derives its key from the file alone, and a
+//! client config that embeds the vault password hands it to whoever
+//! reads that config. A refusal needs no tag: forging one only refuses.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -97,6 +100,15 @@ impl SudoRequest {
         getrandom::fill(&mut bytes).map_err(|e| std::io::Error::other(e.to_string()))?;
         Ok(hex(&bytes))
     }
+}
+
+/// A request as the app claimed it: what the dialog shows, and the bytes
+/// it was read from, which the answer's tag covers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Claimed {
+    pub request: SudoRequest,
+    /// The request file, byte for byte.
+    pub bytes: Vec<u8>,
 }
 
 /// What the person chose.
@@ -182,14 +194,16 @@ fn path_of(dir: &Path, id: &str, ext: &str) -> PathBuf {
     dir.join(format!("{id}.{ext}"))
 }
 
-/// Post `request` (server side).
-pub fn post(dir: &Path, request: &SudoRequest) -> std::io::Result<()> {
+/// Post `request` (server side). Returns the bytes written: the server
+/// verifies the answer's tag over them.
+pub fn post(dir: &Path, request: &SudoRequest) -> std::io::Result<Vec<u8>> {
     if !valid_id(&request.id) {
         return Err(std::io::Error::other("malformed request id"));
     }
     create_private_dir(dir)?;
     let bytes = serde_json::to_vec(request).map_err(std::io::Error::other)?;
-    write_atomic(&path_of(dir, &request.id, "request"), &bytes)
+    write_atomic(&path_of(dir, &request.id, "request"), &bytes)?;
+    Ok(bytes)
 }
 
 /// Where request `id` stands (server side). The answer is read first: an
@@ -231,17 +245,16 @@ pub fn withdraw(dir: &Path, id: &str) {
 
 /// Take request `id` for this app instance (app side). `None` when
 /// another instance took it first or the server withdrew it; else the
-/// request as claimed.
-pub fn claim(dir: &Path, id: &str) -> Option<SudoRequest> {
+/// request as claimed, with the bytes it was read from.
+pub fn claim(dir: &Path, id: &str) -> Option<Claimed> {
     if !valid_id(id) {
         return None;
     }
     let claimed = path_of(dir, id, "claimed");
     std::fs::rename(path_of(dir, id, "request"), &claimed).ok()?;
-    std::fs::read(&claimed)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<SudoRequest>(&bytes).ok())
-        .filter(|r| r.id == id)
+    let bytes = std::fs::read(&claimed).ok()?;
+    let request = serde_json::from_slice::<SudoRequest>(&bytes).ok().filter(|r| r.id == id)?;
+    Some(Claimed { request, bytes })
 }
 
 /// Answer request `id` (app side) and drop the claim. A request whose
@@ -317,20 +330,17 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
     out
 }
 
-/// The bytes the tag covers: the whole request as JSON (every field the
-/// person reads, so a field added later is covered without anyone
-/// remembering to list it) and the decision, a unit separator before
-/// each. Both sides serialize the same struct: a request the app
-/// deserialized from the file re-serializes to the server's bytes only
-/// when every field reads the same.
-pub(crate) fn tag_message(request: &SudoRequest, decision: Decision) -> Result<Vec<u8>, serde_json::Error> {
-    let request = serde_json::to_vec(request)?;
+/// The bytes the tag covers: the request file as read (the server's
+/// bytes when nobody touched it, every field the person reads included,
+/// known to this build or not) and the decision, a unit separator before
+/// each.
+pub(crate) fn tag_message(request: &[u8], decision: Decision) -> Vec<u8> {
     let mut msg = Vec::with_capacity(request.len() + 16);
     msg.push(0x1f);
-    msg.extend_from_slice(&request);
+    msg.extend_from_slice(request);
     msg.push(0x1f);
     msg.extend_from_slice(decision.wire().as_bytes());
-    Ok(msg)
+    msg
 }
 
 pub(crate) fn hex(bytes: &[u8]) -> String {
@@ -390,6 +400,11 @@ mod tests {
     use super::*;
 
     fn request(dir: &Path) -> SudoRequest {
+        let (r, _) = posted(dir);
+        r
+    }
+
+    fn posted(dir: &Path) -> (SudoRequest, Vec<u8>) {
         let r = SudoRequest {
             id: SudoRequest::new_id().unwrap(),
             vault_id: Uuid::new_v4(),
@@ -403,8 +418,8 @@ mod tests {
             command: "systemctl restart nginx".into(),
             created_unix: now(),
         };
-        post(dir, &r).unwrap();
-        r
+        let bytes = post(dir, &r).unwrap();
+        (r, bytes)
     }
 
     fn now() -> u64 {
@@ -424,7 +439,7 @@ mod tests {
         assert_eq!(scanned.posted, vec![r.clone()]);
         assert!(scanned.claimed.is_empty());
 
-        assert_eq!(claim(&dir, &r.id), Some(r.clone()));
+        assert_eq!(claim(&dir, &r.id).map(|c| c.request), Some(r.clone()));
         assert_eq!(status(&dir, &r.id), Status::Claimed);
         assert_eq!(claim(&dir, &r.id), None, "one claim wins");
         let scanned = scan(&dir, now());
@@ -439,6 +454,34 @@ mod tests {
         withdraw(&dir, &r.id);
         assert_eq!(status(&dir, &r.id), Status::Gone);
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn the_claim_reads_the_bytes_the_server_posted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let (r, bytes) = posted(&dir);
+        let claimed = claim(&dir, &r.id).unwrap();
+        assert_eq!(claimed.request, r);
+        assert_eq!(claimed.bytes, bytes, "the tag is over these: they must be the server's");
+    }
+
+    #[test]
+    fn a_request_rewritten_in_the_folder_is_claimed_as_rewritten() {
+        // The agent's shell may rewrite the posted file before the app
+        // claims it. The app shows and tags what it read: not the server's
+        // bytes, so the server's check fails (`tag_message` differs).
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let (r, bytes) = posted(&dir);
+        let swapped = String::from_utf8(bytes.clone())
+            .unwrap()
+            .replace("systemctl restart nginx", "uptime");
+        std::fs::write(dir.join(format!("{}.request", r.id)), swapped.as_bytes()).unwrap();
+        let claimed = claim(&dir, &r.id).unwrap();
+        assert_eq!(claimed.request.command, "uptime", "the person reads the swapped command");
+        assert_ne!(claimed.bytes, bytes);
+        assert_ne!(tag_message(&claimed.bytes, Decision::Once), tag_message(&bytes, Decision::Once));
     }
 
     #[test]

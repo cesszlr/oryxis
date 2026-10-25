@@ -16,9 +16,12 @@
 //! or bidirectional characters, raw control sequences, a download piped
 //! into a shell, a homograph) stand above it, and the buttons come AFTER
 //! the last line. When the card outgrows the window the card itself
-//! scrolls, so reaching Allow with the mouse means passing the tail; a
-//! command box of a fixed height would let a benign first line sit over
-//! forty blank ones and the payload below the fold.
+//! scrolls, so reaching Allow with the mouse means passing the tail, and
+//! the keyboard ring moving onto a button scrolls the card to its end
+//! (`mcp_sudo_scroll_card`), so Enter never fires an Allow that was off
+//! screen; a command box of a fixed height would let a benign first line
+//! sit over forty blank ones and the payload below the fold. The size
+//! and the warnings are read once, at the claim (`McpSudoCard::new`).
 
 use iced::Widget as _;
 use iced::border::Radius;
@@ -72,7 +75,7 @@ impl Oryxis {
                 .push(Space::new().height(8).boxed());
         }
         let c = OryxisColors::t();
-        let size = crate::state::command_size(&r.command);
+        let size = card.size;
         let command_label = crate::i18n::t_fill(
             "mcp_sudo_command_size",
             &[
@@ -84,7 +87,7 @@ impl Oryxis {
         // dialog's shape; the column is always pushed, empty when the
         // command is clean.
         let mut warnings = iced::widget::Column::<Element<'_, Message>>::new().spacing(4);
-        for w in crate::paste_guard::paste_warnings(&r.command) {
+        for w in card.warnings.iter().copied() {
             warnings = warnings.push(
                 dir_row(vec![
                     iced_fonts::lucide::triangle_alert().size(13).color(c.error).boxed(),

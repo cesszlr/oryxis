@@ -163,7 +163,7 @@ impl Oryxis {
             Modal::McpSudoConfirm => {
                 if let Some(card) = self.mcp_sudo.take_pending() {
                     self.mcp_sudo_answer(
-                        &card.request,
+                        &card,
                         oryxis_vault::mcp_consent::Decision::Deny,
                         Some(oryxis_vault::mcp_consent::DenyReason::Person),
                     );
