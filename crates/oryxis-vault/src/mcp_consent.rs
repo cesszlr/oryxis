@@ -10,7 +10,11 @@
 //!    CLAIMS it by renaming it to `<id>.claimed`: a rename has one
 //!    winner, so two instances never ask the same question twice, and a
 //!    request nobody claims within [`CLAIM_WINDOW`] tells the server that
-//!    no app could ask (closed, or the vault locked);
+//!    no app could ask (closed, or the vault locked). A request file any
+//!    instance's scan cannot read (it does not parse, or names another
+//!    id) is claimed and refused at once as [`DenyReason::Unreadable`],
+//!    whatever the vault's state; an entry that is not a plain file
+//!    within [`MAX_REQUEST_BYTES`] is removed unread;
 //! 3. the app ANSWERS `<id>.answer` and drops its claim;
 //! 4. the server reads the answer and removes every file of the request
 //!    ([`withdraw`]), which is also how a cancelled call takes the
@@ -74,8 +78,8 @@ pub const MAX_COMMAND_BYTES: usize = 32 * 1024;
 /// no server writes a file the app removes unread; a file over the cap
 /// was written by someone else (the runtime folder's other writer runs
 /// as the user), and the app neither reads nor lays it out: the scan
-/// removes it and a claim refuses it, so a forged file of any size costs
-/// the app nothing.
+/// and a claim remove it unread, so a forged file of any size costs the
+/// app nothing.
 pub const MAX_REQUEST_BYTES: u64 = (MAX_COMMAND_BYTES + 16 * 1024) as u64;
 
 /// Why a request cannot become a file.
@@ -128,8 +132,9 @@ pub fn consent_dir() -> Option<PathBuf> {
 /// tag is over the bytes), which settles a NEWER server. A newer APP
 /// reads files the older server posts, so **every field added here
 /// carries `#[serde(default)]`**: a required field would make `claim`
-/// fail on every request of the installed plugin, and the agent would
-/// read "not picked up" while the app sits there unlocked.
+/// fail on every request of the installed plugin, and every one would be
+/// refused as [`DenyReason::Unreadable`] while the app sits there
+/// unlocked.
 /// `a_file_of_the_first_shape_still_claims` pins the shape of the first
 /// release.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,6 +208,12 @@ impl Decision {
 }
 
 /// Why the app refused without the person deciding.
+///
+/// The app and the plugin ship on their own tags, so a plugin may read a
+/// reason a newer app added. Every reason this build does not know reads
+/// as [`DenyReason::Unknown`], and so does an answer file that does not
+/// parse at all ([`status`]): never as the person's refusal, which tells
+/// the agent not to retry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DenyReason {
@@ -218,6 +229,10 @@ pub enum DenyReason {
     /// The app could not read the request file (a plugin and an app of
     /// different builds, or a file nobody posted).
     Unreadable,
+    /// A reason this build does not know (a newer app), or an answer that
+    /// does not parse. Read only: no build writes it.
+    #[serde(other)]
+    Unknown,
 }
 
 /// The answer file.
@@ -287,10 +302,11 @@ pub fn status(dir: &Path, id: &str) -> Status {
     if let Ok(bytes) = std::fs::read(path_of(dir, id, "answer")) {
         return match serde_json::from_slice::<Answer>(&bytes) {
             Ok(answer) => Status::Answered(answer),
-            // Unreadable = a refusal: never an allowance by accident.
+            // Unreadable = a refusal: never an allowance by accident, and
+            // never the person's (a decision a newer app added lands here).
             Err(_) => Status::Answered(Answer {
                 decision: Decision::Deny,
-                reason: None,
+                reason: Some(DenyReason::Unknown),
                 tag: String::new(),
             }),
         };
@@ -316,27 +332,47 @@ pub fn withdraw(dir: &Path, id: &str) {
 }
 
 /// Take request `id` for this app instance (app side). `None` when
-/// another instance took it first, the server withdrew it, or the file
-/// is not a request this build can ask (over [`MAX_REQUEST_BYTES`], or
-/// unreadable: logged, since a plugin and an app of different builds
-/// would otherwise read as "nobody picked it up"); else the request as
-/// claimed, with the bytes it was read from.
+/// another instance took it first or the server withdrew it (silently);
+/// when the entry is not a plain file within [`MAX_REQUEST_BYTES`]
+/// (removed unread, logged); when the read failed for a reason of its
+/// own (the claim is put back, so the next poll tries again); or when
+/// the body does not parse or names another id (refused at once as
+/// [`DenyReason::Unreadable`], so the server tells its agent now). Else
+/// the request as claimed, with the bytes it was read from.
 pub fn claim(dir: &Path, id: &str) -> Option<Claimed> {
     if !valid_id(id) {
         return None;
     }
     let posted = path_of(dir, id, "request");
-    if !is_plain_file(&posted) {
-        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request is not a plain file, removed unread");
-        let _ = std::fs::remove_file(&posted);
-        return None;
+    match std::fs::symlink_metadata(&posted) {
+        Ok(m) if m.is_file() => {}
+        // Withdrawn by its server, or claimed by another instance.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Ok(_) => {
+            tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request is not a plain file, removed unread");
+            let _ = std::fs::remove_file(&posted);
+            return None;
+        }
+        Err(e) => {
+            tracing::debug!(target = "oryxis::mcp", request = %id, "sudo request not readable yet, next poll: {e}");
+            return None;
+        }
     }
     let claimed = path_of(dir, id, "claimed");
     std::fs::rename(&posted, &claimed).ok()?;
-    let Some(bytes) = read_request_file(&claimed) else {
-        tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request file over the size cap, removed unread");
-        let _ = std::fs::remove_file(&claimed);
-        return None;
+    let bytes = match read_request_file(&claimed) {
+        RequestRead::Bytes(bytes) => bytes,
+        RequestRead::Refused(why) => {
+            tracing::warn!(target = "oryxis::mcp", request = %id, "sudo request {why}, removed unread");
+            let _ = std::fs::remove_file(&claimed);
+            return None;
+        }
+        RequestRead::Failed(e) => {
+            // Nothing wrong with the request: give it back to the folder.
+            tracing::debug!(target = "oryxis::mcp", request = %id, "sudo request read failed, put back for the next poll: {e}");
+            let _ = std::fs::rename(&claimed, &posted);
+            return None;
+        }
     };
     let request = match serde_json::from_slice::<SudoRequest>(&bytes) {
         Ok(request) if request.id == id => request,
@@ -354,32 +390,54 @@ pub fn claim(dir: &Path, id: &str) -> Option<Claimed> {
     Some(Claimed { request, bytes })
 }
 
-/// Whether `path` is a regular file and not a link to one (`lstat`): the
-/// runtime folder's other writer runs as the user and may plant a
-/// symlink to something huge, a FIFO (opening one blocks until a writer
-/// shows up) or a device. None of those was posted by a server.
-fn is_plain_file(path: &Path) -> bool {
-    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
+/// What reading a request file came to.
+#[derive(Debug)]
+enum RequestRead {
+    Bytes(Vec<u8>),
+    /// Not something a server posted: not a plain file (the runtime
+    /// folder's other writer runs as the user and may plant a symlink to
+    /// something huge, a FIFO, whose open blocks until a writer shows up,
+    /// or a device), or past [`MAX_REQUEST_BYTES`]. Removed unread.
+    Refused(&'static str),
+    /// The read itself failed (a descriptor limit, a scanner holding the
+    /// file on Windows): nothing says the request is bad, so it stays for
+    /// the next poll instead of reaching its server as withdrawn.
+    Failed(std::io::Error),
 }
 
 /// Read a request file through ONE handle, bounded by
-/// [`MAX_REQUEST_BYTES`]: the size is taken on the opened handle, not
-/// on a path a writer could swap under us, and the read stops at the cap
-/// whatever the file grew to meanwhile. `None` when it is not a regular
-/// file within the cap.
-fn read_request_file(path: &Path) -> Option<Vec<u8>> {
+/// [`MAX_REQUEST_BYTES`]: a plain file by `lstat` first, the size taken
+/// on the opened handle (not on a path a writer could swap under us),
+/// the read stopped at the cap whatever the file grew to meanwhile.
+fn read_request_file(path: &Path) -> RequestRead {
     use std::io::Read as _;
-    if !is_plain_file(path) {
-        return None;
+    match std::fs::symlink_metadata(path) {
+        Ok(m) if m.is_file() => {}
+        Ok(_) => return RequestRead::Refused("is not a plain file"),
+        Err(e) => return RequestRead::Failed(e),
     }
-    let file = std::fs::File::open(path).ok()?;
-    let meta = file.metadata().ok()?;
-    if !meta.is_file() || meta.len() > MAX_REQUEST_BYTES {
-        return None;
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => return RequestRead::Failed(e),
+    };
+    let meta = match file.metadata() {
+        Ok(meta) => meta,
+        Err(e) => return RequestRead::Failed(e),
+    };
+    if !meta.is_file() {
+        return RequestRead::Refused("is not a plain file");
+    }
+    if meta.len() > MAX_REQUEST_BYTES {
+        return RequestRead::Refused("is over the size cap");
     }
     let mut bytes = Vec::with_capacity(meta.len() as usize);
-    file.take(MAX_REQUEST_BYTES + 1).read_to_end(&mut bytes).ok()?;
-    (bytes.len() as u64 <= MAX_REQUEST_BYTES).then_some(bytes)
+    if let Err(e) = file.take(MAX_REQUEST_BYTES + 1).read_to_end(&mut bytes) {
+        return RequestRead::Failed(e);
+    }
+    if bytes.len() as u64 > MAX_REQUEST_BYTES {
+        return RequestRead::Refused("is over the size cap");
+    }
+    RequestRead::Bytes(bytes)
 }
 
 /// A claimed request this app cannot read is answered at once with
@@ -451,10 +509,16 @@ pub fn scan(dir: &Path, now_unix: u64) -> Scan {
         }
         match ext {
             "request" => {
-                let Some(bytes) = read_request_file(&path) else {
-                    tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request is not a plain file within the size cap, removed unread");
-                    let _ = std::fs::remove_file(&path);
-                    continue;
+                let bytes = match read_request_file(&path) {
+                    RequestRead::Bytes(bytes) => bytes,
+                    RequestRead::Refused(why) => {
+                        tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request {why}, removed unread");
+                        let _ = std::fs::remove_file(&path);
+                        continue;
+                    }
+                    // The next poll tries again (gone meanwhile = withdrawn
+                    // or claimed elsewhere: nothing to do either way).
+                    RequestRead::Failed(_) => continue,
                 };
                 let Some(request) = serde_json::from_slice::<SudoRequest>(&bytes).ok().filter(|r| r.id == stem) else {
                     tracing::warn!(target = "oryxis::mcp", request = %stem, "sudo request does not parse (plugin and app of different builds?), refused");
@@ -711,6 +775,79 @@ mod tests {
             assert_eq!(claimed.bytes, shape.as_bytes());
             std::fs::remove_file(dir.join(format!("{id}.claimed"))).unwrap();
         }
+    }
+
+    #[test]
+    fn a_reason_or_a_decision_this_build_does_not_know_is_never_the_persons() {
+        // A newer app's reason reaches this plugin as Unknown, not as the
+        // person's refusal (whose text tells the agent not to retry).
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let r = request(&dir);
+        assert!(claim(&dir, &r.id).is_some());
+        let file = dir.join(format!("{}.answer", r.id));
+        std::fs::write(&file, br#"{"decision":"deny","reason":"busy_elsewhere","tag":""}"#).unwrap();
+        assert_eq!(
+            status(&dir, &r.id),
+            Status::Answered(Answer { decision: Decision::Deny, reason: Some(DenyReason::Unknown), tag: String::new() })
+        );
+        // A decision it does not know refuses, for an unknown reason too.
+        std::fs::write(&file, br#"{"decision":"twice","tag":"ab"}"#).unwrap();
+        assert_eq!(
+            status(&dir, &r.id),
+            Status::Answered(Answer { decision: Decision::Deny, reason: Some(DenyReason::Unknown), tag: String::new() })
+        );
+        // The reasons this build writes still read as themselves.
+        for reason in [DenyReason::Person, DenyReason::TimedOut, DenyReason::Locked, DenyReason::AppClosed, DenyReason::Unreadable] {
+            let a = Answer { decision: Decision::Deny, reason: Some(reason), tag: String::new() };
+            std::fs::write(&file, serde_json::to_vec(&a).unwrap()).unwrap();
+            assert_eq!(status(&dir, &r.id), Status::Answered(a));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_request_the_app_fails_to_read_stays_for_the_next_poll() {
+        // A read that fails for a reason of its own (here: no permission,
+        // as a descriptor limit or a scanner holding the file would) is
+        // not a bad request: the scan leaves it, the claim puts it back,
+        // and once it reads it is offered and claimed as usual.
+        use std::os::unix::fs::PermissionsExt as _;
+        if running_as_root() {
+            return; // root reads a 0000 file: nothing to fail.
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let (r, bytes) = posted(&dir);
+        let file = dir.join(format!("{}.request", r.id));
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o000)).unwrap();
+        assert!(scan(&dir, now()).posted.is_empty());
+        assert!(file.exists(), "the scan kept it");
+        assert_eq!(claim(&dir, &r.id), None);
+        assert!(file.exists(), "the claim put it back");
+        assert!(!dir.join(format!("{}.claimed", r.id)).exists());
+        assert_eq!(status(&dir, &r.id), Status::Posted, "its server still waits for an answer");
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(scan(&dir, now()).posted, vec![r.clone()]);
+        assert_eq!(claim(&dir, &r.id).map(|c| c.bytes), Some(bytes));
+    }
+
+    #[cfg(unix)]
+    fn running_as_root() -> bool {
+        std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|s| s.lines().find(|l| l.starts_with("Uid:")).map(|l| l.split_whitespace().nth(1) == Some("0")))
+            .unwrap_or(false)
+    }
+
+    #[test]
+    fn a_request_gone_before_the_claim_is_no_alarm() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(DIR_NAME);
+        let r = request(&dir);
+        withdraw(&dir, &r.id);
+        assert_eq!(claim(&dir, &r.id), None);
+        assert_eq!(status(&dir, &r.id), Status::Gone, "nothing written for a withdrawn request");
     }
 
     #[test]

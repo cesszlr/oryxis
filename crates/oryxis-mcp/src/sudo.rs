@@ -468,8 +468,14 @@ fn consent_text(e: &ConsentError, host: &str, vault: &str) -> String {
             "Oryxis could not read the sudo approval request for {host}: the Oryxis app and this MCP plugin are most likely different releases. \
              Ask the user to update both to the same release. Nothing ran."
         ),
-        ConsentError::Refused(_) => format!(
+        ConsentError::Refused(Some(DenyReason::Person)) => format!(
             "The user refused to let sudo use the password stored for {host}. Nothing ran; do not retry unless the user asks."
+        ),
+        // A reason this plugin does not know (a newer Oryxis), an answer
+        // that did not parse, or none at all: not the person's refusal.
+        ConsentError::Refused(Some(DenyReason::Unknown) | None) => format!(
+            "Oryxis refused the sudo approval for {host} for a reason this MCP plugin does not know: the Oryxis app is most likely a newer release. \
+             Ask the user to update the plugin. Nothing ran."
         ),
         ConsentError::BadTag => format!(
             "The sudo approval for {host} did not carry a valid signature from Oryxis, so it was not honoured. Nothing ran."
@@ -534,6 +540,17 @@ mod tests {
         assert_eq!(password_stdin("a\nb", "id").unwrap_err(), StdinError::PasswordLineBreak);
         assert_eq!(password_stdin("a\rb", "id").unwrap_err(), StdinError::PasswordLineBreak);
         assert_eq!(password_stdin("a", "i\0d").unwrap_err(), StdinError::CommandNul);
+    }
+
+    #[test]
+    fn a_refusal_for_a_reason_this_plugin_does_not_know_is_not_the_persons() {
+        let person = consent_text(&ConsentError::Refused(Some(DenyReason::Person)), "web", "Personal");
+        assert!(person.contains("do not retry"));
+        for e in [ConsentError::Refused(Some(DenyReason::Unknown)), ConsentError::Refused(None)] {
+            let text = consent_text(&e, "web", "Personal");
+            assert!(!text.contains("The user refused") && !text.contains("do not retry"), "{text}");
+            assert!(text.contains("update the plugin") && text.ends_with("Nothing ran."), "{text}");
+        }
     }
 
     #[test]
