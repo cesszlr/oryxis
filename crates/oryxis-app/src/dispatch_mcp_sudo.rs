@@ -179,12 +179,19 @@ impl Oryxis {
     /// row on a card nobody read, its buttons below the fold. Dropped
     /// here, where every path that seats a card meets (an answer, Esc,
     /// a deadline, a lock, a withdrawal), so the card opens on Deny.
+    /// Only a selection the CARD owns (`ModalNavState::restart`): a
+    /// request lands whenever the agent calls, under a new-tab picker or
+    /// a palette the person is stepping through with the arrows, and
+    /// those surfaces sit ahead of the card in `Modal::ESC_ORDER`, so
+    /// their selection is the one Enter acts on; dropping it would make
+    /// that Enter take the top row instead of the one stepped onto.
     pub(crate) fn mcp_sudo_housekeeping(&mut self) -> Option<Task<Message>> {
         if !self.mcp_sudo.came_up() {
             return None;
         }
-        self.keynav.modal.selected = None;
-        self.keynav.modal.kbd.set(false);
+        self.keynav
+            .modal
+            .restart(crate::keynav::ModalSurface::Modal(crate::state::Modal::McpSudoConfirm));
         Some(self.mcp_sudo_scroll_card(false))
     }
 

@@ -241,6 +241,26 @@ pub(crate) struct ModalNavState {
     pub(crate) kbd: std::cell::Cell<bool>,
 }
 
+impl ModalNavState {
+    /// `surface` came up fresh in the slot an earlier instance of itself
+    /// held (a queued dialog taking the screen inside the update that
+    /// answers the one before): the selection that instance left (a row
+    /// the ring Tabbed onto, or the cursor resting on one, which selects
+    /// without drawing a ring) is dropped, and the keyboard modality
+    /// with it, so the next Enter falls to the new instance's default
+    /// row. A selection ANOTHER surface owns (a picker or a menu open
+    /// above this one, ahead of it in `Modal::ESC_ORDER`) is that
+    /// surface's, mid-navigation, and stays. Returns whether a selection
+    /// was dropped.
+    pub(crate) fn restart(&mut self, surface: ModalSurface) -> bool {
+        let dropped = self.selected.take_if(|(tag, _)| *tag == surface).is_some();
+        if dropped {
+            self.kbd.set(false);
+        }
+        dropped
+    }
+}
+
 /// prev/next messages for a picker row: the on_select message the
 /// dropdown would fire for the neighboring option, wrapping at the
 /// ends. Call sites know both the options and the current value, so

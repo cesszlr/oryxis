@@ -180,3 +180,44 @@ fn zone_cycle_nothing_available_is_a_no_op() {
     assert_eq!(cycle_zone(Some(SubNav), true, false, true, true, true), Some(SubNav));
     assert_eq!(cycle_zone(None, true, false, true, true, true), None);
 }
+
+/// A queued dialog taking the slot of the one answered drops the
+/// selection that one left; a picker or menu open above it keeps its
+/// own, mid-navigation (an MCP sudo request lands whenever the agent
+/// calls, under whatever the person is stepping through).
+#[test]
+fn a_surface_restart_drops_only_its_own_selection() {
+    use super::{ModalNavState, ModalSurface};
+    use crate::state::{Modal, OverlayContent};
+
+    let sudo = ModalSurface::Modal(Modal::McpSudoConfirm);
+
+    // The card's own leftover: the ring Tabbed onto Allow (or the
+    // cursor resting on it) goes, and the modality with it.
+    let mut nav = ModalNavState { selected: Some((sudo, 1)), ..Default::default() };
+    nav.kbd.set(true);
+    assert!(nav.restart(sudo));
+    assert_eq!(nav.selected, None);
+    assert!(!nav.kbd.get());
+
+    // The new-tab picker's row 3, stepped onto with the arrows, is the
+    // picker's: the card coming up behind it changes nothing.
+    let picker = ModalSurface::Modal(Modal::NewTabPicker);
+    nav.selected = Some((picker, 3));
+    nav.kbd.set(true);
+    assert!(!nav.restart(sudo));
+    assert_eq!(nav.selected, Some((picker, 3)));
+    assert!(nav.kbd.get());
+
+    // Same for an overlay menu's row.
+    let menu = ModalSurface::Overlay(std::mem::discriminant(&OverlayContent::SplitMenu));
+    nav.selected = Some((menu, 2));
+    assert!(!nav.restart(sudo));
+    assert_eq!(nav.selected, Some((menu, 2)));
+    assert!(nav.kbd.get());
+
+    // Nothing selected: nothing to drop, the modality is left alone.
+    nav.selected = None;
+    assert!(!nav.restart(sudo));
+    assert!(nav.kbd.get());
+}
